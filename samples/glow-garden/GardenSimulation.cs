@@ -4,7 +4,6 @@ using Systemic.Host;
 
 namespace GlowGarden;
 
-
 public readonly record struct PlantState(int Id, Vector2 Position, float Growth);
 
 public readonly record struct CreatureState(int Id, CreatureKind Kind, Vector2 Position, int CarriedGlow, int Cooldown, bool IsCopy, float LeapProgress = 0);
@@ -37,6 +36,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
         Plants = _plants.AsReadOnly();
         Creatures = _creatures.AsReadOnly();
         Motes = _motes.AsReadOnly();
+        PendingImpacts = _pending.AsReadOnly();
 
         for (var i = 0; i < 6; i++)
         {
@@ -51,20 +51,15 @@ public sealed partial class GardenSimulation : ISystemicSystem
 
     public int Order => 0;
 
-    public IReadOnlyList<PlantState> Plants
-    { get; }
+    public IReadOnlyList<PlantState> Plants { get; }
 
-    public IReadOnlyList<CreatureState> Creatures
-    { get; }
+    public IReadOnlyList<CreatureState> Creatures { get; }
 
-    public IReadOnlyList<MoteState> Motes
-    { get; }
+    public IReadOnlyList<MoteState> Motes { get; }
 
-    public long BurstCount
-    { get; private set; }
+    public long BurstCount { get; private set; }
 
-    public int Tick
-    { get; private set; }
+    public int Tick { get; private set; }
 
     private float NextFloat()
     {
@@ -84,6 +79,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
     public void Step(SystemicStepContext context)
     {
         Tick = context.Tick;
+        StepTalents();
 
         for (var i = 0; i < _plants.Count; i++)
         {
@@ -91,8 +87,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
             _plants[i] = p with
             {
                 Growth = MathF.Min(1, p.Growth + (1 + Rank(UpgradeKind.PodGrowth) * 0.12f) / 240f)
-            }
-           ;
+            };
         }
 
         for (var i = 0; i < _motes.Count; i++)
@@ -102,8 +97,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
             {
                 Position = Vector2.Clamp(m.Position + m.Velocity, Vector2.Zero, new(Width, Height)),
                 Velocity = m.Velocity * 0.9f
-            }
-           ;
+            };
         }
 
         for (var i = 0; i < _creatures.Count; i++)
@@ -118,8 +112,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
                     {
                         Cooldown = c.Cooldown - 1,
                         LeapProgress = 0
-                    }
-                   ;
+                    };
                     continue;
                 }
 
@@ -143,16 +136,15 @@ public sealed partial class GardenSimulation : ISystemicSystem
                     {
                         Position = Move(c.Position, p.Position, 3),
                         LeapProgress = Math.Clamp(1 - MathF.Sqrt(best) / 48f, 0, 1)
-                    }
-                   ;
+                    };
                     if (Vector2.DistanceSquared(c.Position, p.Position) < 16)
                     {
-                        BurstPlant(target);
+                        var bounce = BurstWithTalents(target, !c.IsCopy);
+                        if (bounce.HasValue) c = c with { Position = bounce.Value, LeapProgress = 1 };
                         c = c with
                         {
                             Cooldown = Math.Max(3, 30 - Rank(UpgradeKind.BurstlingWorkRate))
-                        }
-                       ;
+                        };
                     }
                 }
             }
@@ -167,8 +159,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
                     c = c with
                     {
                         Position = Move(c.Position, Colony, speed)
-                    }
-;
+                    };
 
                     if (Vector2.DistanceSquared(c.Position, Colony) < 16)
                     {
@@ -177,8 +168,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
                         c = c with
                         {
                             CarriedGlow = 0
-                        }
-                       ;
+                        };
                     }
                 }
 
@@ -201,16 +191,14 @@ public sealed partial class GardenSimulation : ISystemicSystem
                     c = c with
                     {
                         Position = Move(c.Position, m.Position, speed)
-                    }
-                   ;
+                    };
 
                     if (Vector2.DistanceSquared(c.Position, m.Position) < 25)
                     {
                         c = c with
                         {
                             CarriedGlow = c.CarriedGlow + m.Value
-                        }
-                       ;
+                        };
                         _motes.RemoveAt(target);
                     }
                 }
@@ -228,8 +216,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
         _plants[index] = p with
         {
             Growth = 0
-        }
-;
+        };
         BurstCount++;
 
         for (var j = 0; j < 8 + Rank(UpgradeKind.PodYield) * 2 && _motes.Count < MaxMotes; j++)
