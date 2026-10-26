@@ -1,0 +1,1 @@
+{"schemaVersion":3,"id":"sample.glow-garden","name":"Glow Garden","tickRateHz":30,"maxCatchUpSteps":3,"rules":"rules.json","entities":"entities.json"}
