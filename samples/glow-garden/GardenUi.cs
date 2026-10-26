@@ -30,8 +30,8 @@ public sealed class GardenUi
         _speed = Button("", 858, 72, 175, game.CycleSpeed);
         Button("[R] Restart", 1047, 72, 213, game.Restart);
         Label("THE GARDEN", 28, 125, 780);
-        _flow = Label("", 28, 665, 810, 80);
-        Label("Pods grow automatically. Burstlings scatter Glow.\nGatherers carry it home before you can spend it.\n[Space] pause   [Tab/Enter] navigate buttons   [Esc] quit", 28, 733, 810, 64);
+        _flow = Label("", 28, 665, 810, 84);
+        Label("Pods grow; Burstlings scatter Glow; Gatherers bank it at home.\n[Space] pause   [Tab/Enter] navigate buttons   [Esc] quit", 28, 754, 810, 44);
         _creatureTree = Label("", 858, 120, 390);
         Button("[C] Refund creatures", 858, 146, 398, () => Model.ResetTree(UpgradeTree.Creatures));
         for (var i = 0; i < 3; i++)
@@ -81,7 +81,10 @@ public sealed class GardenUi
     public void Refresh()
     {
         var m = Model;
-        var elapsed = TimeSpan.FromSeconds(m.Tick / (double)_game.Host.Game.Clock.TickRateHz);
+        var tickRate = _game.Host.Game.Clock.TickRateHz;
+        var elapsed = TimeSpan.FromSeconds(m.Tick / (double)tickRate);
+        var podsPerSecond = elapsed.TotalSeconds > 0 ? m.BurstCount / elapsed.TotalSeconds : 0;
+        var bankedPerSecond = elapsed.TotalSeconds > 0 ? m.BankedGlow / elapsed.TotalSeconds : 0;
         _stats.Text = $"SPENDABLE {m.Glow} Glow   |   BANKED (lifetime) {m.BankedGlow}   |   Plants {m.Plants.Count}/64   Burstlings {m.Count(CreatureKind.Burstling)}   Gatherers {m.Count(CreatureKind.Gatherer)}   Time {elapsed:mm\\:ss}";
         _burstling.Text = $"[B] Hire Burstling {m.HirePrice(CreatureKind.Burstling)}G";
         _gatherer.Text = $"[G] Hire Gatherer {m.HirePrice(CreatureKind.Gatherer)}G";
@@ -93,7 +96,13 @@ public sealed class GardenUi
         for (var i = 0; i < 5; i++)
         {
             var kind = (UpgradeKind)i;
-            _upgrades[i].Text = $"[{i + 1}] {UpgradeNames[i]}  Lv{m.Rank(kind)}  {(m.Rank(kind) == 25 ? "MAX" : $"{m.Price(kind)}G")}";
+            var effect = kind switch
+            {
+                UpgradeKind.BurstlingWorkRate => $"Work rest {Math.Max(3, 30 - m.Rank(kind)) / (double)tickRate:0.00}s",
+                UpgradeKind.PodYield => $"Yield {8 + 2 * m.Rank(kind)} Glow/pod",
+                _ => UpgradeNames[i]
+            };
+            _upgrades[i].Text = $"[{i + 1}] {effect}  Lv{m.Rank(kind)}  {(m.Rank(kind) == 25 ? "MAX" : $"{m.Price(kind)}G")}";
         }
         _slots.Text = $"TALENTS   {m.ActiveTalentCount}/3 slots   /   [Q W E A S D]";
         for (var i = 0; i < 6; i++)
@@ -102,6 +111,6 @@ public sealed class GardenUi
             _talents[i].Text = $"{(active ? "ON" : "off")}  {TalentNames[i]}\n{Descriptions[i]}";
             ((ButtonVisual)_talents[i].Visual).BackgroundColor = active ? new Color(61, 98, 69) : new Color(29, 60, 62);
         }
-        _flow.Text = $"PRODUCING: {m.BurstCount} pod bursts  |  loose Glow {m.Motes.Sum(x => x.Value)}\nCOLLECTING: {m.Creatures.Sum(x => x.CarriedGlow)} carried  |  RETURNED: {m.BankedGlow} Glow\nGrowth {1 + m.Rank(UpgradeKind.PodGrowth) * .12f:0.00}x  |  Gatherer speed {1 + m.Rank(UpgradeKind.GathererSpeed) * .1f:0.00}x  |  Load {3 + m.Rank(UpgradeKind.GathererCapacity)} Glow";
+        _flow.Text = $"PRODUCTION: {m.BurstCount} pods total  |  Loose {m.Motes.Sum(x => x.Value)} Glow\nCOLLECTION: {m.Creatures.Sum(x => x.CarriedGlow)} carried  |  Returned {m.BankedGlow} Glow total\nAVERAGE since restart: {podsPerSecond:0.00} pods/s  |  {bankedPerSecond:0.00} banked Glow/s\nGrowth {1 + m.Rank(UpgradeKind.PodGrowth) * .12f:0.00}x  |  Gatherer speed {1 + m.Rank(UpgradeKind.GathererSpeed) * .1f:0.00}x  |  Load {3 + m.Rank(UpgradeKind.GathererCapacity)} Glow";
     }
 }
