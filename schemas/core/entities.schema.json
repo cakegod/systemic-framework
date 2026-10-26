@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://press-the-button.dev/systemic/entities.schema.json",
+  "title": "Authored simulation entities",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "entities"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "entities": { "type": "array", "maxItems": 100000, "items": { "$ref": "#/$defs/entity" } },
+    "archetypes": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/archetype" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" },
+    "kind": { "type": "string" },
+    "names": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "pattern": "\\S" } },
+    "properties": { "type": "object", "maxProperties": 256, "propertyNames": { "pattern": "\\S" }, "additionalProperties": { "type": "number" } },
+    "links": { "type": "object", "maxProperties": 128, "propertyNames": { "pattern": "\\S" }, "additionalProperties": { "$ref": "#/$defs/id" } },
+    "archetype": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" }, "kind": { "$ref": "#/$defs/kind" },
+        "archetype": { "$ref": "#/$defs/id" },
+        "tags": { "$ref": "#/$defs/names" }, "capabilities": { "$ref": "#/$defs/names" },
+        "properties": { "$ref": "#/$defs/properties" }, "links": { "$ref": "#/$defs/links" },
+        "visualRecipeId": { "$ref": "#/$defs/id" }, "bounds": { "$ref": "#/$defs/bounds" }
+      }
+    },
+    "entity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "$ref": "#/$defs/kind" }, "archetype": { "$ref": "#/$defs/id" },
+        "tags": { "$ref": "#/$defs/names" }, "capabilities": { "$ref": "#/$defs/names" },
+        "removeTags": { "$ref": "#/$defs/names" }, "removeCapabilities": { "$ref": "#/$defs/names" },
+        "properties": { "$ref": "#/$defs/properties" }, "links": { "$ref": "#/$defs/links" },
+        "visualRecipeId": { "$ref": "#/$defs/id" },
+        "bounds": { "$ref": "#/$defs/bounds" }
+      },
+      "allOf": [{ "if": { "not": { "required": ["archetype"] } }, "then": { "required": ["kind"] } }]
+    },
+    "bounds": { "type": "object", "additionalProperties": false,
+      "required": ["x", "y", "halfWidth", "halfHeight"],
+      "properties": {
+        "x": { "type": "number" }, "y": { "type": "number" },
+        "halfWidth": { "type": "number", "minimum": 0 }, "halfHeight": { "type": "number", "minimum": 0 }
+      } }
+  }
+}

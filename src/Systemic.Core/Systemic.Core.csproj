@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Corvus.Text.Json.Validator" Version="5.7.9" />
+    <ProjectReference Include="../Systemic.Kernel/Systemic.Kernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../schemas/core/*.schema.json"
+                      LogicalName="Systemic.Core.Schemas.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

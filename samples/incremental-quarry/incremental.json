@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "resources": [
+    { "id": "quarry.ore", "entityId": "quarry.ore", "initialValue": 0, "capacity": 100 }
+  ],
+  "producers": [
+    { "id": "quarry.ember-drill", "entityId": "quarry.ember-source", "resourceId": "quarry.ore", "baseRate": 1 }
+  ],
+  "upgrades": [
+    {
+      "id": "quarry.steel-bit",
+      "entityId": "quarry.drill-upgrade",
+      "costs": [{ "resourceId": "quarry.ore", "amount": 10 }]
+    }
+  ],
+  "roles": [
+    { "id": "quarry.worker", "tags": ["worker"], "capabilities": ["produce"] }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 3,
+  "id": "sample.systemic-sandbox",
+  "name": "Systemic Sandbox",
+  "tickRateHz": 30,
+  "maxCatchUpSteps": 3,
+  "rules": "rules.json",
+  "entities": "entities.json"
+}

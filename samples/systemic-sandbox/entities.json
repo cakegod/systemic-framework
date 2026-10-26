@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 2,
+  "entities": [
+    { "id": "actor.target", "kind": "actor", "properties": { "health": 5 } }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "actors": [
+    {
+      "id": "miner",
+      "tags": ["role.miner"],
+      "capabilities": ["move", "gather"],
+      "properties": { "health": 10, "work.rate": 1 },
+      "halfWidth": 3,
+      "halfHeight": 5
+    },
+    {
+      "id": "ore-shard",
+      "tags": ["resource.ore"],
+      "capabilities": ["collectible"],
+      "properties": { "ore": 1 },
+      "halfWidth": 2,
+      "halfHeight": 2
+    }
+  ],
+  "statuses": [
+    {
+      "id": "focus",
+      "tag": "status.focused",
+      "property": "work.rate",
+      "operation": "multiply",
+      "value": 1.25,
+      "durationTicks": 60,
+      "stage": "multiplicative",
+      "stacking": "refresh",
+      "maximumStacks": 1
+    }
+  ]
+}

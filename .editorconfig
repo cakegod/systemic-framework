@@ -1,0 +1,14 @@
+root = true
+
+[*.cs]
+# WHY: each assembly uses one flat namespace; folders are organizational, and the
+# ActionAuthoring namespace must stay stable across consumers.
+dotnet_style_namespace_match_folder = false
+# WHY: attribute constructors and Emit(world, ...) expose parameters for callers
+# rather than for their own bodies.
+dotnet_code_quality_unused_parameters = non_public
+
+# WHY: a primary constructor would report the generator-read attribute parameters
+# as unread (CS9113).
+[src/Systemic.Kernel/ActionHandlerAttribute.cs]
+dotnet_diagnostic.IDE0290.severity = none

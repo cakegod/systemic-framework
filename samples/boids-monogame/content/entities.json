@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 2,
+  "entities": [
+    {
+      "id": "flock.main",
+      "kind": "actor",
+      "tags": ["boids.flock"],
+      "capabilities": ["boids.move"],
+      "properties": {
+        "boids.population": 100000,
+        "boids.worldWidth": 960,
+        "boids.worldHeight": 640,
+        "boids.neighborRadius": 24,
+        "boids.collisionRadius": 4,
+        "boids.collisionStrength": 36,
+        "boids.friction": 0.35,
+        "boids.particleRadius": 1.1,
+        "boids.maxSpeed": 54,
+        "boids.maxForce": 30,
+        "boids.starvedSpeedFactor": 0.55,
+        "boids.energyDrainPerSecond": 0.008
+      }
+    },
+    {
+      "id": "species.amber",
+      "kind": "actor",
+      "tags": ["boids.species"],
+      "capabilities": [],
+      "properties": {
+        "species.index": 0,
+        "species.colorR": 244,
+        "species.colorG": 157,
+        "species.colorB": 74,
+        "species.force.0": 8,
+        "species.force.1": 28,
+        "species.force.2": -20,
+        "species.fleeWeight": 2.2
+      }
+    },
+    {
+      "id": "species.cyan",
+      "kind": "actor",
+      "tags": ["boids.species"],
+      "capabilities": [],
+      "properties": {
+        "species.index": 1,
+        "species.colorR": 75,
+        "species.colorG": 190,
+        "species.colorB": 230,
+        "species.force.0": -22,
+        "species.force.1": 8,
+        "species.force.2": 24,
+        "species.fleeWeight": 1.0
+      }
+    },
+    {
+      "id": "species.green",
+      "kind": "actor",
+      "tags": ["boids.species"],
+      "capabilities": [],
+      "properties": {
+        "species.index": 2,
+        "species.colorR": 145,
+        "species.colorG": 218,
+        "species.colorB": 99,
+        "species.force.0": 25,
+        "species.force.1": -21,
+        "species.force.2": 6,
+        "species.fleeWeight": 0.6
+      }
+    },
+    {
+      "id": "food.patch.northwest",
+      "kind": "actor",
+      "tags": ["food.patch"],
+      "capabilities": [],
+      "properties": {
+        "food.positionX": 150,
+        "food.positionY": 145,
+        "food.capacity": 480,
+        "food.stock": 480,
+        "food.regenPerSecond": 250,
+        "food.feedAmount": 0.18,
+        "food.feedRadius": 16
+      }
+    },
+    {
+      "id": "food.patch.north",
+      "kind": "actor",
+      "tags": ["food.patch"],
+      "capabilities": [],
+      "properties": {
+        "food.positionX": 480,
+        "food.positionY": 150,
+        "food.capacity": 480,
+        "food.stock": 480,
+        "food.regenPerSecond": 250,
+        "food.feedAmount": 0.18,
+        "food.feedRadius": 16
+      }
+    },
+    {
+      "id": "food.patch.northeast",
+      "kind": "actor",
+      "tags": ["food.patch"],
+      "capabilities": [],
+      "properties": {
+        "food.positionX": 810,
+        "food.positionY": 150,
+        "food.capacity": 480,
+        "food.stock": 480,
+        "food.regenPerSecond": 250,
+        "food.feedAmount": 0.18,
+        "food.feedRadius": 16
+      }
+    },
+    {
+      "id": "food.patch.southwest",
+      "kind": "actor",
+      "tags": ["food.patch"],
+      "capabilities": [],
+      "properties": {
+        "food.positionX": 150,
+        "food.positionY": 485,
+        "food.capacity": 480,
+        "food.stock": 480,
+        "food.regenPerSecond": 250,
+        "food.feedAmount": 0.18,
+        "food.feedRadius": 16
+      }
+    },
+    {
+      "id": "food.patch.south",
+      "kind": "actor",
+      "tags": ["food.patch"],
+      "capabilities": [],
+      "properties": {
+        "food.positionX": 480,
+        "food.positionY": 490,
+        "food.capacity": 480,
+        "food.stock": 480,
+        "food.regenPerSecond": 250,
+        "food.feedAmount": 0.18,
+        "food.feedRadius": 16
+      }
+    },
+    {
+      "id": "food.patch.southeast",
+      "kind": "actor",
+      "tags": ["food.patch"],
+      "capabilities": [],
+      "properties": {
+        "food.positionX": 810,
+        "food.positionY": 485,
+        "food.capacity": 480,
+        "food.stock": 480,
+        "food.regenPerSecond": 250,
+        "food.feedAmount": 0.18,
+        "food.feedRadius": 16
+      }
+    },
+    {
+      "id": "predator.roamer",
+      "kind": "actor",
+      "tags": ["boids.predator"],
+      "capabilities": [],
+      "properties": {
+        "predator.positionX": 480,
+        "predator.positionY": 320,
+        "predator.velocityX": 22,
+        "predator.velocityY": 0,
+        "predator.maxSpeed": 84,
+        "predator.maxForce": 46,
+        "predator.fleeRadius": 82,
+        "predator.consumePerSecond": 520,
+        "predator.consumeRadius": 14,
+        "predator.energy": 0.5,
+        "predator.energyDrainPerSecond": 0.02,
+        "predator.energyPerStock": 0.002,
+        "predator.satedThreshold": 0.9,
+        "predator.restSpeedFactor": 0.35,
+        "predator.boidEnergyDrainPerSecond": 0.12
+      }
+    }
+  ]
+}

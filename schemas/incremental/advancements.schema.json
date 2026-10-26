@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://press-the-button.dev/systemic/advancements.schema.json",
+  "title": "Gated build choices and activations",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "groups", "choices"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "groups": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": { "$ref": "#/$defs/group" }
+    },
+    "choices": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": { "$ref": "#/$defs/choice" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ownerEntityId", "progressEntityId", "progressProperty", "unlockAt", "selectionLimit"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "ownerEntityId": { "$ref": "#/$defs/id" },
+        "progressEntityId": { "$ref": "#/$defs/id" },
+        "progressProperty": { "type": "string", "minLength": 1 },
+        "unlockAt": { "type": "number", "minimum": 0 },
+        "selectionLimit": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "freeChoiceId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "groupId", "entityId", "activationMode"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "groupId": { "$ref": "#/$defs/id" },
+        "entityId": { "$ref": "#/$defs/id" },
+        "activationMode": { "enum": ["passive", "triggered", "timed"] },
+        "choiceTag": { "$ref": "#/$defs/id" },
+        "selectedProperty": { "type": "string", "minLength": 1 },
+        "activeUntilProperty": { "type": "string", "minLength": 1 },
+        "cooldownUntilProperty": { "type": "string", "minLength": 1 },
+        "costResourceId": { "$ref": "#/$defs/id" },
+        "costAmount": { "type": "number", "exclusiveMinimum": 0 },
+        "activeTicks": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "cooldownTicks": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "triggerEvent": { "$ref": "#/$defs/id" },
+        "activationEvent": { "$ref": "#/$defs/id" },
+        "isFree": { "type": "boolean" },
+        "requires": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "requiresAny": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "excludes": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "activationMode": { "const": "triggered" } } },
+          "then": { "required": ["triggerEvent", "activationEvent"] }
+        },
+        {
+          "if": { "properties": { "activationMode": { "const": "timed" } } },
+          "then": { "required": ["activationEvent"], "not": { "required": ["triggerEvent"] } }
+        },
+        {
+          "if": { "properties": { "activationMode": { "const": "passive" } } },
+          "then": { "not": { "anyOf": [{ "required": ["triggerEvent"] }, { "required": ["activationEvent"] }] } }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 2,
+  "fragments": [
+    {
+      "id": "quarry.heat-reaction",
+      "rules": [{
+      "id": "contact",
+      "on": "contact",
+      "priority": 10,
+      "when": [
+        { "kind": "hasTag", "subject": "source", "tag": "ember" },
+        { "kind": "hasTag", "subject": "target", "tag": "fuel" }
+      ],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "heat", "amount": 2 },
+        { "kind": "addTag", "subject": "target", "tag": "warm" },
+        { "kind": "emitEvent", "event": "heated" }
+      ]
+      }]
+    }
+  ],
+  "useFragments": ["quarry.heat-reaction"],
+  "rules": [
+    {
+      "id": "quarry.warm-fuel-increases-output",
+      "on": "produce",
+      "priority": 0,
+      "when": [
+        { "kind": "hasTag", "subject": "target", "tag": "warm" },
+        { "kind": "propertyAtLeast", "subject": "target", "property": "heat", "value": 1 }
+      ],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "output", "amount": 1 }
+      ]
+    },
+    {
+      "id": "quarry.ember-drill-produces-ore",
+      "on": "incremental.production",
+      "priority": 10,
+      "when": [
+        { "kind": "hasTag", "subject": "source", "tag": "ember" },
+        { "kind": "hasTag", "subject": "target", "tag": "mineral" }
+      ],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 1 },
+        { "kind": "emitEvent", "event": "quarry.ember-ore-produced" }
+      ]
+    },
+    {
+      "id": "quarry.ore-production-connects-to-ember",
+      "on": "quarry.ember-ore-produced",
+      "priority": 0,
+      "effects": [{ "kind": "addTag", "subject": "source", "tag": "ore-fed" }]
+    },
+    {
+      "id": "quarry.drill-purchase-connects",
+      "on": "incremental.upgrade.purchased",
+      "priority": 0,
+      "when": [{ "kind": "hasTag", "subject": "target", "tag": "upgrade" }],
+      "effects": [
+        { "kind": "addTag", "subject": "target", "tag": "owned" },
+        { "kind": "emitEvent", "event": "quarry.drill-upgrade-owned" }
+      ]
+    },
+    {
+      "id": "quarry.drill-upgrade-inspires-player",
+      "on": "quarry.drill-upgrade-owned",
+      "priority": 0,
+      "effects": [{ "kind": "addTag", "subject": "source", "tag": "builder" }]
+    },
+    {
+      "id": "quarry.core-boosts-production",
+      "on": "incremental.production",
+      "priority": 20,
+      "when": [{ "kind": "hasTag", "subject": "source", "tag": "quarry.core" }],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 1 },
+        { "kind": "emitEvent", "event": "quarry.core-pulse" }
+      ]
+    },
+    {
+      "id": "quarry.relay-boosts-production",
+      "on": "incremental.production",
+      "priority": 15,
+      "when": [{ "kind": "hasTag", "subject": "source", "tag": "quarry.relay" }],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 2 },
+        { "kind": "emitEvent", "event": "quarry.relay-pulse" }
+      ]
+    },
+    {
+      "id": "quarry.overdrive-multiplies-output",
+      "on": "incremental.production",
+      "priority": 10,
+      "when": [{ "kind": "hasTag", "subject": "source", "tag": "quarry.overdrive.active" }],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 4 },
+        { "kind": "emitEvent", "event": "quarry.overdrive-pulse" }
+      ]
+    },
+    {
+      "id": "quarry.echo-repeats-output",
+      "on": "incremental.production",
+      "priority": 5,
+      "when": [{ "kind": "hasTag", "subject": "source", "tag": "quarry.echo.active" }],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 3 },
+        { "kind": "emitEvent", "event": "quarry.echo-pulse" }
+      ]
+    },
+    {
+      "id": "quarry.multi-choice-resonance",
+      "on": "incremental.production",
+      "priority": 0,
+      "when": [
+        { "kind": "hasTag", "subject": "source", "tag": "quarry.core" },
+        { "kind": "hasTag", "subject": "source", "tag": "quarry.relay" },
+        { "kind": "hasTag", "subject": "source", "tag": "ore-fed" }
+      ],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 3 },
+        { "kind": "emitEvent", "event": "quarry.resonance" }
+      ]
+    },
+    {
+      "id": "quarry.echo-activation-counts",
+      "on": "quarry.echo.activated",
+      "priority": 10,
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "activations", "amount": 1 },
+        { "kind": "emitEvent", "event": "quarry.echo-chain" }
+      ]
+    },
+    {
+      "id": "quarry.echo-chain-changes-actor",
+      "on": "quarry.echo-chain",
+      "priority": 0,
+      "effects": [{ "kind": "addTag", "subject": "source", "tag": "ore-fed" }]
+    },
+    {
+      "id": "quarry.overdrive-activation-counts",
+      "on": "quarry.overdrive.activated",
+      "priority": 10,
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "activations", "amount": 1 },
+        { "kind": "emitEvent", "event": "quarry.overdrive-chain" }
+      ]
+    },
+    {
+      "id": "quarry.cataclysm-activation-counts",
+      "on": "quarry.cataclysm.activated",
+      "priority": 10,
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "activations", "amount": 1 },
+        { "kind": "emitEvent", "event": "quarry.cataclysm-chain" }
+      ]
+    }
+  ]
+}

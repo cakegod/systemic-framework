@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 2,
+  "archetypes": [
+    {
+      "id": "quarry.heat-sensitive",
+      "kind": "product",
+      "tags": ["brittle"],
+      "properties": { "heat": 0, "stress": 0 }
+    }
+  ],
+  "entities": [
+    {
+      "id": "quarry.ember-source",
+      "kind": "actor",
+      "tags": ["ember", "worker"],
+      "capabilities": ["contact"],
+      "properties": { "energy": 10, "rate": 0 },
+      "links": { "target": "quarry.fuel" },
+      "visualRecipeId": "quarry.miner",
+      "bounds": { "x": 10, "y": 10, "halfWidth": 3, "halfHeight": 5 }
+    },
+    {
+      "id": "quarry.fuel",
+      "archetype": "quarry.heat-sensitive",
+      "tags": ["fuel"],
+      "properties": { "output": 0 },
+      "bounds": { "x": 18, "y": 10, "halfWidth": 4, "halfHeight": 4 }
+    },
+    {
+      "id": "quarry.ore",
+      "kind": "resource",
+      "tags": ["resource", "mineral"],
+      "properties": { "balance": 0 }
+    },
+    {
+      "id": "quarry.player",
+      "kind": "actor",
+      "tags": ["player"]
+    },
+    {
+      "id": "quarry.drill-upgrade",
+      "kind": "prop",
+      "tags": ["upgrade", "tool"],
+      "properties": { "purchases": 0 }
+    },
+    {
+      "id": "quarry.core-choice",
+      "kind": "prop",
+      "properties": { "selected": 0 },
+      "visualRecipeId": "quarry.core-icon"
+    },
+    {
+      "id": "quarry.relay-choice",
+      "kind": "prop",
+      "properties": { "selected": 0 },
+      "visualRecipeId": "quarry.relay-icon"
+    },
+    {
+      "id": "quarry.overdrive-choice",
+      "kind": "prop",
+      "properties": { "selected": 0, "activeUntilTick": 0, "cooldownUntilTick": 0, "activations": 0 },
+      "visualRecipeId": "quarry.overdrive-icon"
+    },
+    {
+      "id": "quarry.echo-choice",
+      "kind": "prop",
+      "properties": { "selected": 0, "activeUntilTick": 0, "cooldownUntilTick": 0, "activations": 0 },
+      "visualRecipeId": "quarry.echo-icon"
+    },
+    {
+      "id": "quarry.temper-choice",
+      "kind": "prop",
+      "properties": { "selected": 0 },
+      "visualRecipeId": "quarry.temper-icon"
+    },
+    {
+      "id": "quarry.cataclysm-choice",
+      "kind": "prop",
+      "properties": { "selected": 0, "activeUntilTick": 0, "cooldownUntilTick": 0, "activations": 0 },
+      "visualRecipeId": "quarry.cataclysm-icon"
+    }
+  ]
+}

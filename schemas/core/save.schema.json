@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://press-the-button.dev/systemic/save.schema.json",
+  "title": "Versioned engine-neutral systemic save",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "world", "entityIds", "extensionStates"],
+  "properties": {
+    "schemaVersion": { "const": 3 },
+    "entityIds": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1 } },
+    "extensionStates": { "type": "object", "additionalProperties": true },
+    "world": { "$ref": "#/$defs/world" }
+  },
+  "$defs": {
+    "world": {
+      "type": "object", "additionalProperties": false,
+      "required": ["valueScale", "spatialCellSize", "logicalTick", "nextEntityId", "draws", "entities", "modifiers", "grants", "boundRoles", "requiredEntityIds"],
+      "properties": {
+        "valueScale": { "type": "number", "exclusiveMinimum": 0 },
+        "spatialCellSize": { "type": "number", "exclusiveMinimum": 0 },
+        "logicalTick": { "type": "integer", "minimum": 0 },
+        "nextEntityId": { "type": "integer", "minimum": 1 },
+        "draws": { "$ref": "#/$defs/draws" },
+        "entities": { "type": "array", "maxItems": 1000000, "items": { "$ref": "#/$defs/entity" } },
+        "modifiers": { "type": "array", "items": { "$ref": "#/$defs/modifier" } },
+        "grants": { "type": "array", "items": { "$ref": "#/$defs/grant" } },
+        "boundRoles": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1 } },
+        "requiredEntityIds": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 1 } }
+      }
+    },
+    "draws": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "increment", "draws"],
+      "properties": {
+        "state": { "type": "integer", "minimum": 0 },
+        "increment": { "type": "integer", "minimum": 1 },
+        "draws": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "entity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "codec", "payload", "tags", "capabilities", "links", "toRemove", "spatialBounds"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "codec": { "type": "string", "minLength": 1 },
+        "payload": {},
+        "tags": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "capabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "links": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1 } },
+        "toRemove": { "type": "boolean" },
+        "spatialBounds": { "anyOf": [{ "const": null }, { "$ref": "#/$defs/bounds" }] }
+      }
+    },
+    "modifier": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "entityId", "property", "operation", "value", "remainingTicks", "priority", "stage"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "entityId": { "type": "integer", "minimum": 1 },
+        "property": { "type": "string", "minLength": 1 },
+        "operation": { "enum": ["Add", "Multiply", "Set"] },
+        "value": { "type": "number" },
+        "remainingTicks": { "type": "integer", "minimum": -1 },
+        "priority": { "type": "integer" },
+        "stage": { "type": "string", "enum": ["Standard", "Foundation", "Additive", "Multiplicative", "Override", "Final"] }
+      }
+    },
+    "grant": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "entityId", "kind", "name", "remainingTicks"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "entityId": { "type": "integer", "minimum": 1 },
+        "kind": { "enum": ["Tag", "Capability"] },
+        "name": { "type": "string", "minLength": 1 },
+        "remainingTicks": { "type": "integer", "minimum": -1 }
+      }
+    },
+    "bounds": {
+      "type": "object", "additionalProperties": false,
+      "required": ["x", "y", "halfWidth", "halfHeight", "left", "right", "top", "bottom", "isValid"],
+      "properties": {
+        "x": { "type": "number" }, "y": { "type": "number" },
+        "halfWidth": { "type": "number", "minimum": 0 },
+        "halfHeight": { "type": "number", "minimum": 0 },
+        "left": { "type": "number" }, "right": { "type": "number" },
+        "top": { "type": "number" }, "bottom": { "type": "number" },
+        "isValid": { "type": "boolean" }
+      }
+    }
+  }
+}

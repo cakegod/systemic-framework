@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://press-the-button.dev/systemic/ui.schema.json",
+  "title": "Declarative in-game UI layouts",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "layouts"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "layouts": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/layout" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" },
+    "layout": { "type": "object", "additionalProperties": false, "required": ["id", "root"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "root": { "$ref": "#/$defs/node" } } },
+    "node": { "type": "object", "additionalProperties": false, "required": ["type"],
+      "properties": {
+        "type": { "type": "string" },
+        "text": { "type": "string" },
+        "bind": { "type": "string" },
+        "action": { "$ref": "#/$defs/id" },
+        "minimum": { "type": "number" },
+        "maximum": { "type": "number" },
+        "visualRecipeId": { "$ref": "#/$defs/id" },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/node" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "icon" } } },
+          "then": { "anyOf": [
+            { "required": ["visualRecipeId"] },
+            { "required": ["bind"], "properties": { "bind": { "pattern": "^choice\\..+$" } } }
+          ] },
+          "else": { "not": { "required": ["visualRecipeId"] } }
+        }
+      ]
+    }
+  }
+}

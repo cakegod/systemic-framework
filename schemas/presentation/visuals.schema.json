@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://press-the-button.dev/systemic/visuals.schema.json",
+  "title": "Procedural visual recipes",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "recipes"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "palettes": {
+      "type": "object",
+      "maxProperties": 4096,
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": { "$ref": "#/$defs/palette" }
+    },
+    "fragments": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/fragment" } },
+    "recipes": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/recipe" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" },
+    "palette": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 64,
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$" }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "seed", "canvasWidth", "canvasHeight"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["actor", "spell", "particle", "effect", "prop"] },
+        "seed": { "type": "integer", "minimum": -9223372036854775808, "maximum": 9223372036854775807 },
+        "canvasWidth": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "canvasHeight": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "palette": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$" } },
+        "paletteId": { "$ref": "#/$defs/id" },
+        "importedAssetId": { "$ref": "#/$defs/id" },
+        "importedMode": { "enum": ["underlay", "overlay", "replace"] },
+        "useFragments": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "layers": { "type": "array", "maxItems": 512, "items": { "$ref": "#/$defs/layer" } },
+        "parts": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/part" } }
+      },
+      "oneOf": [
+        { "required": ["palette"], "not": { "required": ["paletteId"] } },
+        { "required": ["paletteId"], "not": { "required": ["palette"] } }
+      ],
+      "allOf": [
+        { "if": { "required": ["importedMode"] }, "then": { "required": ["importedAssetId"] } }
+      ]
+    },
+    "fragment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "layers"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "layers": { "type": "array", "maxItems": 512, "items": { "$ref": "#/$defs/layer" } }
+      }
+    },
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "x", "y", "width", "height"],
+      "properties": {
+        "shape": { "enum": ["rect", "ellipse", "line"] },
+        "color": { "type": "integer", "minimum": 0 },
+        "colorRole": { "$ref": "#/$defs/id" },
+        "state": { "$ref": "#/$defs/id" },
+        "x": { "type": "number", "minimum": -4096, "maximum": 4096 },
+        "y": { "type": "number", "minimum": -4096, "maximum": 4096 },
+        "width": { "type": "number", "minimum": 0, "maximum": 1024 },
+        "height": { "type": "number", "minimum": 0, "maximum": 1024 },
+        "jitterPixels": { "type": "integer", "minimum": 0, "maximum": 4 }
+      },
+      "oneOf": [
+        { "required": ["color"], "not": { "required": ["colorRole"] } },
+        { "required": ["colorRole"], "not": { "required": ["color"] } }
+      ]
+    },
+    "part": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recipeId", "x", "y"],
+      "properties": {
+        "recipeId": { "$ref": "#/$defs/id" },
+        "x": { "type": "integer", "minimum": -4096, "maximum": 4096 },
+        "y": { "type": "integer", "minimum": -4096, "maximum": 4096 },
+        "scale": { "type": "integer", "minimum": 1, "maximum": 8, "default": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 2,
+  "layouts": [
+    {
+      "id": "quarry.hud",
+      "root": {
+        "type": "column",
+        "children": [
+          { "type": "text", "text": "Quarry" },
+          { "type": "value", "text": "Ore", "bind": "world.quarry.ore.balance" },
+          { "type": "bar", "text": "Foundation progress", "bind": "world.quarry.ore.balance", "minimum": 0, "maximum": 10 },
+          { "type": "row", "children": [
+            { "type": "icon", "bind": "choice.quarry.core.selected" },
+            { "type": "icon", "bind": "choice.quarry.relay.selected" },
+            { "type": "icon", "bind": "choice.quarry.overdrive.active" },
+            { "type": "bar", "text": "Overdrive cooldown", "bind": "choice.quarry.overdrive.cooldown" },
+            { "type": "icon", "bind": "choice.quarry.echo.active" },
+            { "type": "bar", "text": "Echo cooldown", "bind": "choice.quarry.echo.cooldown" }
+          ] },
+          { "type": "button", "text": "Select relay", "action": "quarry.select.relay" },
+          { "type": "button", "text": "Activate overdrive", "action": "quarry.activate.overdrive" }
+        ]
+      }
+    }
+  ]
+}

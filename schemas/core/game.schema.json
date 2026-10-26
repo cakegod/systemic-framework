@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://press-the-button.dev/systemic/game.schema.json",
+  "title": "Systemic game project",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "tickRateHz", "maxCatchUpSteps", "rules", "entities"],
+  "properties": {
+    "schemaVersion": { "type": "integer" },
+    "id": { "$ref": "#/$defs/id" },
+    "name": { "type": "string", "minLength": 1 },
+    "tickRateHz": { "type": "integer", "minimum": 1, "maximum": 240 },
+    "maxCatchUpSteps": { "type": "integer", "minimum": 1, "maximum": 64 },
+    "rules": { "$ref": "#/$defs/file" },
+    "entities": { "$ref": "#/$defs/file" },
+    "modules": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": {
+        "type": "object",
+        "maxProperties": 64,
+        "propertyNames": { "$ref": "#/$defs/id" },
+        "additionalProperties": { "$ref": "#/$defs/file" }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" },
+    "file": { "type": "string", "minLength": 1, "pattern": "\\S" }
+  }
+}

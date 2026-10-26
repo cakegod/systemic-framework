@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 3,
+  "id": "sample.boids-monogame",
+  "name": "Boids MonoGame Sample",
+  "tickRateHz": 30,
+  "maxCatchUpSteps": 3,
+  "rules": "rules.json",
+  "entities": "entities.json"
+}

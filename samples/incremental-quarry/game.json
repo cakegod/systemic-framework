@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 3,
+  "id": "sample.quarry",
+  "name": "Quarry",
+  "tickRateHz": 60,
+  "maxCatchUpSteps": 4,
+  "rules": "rules.json",
+  "entities": "entities.json",
+  "modules": {
+    "systemic.gameplay2d": { "gameplay2d": "gameplay2d.json" },
+    "systemic.incremental": {
+      "incremental": "incremental.json",
+      "advancements": "advancements.json"
+    },
+    "systemic.presentation": {
+      "visuals": "visuals.json",
+      "ui": "ui.json",
+      "presentation": "presentation.json"
+    }
+  }
+}

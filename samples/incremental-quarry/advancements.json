@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 2,
+  "groups": [
+    {
+      "id": "quarry.foundation",
+      "ownerEntityId": "quarry.ember-source",
+      "progressEntityId": "quarry.ore",
+      "progressProperty": "balance",
+      "unlockAt": 10,
+      "selectionLimit": 2,
+      "freeChoiceId": "quarry.core"
+    },
+    {
+      "id": "quarry.mastery",
+      "ownerEntityId": "quarry.ember-source",
+      "progressEntityId": "quarry.ore",
+      "progressProperty": "balance",
+      "unlockAt": 50,
+      "selectionLimit": 1
+    }
+  ],
+  "choices": [
+    {
+      "id": "quarry.core",
+      "groupId": "quarry.foundation",
+      "entityId": "quarry.core-choice",
+      "activationMode": "passive",
+      "choiceTag": "quarry.core",
+      "isFree": true
+    },
+    {
+      "id": "quarry.relay",
+      "groupId": "quarry.foundation",
+      "entityId": "quarry.relay-choice",
+      "activationMode": "passive",
+      "choiceTag": "quarry.relay",
+      "costResourceId": "quarry.ore",
+      "costAmount": 5
+    },
+    {
+      "id": "quarry.overdrive",
+      "groupId": "quarry.foundation",
+      "entityId": "quarry.overdrive-choice",
+      "activationMode": "timed",
+      "choiceTag": "quarry.overdrive",
+      "costResourceId": "quarry.ore",
+      "costAmount": 8,
+      "activeTicks": 3,
+      "cooldownTicks": 12,
+      "activationEvent": "quarry.overdrive.activated"
+    },
+    {
+      "id": "quarry.echo",
+      "groupId": "quarry.foundation",
+      "entityId": "quarry.echo-choice",
+      "activationMode": "triggered",
+      "choiceTag": "quarry.echo",
+      "costResourceId": "quarry.ore",
+      "costAmount": 4,
+      "activeTicks": 1,
+      "cooldownTicks": 8,
+      "triggerEvent": "quarry.ember-ore-produced",
+      "activationEvent": "quarry.echo.activated"
+    },
+    {
+      "id": "quarry.temper",
+      "groupId": "quarry.mastery",
+      "entityId": "quarry.temper-choice",
+      "activationMode": "passive",
+      "choiceTag": "quarry.temper",
+      "costResourceId": "quarry.ore",
+      "costAmount": 10
+    },
+    {
+      "id": "quarry.cataclysm",
+      "groupId": "quarry.mastery",
+      "entityId": "quarry.cataclysm-choice",
+      "activationMode": "timed",
+      "choiceTag": "quarry.cataclysm",
+      "costResourceId": "quarry.ore",
+      "costAmount": 20,
+      "activeTicks": 4,
+      "cooldownTicks": 16,
+      "activationEvent": "quarry.cataclysm.activated"
+    }
+  ]
+}

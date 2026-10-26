@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "rules": [
+    {
+      "id": "contact.damage",
+      "on": "contact",
+      "priority": 0,
+      "when": [],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "health", "amount": -2 }
+      ]
+    }
+  ]
+}

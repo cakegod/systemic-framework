@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://press-the-button.dev/systemic/gameplay2d.schema.json",
+  "title": "Optional engine-neutral 2D actor and status definitions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "actors", "statuses"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "actors": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": { "$ref": "#/$defs/actor" }
+    },
+    "statuses": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": { "$ref": "#/$defs/status" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "maxLength": 128, "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^\\S(?:.*\\S)?$" },
+    "traits": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/name" }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tags", "capabilities", "properties", "halfWidth", "halfHeight"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "tags": { "$ref": "#/$defs/traits" },
+        "capabilities": { "$ref": "#/$defs/traits" },
+        "properties": {
+          "type": "object",
+          "maxProperties": 256,
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "type": "number" }
+        },
+        "halfWidth": { "type": "number", "minimum": 0, "maximum": 4096 },
+        "halfHeight": { "type": "number", "minimum": 0, "maximum": 4096 }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tag", "property", "operation", "value", "durationTicks"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "tag": { "$ref": "#/$defs/name" },
+        "property": { "$ref": "#/$defs/name" },
+        "operation": { "enum": ["add", "multiply", "set"] },
+        "value": { "type": "number" },
+        "durationTicks": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "stage": { "enum": ["standard", "foundation", "additive", "multiplicative", "override", "final"] },
+        "stacking": { "enum": ["refresh", "stack"] },
+        "maximumStacks": { "type": "integer", "minimum": 1, "maximum": 64 }
+      }
+    }
+  }
+}

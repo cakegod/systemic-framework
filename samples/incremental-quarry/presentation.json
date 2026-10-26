@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 2,
+  "timelines": [
+    {
+      "id": "quarry.impact",
+      "visualRecipeId": "quarry.ember-spark",
+      "durationTicks": 12,
+      "loop": false,
+      "particleCount": 4,
+      "keyframes": [
+        { "tick": 0, "scale": 0.5, "opacity": 1 },
+        { "tick": 4, "x": 2, "y": -2, "scale": 1.5, "opacity": 1, "visualState": "active" },
+        { "tick": 11, "x": 5, "y": -4, "scale": 0.5, "opacity": 0 }
+      ]
+    },
+    {
+      "id": "quarry.upgrade",
+      "visualRecipeId": "quarry.core-icon",
+      "durationTicks": 24,
+      "loop": false,
+      "particleCount": 8,
+      "keyframes": [
+        { "tick": 0, "scale": 0.5, "opacity": 0 },
+        { "tick": 3, "scale": 1.25, "opacity": 1, "visualState": "active" },
+        { "tick": 23, "scale": 1, "opacity": 0 }
+      ]
+    }
+  ],
+  "choiceIcons": {
+    "quarry.core": "quarry.core-icon",
+    "quarry.relay": "quarry.relay-icon",
+    "quarry.overdrive": "quarry.overdrive-icon",
+    "quarry.echo": "quarry.echo-icon",
+    "quarry.temper": "quarry.temper-icon",
+    "quarry.cataclysm": "quarry.cataclysm-icon"
+  },
+  "bindings": [
+    { "event": "incremental.production", "timelineId": "quarry.impact", "anchor": "target", "seedSalt": 17 },
+    { "event": "incremental.upgrade.purchased", "timelineId": "quarry.upgrade", "anchor": "target", "seedSalt": 31 },
+    { "event": "incremental.choice.selected", "timelineId": "quarry.upgrade", "anchor": "target", "seedSalt": 47 },
+    { "event": "gameplay2d.projectile.expired", "timelineId": "quarry.impact", "anchor": "source", "seedSalt": 59 }
+  ]
+}
