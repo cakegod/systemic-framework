@@ -1,6 +1,5 @@
 namespace GlowGarden;
 
-
 public enum CreatureKind
 {
     Burstling, Gatherer
@@ -22,20 +21,16 @@ public sealed partial class GardenSimulation
 
     private readonly long[] _spent = new long[2];
 
-    public long Glow
-    { get; private set; }
- = 30;
+    public long Glow { get; private set; } = 30;
 
-    public long BankedGlow
-    { get; private set; }
+    public long BankedGlow { get; private set; }
 
     public static UpgradeTree Tree(UpgradeKind kind) => kind switch
     {
         UpgradeKind.BurstlingWorkRate or UpgradeKind.GathererSpeed or UpgradeKind.GathererCapacity => UpgradeTree.Creatures,
         UpgradeKind.PodGrowth or UpgradeKind.PodYield => UpgradeTree.MagicGrowth,
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
-    }
-;
+    };
 
     public int Rank(UpgradeKind kind)
     {

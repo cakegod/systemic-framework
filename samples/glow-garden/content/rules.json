@@ -1,1 +1,113 @@
-{"schemaVersion":2,"rules":[]}
+{
+  "schemaVersion": 2,
+  "rules": [
+    {
+      "id": "garden.talent.echo",
+      "on": "garden.pod.burst",
+      "priority": 0,
+      "when": [
+        {
+          "kind": "hasTag",
+          "subject": "source",
+          "tag": "garden.talent.echo"
+        }
+      ],
+      "effects": [
+        {
+          "kind": "emitEvent",
+          "event": "garden.talent.echo"
+        }
+      ]
+    },
+    {
+      "id": "garden.talent.seedstorm",
+      "on": "garden.pod.burst",
+      "priority": 0,
+      "when": [
+        {
+          "kind": "hasTag",
+          "subject": "source",
+          "tag": "garden.talent.seedstorm"
+        }
+      ],
+      "effects": [
+        {
+          "kind": "emitEvent",
+          "event": "garden.talent.seedstorm"
+        }
+      ]
+    },
+    {
+      "id": "garden.talent.chain",
+      "on": "garden.pod.burst",
+      "priority": 0,
+      "when": [
+        {
+          "kind": "hasTag",
+          "subject": "source",
+          "tag": "garden.talent.chain"
+        }
+      ],
+      "effects": [
+        {
+          "kind": "emitEvent",
+          "event": "garden.talent.chain"
+        }
+      ]
+    },
+    {
+      "id": "garden.talent.projectile",
+      "on": "garden.pod.burst",
+      "priority": 0,
+      "when": [
+        {
+          "kind": "hasTag",
+          "subject": "source",
+          "tag": "garden.talent.projectile"
+        }
+      ],
+      "effects": [
+        {
+          "kind": "emitEvent",
+          "event": "garden.talent.projectile"
+        }
+      ]
+    },
+    {
+      "id": "garden.talent.clone",
+      "on": "garden.combo",
+      "priority": 0,
+      "when": [
+        {
+          "kind": "hasTag",
+          "subject": "source",
+          "tag": "garden.talent.clone"
+        }
+      ],
+      "effects": [
+        {
+          "kind": "emitEvent",
+          "event": "garden.talent.clone"
+        }
+      ]
+    },
+    {
+      "id": "garden.talent.magnetism",
+      "on": "garden.tick",
+      "priority": 0,
+      "when": [
+        {
+          "kind": "hasTag",
+          "subject": "source",
+          "tag": "garden.talent.magnetism"
+        }
+      ],
+      "effects": [
+        {
+          "kind": "emitEvent",
+          "event": "garden.talent.magnetism"
+        }
+      ]
+    }
+  ]
+}

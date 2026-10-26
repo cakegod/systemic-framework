@@ -1,4 +1,6 @@
 using System.Numerics;
+using Systemic.Kernel;
+using Systemic.Rules;
 
 namespace GlowGarden;
 
@@ -11,29 +13,90 @@ public sealed partial class GardenSimulation
     public const int MaxPendingImpacts = 256;
     public const int MaxReactionBursts = 16;
     public const int CopyLifetime = 180;
-    private readonly bool[] _talents = new bool[6];
+    public const int MaxTalentIntents = 8192;
     private readonly long[] _effects = new long[6];
     private readonly List<PendingImpact> _pending = new(MaxPendingImpacts);
-    private readonly Dictionary<int, int> _copyExpiry = new(MaxCopies);
-    private readonly int[] _reactionTargets = new int[MaxReactionBursts];
-    private readonly int[] _reactionDepths = new int[MaxReactionBursts];
+    private readonly Queue<TalentIntent> _talentIntents = new(MaxTalentIntents);
+    private readonly PopulationSpatialGrid2D _creatureGrid = new(new Bounds2(Width / 2, Height / 2, Width / 2, Height / 2), 90);
+    private readonly List<int> _nearbyCreatures = new(MaxWorkers + MaxCopies);
+    private Impact? _publishingImpact;
 
-    public int ActiveTalentCount { get; private set; }
-    public int CopyCount => _copyExpiry.Count;
+    // Shared by one worker impact and its finite breadth-first chain, never indexed by dense rows.
+    private sealed class Reaction(int creatureId, bool allowBounce)
+    {
+        public int CreatureId { get; } = creatureId;
+        public bool AllowBounce { get; } = allowBounce;
+        public int Bursts { get; set; } = 1;
+        public bool Bounced { get; set; }
+    }
+
+    private readonly record struct Impact(Vector2 Position, Reaction? Reaction = null, int Depth = 0);
+    private readonly record struct TalentIntent(Talent Talent, Impact Impact);
+
+    public int ActiveTalentCount => Enum.GetValues<Talent>().Count(IsTalentActive);
+    public int CopyCount => _creatures.Count(creature => creature.IsCopy);
     public int PendingImpactCount => _pending.Count;
     public IReadOnlyList<PendingImpact> PendingImpacts { get; }
-    public bool IsTalentActive(Talent talent) => _talents[TalentIndex(talent)];
+    public bool IsTalentActive(Talent talent) => _garden.HasTag(TalentTag(talent));
     public long EffectCount(Talent talent) => _effects[TalentIndex(talent)];
 
     private static int TalentIndex(Talent talent) => (uint)talent < 6 ? (int)talent : throw new ArgumentOutOfRangeException(nameof(talent));
+    private static string TalentTag(Talent talent)
+    {
+        _ = TalentIndex(talent);
+        return talent switch
+        {
+            Talent.Echo => "garden.talent.echo",
+            Talent.Seedstorm => "garden.talent.seedstorm",
+            Talent.Magnetism => "garden.talent.magnetism",
+            Talent.ChainReaction => "garden.talent.chain",
+            Talent.LivingProjectile => "garden.talent.projectile",
+            _ => "garden.talent.clone"
+        };
+    }
 
     public bool ToggleTalent(Talent talent)
     {
-        var index = TalentIndex(talent);
-        if (!_talents[index] && ActiveTalentCount == 3) return false;
-        _talents[index] = !_talents[index];
-        ActiveTalentCount += _talents[index] ? 1 : -1;
+        var tag = TalentTag(talent);
+        if (_garden.HasTag(tag)) _garden.RemoveTag(tag);
+        else
+        {
+            if (ActiveTalentCount == 3) return false;
+            _garden.AddTag(tag);
+        }
         return true;
+    }
+
+    /// <summary>Register with the host builder. Rules select intents; only successful commits enqueue them.</summary>
+    public void ObserveFact(SimulationFact fact, SimulationFactEmitter emitter)
+    {
+        if (_publishingImpact is not { } impact || fact.SourceId != _garden.Id) return;
+        Talent? talent = fact.Type switch
+        {
+            "garden.talent.echo" => Talent.Echo,
+            "garden.talent.seedstorm" => Talent.Seedstorm,
+            "garden.talent.magnetism" => Talent.Magnetism,
+            "garden.talent.chain" => Talent.ChainReaction,
+            "garden.talent.projectile" => Talent.LivingProjectile,
+            "garden.talent.clone" => Talent.Clone,
+            _ => null
+        };
+        if (talent is not { } selected) return;
+        emitter.OnCommit(() =>
+        {
+            if (_talentIntents.Count < MaxTalentIntents) _talentIntents.Enqueue(new(selected, impact));
+        });
+    }
+
+    private void Publish(string type, double amount = 0, Impact? impact = null)
+    {
+        var previous = _publishingImpact;
+        _publishingImpact = impact;
+        try
+        {
+            _stepContext!.Publish(new SimulationFact(type, _garden.Id, _garden.Id, Amount: amount));
+        }
+        finally { _publishingImpact = previous; }
     }
 
     private int NearestRipe(Vector2 position, float radius)
@@ -59,10 +122,8 @@ public sealed partial class GardenSimulation
         for (var i = _creatures.Count - 1; i >= 0; i--)
         {
             var c = _creatures[i];
-            if (c.IsCopy && _copyExpiry[c.Id] <= Tick)
+            if (c.IsCopy && _creatures.Columns.CopyExpiryTick.ReadOnlySpan[i] <= Tick)
             {
-                // Copies drop loads only if future creature kinds are added; currently all copies are Burstlings.
-                _copyExpiry.Remove(c.Id);
                 _creatures.RemoveAt(i);
             }
         }
@@ -74,7 +135,9 @@ public sealed partial class GardenSimulation
             {
                 if (_plants.Count < MaxPlants)
                 {
-                    _plants.Add(new(_plants.Count, impact.Position, 0));
+                    // Stable identifiers remain independent of row count and swap-back layout.
+                    _nextPlantId = Math.Max(_nextPlantId, _plants.Count == 0 ? 0 : _plants.Max(p => p.Id) + 1);
+                    _plants.Add(new(_nextPlantId++, impact.Position, 0));
                     _effects[(int)Talent.Seedstorm]++;
                 }
                 _pending.RemoveAt(i);
@@ -86,25 +149,33 @@ public sealed partial class GardenSimulation
                 {
                     BurstPlant(target);
                     _effects[(int)Talent.Echo]++;
-                    SpawnCopy(impact.Position);
+                    Publish("garden.combo", impact: new Impact(impact.Position));
                     _pending.RemoveAt(i);
                 }
                 else if (Tick >= impact.ExpiryTick) _pending.RemoveAt(i);
                 else i++;
             }
         }
-        if (!IsTalentActive(Talent.Magnetism)) return;
+        Publish("garden.tick", impact: new Impact(Colony));
+    }
+
+    private void ApplyMagnetism()
+    {
+        // This snapshot is local to a phase with no creature movement or structural edits.
+        // Mote removals elsewhere cannot stale its creature row indexes.
+        _creatureGrid.Rebuild(_creatures.Columns.Position.ReadOnlySpan);
         for (var i = 0; i < _motes.Count; i++)
         {
             var m = _motes[i];
             var target = -1;
             var best = 90f * 90;
-            for (var j = 0; j < _creatures.Count; j++)
+            _creatureGrid.QueryRadius(m.Position, 90, _nearbyCreatures);
+            foreach (var row in _nearbyCreatures)
             {
-                var c = _creatures[j];
+                var c = _creatures[row];
                 if (c.Kind != CreatureKind.Gatherer || c.CarriedGlow >= 3 + Rank(UpgradeKind.GathererCapacity)) continue;
                 var distance = Vector2.DistanceSquared(m.Position, c.Position);
-                if (distance > 0 && distance < best) { target = j; best = distance; }
+                if (distance > 0 && distance < best) { target = row; best = distance; }
             }
             if (target < 0) continue;
             _motes[i] = m with { Position = Move(m.Position, _creatures[target].Position, 4) };
@@ -114,62 +185,76 @@ public sealed partial class GardenSimulation
 
     private void SpawnCopy(Vector2 position)
     {
-        if (!IsTalentActive(Talent.Clone) || CopyCount >= MaxCopies) return;
+        if (CopyCount >= MaxCopies) return;
         var id = _nextCreatureId++;
         _creatures.Add(new(id, CreatureKind.Burstling, position, 0, 15, true));
-        _copyExpiry.Add(id, Tick + CopyLifetime);
+        _creatures.Columns.CopyExpiryTick.EditRange(_creatures.Count - 1, 1)[0] = Tick + CopyLifetime;
         _effects[(int)Talent.Clone]++;
     }
 
-    private Vector2? BurstWithTalents(int index, bool allowBounce)
+    private void DrainTalentIntents()
     {
-        var count = 1;
-        _reactionTargets[0] = index;
-        _reactionDepths[0] = 0;
-        Vector2? bouncePosition = null;
-        var bounced = false;
-        for (var head = 0; head < count; head++)
+        // Invoked after the host transaction commits, outside RuleEngine dispatch. Subsequent
+        // publishes may enqueue more work, but cannot recursively execute domain effects.
+        for (var processed = 0; processed < MaxTalentIntents && _talentIntents.TryDequeue(out var intent); processed++)
         {
-            var target = _reactionTargets[head];
-            if (_plants[target].Growth < 1) continue;
-            var position = _plants[target].Position;
-            BurstPlant(target);
-            if (head > 0)
+            var impact = intent.Impact;
+            switch (intent.Talent)
             {
-                _effects[(int)Talent.ChainReaction]++;
-                SpawnCopy(position);
-            }
-            if (IsTalentActive(Talent.Echo)) QueueImpact(position, false);
-            if (IsTalentActive(Talent.Seedstorm))
-            {
-                var angle = NextFloat() * MathF.Tau;
-                QueueImpact(Vector2.Clamp(position + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 50, Vector2.Zero, new(Width, Height)), true);
-            }
-            if (IsTalentActive(Talent.ChainReaction) && _reactionDepths[head] < 3)
-            {
-                for (var j = 0; j < _plants.Count && count < MaxReactionBursts; j++)
-                {
-                    if (_plants[j].Growth < 1 || Vector2.DistanceSquared(position, _plants[j].Position) > 100 * 100) continue;
-                    var queued = false;
-                    for (var k = 0; k < count; k++) if (_reactionTargets[k] == j) { queued = true; break; }
-                    if (queued) continue;
-                    _reactionTargets[count] = j;
-                    _reactionDepths[count++] = _reactionDepths[head] + 1;
-                }
-            }
-            if (!bounced && allowBounce && IsTalentActive(Talent.LivingProjectile))
-            {
-                var bounce = NearestRipe(position, 240);
-                if (bounce >= 0)
-                {
-                    BurstPlant(bounce);
-                    _effects[(int)Talent.LivingProjectile]++;
-                    SpawnCopy(_plants[bounce].Position);
-                    bouncePosition = _plants[bounce].Position;
-                    bounced = true;
-                }
+                case Talent.Echo:
+                    QueueImpact(impact.Position, false);
+                    break;
+                case Talent.Seedstorm:
+                    var angle = NextFloat() * MathF.Tau;
+                    QueueImpact(Vector2.Clamp(impact.Position + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 50,
+                        Vector2.Zero, new(Width, Height)), true);
+                    break;
+                case Talent.Magnetism:
+                    ApplyMagnetism();
+                    break;
+                case Talent.Clone:
+                    SpawnCopy(impact.Position);
+                    break;
+                case Talent.ChainReaction:
+                    ApplyChain(impact);
+                    break;
+                case Talent.LivingProjectile:
+                    ApplyBounce(impact);
+                    break;
             }
         }
-        return bouncePosition;
+        _talentIntents.Clear();
+    }
+
+    private void ApplyChain(Impact impact)
+    {
+        if (impact.Reaction is not { } reaction || impact.Depth >= 3) return;
+        for (var row = 0; row < _plants.Count && reaction.Bursts < MaxReactionBursts; row++)
+        {
+            var plant = _plants[row];
+            if (plant.Growth < 1 || Vector2.DistanceSquared(impact.Position, plant.Position) > 100 * 100) continue;
+            reaction.Bursts++;
+            BurstPlant(row, new Impact(plant.Position, reaction, impact.Depth + 1));
+            _effects[(int)Talent.ChainReaction]++;
+            Publish("garden.combo", impact: new Impact(plant.Position));
+        }
+    }
+
+    private void ApplyBounce(Impact impact)
+    {
+        if (impact.Reaction is not { AllowBounce: true, Bounced: false } reaction) return;
+        var target = NearestRipe(impact.Position, 240);
+        if (target < 0) return;
+        var position = _plants[target].Position;
+        BurstPlant(target);
+        reaction.Bounced = true;
+        _effects[(int)Talent.LivingProjectile]++;
+        for (var row = 0; row < _creatures.Count; row++)
+        {
+            if (_creatures[row].Id != reaction.CreatureId) continue;
+            _creatures[row] = _creatures[row] with { Position = position, LeapProgress = 1 };
+            break;
+        }
+        Publish("garden.combo", impact: new Impact(position));
     }
 }

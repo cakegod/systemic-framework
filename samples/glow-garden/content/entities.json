@@ -1,1 +1,1 @@
-{"schemaVersion":2,"entities":[{"id":"garden","kind":"actor","tags":[],"capabilities":[],"properties":{}}]}
+{"schemaVersion":2,"entities":[{"id":"garden","kind":"actor","tags":["garden"],"capabilities":[],"properties":{}}]}

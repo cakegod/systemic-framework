@@ -1,6 +1,7 @@
 using System.Numerics;
 
 using Systemic.Host;
+using Systemic.Kernel;
 
 namespace GlowGarden;
 
@@ -10,7 +11,11 @@ public readonly record struct CreatureState(int Id, CreatureKind Kind, Vector2 P
 
 public readonly record struct MoteState(int Id, Vector2 Position, Vector2 Velocity, int Value);
 
-/// <summary>Bounded deterministic prototype state. Scratch/progression are not integrated with framework save or rollback.</summary>
+/// <summary>
+/// Live plants, creatures (including copy expiry), and motes are authoritative Kernel populations.
+/// Progression, identifiers, diagnostics, delayed effects, and commit-phase talent work are not a
+/// complete save/rollback implementation; the prototype deliberately does not support save/load.
+/// </summary>
 public sealed partial class GardenSimulation : ISystemicSystem
 {
     public const int MaxWorkers = 1000, MaxPlants = 64, MaxMotes = 12000, MaxCopies = 128;
@@ -19,29 +24,34 @@ public sealed partial class GardenSimulation : ISystemicSystem
 
     public static readonly Vector2 Colony = new(480, 320);
 
-    private readonly List<PlantState> _plants = new(MaxPlants);
-
-    private readonly List<CreatureState> _creatures = new(MaxWorkers + MaxCopies);
-
-    private readonly List<MoteState> _motes = new(MaxMotes);
-
-    private uint _random;
-
-    private int _nextCreatureId, _nextMoteId;
+    private readonly World _world;
+    private readonly Entity _garden;
+    internal readonly PlantStates _plants;
+    internal readonly CreatureStates _creatures;
+    internal readonly MoteStates _motes;
+    private SystemicStepContext? _stepContext;
+    private int _nextCreatureId, _nextMoteId, _nextPlantId;
 
     public GardenSimulation(int seed)
-    {
-        _random = unchecked((uint)seed) ^ 0x9e3779b9u;
+        : this(SystemicGame.FromDirectory(Path.Combine(AppContext.BaseDirectory, "content"), seed).World) { }
 
-        Plants = _plants.AsReadOnly();
-        Creatures = _creatures.AsReadOnly();
-        Motes = _motes.AsReadOnly();
+    public GardenSimulation(World world)
+    {
+        _world = world;
+        _garden = world.Entities.Single(e => e.HasTag("garden"));
+        _plants = new PlantStates(world);
+        _creatures = new CreatureStates(world);
+        _motes = new MoteStates(world);
+        _creatureGrid.Reserve(MaxWorkers + MaxCopies);
+        Plants = _plants;
+        Creatures = _creatures;
+        Motes = _motes;
         PendingImpacts = _pending.AsReadOnly();
 
         for (var i = 0; i < 6; i++)
         {
             var angle = i * MathF.Tau / 6;
-            _plants.Add(new(i, Colony + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 150, NextFloat()));
+            _plants.Add(new(_nextPlantId++, Colony + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 150, NextFloat()));
         }
 
         for (var i = 0; i < 6; i++) _creatures.Add(new(_nextCreatureId++, i < 2 ? CreatureKind.Burstling : CreatureKind.Gatherer, Colony, 0, 0, false));
@@ -61,13 +71,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
 
     public int Tick { get; private set; }
 
-    private float NextFloat()
-    {
-        _random ^= _random << 13;
-        _random ^= _random >> 17;
-        _random ^= _random << 5;
-        return (_random >> 8) * (1f / 16777216f);
-    }
+    private float NextFloat() => _world.Draws.NextFloat();
 
     private static Vector2 Move(Vector2 from, Vector2 to, float distance)
     {
@@ -78,6 +82,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
 
     public void Step(SystemicStepContext context)
     {
+        _stepContext = context;
         Tick = context.Tick;
         StepTalents();
 
@@ -139,8 +144,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
                     };
                     if (Vector2.DistanceSquared(c.Position, p.Position) < 16)
                     {
-                        var bounce = BurstWithTalents(target, !c.IsCopy);
-                        if (bounce.HasValue) c = c with { Position = bounce.Value, LeapProgress = 1 };
+                        BurstPlant(target, new Impact(p.Position, new Reaction(c.Id, !c.IsCopy)));
                         c = c with
                         {
                             Cooldown = Math.Max(3, 30 - Rank(UpgradeKind.BurstlingWorkRate))
@@ -165,6 +169,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
                     {
                         Glow += c.CarriedGlow;
                         BankedGlow += c.CarriedGlow;
+                        Publish("garden.glow.deposited", c.CarriedGlow);
                         c = c with
                         {
                             CarriedGlow = 0
@@ -200,15 +205,22 @@ public sealed partial class GardenSimulation : ISystemicSystem
                             CarriedGlow = c.CarriedGlow + m.Value
                         };
                         _motes.RemoveAt(target);
+                        Publish("garden.glow.collected", m.Value);
                     }
                 }
             }
 
             _creatures[i] = c;
         }
+
+        // Fact callbacks enqueue only on successful outer commit. Drain after those callbacks,
+        // so reactions are visible when Game.Step returns and never reenter active dispatch.
+        using var completion = _world.BeginTransaction();
+        completion.OnCommit(DrainTalentIntents);
+        completion.Commit();
     }
 
-    private void BurstPlant(int index)
+    private void BurstPlant(int index, Impact? impact = null)
     {
         var p = _plants[index];
         if (p.Growth < 1) return;
@@ -225,6 +237,7 @@ public sealed partial class GardenSimulation : ISystemicSystem
             var speed = 0.5f + NextFloat() * 2;
             _motes.Add(new(_nextMoteId++, p.Position, new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * speed, 1));
         }
+        Publish(impact.HasValue ? "garden.pod.burst" : "garden.pod.secondary", p.Id, impact);
     }
 }
 

@@ -118,15 +118,12 @@ public class GardenTests
             Assert.InRange(c.Position.X, 0, GardenSimulation.Width); Assert.InRange(c.Position.Y, 0, GardenSimulation.Height);
         });
     }
-    private static List<T> State<T>(GardenSimulation s, string field) =>
-        (List<T>)typeof(GardenSimulation).GetField(field, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(s)!;
-
     private static void Arrange(GardenSimulation s)
     {
-        var plants = State<PlantState>(s, "_plants");
+        var plants = s._plants;
         plants.Clear();
         for (var i = 0; i < 20; i++) plants.Add(new(i, GardenSimulation.Colony + new System.Numerics.Vector2(i * 8, 0), 1));
-        var workers = State<CreatureState>(s, "_creatures");
+        var workers = s._creatures;
         workers.Clear();
         workers.Add(new(0, CreatureKind.Burstling, GardenSimulation.Colony, 0, 0, false));
     }
@@ -176,7 +173,7 @@ public class GardenTests
         host.Step(1);
         Assert.True(s.CopyCount > 0);
         s.ToggleTalent(Talent.Clone);
-        State<PlantState>(s, "_plants").Clear();
+        s._plants.Clear();
         host.Step(400);
         Assert.Equal(0, s.CopyCount);
         Assert.Equal(0, s.PendingImpactCount);
@@ -187,11 +184,11 @@ public class GardenTests
     {
         using var host = GardenHost.Create(12);
         var s = host.Simulation;
-        State<PlantState>(s, "_plants").Clear();
-        var workers = State<CreatureState>(s, "_creatures");
+        s._plants.Clear();
+        var workers = s._creatures;
         workers.Clear();
         workers.Add(new(0, CreatureKind.Gatherer, GardenSimulation.Colony, 0, 0, false));
-        State<MoteState>(s, "_motes").Add(new(0, GardenSimulation.Colony + new System.Numerics.Vector2(12, 0), default, 1));
+        s._motes.Add(new(0, GardenSimulation.Colony + new System.Numerics.Vector2(12, 0), default, 1));
         s.ToggleTalent(Talent.Magnetism);
         host.Step(1);
         Assert.True(s.EffectCount(Talent.Magnetism) > 0);
@@ -246,7 +243,7 @@ public class GardenTests
         using var host = GardenHost.Create(21);
         var s = host.Simulation;
         Arrange(s);
-        var plants = State<PlantState>(s, "_plants");
+        var plants = s._plants;
         for (var i = 0; i < plants.Count; i++) plants[i] = plants[i] with { Growth = 0 };
         s.ToggleTalent(Talent.ChainReaction);
         s.ToggleTalent(Talent.Clone);
