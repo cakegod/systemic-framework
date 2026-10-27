@@ -211,6 +211,76 @@ public sealed class SystemicSystemContext
             throw new InvalidOperationException("System context operations are available only while the system executes.");
     }
 
+    /// <summary>Runs work with callback-scoped access to a population's declared columns.</summary>
+    /// <typeparam name="TKind">The population schema.</typeparam>
+    /// <typeparam name="TState">Caller-owned state passed to each callback.</typeparam>
+    /// <param name="lease">The population lease acquired before dispatch.</param>
+    /// <param name="state">State passed to each callback.</param>
+    /// <param name="executeRange">Callback receiving a scoped view of its assigned rows.</param>
+    public void ForEachPopulationRange<TKind, TState>(
+        PopulationLease<TKind> lease,
+        TState state,
+        PopulationRangeAction<TKind, TState> executeRange)
+        where TKind : IPopulationKind
+    {
+        ArgumentNullException.ThrowIfNull(lease);
+        ArgumentNullException.ThrowIfNull(executeRange);
+        if (_kernelContext is { } kernelContext)
+        {
+            kernelContext.ForEachPopulationRange(lease, state, executeRange);
+            return;
+        }
+
+        if (!_standalone)
+            throw new InvalidOperationException("System context operations are available only while the system executes.");
+        if (!ReferenceEquals(lease.WorldIdentity, _world))
+            throw new ArgumentException("The population lease belongs to a different world.", nameof(lease));
+
+        var range = new PopulationRange(0, lease.Count);
+        if (range.Length == 0)
+            return;
+
+        lease.WithAccess(range, new StandalonePopulationRangeState<TKind, TState>(state, executeRange),
+            static (StandalonePopulationRangeState<TKind, TState> callbackState,
+                scoped ref PopulationAccessScope<TKind> scope) =>
+                callbackState.Callback(callbackState.State, 0, ref scope));
+    }
+
+    /// <summary>Runs work with callback-scoped access without allocating a separate population lease.</summary>
+    /// <typeparam name="TKind">The population schema.</typeparam>
+    /// <typeparam name="TState">Caller-owned state passed to each callback.</typeparam>
+    /// <param name="population">The population whose rows are partitioned.</param>
+    /// <param name="state">State passed to each callback.</param>
+    /// <param name="executeRange">Callback receiving a scoped view of its assigned rows.</param>
+    public void ForEachPopulationRange<TKind, TState>(
+        Population<TKind> population,
+        TState state,
+        PopulationRangeAction<TKind, TState> executeRange)
+        where TKind : IPopulationKind
+    {
+        ArgumentNullException.ThrowIfNull(population);
+        ArgumentNullException.ThrowIfNull(executeRange);
+        if (_kernelContext is { } kernelContext)
+        {
+            kernelContext.ForEachPopulationRange(population, state, executeRange);
+            return;
+        }
+
+        if (!_standalone)
+            throw new InvalidOperationException("System context operations are available only while the system executes.");
+        if (!ReferenceEquals(population.World, _world))
+            throw new ArgumentException("The population belongs to a different world.", nameof(population));
+
+        var range = new PopulationRange(0, population.Count);
+        if (range.Length == 0)
+            return;
+
+        population.WithAccess(range, new StandalonePopulationRangeState<TKind, TState>(state, executeRange),
+            static (StandalonePopulationRangeState<TKind, TState> callbackState,
+                scoped ref PopulationAccessScope<TKind> scope) =>
+                callbackState.Callback(callbackState.State, 0, ref scope));
+    }
+
     /// <summary>Maps fixed partitions and merges their results in partition order.</summary>
     /// <typeparam name="TState">State read by the map callback.</typeparam>
     /// <typeparam name="TResult">Mapped value merged into the result.</typeparam>
@@ -241,9 +311,17 @@ public sealed class SystemicSystemContext
     /// <param name="population">Population owned by the context's World.</param>
     /// <returns>A lease that must outlive every view obtained from it.</returns>
     public PopulationLease<TKind> BorrowPopulation<TKind>(Population<TKind> population)
-        where TKind : IPopulationKind => _kernelContext?.BorrowPopulation(population)
-            ?? (_standalone ? population.Borrow()
-                : throw new InvalidOperationException("System context operations are available only while the system executes."));
+        where TKind : IPopulationKind
+    {
+        ArgumentNullException.ThrowIfNull(population);
+        if (!ReferenceEquals(population.World, _world))
+            throw new ArgumentException("The population belongs to a different world.", nameof(population));
+        if (_kernelContext is { } kernelContext)
+            return kernelContext.BorrowPopulation(population);
+        if (_standalone)
+            return population.Borrow();
+        throw new InvalidOperationException("System context operations are available only while the system executes.");
+    }
 
     /// <summary>Creates partition-local population buffers applied at the schedule's wave barrier.</summary>
     /// <typeparam name="TKind">Generated population schema type.</typeparam>
@@ -319,6 +397,11 @@ public sealed class SystemicSystemContext
 
         return result;
     }
+
+    private readonly record struct StandalonePopulationRangeState<TKind, TState>(
+        TState State,
+        PopulationRangeAction<TKind, TState> Callback)
+        where TKind : IPopulationKind;
 
     private void EnsureImmediateWorldWriteAccess()
     {
@@ -528,7 +611,9 @@ public sealed class SystemicGameBuilder
         if (_extensionStates is not null)
         {
             var extensionsById = statefulExtensions.ToDictionary(extension => extension.Id, StringComparer.Ordinal);
-            foreach (var (extensionId, state) in _extensionStates)
+            foreach (var (extensionId, state) in _extensionStates
+                .OrderBy(pair => pair.Key == PopulationStatefulExtension.ExtensionId ? 0 : 1)
+                .ThenBy(pair => pair.Key, StringComparer.Ordinal))
             {
                 if (!extensionsById.TryGetValue(extensionId, out var extension))
                 {
@@ -635,7 +720,7 @@ public sealed class SystemicGame : IDisposable
     public FixedStepClock Clock { get; }
     public SystemicTickStats TickStats { get; }
     public ImmutableArray<ImmutableArray<string>> SchedulerWaves =>
-        _schedule?.Waves ?? ImmutableArray<ImmutableArray<string>>.Empty;
+        _schedule?.Waves ?? [];
     public int SchedulerWorkerCount => _schedule?.WorkerCount ?? 0;
     public ImmutableDictionary<string, int> EntityIds { get; }
     public IReadOnlyList<ISystemicStatefulExtension> StatefulExtensions { get; }

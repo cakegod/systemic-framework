@@ -22,7 +22,7 @@ public readonly record struct PopulationRange(int Start, int Length)
 }
 
 /// <summary>Stores dense columns for one population kind in a World.</summary>
-/// <remarks>Structural changes are not allowed while borrowed population views are leased.</remarks>
+/// <remarks>Column data is available only through synchronous callback-scoped access. Leases prevent structural changes and transaction boundaries until disposed.</remarks>
 public sealed class Population<TKind> where TKind : IPopulationKind
 {
     private static long s_nextOwnerToken;
@@ -48,22 +48,189 @@ public sealed class Population<TKind> where TKind : IPopulationKind
 
     internal World World { get; private set; }
 
-    /// <summary>Leases this population's row identity and buffers until the returned lease is disposed.</summary>
-    /// <remarks>
-    /// Dispose the lease only after every user of its views has finished. A previously returned span cannot be
-    /// revoked after disposal. Concurrent access must use disjoint ranges whenever a range is written.
-    /// </remarks>
-    /// <summary>Leases this population's row identity and buffers until the returned lease is disposed.</summary>
-    /// <remarks>Finish all users of its views before disposing the lease; concurrent writes must use disjoint ranges.</remarks>
+    /// <summary>Leases this population's row identity until the returned lease is disposed.</summary>
+    /// <remarks>Column data is available only through synchronous callback-scoped access.</remarks>
     public PopulationLease<TKind> Borrow()
+    {
+        var systemAccess = World.GetCurrentSystemAccess();
+        PopulationLease<TKind> lease;
+        lock (World.TransactionGate)
+        {
+            EnsureActive();
+            lease = new PopulationLease<TKind>(this, _storage);
+            _storage.AcquireLease();
+        }
+
+        if (systemAccess is not null)
+            lease.BindSystemAccess(systemAccess, Environment.CurrentManagedThreadId);
+        return lease;
+    }
+
+    /// <summary>Runs serial work with callback-scoped access without creating a separate lease object.</summary>
+    /// <typeparam name="TState">Caller-owned state passed to the callback.</typeparam>
+    /// <param name="range">The only rows this callback may write.</param>
+    /// <param name="state">State passed to the callback.</param>
+    /// <param name="callback">Synchronous access callback.</param>
+    /// <remarks>Inside a scheduled system, this method uses the system's declared per-column access.</remarks>
+    public void WithAccess<TState>(
+        PopulationRange range,
+        TState state,
+        PopulationAccessAction<TKind, TState> callback)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        var access = World.GetCurrentSystemAccess();
+        var lifetime = _storage.SerialScopeLifetime;
+        long generation;
+        lock (World.TransactionGate)
+        {
+            EnsureActive();
+            _storage.ValidateRange(range.Start, range.Length);
+            _storage.AcquireLease();
+            var scopeEntered = false;
+            try
+            {
+                _storage.EnterScope(parallel: false, group: null);
+                scopeEntered = true;
+                generation = lifetime.Activate(_storage, range, access, parallel: false, group: null);
+            }
+            catch
+            {
+                if (scopeEntered)
+                    _storage.ExitScope(parallel: false);
+                _storage.ReleaseLease();
+                throw;
+            }
+        }
+
+        var scope = new PopulationAccessScope<TKind>(this, lifetime, generation);
+        try
+        {
+            callback(state, ref scope);
+        }
+        finally
+        {
+            lock (World.TransactionGate)
+            {
+                lifetime.Deactivate(generation);
+                _storage.ExitScope(parallel: false);
+                _storage.ReleaseLease();
+            }
+        }
+    }
+
+    /// <summary>Runs serial initialization with caller-owned input and callback-scoped population access.</summary>
+    /// <typeparam name="TInput">The unmanaged input row type.</typeparam>
+    /// <typeparam name="TState">Caller-owned state passed to the callback.</typeparam>
+    /// <param name="range">The only rows this callback may write.</param>
+    /// <param name="input">Read-only input whose lifetime is limited to the callback.</param>
+    /// <param name="state">State passed to the callback.</param>
+    /// <param name="callback">Synchronous access callback.</param>
+    public void WithAccess<TInput, TState>(
+        PopulationRange range,
+        scoped ReadOnlySpan<TInput> input,
+        TState state,
+        PopulationInputAccessAction<TKind, TInput, TState> callback)
+        where TInput : unmanaged
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        var access = World.GetCurrentSystemAccess();
+        var lifetime = _storage.SerialScopeLifetime;
+        long generation;
+        lock (World.TransactionGate)
+        {
+            EnsureActive();
+            _storage.ValidateRange(range.Start, range.Length);
+            _storage.AcquireLease();
+            var scopeEntered = false;
+            try
+            {
+                _storage.EnterScope(parallel: false, group: null);
+                scopeEntered = true;
+                generation = lifetime.Activate(_storage, range, access, parallel: false, group: null);
+            }
+            catch
+            {
+                if (scopeEntered)
+                    _storage.ExitScope(parallel: false);
+                _storage.ReleaseLease();
+                throw;
+            }
+        }
+
+        var scope = new PopulationAccessScope<TKind>(this, lifetime, generation);
+        try
+        {
+            callback(input, state, ref scope);
+        }
+        finally
+        {
+            lock (World.TransactionGate)
+            {
+                lifetime.Deactivate(generation);
+                _storage.ExitScope(parallel: false);
+                _storage.ReleaseLease();
+            }
+        }
+    }
+
+    internal object WorldIdentity => World;
+
+    internal PopulationStorage StorageIdentity => _storage;
+
+    internal int BeginScheduledRangeAccess()
     {
         lock (World.TransactionGate)
         {
             EnsureActive();
-            var lease = new PopulationLease<TKind>(this, _storage);
             _storage.AcquireLease();
-            return lease;
+            return _storage.Count;
         }
+    }
+
+    internal void EndScheduledRangeAccess()
+    {
+        lock (World.TransactionGate)
+            _storage.ReleaseLease();
+    }
+
+    internal long BeginScheduledRangeScope(
+        PopulationRange range,
+        PopulationScopeLifetime lifetime,
+        SystemAccess[] access,
+        object group)
+    {
+        lock (World.TransactionGate)
+        {
+            EnsureActive();
+            _storage.ValidateRange(range.Start, range.Length);
+            _storage.EnterScope(parallel: true, group);
+            try
+            {
+                return lifetime.Activate(_storage, range, access, parallel: true, group);
+            }
+            catch
+            {
+                _storage.ExitScope(parallel: true);
+                throw;
+            }
+        }
+    }
+
+    internal void EndScheduledRangeScope(PopulationScopeLifetime lifetime, long generation)
+    {
+        lock (World.TransactionGate)
+        {
+            lifetime.Deactivate(generation);
+            _storage.ExitScope(parallel: true);
+        }
+    }
+
+    internal void ValidateScopedColumn(PopulationColumnBase column)
+    {
+        EnsureActive();
+        ArgumentNullException.ThrowIfNull(column);
+        if (!Owns(column))
+            throw new ArgumentException("The column does not belong to this population.", nameof(column));
     }
 
     internal bool Owns(PopulationColumnBase column) =>
@@ -738,11 +905,10 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     }
 }
 
-/// <summary>A tracked lifetime for borrowed column views and stable population rows.</summary>
-/// <summary>Leases row identity and borrowed column views for one population.</summary>
+/// <summary>Leases stable population row identity while callback-scoped column access is active.</summary>
 /// <remarks>
-/// Keep the lease alive while any issued view is in use. A view retained after disposal cannot be revoked;
-/// this API does not make overlapping reads and writes or unrelated World operations thread-safe.
+/// Column spans can only be obtained inside <see cref="WithAccess{TState}"/> callbacks and expire when the callback returns.
+/// The lease prevents structural changes, buffer swaps and transaction boundaries until it is disposed.
 /// </remarks>
 public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulationKind
 {
@@ -750,6 +916,9 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
     private readonly PopulationStorage _storage;
     private readonly World _world;
     private bool _disposed;
+    private bool _systemBound;
+    private int _systemThreadId;
+    private SystemAccess[]? _systemAccess;
 
     internal PopulationLease(Population<TKind> population, PopulationStorage storage)
     {
@@ -758,65 +927,150 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
         _world = storage.World;
     }
 
-    /// <summary>Reads the live rows of a single-buffered column.</summary>
-    public ReadOnlySpan<T> Read<T>(PopulationColumn<T> column) where T : unmanaged
+    /// <summary>Gets the stable live row count protected by this lease.</summary>
+    public int Count
     {
-        lock (_world.TransactionGate)
+        get
         {
-            Validate(column);
-            return column.ReadOnlySpan;
+            lock (_world.TransactionGate)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                return _storage.Count;
+            }
         }
     }
 
-    /// <summary>Gets a writable range from a single-buffered column.</summary>
-    public Span<T> Edit<T>(PopulationColumn<T> column, int start, int length) where T : unmanaged
+    /// <summary>Runs serial work with column spans that expire when the callback returns.</summary>
+    /// <typeparam name="TState">Caller-owned state passed to the callback.</typeparam>
+    /// <param name="range">The only rows this callback may write.</param>
+    /// <param name="state">State passed to the callback.</param>
+    /// <param name="callback">Synchronous access callback.</param>
+    public void WithAccess<TState>(
+        PopulationRange range,
+        TState state,
+        PopulationAccessAction<TKind, TState> callback)
     {
-        lock (_world.TransactionGate)
+        ArgumentNullException.ThrowIfNull(callback);
+        var access = _systemAccess;
+        if (_systemBound && Environment.CurrentManagedThreadId != _systemThreadId)
+            throw new InvalidOperationException("Serial population access from a scheduled system belongs to its execution thread.");
+        var lifetime = _storage.SerialScopeLifetime;
+        var generation = BeginScopedAccess(range, lifetime, access, parallel: false, group: null);
+        var scope = new PopulationAccessScope<TKind>(this, lifetime, generation);
+        try
         {
-            Validate(column);
-            return column.EditRange(start, length);
+            callback(state, ref scope);
+        }
+        finally
+        {
+            EndScopedAccess(lifetime, generation, parallel: false);
         }
     }
 
-    /// <summary>Reads the current values of a double-buffered column.</summary>
-    public ReadOnlySpan<T> ReadCurrent<T>(DoubleBufferedPopulationColumn<T> column) where T : unmanaged
+    /// <summary>Runs serial initialization with caller-owned input and callback-scoped population access.</summary>
+    /// <typeparam name="TInput">The unmanaged input row type.</typeparam>
+    /// <typeparam name="TState">Caller-owned state passed to the callback.</typeparam>
+    /// <param name="range">The only rows this callback may write.</param>
+    /// <param name="input">Read-only input whose lifetime is limited to the callback.</param>
+    /// <param name="state">State passed to the callback.</param>
+    /// <param name="callback">Synchronous access callback.</param>
+    public void WithAccess<TInput, TState>(
+        PopulationRange range,
+        scoped ReadOnlySpan<TInput> input,
+        TState state,
+        PopulationInputAccessAction<TKind, TInput, TState> callback)
+        where TInput : unmanaged
     {
-        lock (_world.TransactionGate)
+        ArgumentNullException.ThrowIfNull(callback);
+        var access = _systemAccess;
+        if (_systemBound && Environment.CurrentManagedThreadId != _systemThreadId)
+            throw new InvalidOperationException("Serial population access from a scheduled system belongs to its execution thread.");
+        var lifetime = _storage.SerialScopeLifetime;
+        var generation = BeginScopedAccess(range, lifetime, access, parallel: false, group: null);
+        var scope = new PopulationAccessScope<TKind>(this, lifetime, generation);
+        try
         {
-            Validate(column);
-            return column.Current;
+            callback(input, state, ref scope);
+        }
+        finally
+        {
+            EndScopedAccess(lifetime, generation, parallel: false);
         }
     }
 
-    /// <summary>Gets a writable range from the next buffer of a double-buffered column.</summary>
-    public Span<T> EditNext<T>(DoubleBufferedPopulationColumn<T> column, int start, int length) where T : unmanaged
-    {
-        lock (_world.TransactionGate)
-        {
-            Validate(column);
-            return column.EditNext(start, length);
-        }
-    }
-
-    /// <summary>Gets writable ranges from both buffers for initializing newly created rows.</summary>
-    public DoubleBufferedPopulationEdit<T> EditBoth<T>(DoubleBufferedPopulationColumn<T> column, int start, int length)
-        where T : unmanaged
-    {
-        lock (_world.TransactionGate)
-        {
-            Validate(column);
-            return column.EditBothBuffers(start, length);
-        }
-    }
-
-    /// <summary>Ends the lease and releases the population's borrowed-view lock.</summary>
+    /// <summary>Ends the lease and releases its protection against structural and transaction changes.</summary>
     public void Dispose()
     {
         lock (_world.TransactionGate)
         {
             if (_disposed) return;
+            if (_storage.HasActiveScopes)
+                throw new InvalidOperationException("A population lease cannot be disposed while a scoped callback is active.");
             _disposed = true;
             _storage.ReleaseLease();
+        }
+    }
+
+    internal object WorldIdentity => _world;
+
+    internal PopulationStorage StorageIdentity => _storage;
+
+    internal void BindSystemAccess(SystemAccess[] access, int executionThreadId)
+    {
+        lock (_world.TransactionGate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _systemAccess = access;
+            _systemThreadId = executionThreadId;
+            _systemBound = true;
+        }
+    }
+
+    internal long BeginScopedAccess(
+        PopulationRange range,
+        PopulationScopeLifetime lifetime,
+        SystemAccess[]? access,
+        bool parallel,
+        object? group)
+    {
+        lock (_world.TransactionGate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ArgumentNullException.ThrowIfNull(lifetime);
+            _storage.ValidateRange(range.Start, range.Length);
+            _storage.EnterScope(parallel, group);
+            try
+            {
+                return lifetime.Activate(_storage, range, access, parallel, group);
+            }
+            catch
+            {
+                _storage.ExitScope(parallel);
+                throw;
+            }
+        }
+    }
+
+    internal void EndScopedAccess(PopulationScopeLifetime lifetime, long generation, bool parallel)
+    {
+        lock (_world.TransactionGate)
+        {
+            lifetime.Deactivate(generation);
+            _storage.ExitScope(parallel);
+        }
+    }
+
+    internal void ValidateScopedColumn(PopulationColumnBase column)
+    {
+        Validate(column);
+    }
+
+    internal void RegisterScopedDependency(PopulationScopeLifetime lifetime)
+    {
+        lock (_world.TransactionGate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            lifetime.RegisterDependency(_storage);
         }
     }
 

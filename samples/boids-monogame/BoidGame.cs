@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Systemic.Content;
 using Systemic.Host;
+using Systemic.Kernel;
 using Systemic.Rendering;
 using XnaColor = Microsoft.Xna.Framework.Color;
 using XnaVector2 = Microsoft.Xna.Framework.Vector2;
@@ -15,6 +16,21 @@ public sealed class BoidGame : Game
     private const int TargetFramesPerSecond = 60;
     private const int WarmupFrames = 60;
     private const int MarkerTextureSize = 32;
+
+    private readonly record struct BoidDrawState(
+        BoidRenderer Renderer,
+        BoidPopulation.Columns Columns,
+        int Tick,
+        Matrix Projection);
+
+    private static readonly PopulationAccessAction<Boid, BoidDrawState> s_drawBoids =
+        static (BoidDrawState state, scoped ref PopulationAccessScope<Boid> access) =>
+            state.Renderer.Draw(
+                access.ReadCurrent(state.Columns.Position),
+                access.ReadCurrent(state.Columns.Energy),
+                access.ReadAll(state.Columns.Species),
+                state.Tick,
+                state.Projection);
 
     private readonly GraphicsDeviceManager _graphics;
     private readonly int _seed;
@@ -163,12 +179,9 @@ public sealed class BoidGame : Game
 
         var drawingStart = _measuring ? Stopwatch.GetTimestamp() : 0;
         GraphicsDevice.Clear(new XnaColor(17, 24, 33));
-        _renderer.Draw(
-            _flockSystem.Positions,
-            _flockSystem.Energies,
-            _flockSystem.SpeciesByBoid,
-            _simulation.World.LogicalTick,
-            _worldToClip);
+        _flockSystem.WithPopulationAccess(
+            new BoidDrawState(_renderer, _flockSystem.Columns, _simulation.World.LogicalTick, _worldToClip),
+            s_drawBoids);
         DrawMarkers();
         if (_verifyRender && !_renderVerified && ++_renderVerifyFrames >= 5)
         {

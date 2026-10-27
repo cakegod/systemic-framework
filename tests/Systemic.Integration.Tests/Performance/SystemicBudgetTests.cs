@@ -124,13 +124,16 @@ public sealed class SystemicBudgetTests(ITestOutputHelper output)
         var dispatchProfile = Measure(() => dispatchOnly(noRuleEngine, requireReactionCutoff: false));
         var oneEffectProfile = Measure(() => dispatchOnly(oneEffectEngine, requireReactionCutoff: false));
         var reactionProfile = Measure(() => dispatchOnly(engine, requireReactionCutoff: true));
-        var fullProfile = Measure(queryAndReact);
+        var fullPhases = MeasureCombined(queryOnly, () => dispatchOnly(engine, requireReactionCutoff: true));
+        var fullProfile = fullPhases.Total;
         var p95 = fullProfile.P95;
         _output.WriteLine($"Products={ProductCount}, actors={ActorCount}, warmup=20, samples=60");
         _output.WriteLine($"Full query + chain p50/p95/p99={fullProfile.P50:F3}/{fullProfile.P95:F3}/{fullProfile.P99:F3} ms; allocations={fullProfile.Allocations} B");
+        _output.WriteLine($"Combined phases query p50/p95={fullPhases.First.P50:F3}/{fullPhases.First.P95:F3} ms; reaction p50/p95={fullPhases.Second.P50:F3}/{fullPhases.Second.P95:F3} ms");
         _output.WriteLine($"Spatial query p50/p95={queryProfile.P50:F3}/{queryProfile.P95:F3} ms; empty dispatch={dispatchProfile.P50:F3}/{dispatchProfile.P95:F3} ms; one-effect dispatch={oneEffectProfile.P50:F3}/{oneEffectProfile.P95:F3} ms; reaction chain={reactionProfile.P50:F3}/{reactionProfile.P95:F3} ms");
         _output.WriteLine($"Last chain sample: effects={lastDispatchEffects}, cutoff facts={lastDispatchCutoffs} (expected {ActorCount} reaction-depth cutoffs)");
         Assert.Equal(0, invalidDispatches);
+        Assert.Equal(0, fullProfile.Allocations);
         Assert.True(p95 < 5, $"Generic 50k-product + 1k-actor step p95 was {p95:F3} ms; target is <5 ms.");
     }
 
@@ -159,10 +162,52 @@ public sealed class SystemicBudgetTests(ITestOutputHelper output)
             allocations);
     }
 
+    private static CombinedTimingProfile MeasureCombined(Action first, Action second)
+    {
+        for (var warmup = 0; warmup < 20; warmup++)
+        {
+            first();
+            second();
+        }
+
+        var total = new double[60];
+        var firstPhase = new double[60];
+        var secondPhase = new double[60];
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var sample = 0; sample < total.Length; sample++)
+        {
+            var started = Stopwatch.GetTimestamp();
+            first();
+            var middle = Stopwatch.GetTimestamp();
+            second();
+            var finished = Stopwatch.GetTimestamp();
+            firstPhase[sample] = Stopwatch.GetElapsedTime(started, middle).TotalMilliseconds;
+            secondPhase[sample] = Stopwatch.GetElapsedTime(middle, finished).TotalMilliseconds;
+            total[sample] = Stopwatch.GetElapsedTime(started, finished).TotalMilliseconds;
+        }
+
+        var allocations = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        return new CombinedTimingProfile(
+            CreateProfile(total, allocations),
+            CreateProfile(firstPhase, allocations),
+            CreateProfile(secondPhase, allocations));
+    }
+
+    private static TimingProfile CreateProfile(double[] timings, long allocations)
+    {
+        Array.Sort(timings);
+        return new TimingProfile(
+            Percentile(timings, 0.50),
+            Percentile(timings, 0.95),
+            Percentile(timings, 0.99),
+            allocations);
+    }
+
     private static double Percentile(double[] sorted, double percentile) =>
         sorted[(int)Math.Ceiling(sorted.Length * percentile) - 1];
 
     private readonly record struct TimingProfile(double P50, double P95, double P99, long Allocations);
+    private readonly record struct CombinedTimingProfile(TimingProfile Total, TimingProfile First, TimingProfile Second);
 
     private static CompiledRuleSet CreateReactiveTalentRules()
     {

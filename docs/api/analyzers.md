@@ -37,9 +37,10 @@ The current unshipped `SYSACC` rules are enabled errors for recognized `ISystemi
 | --- | --- |
 | [`SYSACC001`](#sysacc001) | Immediate `SystemicSystemContext` World operations (`GetWritableWorld`, `SetProperty`, `Publish`, and `Execute`) need `SystemAccess.WriteWorld`. |
 | [`SYSACC002`](#sysacc002) | `DeferPopulationCommands` needs `SystemAccess.DeferWorldWrites` or `SystemAccess.WriteWorld`. |
-| [`SYSACC003`](#sysacc003) | Direct population edits inside a `ForEachRange` callback can escape the assigned range or mutate whole buffers; use range-local writes and move whole-buffer operations out of the callback. |
-| [`SYSACC004`](#sysacc004) | Direct reads and writes of generated population column views need the matching generated column access declaration. |
-| [`SYSACC005`](#sysacc005) | Immediate World operations and mutations through `SystemicSystemContext.Commands` are unsafe inside a `ForEachRange` callback. |
+| [`SYSACC003`](#sysacc003) | Buffer swaps and both-buffer edits are unsafe inside a range callback. |
+| [`SYSACC004`](#sysacc004) | Scoped population column reads and writes need matching per-column access declarations. |
+| [`SYSACC005`](#sysacc005) | Immediate World operations and mutations through `SystemicSystemContext.Commands` are unsafe inside a range callback. |
+| [`SYSACC006`](#sysacc006) | A parallel range callback cannot read all rows of a single-buffered column that it writes. |
 
 <a id="sysacc001"></a>
 ### SYSACC001
@@ -54,26 +55,31 @@ Declares missing deferred population access for a direct call to `DeferPopulatio
 <a id="sysacc003"></a>
 ### SYSACC003
 
-Flags direct calls to `EditRange`, `EditMemory`, `EditNext`, and `EditNextMemory` inside a recognized range callback because they do not encode the callback's assigned range. It also flags `EditBothBuffers` and `Swap`, which operate on whole buffers. Use the generated `Columns.WriteRange(range)` writer for row-local edits and move whole-buffer operations outside the callback.
+Flags `PopulationAccessScope.EditBoth` and `DoubleBufferedPopulationColumn.Swap` inside a recognized range callback. Scheduler scopes only expose the assigned range for writes, and parallel scopes reject both-buffer edits at runtime. Initialize both buffers and swap roles outside the parallel callback.
 
 <a id="sysacc004"></a>
 ### SYSACC004
 
-Flags recognized direct reads or writes through generated population column views when the corresponding `Read*` or `Write*` access is missing. Declare all columns touched by the operation.
+Flags recognized `PopulationAccessScope` reads and writes when the corresponding generated `Read*` or `Write*` column declaration is missing. `WriteWorld` orders the system exclusively, but does not grant column access. Full reads of single-buffered columns need `Read*`; a `Write*` declaration also allows partition-local reads. The current buffer of a double-buffered column can be read with either a read or write declaration while writes target `Next`.
+
+<a id="sysacc006"></a>
+### SYSACC006
+
+Flags `PopulationAccessScope.ReadAll` for a single-buffered column inside `ForEachPopulationRange` when the system also declares writes to that column. Other partitions can mutate those rows at the same time. Use `ReadRange` for the callback's assigned rows, or move cross-partition reads to a separate immutable/double-buffered column. The runtime enforces the same restriction even when the analyzer cannot recognize the access declaration or call site.
 
 <a id="sysacc005"></a>
 ### SYSACC005
 
-Flags direct immediate World operations and direct mutations through `SystemicSystemContext.Commands` inside a recognized range callback. Queue World changes for the wave barrier instead.
+Flags direct immediate World operations and direct mutations through `SystemicSystemContext.Commands` inside a recognized `ForEachRange` or `ForEachPopulationRange` callback. Queue World changes for the wave barrier instead.
 
 `SYSACC001` and `SYSACC002` understand direct access initializers and private static readonly `ImmutableArray<SystemAccess>` values with direct collection or array initializers. They skip access declarations whose value cannot be resolved from those forms. A constant `WriteResource("$world")` is treated as `WriteWorld`; an unrelated constant resource name is known non-World access, while a nonconstant resource name makes the declaration unknown. For per-column checks, use the generated `Read*` and `Write*` declarations.
 
-The preferred pattern is to state the actual column access in `ISystemicSystem.Access`, borrow the population once, and use the callback's `PopulationRange` for writes. Queue World and population mutations through the context's deferred APIs and let the schedule apply them at a barrier.
+The preferred pattern is to state the actual column access in `ISystemicSystem.Access` and pass the population to `SystemicSystemContext.ForEachPopulationRange`. The callback receives a scoped capability with its assigned range and column operations; generated `Columns.WriteRange(ref scope)` binds its writer to that range and checks its lifetime token on every write. Keep an explicit population lease only when row identity must span phases or a callback reads another population. Queue World and population structure changes through deferred APIs and let the schedule apply them at a barrier.
 
 ## Analysis boundaries
 
 These diagnostics are a static guardrail, not a proof of determinism, race freedom, or complete access coverage. They inspect direct, statically resolvable access declarations and recognized call sites. They do not perform whole-program alias analysis or interprocedural proof. Computed or unknown `Access` expressions are skipped when the analyzer cannot resolve them. Mutable `SystemAccess[]` backing fields are intentionally skipped; the analyzer resolves private static readonly `ImmutableArray<SystemAccess>` initializers with direct contents. Custom or indirect access helpers, aliases of contexts, populations, columns, or command buffers, and indirect calls may not be reported. Other column API forms can also fall outside the checks.
 
-`SYSACC005` analyzes direct uses of `SystemicSystemContext.Commands` inside a recognized `ForEachRange` callback. It does not track a command-buffer alias, nor does it track a `World` or `Entity` passed into the callback as its `state` value and then mutated there. `SYSACC003` flags direct `EditRange`, `EditMemory`, `EditNext`, and `EditNextMemory` calls in range callbacks, plus whole-buffer `EditBothBuffers` and `Swap` calls; it cannot follow an indirect helper that performs the edit.
+`SYSACC005` analyzes direct uses of `SystemicSystemContext.Commands` inside recognized range callbacks. It does not prove arbitrary alias or helper behavior. `SYSACC003` checks `PopulationAccessScope.EditBoth` and direct `Swap` calls; scope-mediated row writes are checked against their declared columns by `SYSACC004`.
 
-The schedule also relies on truthful resource declarations and range callbacks that write only their assigned rows. Use tests and code review alongside analyzer diagnostics. A clean analyzer build only means no diagnostic was found in the patterns it recognizes.
+The schedule also relies on truthful resource declarations and range callbacks that write only their assigned rows. Runtime scopes enforce declared column modes, callback thread, population ownership, and range bounds. Use tests and code review alongside analyzer diagnostics; a clean analyzer build only means no diagnostic was found in the patterns it recognizes.

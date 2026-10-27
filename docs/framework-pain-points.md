@@ -22,17 +22,17 @@ performance from unresolved optimization proposals.
 | 1.2 | Undo capture could replace the real exception with a `NullReferenceException` | major | Fixed: cleanup is best-effort and preserves the original capture failure. |
 | 1.3 | Grid rebuild did not identify the population or bad coordinates | major | Fixed: named rebuild diagnostics include row, coordinates and bounds; opt-in `Skip` counts invalid rows. |
 | 1.4 | No deterministic random source was available to parallel systems | blocker | Fixed at API level with counter-based per-entity/tick draws; Garden uses it for scouting, while obstacle noise still uses a separate stable hash. |
-| 1.5 | Structural edits could invalidate borrowed population storage | major | Partial: active population leases block structural changes; ordinary raw spans still cannot be tracked after the caller obtains them. |
-| 1.6 | `RemoveSwapBack` changed row identity during parallel passes | major | Partial: handles and deferred commands help, but row indexes remain transient across structural edits. |
+| 1.5 | Structural edits could invalidate borrowed population storage | major | Fixed: public column views are available only inside scoped callbacks; active scopes and leases block structural changes, buffer swaps, cloning, adoption and transaction boundaries. |
+| 1.6 | `RemoveSwapBack` changed row identity during parallel passes | major | Partial: active range callbacks prevent row changes while workers run; row indexes remain transient after the callback and across later swap-back removals. Handles and deferred commands are available. |
 | 1.7 | No world seed accessor | minor | Fixed: `World.Seed` exposes the original seed independently of later draws. |
 | 1.8 | Transactions did not restore plain domain-system state | major | Partial: the host snapshots registered transactional/stateful systems and Garden includes progression, IDs, scent and pending work; unregistered state and external side effects need explicit handling. |
 | 2.1 | Systems used two `Step` methods and publish paths | major | Open: the dual hosting APIs remain. |
-| 2.2 | Per-row column writes were verbose and repeated captures | major | Partial: generated row/range writers batch writes across columns; no lifetime-enforced multi-column edit lease exists, and Garden keeps hand-written projections. |
+| 2.2 | Per-row column writes were verbose and repeated captures | major | Partial: generated row/range writers use a callback scope, exact assigned range and expiring token; Garden keeps hand-written state projections, and no public `TState` projection is generated. |
 | 2.3 | Content properties were stringly typed and read every tick | major | Fixed for registered schemas: Garden validates tuning at load and uses a typed snapshot; ad hoc property reads remain available. |
-| 2.5 | Parallel row writes were not safely supported by the column layer | blocker | Partial: disjoint row writes no longer race during transaction capture; the API does not enforce row ownership or prevent overlapping writes. |
+| 2.5 | Parallel row writes were not safely supported by the column layer | blocker | Fixed for scoped population access: scheduler-issued capabilities expose only disjoint write ranges, and runtime checks reject undeclared columns, wrong threads, expired scopes and unsafe full-column reads. |
 | 2.6 | Facts carried no payload or position | major | Fixed: typed fact IDs, bounded primitive payloads and exact integer positions are available. |
 | 2.7 | Cue overflow silently discarded old cues | major | Fixed at API level: configurable overflow policies, counters, expiry and a bounded presentation window are available; games still choose policy and surface counters. |
-| 2.8 | Access declarations were strings and `WriteWorld` serialized the wave | minor | Partial: typed column access declarations are available and `WriteWorld` is intentionally exclusive as approved; ad hoc named resources remain string-keyed. |
+| 2.8 | Access declarations were strings and `WriteWorld` serialized the wave | minor | Partial: typed per-column declarations are enforced at runtime and checked by `SYSACC` analyzers; `WriteWorld` remains intentionally exclusive, and ad hoc named resources remain string-keyed. |
 | 2.9 | Hosts had to prune presentation cues by age | minor | Partial: stream expiry and a reusable cue window exist; the host must still advance/pump the window. |
 | 2.10 | Public state projections duplicate generated column layout | minor | Partial: generated row readers/writers reduce access boilerplate; Garden projections remain hand-written. |
 | 3.1 | Default scheduler worker cap is four | major | Open: default remains capped at four and there is no startup cap report. |
@@ -604,10 +604,11 @@ reload.
 
 World transaction journaling serializes page capture and preserves disjoint parallel row writes;
 `WriteWorld` excludes all other systems from its schedule wave. Range reduction merges in a fixed
-order. A population lease prevents structural changes while held, and deferred commands are
-available. The API still cannot prove that callers only write their assigned rows, and ordinary
-raw spans can outlive the lease or be retained after the caller has stopped respecting its borrow
-contract. Column declarations have typed helpers; ad hoc named resources remain string-keyed.
+order. Population data is available only through scoped callbacks, and each write span is limited
+to the serial caller's range or the scheduler's disjoint partition. Runtime checks enforce scope
+lifetime, thread, population ownership and typed per-column access; leases prevent structural
+changes and transaction boundaries while active. Deferred commands remain available. Ad hoc named
+resources remain string-keyed, and unsafe code can bypass language-level lifetime checks.
 
 ### 11.7 Tooling and CI
 
@@ -620,12 +621,12 @@ suite, or allocation budget covering worker threads.
 
 ### 11.8 API stability and remaining ergonomics
 
-Still open: there is no semantic-versioning policy, event IDs and access declarations still expose
-strings, there is no generated domain-event vocabulary, and the separate scheduled/unscheduled
-system hosting APIs remain. Generated row/range writers reduce repeated writes, but callers do not
-get a lifetime-enforced multi-column edit lease or an automatically generated public `TState`
-projection; Garden still maintains its hand-written projections. These are API design gaps, not
-evidence that the fixed transaction or tuning paths are unsafe.
+Still open: there is no semantic-versioning policy, event IDs and ad hoc access resources still
+expose strings, there is no generated domain-event vocabulary, and the separate
+scheduled/unscheduled system hosting APIs remain. Generated row/range writers now use the scoped
+column capability and validate its token on every write, but there is no automatically generated
+public `TState` projection; Garden still maintains its hand-written projections. These are API
+design gaps, not evidence that the fixed transaction or tuning paths are unsafe.
 
 ### 11.9 Definition of done
 
@@ -637,7 +638,7 @@ evidence that the fixed transaction or tuning paths are unsafe.
 | Invalid spatial rows identify the population and can be counted/skipped | Implemented through strict named diagnostics and opt-in skip policy. |
 | Full sample save/load with version, fingerprint and integrity check | Implemented for Garden state, world and registered extensions; module-specific cue policy remains separate. |
 | Content schema validated with file/path/location diagnostics | Implemented for registered schemas; not every game property is required to opt in. |
-| Parallel population writes safe for disjoint ranges | Partial: synchronized transaction capture supports disjoint writes; overlapping writes and row ownership are not runtime-enforced. |
+| Parallel population writes safe for disjoint ranges | Implemented for scoped APIs: scheduler-issued partitions are disjoint and the scope exposes writes only within its assigned rows; declared columns, scope lifetime and callback thread are checked at runtime. |
 | Per-system timing, bounded history and runtime display | Implemented; worker-thread allocations are excluded and budgets only count overruns. |
 | Debug view for scheduler and spatial/field state | Partial: Garden F3 shows waves, timings, walkability and scent, not every engine counter. |
 | Live content hot reload | Partial: candidate preparation/validation exists; host swap and state migration do not. |
@@ -658,31 +659,44 @@ metadata; they are useful as motivation, not as current benchmark evidence.
 
 The checked-in million-agent benchmark measures one narrow CPU loop: one million rows with four
 32-bit integer columns, single-threaded position integration, no spatial index, rules, entities,
-renderer, scheduler or GPU. Each reported mode ran 20 warm-up and 100 measured ticks on the shared
-container (AMD EPYC 9V74, Debian 13, .NET 10.0.14 x64, four CPUs of cgroup quota). The `safe` mode
-wraps each tick in a world transaction; `optimized` deliberately runs without rollback. Exact
-workload and limitations are documented in `docs/million-agent-benchmark.md`.
+renderer, scheduler or GPU. Each run used 20 warm-up and 100 measured ticks on the shared container
+(AMD EPYC 9V74, Debian 13, .NET 10.0.14 x64, four CPUs of cgroup quota). The `safe` mode wraps each
+tick in a world transaction; `optimized` deliberately runs without rollback. Exact workload and
+limitations are documented in `docs/million-agent-benchmark.md`.
 
-| Mode | p50 | p95 | Maximum | Process allocations |
-| --- | ---: | ---: | ---: | ---: |
-| Safe, transactional | 1.444 ms | 5.515 ms | 23.660 ms | 0 B |
-| Optimized, no rollback | 0.881 ms | 1.278 ms | 18.444 ms | 0 B |
+| Mode | p50 | p95 | Maximum | Process allocations | Sampling |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Safe, transactional | 1.338 ms | 1.697 ms | 3.294 ms | 0 B | Median of 3 Release runs |
+| Optimized, no rollback | 0.768 ms | 0.919 ms | 4.947 ms | 0 B | Current single run |
 
-Both runs validated all rows and produced the same final hash. These values are observations from
-one shared virtualized machine, not a guarantee for a full game or the historical Core i5 target.
-The optimized mode is explicitly unsafe on a mid-tick failure because it may leave partial state.
+The three safe runs had p50 values 1.351, 1.338 and 1.274 ms and p95 values 2.098, 1.697 and
+1.600 ms. All runs validated every row, reported 0 B allocation and produced the same final hash
+`6d85a88dbfda5105`; the median safe p50 is below the 1.6467 ms limit (10% above the 1.497 ms
+baseline). These values are observations from one shared virtual machine, not a guarantee for a
+full game or the historical Core i5 target. The optimized mode is explicitly unsafe on a mid-tick
+failure because it may leave partial state.
 
-The solution-wide Release run also exercised the existing generic performance gate with 50,000
-products and 1,000 reactive actors. It measured p50 9.148 ms, p95 15.321 ms and p99 22.599 ms
-with 0 B reported allocations, against a p95 target below 5 ms. That gate failed on this shared
-container; the other 189 Integration tests passed. Do not lower the gate based on this result, and
-do not treat it as a measurement of the historical laptop target.
+The latest solution-wide Release run exercised the generic gate with 50,000 products and 1,000
+reactive actors and measured p50/p95/p99 of 4.923/6.235/6.529 ms, failing its p95 target below
+5 ms. A filtered current-branch Release run measured 7.912/9.263/9.505 ms; a CPU-pinned run later
+measured 2.853/3.418/4.548 ms and passed. The committed baseline failed in three filtered runs,
+with p95 values of 10.104, 11.403, and 10.251 ms; current-branch runs on the same container
+included both a failure and passes. The large spread means the shared runner cannot establish
+reliable acceptance, though the paired results suggest the current implementation is faster. Keep
+the workload and 5 ms target, and treat the gate as unresolved until it can run on a stable target.
+
+A paired Boids headless check pinned both builds to CPUs 0–3 and used 100,000 agents, four workers,
+200 warm-up ticks and 500 measured ticks. The committed baseline means were 9.272, 8.800, and
+9.485 ms/tick; the current branch after removing per-tick mirror-array copies measured 8.839,
+8.791, and 8.816 ms/tick. Every run remained above the 5 ms budget and reported 0 B allocation.
+The current median is modestly faster in this paired run, but the sample's strict budget is still
+open; these shared-container results do not establish behavior on the historical laptop target.
 
 ### 12.2 Costs that remain visible in the current code
 
 | Area | Current behavior and evidence |
 | --- | --- |
-| Safe rollback | The one-million-row example measures 5.515 ms p95 with transactions and 1.278 ms without. The gap is evidence of this workload's rollback cost; it does not isolate every undo copy or predict other systems. |
+| Safe rollback | The one-million-row example's latest three safe runs had median p95 1.697 ms; a separate no-rollback run measured 0.919 ms p95. The gap is evidence of this workload's rollback cost; it does not isolate every undo copy or predict other systems. |
 | Garden targeting | Garden rebuilds its population grids each tick and still has game-specific target selection. Floating and fixed-point nearest/k-nearest APIs and an incremental grid are available for other implementations. |
 | Garden resolution | Worker decisions run over disjoint scheduled ranges, then ordered bursts, pickups and deposits resolve serially to preserve first-come outcomes and fact order. No Garden benchmark isolates this tail. |
 | Dense talents | Magnetism work scales with motes and nearby creature candidates. The old claim of over one second at 50k workers is historical and was not reproduced with a recorded protocol. |

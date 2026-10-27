@@ -36,13 +36,14 @@ public sealed class SpatialIndex
 {
     private const long MaximumCellsPerEntry = 16_384;
     private const long DefaultMaximumCellMemberships = 1_000_000;
+    // Keep dense world IDs off the query dictionary without allocating for sparse, restored IDs.
+    private const int DenseEntryCacheLimit = 131_072;
     private readonly float _cellSize;
     private readonly long _maximumCellMemberships;
     private readonly Dictionary<Cell, HashSet<int>> _cells = [];
     private readonly Dictionary<int, Entry> _entries = [];
-    private readonly Dictionary<int, int> _queryMarks = [];
+    private Entry[] _entriesById = [];
     private long _cellMembershipCount;
-    private int _queryVersion;
 
     public SpatialIndex(float cellSize, long maximumCellMemberships = DefaultMaximumCellMemberships)
     {
@@ -92,6 +93,7 @@ public sealed class SpatialIndex
         }
 
         _entries[entityId] = next;
+        CacheEntry(entityId, next);
         AddToCells(entityId, next);
     }
 
@@ -100,6 +102,11 @@ public sealed class SpatialIndex
         if (!_entries.Remove(entityId, out var entry))
         {
             return false;
+        }
+
+        if (entityId < _entriesById.Length)
+        {
+            _entriesById[entityId] = default;
         }
 
         RemoveFromCells(entityId, entry);
@@ -146,22 +153,11 @@ public sealed class SpatialIndex
     {
         _cells.Clear();
         _entries.Clear();
-        _queryMarks.Clear();
+        _entriesById = [];
         _cellMembershipCount = 0;
-        _queryVersion = 0;
     }
 
-    private void BeginQuery(List<int> results)
-    {
-        results.Clear();
-        if (_queryVersion == int.MaxValue)
-        {
-            _queryMarks.Clear();
-            _queryVersion = 0;
-        }
-
-        _queryVersion++;
-    }
+    private static void BeginQuery(List<int> results) => results.Clear();
 
     private void CollectCandidates(
         Entry range,
@@ -182,13 +178,18 @@ public sealed class SpatialIndex
 
                 foreach (var entityId in bucket)
                 {
-                    if (_queryMarks.TryGetValue(entityId, out var markedVersion) && markedVersion == _queryVersion)
+                    var cachedEntry = entityId < _entriesById.Length
+                        ? _entriesById[entityId]
+                        : default;
+                    var entry = cachedEntry.CellCount > 0 ? cachedEntry : _entries[entityId];
+                    // Visit entries from their first cell shared with the query instead of using a marks table.
+                    if (Math.Max(range.MinX, entry.MinX) != x
+                        || Math.Max(range.MinY, entry.MinY) != y)
                     {
                         continue;
                     }
 
-                    _queryMarks[entityId] = _queryVersion;
-                    var bounds = _entries[entityId].Bounds;
+                    var bounds = entry.Bounds;
                     if (checkDistance)
                     {
                         if (bounds.DistanceSquaredTo(point) <= radiusSquared)
@@ -231,6 +232,24 @@ public sealed class SpatialIndex
         }
 
         return (int)cell;
+    }
+
+    private void CacheEntry(int entityId, Entry entry)
+    {
+        if (entityId > DenseEntryCacheLimit || entityId > _entries.Count * 2L)
+        {
+            return;
+        }
+
+        if (entityId >= _entriesById.Length)
+        {
+            var minimumLength = entityId + 1;
+            var doubledLength = Math.Max(16, _entriesById.Length * 2);
+            Array.Resize(ref _entriesById, Math.Min(DenseEntryCacheLimit + 1,
+                Math.Max(minimumLength, doubledLength)));
+        }
+
+        _entriesById[entityId] = entry;
     }
 
     private static void Validate(Bounds2 bounds)

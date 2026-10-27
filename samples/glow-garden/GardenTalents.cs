@@ -18,7 +18,23 @@ public sealed partial class GardenSimulation
     private readonly Queue<TalentIntent> _talentIntents = new(MaxTalentIntents);
     private readonly PopulationSpatialGrid2D _creatureGrid = new(new Bounds2(Width / 2, Height / 2, Width / 2, Height / 2), 90);
     private readonly List<int> _nearbyCreatures = new(MaxWorkers + MaxCopies);
+    private readonly List<int> _expiredCopies = new(MaxCopies);
+    private readonly List<(int Row, Vector2 Position)> _reactionBursts = new(MaxReactionBursts);
     private Impact? _publishingImpact;
+
+    private sealed class ChainState(
+        GardenSimulation simulation,
+        Impact impact,
+        Reaction reaction,
+        float radius,
+        int limit)
+    {
+        public GardenSimulation Simulation { get; } = simulation;
+        public Impact Impact { get; } = impact;
+        public Reaction Reaction { get; } = reaction;
+        public float Radius { get; } = radius;
+        public int Limit { get; } = limit;
+    }
 
     // Shared by one worker impact and its finite breadth-first chain, never indexed by dense rows.
     private sealed class Reaction(int creatureId, bool allowBounce)
@@ -130,14 +146,16 @@ public sealed partial class GardenSimulation
 
     private void StepTalents()
     {
-        for (var i = _creatures.Count - 1; i >= 0; i--)
-        {
-            var c = _creatures[i];
-            if (c.IsCopy && _creatures.Columns.CopyExpiryTick.ReadOnlySpan[i] <= Tick)
+        _creatures.WithAccess(new PopulationRange(0, _creatures.Count), this,
+            static (GardenSimulation simulation, scoped ref PopulationAccessScope<GardenCreature> access) =>
             {
-                _creatures.RemoveAt(i);
-            }
-        }
+                var copies = access.ReadRange(simulation._creatures.Columns.IsCopy);
+                var expiries = access.ReadRange(simulation._creatures.Columns.CopyExpiryTick);
+                simulation._expiredCopies.Clear();
+                for (var row = copies.Length - 1; row >= 0; row--)
+                    if (copies[row] && expiries[row] <= simulation.Tick) simulation._expiredCopies.Add(row);
+            });
+        foreach (var row in _expiredCopies) _creatures.RemoveAt(row);
         for (var i = 0; i < _pending.Count;)
         {
             var impact = _pending[i];
@@ -173,23 +191,37 @@ public sealed partial class GardenSimulation
         var pull = _tuning.MagnetismPull;
         // This snapshot is local to a phase with no creature movement or structural edits.
         // Mote removals elsewhere cannot stale its creature row indexes.
-        _creatureGrid.Rebuild(_creatures.Columns.Position.ReadOnlySpan);
-        for (var i = 0; i < _motes.Count; i++)
-        {
-            var m = _motes[i];
-            var target = -1;
-            var best = radius * radius;
-            _creatureGrid.QueryRadius(m.Position, radius, _nearbyCreatures);
-            foreach (var row in _nearbyCreatures)
+        _creatures.WithAccess(new PopulationRange(0, _creatures.Count), this,
+            static (GardenSimulation simulation, scoped ref PopulationAccessScope<GardenCreature> access) =>
+                simulation._creatureGrid.Rebuild(access.ReadRange(simulation._creatures.Columns.Position)));
+
+        using var creatures = _creatures.BorrowLease();
+        var state = new MagnetismState(this, creatures, radius, pull);
+        _motes.WithAccess(new PopulationRange(0, _motes.Count), state,
+            static (MagnetismState callbackState, scoped ref PopulationAccessScope<GardenMote> access) =>
             {
-                var c = _creatures[row];
-                if (c.Kind != CreatureKind.Gatherer || c.CarriedGlow >= 3 + Rank(UpgradeKind.GathererCapacity)) continue;
-                var distance = Vector2.DistanceSquared(m.Position, c.Position);
-                if (distance > 0 && distance < best) { target = row; best = distance; }
-            }
-            if (target < 0) continue;
-            _motes[i] = m with { Position = Move(m.Position, _creatures[target].Position, pull) };
-        }
+                var simulation = callbackState.Simulation;
+                var motePositions = access.EditRange(simulation._motes.Columns.Position);
+                var creaturePositions = access.ReadAll(callbackState.Creatures, simulation._creatures.Columns.Position);
+                var creatureKinds = access.ReadAll(callbackState.Creatures, simulation._creatures.Columns.Kind);
+                var carriedGlow = access.ReadAll(callbackState.Creatures, simulation._creatures.Columns.CarriedGlow);
+                var capacity = 3 + simulation.Rank(UpgradeKind.GathererCapacity);
+                for (var mote = 0; mote < motePositions.Length; mote++)
+                {
+                    var position = motePositions[mote];
+                    var target = -1;
+                    var best = callbackState.Radius * callbackState.Radius;
+                    simulation._creatureGrid.QueryRadius(position, callbackState.Radius, simulation._nearbyCreatures);
+                    foreach (var row in simulation._nearbyCreatures)
+                    {
+                        if ((CreatureKind)creatureKinds[row] != CreatureKind.Gatherer || carriedGlow[row] >= capacity) continue;
+                        var distance = Vector2.DistanceSquared(position, creaturePositions[row]);
+                        if (distance > 0 && distance < best) { target = row; best = distance; }
+                    }
+                    if (target >= 0)
+                        motePositions[mote] = Move(position, creaturePositions[target], callbackState.Pull);
+                }
+            });
     }
 
     private void SpawnCopy(Vector2 position)
@@ -197,8 +229,10 @@ public sealed partial class GardenSimulation
         if (CopyCount >= MaxCopies) return;
         var id = _nextCreatureId++;
         _creatures.Add(new(id, CreatureKind.Burstling, position, 0, 15, true));
-        _creatures.Columns.CopyExpiryTick.EditRange(_creatures.Count - 1, 1)[0] =
-            Tick + _tuning.CloneLifetime;
+        _creatures.WithAccess(new PopulationRange(_creatures.Count - 1, 1),
+            (_creatures.Columns, Expiry: Tick + _tuning.CloneLifetime),
+            static ((GardenCreaturePopulation.Columns Columns, int Expiry) state, scoped ref PopulationAccessScope<GardenCreature> access) =>
+                access.EditRange(state.Columns.CopyExpiryTick)[0] = state.Expiry);
     }
 
     private void DrainTalentIntents()
@@ -269,15 +303,29 @@ public sealed partial class GardenSimulation
         if (impact.Reaction is not { } reaction || impact.Depth >= 3) return;
         var radius = _tuning.ChainRadius;
         var limit = Math.Min(_tuning.ChainBursts, MaxReactionBursts);
-        _plantGrid.QueryRadius(impact.Position, radius, _reactionPlants);
-        var growth = _plants.Columns.Growth.ReadOnlySpan;
-        var positions = _plants.Columns.Position.ReadOnlySpan;
-        foreach (var row in _reactionPlants)
+        var state = new ChainState(this, impact, reaction, radius, limit);
+        _plants.WithAccess(new PopulationRange(0, _plants.Count), state,
+            static (ChainState callbackState, scoped ref PopulationAccessScope<GardenPlant> access) =>
+            {
+                var simulation = callbackState.Simulation;
+                var growth = access.ReadRange(simulation._plants.Columns.Growth);
+                var positions = access.ReadRange(simulation._plants.Columns.Position);
+                simulation._reactionPlants.Clear();
+                simulation._reactionBursts.Clear();
+                simulation._plantGrid.QueryRadius(callbackState.Impact.Position, callbackState.Radius, simulation._reactionPlants);
+                foreach (var row in simulation._reactionPlants)
+                {
+                    if (callbackState.Reaction.Bursts >= callbackState.Limit) break;
+                    var position = positions[row];
+                    if (growth[row] < 1
+                        || Vector2.DistanceSquared(callbackState.Impact.Position, position) > callbackState.Radius * callbackState.Radius) continue;
+                    callbackState.Reaction.Bursts++;
+                    simulation._reactionBursts.Add((row, position));
+                }
+            });
+
+        foreach (var (row, position) in _reactionBursts)
         {
-            if (reaction.Bursts >= limit) break;
-            var position = positions[row];
-            if (growth[row] < 1 || Vector2.DistanceSquared(impact.Position, position) > radius * radius) continue;
-            reaction.Bursts++;
             BurstPlant(row, new Impact(position, reaction, impact.Depth + 1));
             Publish("garden.combo", impact: new Impact(position));
         }

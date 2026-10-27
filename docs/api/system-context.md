@@ -30,11 +30,11 @@ The [compile-checked example](https://github.com/cakegod/systemic-framework/blob
 
 ## What the context exposes
 
-- `Tick`, `WorkerCount`, `World`, and `IsScheduledExecution` describe the current execution. Context methods are valid during a scheduled `Step`; do not retain the context, command writers, population buffers, or borrowed views after that call returns.
+- `Tick`, `WorkerCount`, `World`, and `IsScheduledExecution` describe the current execution. Context methods are valid during a scheduled `Step`; do not retain the context or command writers after that call returns. Population data is available only through synchronous access callbacks, whose spans expire when each callback returns.
 - `GetService<T>()` retrieves a service registered with `SystemicGameBuilder.AddService`. Systems share the registered service instance, so declare the resources that protect any shared mutable service state.
 - `Commands` records deferred World changes. A system's private commands flush at the end of its scheduling wave in stable registration order.
 - `GetWritableWorld`, `SetProperty`, `Publish`, and `Execute` perform immediate World work. The system must declare `SystemAccess.WriteWorld`; this places it in a wave by itself.
-- `BorrowPopulation` leases population storage while a system uses its column views. Structural changes must wait until those views are no longer leased.
+- `ForEachPopulationRange` can take a `Population<TKind>` directly, lease its storage for the scheduled callback, and release it when the range call returns. `BorrowPopulation` is available when a system needs a lease outside one range call, such as to read another population. Structural changes must wait until all relevant access callbacks and leases end.
 - `ForEachRange` partitions contiguous row ranges. Each row belongs to at most one callback, and each callback receives its partition index and range. Worker callbacks should write only that range and should not make immediate World changes or mutate a shared command buffer.
 - `ReduceRanges` maps logical partitions and merges partial results in partition order. Keep the partition count fixed when results must use the same merge order across worker counts; the arithmetic itself must also be deterministic.
 - `OnRollback` registers recovery for state outside the World journal. Stateful extensions already participate in the host's transaction snapshots; use this hook for other external state changed by the current step.

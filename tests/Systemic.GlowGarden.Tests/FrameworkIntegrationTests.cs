@@ -2,6 +2,7 @@ using GlowGarden;
 using System.Numerics;
 using System.Text.Json.Nodes;
 using Systemic.Host;
+using Systemic.Kernel;
 using Systemic.Rules;
 using Xunit;
 
@@ -30,7 +31,7 @@ public sealed class FrameworkIntegrationTests
         b.Step(300);
         Assert.True(a.Game.World.Draws.Draws > 6);
         Assert.Equal(a.Game.World.Draws.CaptureState(), b.Game.World.Draws.CaptureState());
-        Assert.Equal(a.Simulation.Motes.ToArray(), b.Simulation.Motes.ToArray());
+        Assert.Equal(a.Simulation.Motes.ToArray(), [.. b.Simulation.Motes]);
     }
 
     [Fact]
@@ -52,7 +53,7 @@ public sealed class FrameworkIntegrationTests
             Assert.Equal(before.Length + 1, host.Simulation.Creatures.Count);
             transaction.Rollback();
         }
-        Assert.Equal(before, host.Simulation.Creatures.ToArray());
+        Assert.Equal(before, [.. host.Simulation.Creatures]);
         Assert.Equal(beforeGlow, host.Simulation.Glow);
         Assert.Equal(beforeTreeSpend, host.Simulation.Spent(UpgradeTree.MagicGrowth));
         Assert.Equal(beforeYieldRank, host.Simulation.Rank(UpgradeKind.PodYield));
@@ -120,7 +121,7 @@ public sealed class FrameworkIntegrationTests
             }
             else
             {
-                Assert.Equal(normal.Simulation.Plants.ToArray(), changed.Plants.ToArray());
+                Assert.Equal(normal.Simulation.Plants.ToArray(), [.. changed.Plants]);
                 Assert.Equal(normal.Simulation.EffectCount(Talent.Seedstorm), changed.EffectCount(Talent.Seedstorm));
             }
             Assert.True(changed.BurstCount > 0);
@@ -137,13 +138,18 @@ public sealed class FrameworkIntegrationTests
         using (var transaction = host.Game.World.BeginTransaction())
         {
             var columns = GardenPlantPopulation.Bind(host.Game.World.GetPopulation<GardenPlant>());
-            columns.Growth.EditRange(0, 1)[0] = 0.75f;
+            using (var lease = host.Game.World.GetPopulation<GardenPlant>().Borrow())
+            {
+                lease.WithAccess(new PopulationRange(0, 1), columns.Growth,
+                    static (PopulationColumn<float> growth, scoped ref PopulationAccessScope<GardenPlant> access) =>
+                        access.EditRange(growth)[0] = 0.75f);
+            }
             Assert.Equal(0.75f, model.Plants[0].Growth);
             model._plants.RemoveAt(1);
             Assert.Equal(before[^1].Id, model.Plants[1].Id);
             transaction.Rollback();
         }
-        Assert.Equal(before, model.Plants.ToArray());
+        Assert.Equal(before, [.. model.Plants]);
     }
 
     [Fact]

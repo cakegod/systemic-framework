@@ -16,7 +16,7 @@ internal partial struct DocumentationAgent
 }
 #pragma warning restore CS0649
 
-internal sealed class DocumentationPopulationSystem : ISystemicSystem
+internal sealed class DocumentationPopulationSystem(Population<DocumentationAgent> agents) : ISystemicSystem
 {
     private static readonly ImmutableArray<SystemAccess> s_access =
     [
@@ -26,14 +26,8 @@ internal sealed class DocumentationPopulationSystem : ISystemicSystem
         DocumentationAgentPopulation.WriteVelocity
     ];
 
-    private readonly Population<DocumentationAgent> _agents;
-    private readonly DocumentationAgentPopulation.Columns _columns;
-
-    public DocumentationPopulationSystem(Population<DocumentationAgent> agents)
-    {
-        _agents = agents;
-        _columns = DocumentationAgentPopulation.Bind(agents);
-    }
+    private readonly Population<DocumentationAgent> _agents = agents;
+    private readonly DocumentationAgentPopulation.Columns _columns = DocumentationAgentPopulation.Bind(agents);
 
     public string Id => "docs.agent-movement";
 
@@ -43,20 +37,21 @@ internal sealed class DocumentationPopulationSystem : ISystemicSystem
     {
         _ = context.Tick;
         using var lease = context.BorrowPopulation(_agents);
-        context.ForEachRange((Lease: lease, Columns: _columns), _agents.Count,
-            static (state, _, range) =>
+        context.ForEachPopulationRange(lease, (Lease: lease, Columns: _columns),
+            static ((PopulationLease<DocumentationAgent> Lease, DocumentationAgentPopulation.Columns Columns) state,
+                int _, scoped ref PopulationAccessScope<DocumentationAgent> access) =>
             {
-                var positions = state.Lease.ReadCurrent(state.Columns.Position);
-                var velocities = state.Lease.Read(state.Columns.Velocity);
-                var writer = state.Columns.WriteRange(range);
+                var range = access.Range;
+                var positions = access.ReadCurrentRange(state.Columns.Position);
+                var velocities = access.ReadRange(state.Columns.Velocity);
+                var writer = state.Columns.WriteRange(ref access);
 
                 for (var offset = 0; offset < range.Length; offset++)
                 {
-                    var row = range.Start + offset;
                     writer.Write(offset, new DocumentationAgentPopulation.Row
                     {
-                        Position = positions[row] + velocities[row],
-                        Velocity = velocities[row]
+                        Position = positions[offset] + velocities[offset],
+                        Velocity = velocities[offset]
                     });
                 }
             });

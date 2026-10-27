@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Systemic.Kernel;
 
@@ -46,6 +48,27 @@ public sealed class DataEntity : Entity
 
         world.RecordDataEntityPropertyMutation(this, name, value1);
         _properties[name] = value;
+
+        return true;
+    }
+
+    // Rule adjustments can update the existing dictionary slot after recording its undo value.
+    internal bool TryAdjustProperty(World world, string name, double amount, out double updated)
+    {
+        ref var current = ref CollectionsMarshal.GetValueRefOrNullRef(_properties, name);
+        if (Unsafe.IsNullRef(ref current))
+        {
+            updated = 0;
+            return false;
+        }
+
+        var previous = current;
+        updated = previous + amount;
+        if (double.IsFinite(updated))
+        {
+            world.RecordDataEntityPropertyMutation(this, name, previous);
+            current = updated;
+        }
 
         return true;
     }

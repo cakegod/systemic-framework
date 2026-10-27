@@ -11,3 +11,4 @@ SYSACC002 | SystemAccess | Error | Deferred population commands require deferred
 SYSACC003 | SystemAccess | Error | Direct population edits are forbidden inside ForEachRange callbacks
 SYSACC004 | SystemAccess | Error | Direct generated column reads and writes require matching per-column access declarations
 SYSACC005 | SystemAccess | Error | Immediate World and shared command-buffer mutations are unsafe inside ForEachRange callbacks
+SYSACC006 | SystemAccess | Error | Full single-buffered population reads conflict with parallel writes to the column

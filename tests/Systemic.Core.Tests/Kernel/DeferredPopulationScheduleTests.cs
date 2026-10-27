@@ -36,7 +36,7 @@ public sealed class DeferredPopulationScheduleTests
 
         schedule.Execute(world, 1);
 
-        Assert.Equal(new[] { 30, 40, 50, 55, 60 }, column.ReadOnlySpan.ToArray());
+        Assert.Equal([30, 40, 50, 55, 60], column.ReadOnlySpan.ToArray());
         Assert.True(population.TryResolve(kept, out var keptRow));
         Assert.Equal(0, keptRow);
     }
@@ -62,7 +62,7 @@ public sealed class DeferredPopulationScheduleTests
 
         Assert.Throws<InvalidDataException>(() => schedule.Execute(world, 1));
 
-        Assert.Equal(new[] { 3, 3 }, column.ReadOnlySpan.ToArray());
+        Assert.Equal([3, 3], column.ReadOnlySpan.ToArray());
         Assert.Equal(2, population.Count);
         Assert.Throws<InvalidOperationException>(() => captured!.RemoveRow(0));
         Assert.Throws<InvalidOperationException>(() => captured!.Flush());
@@ -125,15 +125,19 @@ public sealed class DeferredPopulationScheduleTests
             .Add(new TestSystem("lease", context =>
             {
                 lease = context.BorrowPopulation(population);
-                lease.Edit(column, 1, 1)[0] = 8;
+                context.ForEachPopulationRange(lease, column,
+                    static (PopulationColumn<int> target, int _, scoped ref PopulationAccessScope<Kind> scope) =>
+                        scope.EditRange(target)[1] = 8);
                 context.DeferPopulationCommands(population, 1)[0].RemoveRow(0);
-            }))
+            }, [SystemAccess.DeferWorldWrites, SystemAccess.WriteColumn<Kind, int>(s_key)]))
             .Build();
 
         schedule.Execute(world, 1);
 
-        Assert.Equal(new[] { 8 }, column.ReadOnlySpan.ToArray());
-        Assert.Throws<ObjectDisposedException>(() => { _ = lease!.Read(column); });
+        Assert.Equal([8], column.ReadOnlySpan.ToArray());
+        Assert.Throws<ObjectDisposedException>(() => lease!.WithAccess(new PopulationRange(0, 1), column,
+            static (PopulationColumn<int> target, scoped ref PopulationAccessScope<Kind> scope) =>
+                _ = scope.ReadAll(target)));
     }
 
     [Fact]
@@ -147,9 +151,11 @@ public sealed class DeferredPopulationScheduleTests
             .Add(new TestSystem("failure", context =>
             {
                 var lease = context.BorrowPopulation(population);
-                lease.Edit(column, 0, 1)[0] = 9;
+                context.ForEachPopulationRange(lease, column,
+                    static (PopulationColumn<int> target, int _, scoped ref PopulationAccessScope<Kind> scope) =>
+                        scope.EditRange(target)[0] = 9);
                 throw new InvalidOperationException("expected failure");
-            }))
+            }, [SystemAccess.WriteColumn<Kind, int>(s_key)]))
             .Build();
 
         Assert.Throws<InvalidOperationException>(() => schedule.Execute(world, 1));

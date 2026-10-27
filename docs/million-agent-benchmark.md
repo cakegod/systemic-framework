@@ -58,19 +58,21 @@ virtualized CPU model does not establish performance on an older desktop CPU.
 
 ## Example observation
 
-On 2026-10-27, a Release run in the shared development container used 20 warm-up
-ticks and 100 measured ticks per mode. The reported CPU was an AMD EPYC 9V74,
-with Debian 13 and .NET 10.0.14 x64. The process reported 4 available processors,
-affinity and effective cpuset `0-4`, cgroup `cpu.max` of `400000 100000`
-(four CPUs of quota), and `memory.max` of 32 GiB. Other development activity was
-present, so this is a single shared-container observation.
+On 2026-10-27, three safe Release runs and one optimized Release run in the shared
+development container used 20 warm-up ticks and 100 measured ticks per run. The
+reported CPU was an AMD EPYC 9V74, with Debian 13 and .NET 10.0.14 x64. The process
+reported 4 available processors, affinity and effective cpuset `0-4`, cgroup
+`cpu.max` of `400000 100000` (four CPUs of quota), and `memory.max` of 32 GiB.
+Other development activity was present, so these are shared-container observations.
 
-| Mode | p50 | p95 | Maximum | Process allocations |
-| --- | ---: | ---: | ---: | ---: |
-| Safe, transactional | 1.444 ms | 5.515 ms | 23.660 ms | 0 B |
-| Optimized, no rollback | 0.881 ms | 1.278 ms | 18.444 ms | 0 B |
+| Mode | p50 | p95 | Maximum | Process allocations | Sampling |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Safe, transactional | 1.338 ms | 1.697 ms | 3.294 ms | 0 B | Median of 3 runs |
+| Optimized, no rollback | 0.768 ms | 0.919 ms | 4.947 ms | 0 B | 1 run |
 
-Both modes validated all 1,000,000 rows and reported state hash
-`6d85a88dbfda5105`. Their p95s met the 8 ms target in this run; the larger maxima
-show that individual ticks exceeded it. These values describe the workload and
-environment above and are not measurements of a full game or another CPU.
+The three safe runs had p50 values 1.351, 1.338 and 1.274 ms and p95 values
+2.098, 1.697 and 1.600 ms. Both modes validated all 1,000,000 rows and reported
+state hash `6d85a88dbfda5105`; all measured runs reported 0 B process allocation.
+The safe p50 median is below the 1.6467 ms limit (10% above the 1.497 ms baseline).
+These values describe the workload and environment above and are not measurements
+of a full game or another CPU.

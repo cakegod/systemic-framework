@@ -46,6 +46,41 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
     internal readonly MoteStates _motes;
     private int _nextCreatureId, _nextMoteId, _nextPlantId;
 
+    private sealed class PlantSearchState(
+        GardenSimulation simulation,
+        Vector2 position,
+        float maxRadius,
+        List<int> rows)
+    {
+        public GardenSimulation Simulation { get; } = simulation;
+        public Vector2 Position { get; } = position;
+        public float MaxRadius { get; } = maxRadius;
+        public List<int> Rows { get; } = rows;
+        public int Result { get; set; } = -1;
+    }
+
+    private sealed class MagnetismState(
+        GardenSimulation simulation,
+        PopulationLease<GardenCreature> creatures,
+        float radius,
+        float pull)
+    {
+        public GardenSimulation Simulation { get; } = simulation;
+        public PopulationLease<GardenCreature> Creatures { get; } = creatures;
+        public float Radius { get; } = radius;
+        public float Pull { get; } = pull;
+    }
+
+    private sealed class DecisionState(
+        GardenSimulation simulation,
+        PopulationLease<GardenPlant> plants,
+        PopulationLease<GardenMote> motes)
+    {
+        public GardenSimulation Simulation { get; } = simulation;
+        public PopulationLease<GardenPlant> Plants { get; } = plants;
+        public PopulationLease<GardenMote> Motes { get; } = motes;
+    }
+
     public GardenSimulation(World world, GardenTuning? tuning = null, bool restoring = false)
     {
         _world = world;
@@ -104,14 +139,44 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
     private static readonly ImmutableArray<SystemAccess> s_access =
     [
         SystemAccess.WriteWorld,
+        GardenPlantPopulation.ReadStableId,
+        GardenPlantPopulation.ReadPosition,
+        GardenPlantPopulation.ReadGrowth,
+        GardenPlantPopulation.WriteStableId,
+        GardenPlantPopulation.WritePosition,
         GardenPlantPopulation.WriteGrowth,
-        GardenMotePopulation.WritePosition,
-        GardenMotePopulation.WriteVelocity,
-        GardenMotePopulation.WriteValue,
+        GardenCreaturePopulation.ReadStableId,
+        GardenCreaturePopulation.ReadKind,
+        GardenCreaturePopulation.ReadPosition,
+        GardenCreaturePopulation.ReadCarriedGlow,
+        GardenCreaturePopulation.ReadCooldown,
+        GardenCreaturePopulation.ReadIsCopy,
+        GardenCreaturePopulation.ReadLeapProgress,
+        GardenCreaturePopulation.ReadHeading,
+        GardenCreaturePopulation.ReadWanderTicks,
+        GardenCreaturePopulation.ReadStallTicks,
+        GardenCreaturePopulation.ReadSlideSide,
+        GardenCreaturePopulation.ReadCopyExpiryTick,
+        GardenCreaturePopulation.WriteStableId,
+        GardenCreaturePopulation.WriteKind,
         GardenCreaturePopulation.WritePosition,
         GardenCreaturePopulation.WriteCarriedGlow,
         GardenCreaturePopulation.WriteCooldown,
+        GardenCreaturePopulation.WriteIsCopy,
         GardenCreaturePopulation.WriteLeapProgress,
+        GardenCreaturePopulation.WriteHeading,
+        GardenCreaturePopulation.WriteWanderTicks,
+        GardenCreaturePopulation.WriteStallTicks,
+        GardenCreaturePopulation.WriteSlideSide,
+        GardenCreaturePopulation.WriteCopyExpiryTick,
+        GardenMotePopulation.ReadStableId,
+        GardenMotePopulation.ReadPosition,
+        GardenMotePopulation.ReadVelocity,
+        GardenMotePopulation.ReadValue,
+        GardenMotePopulation.WriteStableId,
+        GardenMotePopulation.WritePosition,
+        GardenMotePopulation.WriteVelocity,
+        GardenMotePopulation.WriteValue,
     ];
 
     public IReadOnlyList<SystemAccess> Access => s_access;
@@ -128,6 +193,13 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
 
     private float NextFloat() => _world.Draws.NextFloat();
 
+    private void BindPopulationContext(SystemicSystemContext? context)
+    {
+        _plants.BindContext(context);
+        _creatures.BindContext(context);
+        _motes.BindContext(context);
+    }
+
     private static Vector2 Move(Vector2 from, Vector2 to, float distance)
     {
         var delta = to - from;
@@ -138,11 +210,19 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
     /// <summary>Consumed motes are tombstoned so row indexes stay valid during the worker loop.</summary>
     private void RemoveConsumedMotes()
     {
-        for (var i = _motes.Count - 1; i >= 0; i--)
-        {
-            if (_motes.Columns.Value.ReadOnlySpan[i] <= 0) _motes.RemoveAt(i);
-        }
+        _motes.WithAccess(new PopulationRange(0, _motes.Count), this,
+            static (GardenSimulation simulation, scoped ref PopulationAccessScope<GardenMote> access) =>
+            {
+                var values = access.ReadRange(simulation._motes.Columns.Value);
+                simulation._consumedMotes.Clear();
+                for (var row = values.Length - 1; row >= 0; row--)
+                    if (values[row] <= 0) simulation._consumedMotes.Add(row);
+            });
+
+        foreach (var row in _consumedMotes) _motes.RemoveAt(row);
     }
+
+    private readonly List<int> _consumedMotes = new(MaxMotes);
 
     /// <summary>
     /// Grid radius queries grow from a small radius; a hit inside the queried radius is the true
@@ -150,15 +230,33 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
     /// </summary>
     private int NearestRipe(Vector2 position, float maxRadius, List<int>? rows = null)
     {
-        var scratch = rows ?? _nearbyPlants;
+        var state = new PlantSearchState(this, position, maxRadius, rows ?? _nearbyPlants);
+        _plants.WithAccess(new PopulationRange(0, _plants.Count), state,
+            static (PlantSearchState search, scoped ref PopulationAccessScope<GardenPlant> access) =>
+            {
+                search.Result = search.Simulation.FindNearestRipe(
+                    search.Position,
+                    search.MaxRadius,
+                    search.Rows,
+                    access.ReadRange(search.Simulation._plants.Columns.Growth),
+                    access.ReadRange(search.Simulation._plants.Columns.Position));
+            });
+        return state.Result;
+    }
+
+    private int FindNearestRipe(
+        Vector2 position,
+        float maxRadius,
+        List<int> scratch,
+        ReadOnlySpan<float> growth,
+        ReadOnlySpan<Vector2> positions)
+    {
         var radius = MathF.Min(SearchStartRadius, maxRadius);
         while (true)
         {
             var found = -1;
             var best = float.MaxValue;
             _plantGrid.QueryRadius(position, radius, scratch);
-            var growth = _plants.Columns.Growth.ReadOnlySpan;
-            var positions = _plants.Columns.Position.ReadOnlySpan;
             foreach (var row in scratch)
             {
                 if (growth[row] < 1) continue;
@@ -176,17 +274,19 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
         }
     }
 
-    private int NearestMote(Vector2 position, float maxRadius, List<int>? rows = null)
+    private int FindNearestMote(
+        Vector2 position,
+        float maxRadius,
+        List<int> scratch,
+        ReadOnlySpan<int> values,
+        ReadOnlySpan<Vector2> positions)
     {
-        var scratch = rows ?? _nearbyMotes;
         var radius = MathF.Min(SearchStartRadius, maxRadius);
         while (true)
         {
             var found = -1;
             var best = float.MaxValue;
             _moteGrid.QueryRadius(position, radius, scratch);
-            var values = _motes.Columns.Value.ReadOnlySpan;
-            var positions = _motes.Columns.Position.ReadOnlySpan;
             foreach (var row in scratch)
             {
                 if (values[row] <= 0) continue;
@@ -206,9 +306,6 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
 
     private const byte IntentNone = 0, IntentBurst = 1, IntentCollect = 2, IntentDeposit = 3;
 
-    private static readonly Action<GardenSimulation, int, PopulationRange> s_decideRange =
-        static (simulation, _, range) => simulation.DecideRange(range.Start, range.End);
-
     [ThreadStatic] private static List<int>? t_plantRows;
     [ThreadStatic] private static List<int>? t_moteRows;
 
@@ -221,6 +318,9 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
     private readonly int[] _decidedWaits = new int[MaxWorkers + MaxCopies];
     private readonly int[] _decidedStalls = new int[MaxWorkers + MaxCopies];
     private readonly int[] _decidedSides = new int[MaxWorkers + MaxCopies];
+    private readonly int[] _resolvedIds = new int[MaxWorkers + MaxCopies];
+    private readonly bool[] _resolvedCopies = new bool[MaxWorkers + MaxCopies];
+    private readonly int[] _resolvedCarried = new int[MaxWorkers + MaxCopies];
     private Action<SimulationFact> _publish = _ => { };
     private int _tickCooldown, _tickCapacity, _tickPatience;
     private float _tickSpeed, _tickScoutRadius, _tickTrailThreshold, _tickTrailStrength;
@@ -228,7 +328,15 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
     public void Step(SystemicSystemContext context)
     {
         _publish = fact => context.Publish(fact);
-        ExecuteCore(context);
+        BindPopulationContext(context);
+        try
+        {
+            ExecuteCore(context);
+        }
+        finally
+        {
+            BindPopulationContext(null);
+        }
     }
 
     private void ExecuteCore(SystemicSystemContext context)
@@ -240,34 +348,23 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
         _tickTrailStrength = _tuning.TrailStrength;
         _scent.Decay(_tuning.TrailDecay);
         StepTalents();
-        _plantGrid.Rebuild(_plants.Columns.Position.ReadOnlySpan);
-
-        for (var i = 0; i < _plants.Count; i++)
-        {
-            var p = _plants[i];
-            _plants[i] = p with
-            {
-                Growth = MathF.Min(1, p.Growth + (1 + Rank(UpgradeKind.PodGrowth) * 0.12f) / 240f)
-            };
-        }
-
-        var motePositions = _motes.Columns.Position.EditRange(0, _motes.Count);
-        var moteVelocities = _motes.Columns.Velocity.EditRange(0, _motes.Count);
-        for (var i = 0; i < motePositions.Length; i++)
-        {
-            var previous = motePositions[i];
-            var next = Vector2.Clamp(previous + moteVelocities[i], Vector2.Zero, new(Width, Height));
-            // Glow drifts up to a thicket and stops against it, so it always stays collectable.
-            motePositions[i] = Obstacles.Constrain(previous, next);
-            moteVelocities[i] *= 0.9f;
-        }
-        _moteGrid.Rebuild(motePositions);
+        RebuildPlantGrid();
+        GrowPlants();
+        DriftMotes();
 
         _tickCooldown = Math.Max(3, 30 - Rank(UpgradeKind.BurstlingWorkRate));
         _tickCapacity = 3 + Rank(UpgradeKind.GathererCapacity);
         _tickSpeed = 3 + Rank(UpgradeKind.GathererSpeed) * 0.3f;
         var count = _creatures.Count;
-        context.ForEachRange(this, count, s_decideRange);
+        {
+            using var creatures = context.BorrowPopulation(_creatures.Population);
+            using var plants = context.BorrowPopulation(_plants.Population);
+            using var motes = context.BorrowPopulation(_motes.Population);
+            context.ForEachPopulationRange(
+                creatures,
+                new DecisionState(this, plants, motes),
+                DecidePopulationRange);
+        }
         ApplyDecisions(count);
         ResolveWorkerIntents(count);
         RemoveConsumedMotes();
@@ -276,27 +373,67 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
         DrainTalentIntents();
     }
 
+    private void RebuildPlantGrid() =>
+        _plants.WithAccess(new PopulationRange(0, _plants.Count), this,
+            static (GardenSimulation simulation, scoped ref PopulationAccessScope<GardenPlant> access) =>
+                simulation._plantGrid.Rebuild(access.ReadRange(simulation._plants.Columns.Position)));
+
+    private void GrowPlants()
+    {
+        var growth = (1 + Rank(UpgradeKind.PodGrowth) * 0.12f) / 240f;
+        _plants.WithAccess(new PopulationRange(0, _plants.Count), (_plants.Columns, Growth: growth),
+            static ((GardenPlantPopulation.Columns Columns, float Growth) state, scoped ref PopulationAccessScope<GardenPlant> access) =>
+            {
+                var plants = access.EditRange(state.Columns.Growth);
+                for (var row = 0; row < plants.Length; row++)
+                    plants[row] = MathF.Min(1, plants[row] + state.Growth);
+            });
+    }
+
+    private void DriftMotes()
+    {
+        _motes.WithAccess(new PopulationRange(0, _motes.Count), this,
+            static (GardenSimulation simulation, scoped ref PopulationAccessScope<GardenMote> access) =>
+            {
+                var positions = access.EditRange(simulation._motes.Columns.Position);
+                var velocities = access.EditRange(simulation._motes.Columns.Velocity);
+                for (var row = 0; row < positions.Length; row++)
+                {
+                    var previous = positions[row];
+                    var next = Vector2.Clamp(previous + velocities[row], Vector2.Zero, new(Width, Height));
+                    // Glow drifts up to a thicket and stops against it, so it always stays collectable.
+                    positions[row] = simulation.Obstacles.Constrain(previous, next);
+                    velocities[row] *= 0.9f;
+                }
+                simulation._moteGrid.Rebuild(positions);
+            });
+    }
+
     /// <summary>Copies parallel decisions into population columns in stable row order.</summary>
     private void ApplyDecisions(int count)
     {
-        var positions = _creatures.Columns.Position.EditRange(0, count);
-        var cooldowns = _creatures.Columns.Cooldown.EditRange(0, count);
-        var leaps = _creatures.Columns.LeapProgress.EditRange(0, count);
-        var headings = _creatures.Columns.Heading.EditRange(0, count);
-        var waits = _creatures.Columns.WanderTicks.EditRange(0, count);
-        var stalls = _creatures.Columns.StallTicks.EditRange(0, count);
-        var sides = _creatures.Columns.SlideSide.EditRange(0, count);
-        for (var row = 0; row < count; row++)
-        {
-            // Wall-following can push a worker past the garden edge; populations reject out-of-bounds rows.
-            positions[row] = Vector2.Clamp(_decidedPositions[row], Vector2.Zero, new(Width, Height));
-            cooldowns[row] = _decidedCooldowns[row];
-            leaps[row] = _decidedLeaps[row];
-            headings[row] = _decidedHeadings[row];
-            waits[row] = _decidedWaits[row];
-            stalls[row] = _decidedStalls[row];
-            sides[row] = _decidedSides[row];
-        }
+        _creatures.WithAccess(new PopulationRange(0, count), this,
+            static (GardenSimulation simulation, scoped ref PopulationAccessScope<GardenCreature> access) =>
+            {
+                var positions = access.EditRange(simulation._creatures.Columns.Position);
+                var cooldowns = access.EditRange(simulation._creatures.Columns.Cooldown);
+                var leaps = access.EditRange(simulation._creatures.Columns.LeapProgress);
+                var headings = access.EditRange(simulation._creatures.Columns.Heading);
+                var waits = access.EditRange(simulation._creatures.Columns.WanderTicks);
+                var stalls = access.EditRange(simulation._creatures.Columns.StallTicks);
+                var sides = access.EditRange(simulation._creatures.Columns.SlideSide);
+                for (var row = 0; row < positions.Length; row++)
+                {
+                    // Wall-following can push a worker past the garden edge; populations reject out-of-bounds rows.
+                    positions[row] = Vector2.Clamp(simulation._decidedPositions[row], Vector2.Zero, new(Width, Height));
+                    cooldowns[row] = simulation._decidedCooldowns[row];
+                    leaps[row] = simulation._decidedLeaps[row];
+                    headings[row] = simulation._decidedHeadings[row];
+                    waits[row] = simulation._decidedWaits[row];
+                    stalls[row] = simulation._decidedStalls[row];
+                    sides[row] = simulation._decidedSides[row];
+                }
+            });
     }
 
     /// <summary>Deterministic per-row noise: scouting must not read the shared draw stream in parallel.</summary>
@@ -339,37 +476,46 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
     /// worker that finds nothing for a while commits to the full-map search, and stays committed
     /// until it arrives. Thickets are followed rather than pressed into.
     /// </summary>
-    private void DecideRange(int start, int end)
+    private static void DecidePopulationRange(
+        DecisionState state,
+        int partition,
+        scoped ref PopulationAccessScope<GardenCreature> access)
     {
-        var positions = _creatures.Columns.Position.ReadOnlySpan;
-        var cooldowns = _creatures.Columns.Cooldown.ReadOnlySpan;
-        var leaps = _creatures.Columns.LeapProgress.ReadOnlySpan;
-        var kinds = _creatures.Columns.Kind.ReadOnlySpan;
-        var carried = _creatures.Columns.CarriedGlow.ReadOnlySpan;
-        var headings = _creatures.Columns.Heading.ReadOnlySpan;
-        var waits = _creatures.Columns.WanderTicks.ReadOnlySpan;
-        var stalls = _creatures.Columns.StallTicks.ReadOnlySpan;
-        var sides = _creatures.Columns.SlideSide.ReadOnlySpan;
-        var ids = _creatures.Columns.StableId.ReadOnlySpan;
-        var plants = _plants.Columns.Position.ReadOnlySpan;
-        var motes = _motes.Columns.Position.ReadOnlySpan;
-        var tick = Tick;
-        var scoutSpeed = _tickSpeed * 0.7f;
+        _ = partition;
+        var simulation = state.Simulation;
+        var range = access.Range;
+        var positions = access.ReadRange(simulation._creatures.Columns.Position);
+        var cooldowns = access.ReadRange(simulation._creatures.Columns.Cooldown);
+        var leaps = access.ReadRange(simulation._creatures.Columns.LeapProgress);
+        var kinds = access.ReadRange(simulation._creatures.Columns.Kind);
+        var carried = access.ReadRange(simulation._creatures.Columns.CarriedGlow);
+        var headings = access.ReadRange(simulation._creatures.Columns.Heading);
+        var waits = access.ReadRange(simulation._creatures.Columns.WanderTicks);
+        var stalls = access.ReadRange(simulation._creatures.Columns.StallTicks);
+        var sides = access.ReadRange(simulation._creatures.Columns.SlideSide);
+        var ids = access.ReadRange(simulation._creatures.Columns.StableId);
+        var plantGrowth = access.ReadAll(state.Plants, simulation._plants.Columns.Growth);
+        var plants = access.ReadAll(state.Plants, simulation._plants.Columns.Position);
+        var moteValues = access.ReadAll(state.Motes, simulation._motes.Columns.Value);
+        var motes = access.ReadAll(state.Motes, simulation._motes.Columns.Position);
+        var tick = simulation.Tick;
+        var scoutSpeed = simulation._tickSpeed * 0.7f;
 
-        for (var row = start; row < end; row++)
+        for (var offset = 0; offset < range.Length; offset++)
         {
-            var position = positions[row];
-            var heading = headings[row];
-            var waiting = waits[row];
-            var stall = stalls[row];
-            var side = sides[row];
+            var row = range.Start + offset;
+            var position = positions[offset];
+            var heading = headings[offset];
+            var waiting = waits[offset];
+            var stall = stalls[offset];
+            var side = sides[offset];
             var next = position;
             var mode = IntentNone;
             var target = -1;
-            var cooldown = cooldowns[row];
-            var leap = leaps[row];
+            var cooldown = cooldowns[offset];
+            var leap = leaps[offset];
 
-            if ((CreatureKind)kinds[row] == CreatureKind.Burstling)
+            if ((CreatureKind)kinds[offset] == CreatureKind.Burstling)
             {
                 if (cooldown > 0)
                 {
@@ -379,30 +525,32 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                 }
                 else
                 {
-                    target = NearestRipe(position, _tickScoutRadius, t_plantRows ??= new(256));
+                    target = simulation.FindNearestRipe(
+                        position, simulation._tickScoutRadius, t_plantRows ??= new(256), plantGrowth, plants);
                     var nearby = target >= 0;
-                    if (!nearby && waiting >= _tickPatience)
-                        target = NearestRipe(position, MaximumSearchRadius, t_plantRows ??= new(256));
+                    if (!nearby && waiting >= simulation._tickPatience)
+                        target = simulation.FindNearestRipe(
+                            position, MaximumSearchRadius, t_plantRows ??= new(256), plantGrowth, plants);
 
                     if (target < 0)
                     {
-                        if (_scent.TrySteer(position, _tickTrailThreshold, out var trail))
+                        if (simulation._scent.TrySteer(position, simulation._tickTrailThreshold, out var trail))
                         {
                             // Scout along a known food route before falling back to blind wandering.
                             next = Move(position, position + (trail * 16f), scoutSpeed);
                             heading = MathF.Atan2(trail.Y, trail.X);
                         }
-                        else next = Wander(tick, ids[row], position, scoutSpeed, ref heading);
+                        else next = simulation.Wander(tick, ids[offset], position, scoutSpeed, ref heading);
                         waiting++;
                     }
                     else
                     {
                         var plantPosition = plants[target];
                         var distance = Vector2.DistanceSquared(position, plantPosition);
-                        next = Move(position, plantPosition, _tickSpeed);
+                        next = Move(position, plantPosition, simulation._tickSpeed);
                         leap = Math.Clamp(1 - (MathF.Sqrt(distance) / 48f), 0, 1);
                         heading = Direction(position, plantPosition, heading);
-                        waiting = nearby ? 0 : _tickPatience;
+                        waiting = nearby ? 0 : simulation._tickPatience;
                         mode = IntentBurst;
                     }
                 }
@@ -411,14 +559,16 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
             {
                 // A fresh grid query here would see motes collected later this tick; serial
                 // resolution skips values already taken, preserving first-come collection.
-                target = NearestMote(position, _tickScoutRadius, t_moteRows ??= new(256));
+                target = simulation.FindNearestMote(
+                    position, simulation._tickScoutRadius, t_moteRows ??= new(256), moteValues, motes);
                 var nearby = target >= 0;
-                if (!nearby && waiting >= _tickPatience && carried[row] == 0)
-                    target = NearestMote(position, MaximumSearchRadius, t_moteRows ??= new(256));
+                if (!nearby && waiting >= simulation._tickPatience && carried[offset] == 0)
+                    target = simulation.FindNearestMote(
+                        position, MaximumSearchRadius, t_moteRows ??= new(256), moteValues, motes);
 
-                if (carried[row] >= _tickCapacity || (carried[row] > 0 && target < 0))
+                if (carried[offset] >= simulation._tickCapacity || (carried[offset] > 0 && target < 0))
                 {
-                    next = Move(position, Colony, _tickSpeed);
+                    next = Move(position, Colony, simulation._tickSpeed);
                     heading = Direction(position, Colony, heading);
                     waiting = 0;
                     target = -1;
@@ -427,12 +577,12 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                 else if (target >= 0)
                 {
                     var motePosition = motes[target];
-                    next = Move(position, motePosition, _tickSpeed);
+                    next = Move(position, motePosition, simulation._tickSpeed);
                     heading = Direction(position, motePosition, heading);
-                    waiting = nearby ? 0 : _tickPatience;
+                    waiting = nearby ? 0 : simulation._tickPatience;
                     mode = IntentCollect;
                 }
-                else if (_scent.TrySteer(position, _tickTrailThreshold, out var trail))
+                else if (simulation._scent.TrySteer(position, simulation._tickTrailThreshold, out var trail))
                 {
                     // Recruited: climb the trail that a burst left between the pod and the colony.
                     next = Move(position, position + (trail * 16f), scoutSpeed);
@@ -441,13 +591,13 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                 }
                 else
                 {
-                    next = Wander(tick, ids[row], position, scoutSpeed, ref heading);
+                    next = simulation.Wander(tick, ids[offset], position, scoutSpeed, ref heading);
                     waiting++;
                 }
             }
 
             // Trace the thicket edge instead of grinding into it; change tack when fully wedged.
-            var legal = Obstacles.Steer(position, next, ref side);
+            var legal = simulation.Obstacles.Steer(position, next, ref side);
             var troubled = side != 0 || (next != position && legal == position);
             stall = troubled ? stall + 1 : 0;
             if (stall > StallLimit)
@@ -457,75 +607,85 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                 heading += 2.1f;
                 if (heading > MathF.PI) heading -= MathF.Tau;
                 side = 0;
-                legal = Obstacles.Steer(position, Wander(tick, ids[row], position, scoutSpeed, ref heading), ref side);
+                legal = simulation.Obstacles.Steer(position, simulation.Wander(tick, ids[offset], position, scoutSpeed, ref heading), ref side);
                 stall = 0;
-                waiting = _tickPatience;
+                waiting = simulation._tickPatience;
             }
 
-            _intents[row] = IntentNone;
-            _decidedPositions[row] = legal;
-            _decidedCooldowns[row] = cooldown;
-            _decidedLeaps[row] = leap;
-            _decidedHeadings[row] = heading;
-            _decidedWaits[row] = waiting;
-            _decidedStalls[row] = stall;
-            _decidedSides[row] = side;
+            simulation._intents[row] = IntentNone;
+            simulation._decidedPositions[row] = legal;
+            simulation._decidedCooldowns[row] = cooldown;
+            simulation._decidedLeaps[row] = leap;
+            simulation._decidedHeadings[row] = heading;
+            simulation._decidedWaits[row] = waiting;
+            simulation._decidedStalls[row] = stall;
+            simulation._decidedSides[row] = side;
 
             if (mode == IntentNone) continue;
             if (mode == IntentBurst && target >= 0 && Vector2.DistanceSquared(legal, plants[target]) < 16)
             {
-                _decidedCooldowns[row] = _tickCooldown;
-                _intents[row] = IntentBurst;
-                _intentTargets[row] = target;
+                simulation._decidedCooldowns[row] = simulation._tickCooldown;
+                simulation._intents[row] = IntentBurst;
+                simulation._intentTargets[row] = target;
             }
             else if (mode == IntentCollect && target >= 0 && Vector2.DistanceSquared(legal, motes[target]) < 25)
             {
-                _intents[row] = IntentCollect;
-                _intentTargets[row] = target;
+                simulation._intents[row] = IntentCollect;
+                simulation._intentTargets[row] = target;
             }
             else if (mode == IntentDeposit && Vector2.DistanceSquared(legal, Colony) < 16)
             {
-                _intents[row] = IntentDeposit;
+                simulation._intents[row] = IntentDeposit;
             }
         }
     }
 
     private void ResolveWorkerIntents(int count)
     {
-        var ids = _creatures.Columns.StableId.ReadOnlySpan;
-        var copies = _creatures.Columns.IsCopy.ReadOnlySpan;
-        var carried = _creatures.Columns.CarriedGlow.ReadOnlySpan;
+        _creatures.WithAccess(new PopulationRange(0, count), this,
+            static (GardenSimulation simulation, scoped ref PopulationAccessScope<GardenCreature> access) =>
+            {
+                var ids = access.ReadRange(simulation._creatures.Columns.StableId);
+                var copies = access.ReadRange(simulation._creatures.Columns.IsCopy);
+                var carried = access.ReadRange(simulation._creatures.Columns.CarriedGlow);
+                ids.CopyTo(simulation._resolvedIds);
+                copies.CopyTo(simulation._resolvedCopies);
+                carried.CopyTo(simulation._resolvedCarried);
+            });
+
         for (var row = 0; row < count; row++)
         {
             switch (_intents[row])
             {
                 case IntentBurst:
                     var plant = _intentTargets[row];
-                    if (_plants.Columns.Growth.ReadOnlySpan[plant] < 1)
+                    var plantState = _plants[plant];
+                    if (plantState.Growth < 1)
                     {
                         // Another row already burst this plant; refund the cooldown decision.
-                        _creatures.Columns.Cooldown.EditRange(row, 1)[0] = 0;
+                        _creatures[row] = _creatures[row] with { Cooldown = 0 };
                         break;
                     }
-                    BurstPlant(plant, new Impact(_plants.Columns.Position.ReadOnlySpan[plant],
-                        new Reaction(ids[row], !copies[row])));
+                    BurstPlant(plant, new Impact(plantState.Position,
+                        new Reaction(_resolvedIds[row], !_resolvedCopies[row])));
                     break;
                 case IntentCollect:
                     var mote = _intentTargets[row];
-                    var value = _motes.Columns.Value.ReadOnlySpan[mote];
+                    var moteState = _motes[mote];
+                    var value = moteState.Value;
                     if (value <= 0) break;
-                    _creatures.Columns.CarriedGlow.EditRange(row, 1)[0] = carried[row] + value;
-                    _motes.Columns.Value.EditRange(mote, 1)[0] = 0;
+                    _creatures[row] = _creatures[row] with { CarriedGlow = _resolvedCarried[row] + value };
+                    _motes[mote] = moteState with { Value = 0 };
                     // Pickups keep refreshing the route while there is still food at the far end,
                     // so the trail only fades once the pod has actually been stripped.
-                    _scent.StampTrail(_motes.Columns.Position.ReadOnlySpan[mote], Colony, _tickTrailStrength);
+                    _scent.StampTrail(moteState.Position, Colony, _tickTrailStrength);
                     Publish("garden.glow.collected", value);
                     break;
                 case IntentDeposit:
-                    var amount = carried[row];
+                    var amount = _resolvedCarried[row];
                     Glow += amount;
                     BankedGlow += amount;
-                    _creatures.Columns.CarriedGlow.EditRange(row, 1)[0] = 0;
+                    _creatures[row] = _creatures[row] with { CarriedGlow = 0 };
                     Publish("garden.glow.deposited", amount);
                     break;
             }

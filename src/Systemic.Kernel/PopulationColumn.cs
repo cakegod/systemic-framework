@@ -215,6 +215,10 @@ internal sealed class PopulationStorage(World world)
 {
     private World? _world = world;
     private int _activeLeases;
+    private int _activeScopes;
+    private bool _exclusiveScope;
+    private object? _parallelScopeGroup;
+    private readonly PopulationScopeLifetime _serialScopeLifetime = new();
 
     public int Count { get; set; }
 
@@ -249,10 +253,37 @@ internal sealed class PopulationStorage(World world)
         World.ReleasePopulationLease();
     }
 
+    public bool HasActiveScopes => _activeScopes != 0;
+
+    public PopulationScopeLifetime SerialScopeLifetime => _serialScopeLifetime;
+
+    public void EnterScope(bool parallel, object? group)
+    {
+        if (parallel
+            ? _exclusiveScope || (_activeScopes != 0 && !ReferenceEquals(_parallelScopeGroup, group))
+            : _activeScopes != 0)
+            throw new InvalidOperationException("Population access scopes must not overlap serial access or another serial scope.");
+
+        checked { _activeScopes++; }
+        if (!parallel)
+            _exclusiveScope = true;
+        else
+            _parallelScopeGroup = group;
+    }
+
+    public void ExitScope(bool parallel)
+    {
+        _activeScopes--;
+        if (!parallel)
+            _exclusiveScope = false;
+        else if (_activeScopes == 0)
+            _parallelScopeGroup = null;
+    }
+
     public void EnsureNoLeases()
     {
         if (_activeLeases != 0)
-            throw new InvalidOperationException("A population cannot change structure while borrowed views are leased.");
+            throw new InvalidOperationException("A population cannot change structure while leases or scoped callbacks are active.");
     }
 
     public void Rebind(World world) => _world = world;
@@ -454,7 +485,7 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
 
     /// <summary>Gets a borrowed read-only view of the live column rows.</summary>
     /// <remarks>Do not retain or use this span across world cloning, adoption, or population structural changes.</remarks>
-    public ReadOnlySpan<T> ReadOnlySpan
+    internal ReadOnlySpan<T> ReadOnlySpan
     {
         get
         {
@@ -465,7 +496,7 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
 
     /// <summary>Gets a borrowed read-only memory view of the live column rows.</summary>
     /// <remarks>Do not retain or use this view across world cloning, adoption, or population structural changes.</remarks>
-    public ReadOnlyMemory<T> ReadOnlyMemory
+    internal ReadOnlyMemory<T> ReadOnlyMemory
     {
         get
         {
@@ -481,7 +512,7 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
     /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
     /// changing transaction scopes, cloning, swapping buffers, or making structural changes.
     /// </remarks>
-    public Span<T> EditRange(int start, int length)
+    internal Span<T> EditRange(int start, int length)
     {
         _population.ValidateRange(start, length);
         lock (_population.World.TransactionGate)
@@ -499,7 +530,7 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
     /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
     /// changing transaction scopes, cloning, swapping buffers, or making structural changes.
     /// </remarks>
-    public Memory<T> EditMemory(int start, int length)
+    internal Memory<T> EditMemory(int start, int length)
     {
         _population.ValidateRange(start, length);
         lock (_population.World.TransactionGate)
@@ -632,7 +663,7 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
 
     /// <summary>Gets a borrowed read-only view of the current buffer.</summary>
     /// <remarks>Do not retain or use this span across world cloning, adoption, or population structural changes.</remarks>
-    public ReadOnlySpan<T> Current
+    internal ReadOnlySpan<T> Current
     {
         get
         {
@@ -643,7 +674,7 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
 
     /// <summary>Gets a borrowed read-only memory view of the current buffer.</summary>
     /// <remarks>Do not retain or use this view across world cloning, adoption, or population structural changes.</remarks>
-    public ReadOnlyMemory<T> CurrentMemory
+    internal ReadOnlyMemory<T> CurrentMemory
     {
         get
         {
@@ -659,7 +690,7 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
     /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
     /// changing transaction scopes, cloning, swapping buffers, or making structural changes.
     /// </remarks>
-    public Span<T> EditNext(int start, int length)
+    internal Span<T> EditNext(int start, int length)
     {
         _population.ValidateRange(start, length);
         lock (_population.World.TransactionGate)
@@ -674,7 +705,7 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
     /// <remarks>Use for structural initialization; simulation updates should write only to <see cref="EditNext"/>.
     /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
     /// changing transaction scopes, cloning, swapping buffers, or making structural changes.</remarks>
-    public DoubleBufferedPopulationEdit<T> EditBothBuffers(int start, int length)
+    internal DoubleBufferedPopulationEdit<T> EditBothBuffers(int start, int length)
     {
         _population.ValidateRange(start, length);
         lock (_population.World.TransactionGate)
@@ -694,7 +725,7 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
     /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
     /// changing transaction scopes, cloning, swapping buffers, or making structural changes.
     /// </remarks>
-    public Memory<T> EditNextMemory(int start, int length)
+    internal Memory<T> EditNextMemory(int start, int length)
     {
         _population.ValidateRange(start, length);
         lock (_population.World.TransactionGate)

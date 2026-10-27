@@ -19,7 +19,7 @@ public sealed class SystemAccessAnalyzerTests
         var analyzer = (DiagnosticAnalyzer)Activator.CreateInstance(analyzerType)!;
         var diagnostics = analyzer.SupportedDiagnostics;
 
-        Assert.Equal(5, diagnostics.Length);
+        Assert.Equal(6, diagnostics.Length);
         foreach (var descriptor in diagnostics)
         {
             Assert.Equal("SystemAccess", descriptor.Category);
@@ -36,6 +36,7 @@ public sealed class SystemAccessAnalyzerTests
     public async Task Default_access_allows_immediate_world_operations()
     {
         const string source = """
+            using System.Collections.Generic;
             using Systemic.Host;
             internal sealed class DefaultSystem : ISystemicSystem
             {
@@ -178,7 +179,7 @@ public sealed class SystemAccessAnalyzerTests
 
         var diagnostics = await Analyze(source);
         var diagnostic = Assert.Single(diagnostics.Where(item => item.Id == "SYSACC001"));
-        Assert.Contains("ResourceWriterSystem", source.Substring(0, diagnostic.Location.SourceSpan.Start));
+        Assert.Contains("ResourceWriterSystem", source[..diagnostic.Location.SourceSpan.Start]);
     }
 
     [Fact]
@@ -239,8 +240,13 @@ public sealed class SystemAccessAnalyzerTests
                 public void Step(SystemicSystemContext context)
                 {
                     var columns = ItemPopulation.Bind(_population);
-                    _ = columns.Value.ReadOnlySpan[0];
-                    columns.Phase.EditNext(0, 1)[0] = 1;
+                    var lease = context.BorrowPopulation(_population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> access) =>
+                        {
+                            _ = access.ReadAll(state.Value)[0];
+                            access.EditNext(state.Phase)[0] = 1;
+                        });
                 }
             }
 
@@ -253,7 +259,10 @@ public sealed class SystemAccessAnalyzerTests
                 public void Step(SystemicSystemContext context)
                 {
                     var columns = ItemPopulation.Bind(_population);
-                    _ = columns.Phase.Current[0];
+                    var lease = context.BorrowPopulation(_population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> access) =>
+                            _ = access.ReadCurrent(state.Phase)[0]);
                 }
             }
             """;
@@ -337,9 +346,10 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Direct_population_edits_in_range_callbacks_are_flagged_but_generated_writers_are_allowed()
+    public async Task Scoped_writes_are_allowed_but_buffer_swaps_are_flagged_inside_range_callbacks()
     {
         const string source = """
+            using System.Collections.Generic;
             using Systemic.Host;
             using Systemic.Kernel;
 
@@ -357,34 +367,80 @@ public sealed class SystemAccessAnalyzerTests
             internal sealed class RangeSystem : ISystemicSystem
             {
                 public string Id => "range";
+                public IReadOnlyList<SystemAccess> Access => [SystemAccess.WriteWorld, ItemPopulation.WriteValue, ItemPopulation.WritePhase];
                 public void Step(SystemicSystemContext context)
                 {
                     var population = ItemPopulation.Define(context.GetWritableWorld());
                     var columns = ItemPopulation.Bind(population);
-                    context.ForEachRange(columns, 1, static (state, _, range) =>
-                        state.Value.EditRange(range.Start, range.Length).Fill(1));
-                    context.ForEachRange(columns, 1, static (state, _, range) =>
-                        state.Phase.EditNext(range.Start, range.Length).Fill(1));
-                    context.ForEachRange(columns, 1, static (state, _, range) =>
-                        state.WriteRange(range).Write(0, new ItemPopulation.Row { Value = 2 }));
-                    columns.Value.EditRange(0, 1).Fill(3);
-                    columns.Phase.EditNext(0, 1).Fill(3);
+                    var lease = context.BorrowPopulation(population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> scope) =>
+                        {
+                            scope.EditRange(state.Value).Fill(1);
+                            scope.EditNext(state.Phase).Fill(1);
+                            state.WriteRange(ref scope).Write(0, new ItemPopulation.Row { Value = 2 });
+                            state.Phase.Swap();
+                        });
                 }
             }
             """;
 
         var diagnostics = await Analyze(source, generatePopulationSchema: true);
         var rangeDiagnostics = diagnostics.Where(item => item.Id == "SYSACC003").ToArray();
-        Assert.Equal(2, rangeDiagnostics.Length);
-        Assert.Contains(rangeDiagnostics, diagnostic => At(diagnostic, source).Contains("EditRange"));
-        Assert.Contains(rangeDiagnostics, diagnostic => At(diagnostic, source).Contains("EditNext"));
-        Assert.All(rangeDiagnostics, diagnostic => Assert.Contains("WriteRange(range).Write", diagnostic.GetMessage()));
+        Assert.Single(rangeDiagnostics);
+        Assert.Contains(rangeDiagnostics, diagnostic => At(diagnostic, source).Contains("Swap"));
+        Assert.Contains("WriteRange(ref scope)", rangeDiagnostics[0].GetMessage());
     }
 
     [Fact]
-    public async Task Direct_memory_two_buffer_and_swap_mutators_are_flagged_only_inside_range_callbacks()
+    public async Task Full_single_buffered_read_is_rejected_when_its_parallel_range_callback_writes_the_column()
     {
         const string source = """
+            using System.Collections.Generic;
+            using Systemic.Host;
+            using Systemic.Kernel;
+
+            namespace ParallelReadProof;
+
+            [PopulationSchema("parallel.items", 1)]
+            public partial struct Item
+            {
+                [PopulationColumn("value")] public int Value;
+            }
+
+            internal sealed class RangeSystem : ISystemicSystem
+            {
+                public string Id => "parallel-read";
+                public IReadOnlyList<SystemAccess> Access =>
+                    [ItemPopulation.ReadValue, ItemPopulation.WriteValue];
+                public void Step(SystemicSystemContext context)
+                {
+                    var population = ItemPopulation.Define(context.GetWritableWorld());
+                    var columns = ItemPopulation.Bind(population);
+                    var lease = context.BorrowPopulation(population);
+                    var alias = context.BorrowPopulation(population);
+                    context.ForEachPopulationRange(lease, (columns, alias),
+                        static ((ItemPopulation.Columns Columns, PopulationLease<Item> Lease) state,
+                            int partition, scoped ref PopulationAccessScope<Item> scope) =>
+                        {
+                            scope.ReadAll(state.Lease, state.Columns.Value);
+                            scope.EditRange(state.Columns.Value).Fill(1);
+                        });
+                }
+            }
+            """;
+
+        var diagnostics = await Analyze(source, generatePopulationSchema: true);
+        var diagnostic = Assert.Single(diagnostics.Where(item => item.Id == "SYSACC006"));
+        Assert.Contains("ReadRange", diagnostic.GetMessage());
+        Assert.Contains("ReadAll", At(diagnostic, source));
+    }
+
+    [Fact]
+    public async Task Both_buffer_edits_and_swaps_are_flagged_only_inside_population_range_callbacks()
+    {
+        const string source = """
+            using System.Collections.Generic;
             using Systemic.Host;
             using Systemic.Kernel;
 
@@ -400,21 +456,18 @@ public sealed class SystemAccessAnalyzerTests
             internal sealed class RangeSystem : ISystemicSystem
             {
                 public string Id => "range";
+                public IReadOnlyList<SystemAccess> Access => [SystemAccess.WriteWorld, ItemPopulation.WritePhase];
                 public void Step(SystemicSystemContext context)
                 {
                     var population = ItemPopulation.Define(context.GetWritableWorld());
                     var columns = ItemPopulation.Bind(population);
-                    context.ForEachRange(columns, 1, static (state, _, range) =>
-                        state.Value.EditMemory(range.Start, range.Length).Span.Fill(1));
-                    context.ForEachRange(columns, 1, static (state, _, range) =>
-                        state.Phase.EditNextMemory(range.Start, range.Length).Span.Fill(2));
-                    context.ForEachRange(columns, 1, static (state, _, range) =>
-                        state.Phase.EditBothBuffers(range.Start, range.Length).Next.Fill(3));
-                    context.ForEachRange(columns, 1, static (state, _, _) => state.Phase.Swap());
-
-                    columns.Value.EditMemory(0, 1).Span.Fill(4);
-                    columns.Phase.EditNextMemory(0, 1).Span.Fill(5);
-                    columns.Phase.EditBothBuffers(0, 1).Next.Fill(6);
+                    var lease = context.BorrowPopulation(population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> access) =>
+                        {
+                            access.EditBoth(state.Phase).Next.Fill(3);
+                            state.Phase.Swap();
+                        });
                     columns.Phase.Swap();
                 }
             }
@@ -422,10 +475,10 @@ public sealed class SystemAccessAnalyzerTests
 
         var diagnostics = await Analyze(source, generatePopulationSchema: true);
         var rangeDiagnostics = diagnostics.Where(item => item.Id == "SYSACC003").ToArray();
-        Assert.Equal(4, rangeDiagnostics.Length);
-        foreach (var methodName in new[] { "EditMemory", "EditNextMemory", "EditBothBuffers", "Swap" })
+        Assert.Equal(2, rangeDiagnostics.Length);
+        foreach (var methodName in new[] { "EditBoth", "Swap" })
             Assert.Contains(rangeDiagnostics, diagnostic => At(diagnostic, source).Contains(methodName));
-        Assert.Contains("Initialize both buffers outside", rangeDiagnostics.Single(diagnostic => At(diagnostic, source).Contains("EditBothBuffers")).GetMessage());
+        Assert.Contains("Initialize both buffers outside", rangeDiagnostics.Single(diagnostic => At(diagnostic, source).Contains("EditBoth")).GetMessage());
         Assert.Contains("Move buffer swaps outside", rangeDiagnostics.Single(diagnostic => At(diagnostic, source).Contains("Swap")).GetMessage());
     }
 
@@ -481,7 +534,10 @@ public sealed class SystemAccessAnalyzerTests
                 public void Step(SystemicSystemContext context)
                 {
                     var columns = ItemPopulation.Bind(_population);
-                    _ = columns.Value.ReadOnlySpan[0];
+                    var lease = context.BorrowPopulation(_population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> access) =>
+                            _ = access.ReadAll(state.Value)[0]);
                 }
             }
 
@@ -493,8 +549,13 @@ public sealed class SystemAccessAnalyzerTests
                 public void Step(SystemicSystemContext context)
                 {
                     var columns = ItemPopulation.Bind(_population);
-                    _ = columns.Phase.Current[0];
-                    columns.Value.EditRange(0, 1)[0] = 1;
+                    var lease = context.BorrowPopulation(_population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> access) =>
+                        {
+                            _ = access.ReadCurrent(state.Phase)[0];
+                            access.EditRange(state.Value)[0] = 1;
+                        });
                 }
             }
 
@@ -506,8 +567,13 @@ public sealed class SystemAccessAnalyzerTests
                 public void Step(SystemicSystemContext context)
                 {
                     var columns = ItemPopulation.Bind(_population);
-                    _ = columns.Phase.Current[0];
-                    columns.Phase.EditNext(0, 1)[0] = 2;
+                    var lease = context.BorrowPopulation(_population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> access) =>
+                        {
+                            _ = access.ReadCurrent(state.Phase)[0];
+                            access.EditNext(state.Phase)[0] = 2;
+                        });
                 }
             }
 
@@ -519,7 +585,10 @@ public sealed class SystemAccessAnalyzerTests
                 public void Step(SystemicSystemContext context)
                 {
                     var columns = ItemPopulation.Bind(_population);
-                    columns.Value.EditRange(0, 1)[0] = 3;
+                    var lease = context.BorrowPopulation(_population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> access) =>
+                            access.EditRange(state.Value)[0] = 3);
                 }
             }
 
@@ -532,8 +601,13 @@ public sealed class SystemAccessAnalyzerTests
                 public void Step(SystemicSystemContext context)
                 {
                     var columns = ItemPopulation.Bind(_population);
-                    _ = columns.Value.ReadOnlySpan[0];
-                    columns.Value.EditRange(0, 1)[0] = 4;
+                    var lease = context.BorrowPopulation(_population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> access) =>
+                        {
+                            _ = access.ReadAll(state.Value)[0];
+                            access.EditRange(state.Value)[0] = 4;
+                        });
                 }
             }
 
@@ -542,17 +616,17 @@ public sealed class SystemAccessAnalyzerTests
                 private readonly UserColumns _columns = new();
                 public string Id => "user-columns";
                 public IReadOnlyList<SystemAccess> Access => [SystemAccess.ReadWorld];
-                public void Step(SystemicSystemContext context) => _ = _columns.Value.ReadOnlySpan[0];
+                public void Step(SystemicSystemContext context) => _ = _columns.Value;
             }
 
             internal sealed class UserColumns
             {
-                public PopulationColumn<int> Value { get; } = null!;
+                public int Value { get; } = 0;
             }
             """;
 
         var diagnostics = await Analyze(source, generatePopulationSchema: true);
-        Assert.Equal(2, diagnostics.Count(diagnostic => diagnostic.Id == "SYSACC004"));
+        Assert.Equal(3, diagnostics.Count(diagnostic => diagnostic.Id == "SYSACC004"));
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "SYSACC004" && diagnostic.GetMessage().Contains("read"));
         Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "SYSACC004" && diagnostic.GetMessage().Contains("write"));
     }
@@ -583,8 +657,13 @@ public sealed class SystemAccessAnalyzerTests
                 public void Step(SystemicSystemContext context)
                 {
                     var columns = ItemPopulation.Bind(_population);
-                    _ = columns.Value.ReadOnlySpan[0];
-                    _ = columns.Phase.Current[0];
+                    var lease = context.BorrowPopulation(_population);
+                    context.ForEachPopulationRange(lease, columns,
+                        static (ItemPopulation.Columns state, int _, scoped ref PopulationAccessScope<Item> access) =>
+                        {
+                            _ = access.ReadAll(state.Value)[0];
+                            _ = access.ReadCurrent(state.Phase)[0];
+                        });
                 }
             }
             """;
@@ -662,7 +741,7 @@ public sealed class SystemAccessAnalyzerTests
         var analyzerType = typeof(StrictDeterminismAnalyzer).Assembly
             .GetType("Systemic.Kernel.Generator.SystemAccessAnalyzer");
         if (analyzerType is null)
-            return ImmutableArray<Diagnostic>.Empty;
+            return [];
 
         var analyzer = (DiagnosticAnalyzer)Activator.CreateInstance(analyzerType)!;
         return await compilation.WithAnalyzers([analyzer]).GetAnalyzerDiagnosticsAsync();

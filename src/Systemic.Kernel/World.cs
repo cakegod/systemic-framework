@@ -49,6 +49,15 @@ public sealed class World
 {
     public const float DefaultSpatialCellSize = 32.0f;
 
+    [ThreadStatic]
+    private static World? s_currentSystemWorld;
+
+    [ThreadStatic]
+    private static SystemAccess[]? s_currentSystemAccess;
+
+    [ThreadStatic]
+    private static DataPropertyMutationCacheEntry s_dataPropertyMutationCache;
+
     private readonly Dictionary<(int EntityId, string Property), List<PropertyModifier>> _modifiersByKey = [];
     private readonly Dictionary<(int EntityId, string Property), long> _modifierVersions = [];
     private readonly Dictionary<(int EntityId, string Property), CachedModifierApplication> _modifierCache = [];
@@ -80,6 +89,7 @@ public sealed class World
     // scopes, cloning, swapping buffers, or making structural changes.
     internal Lock TransactionGate { get; } = new();
     private int _activePopulationLeases;
+    private int _activeScheduledSystems;
     private readonly List<UndoRecord> _journal = [];
     private readonly Stack<ScopeState> _scopes = [];
     private readonly Stack<ScopeState> _freeScopes = [];
@@ -118,6 +128,50 @@ public sealed class World
     }
 
     internal void ReleasePopulationLease() => _activePopulationLeases--;
+
+    internal void EnterScheduledSystem(
+        SystemAccess[] access,
+        out World? previousWorld,
+        out SystemAccess[]? previousAccess)
+    {
+        ArgumentNullException.ThrowIfNull(access);
+        lock (TransactionGate)
+        {
+            if (_activeScheduledSystems == int.MaxValue)
+                throw new InvalidOperationException("Too many scheduled systems are active for this World.");
+            _activeScheduledSystems++;
+        }
+
+        previousWorld = s_currentSystemWorld;
+        previousAccess = s_currentSystemAccess;
+        s_currentSystemWorld = this;
+        s_currentSystemAccess = access;
+    }
+
+    internal void ExitScheduledSystem(World? previousWorld, SystemAccess[]? previousAccess)
+    {
+        if (!ReferenceEquals(s_currentSystemWorld, this))
+            throw new InvalidOperationException("Scheduled system access must end on the thread that started it.");
+
+        s_currentSystemWorld = previousWorld;
+        s_currentSystemAccess = previousAccess;
+        lock (TransactionGate)
+            _activeScheduledSystems--;
+    }
+
+    internal SystemAccess[]? GetCurrentSystemAccess()
+    {
+        if (ReferenceEquals(s_currentSystemWorld, this))
+            return s_currentSystemAccess ?? [];
+
+        if (s_currentSystemWorld is not null)
+            throw new InvalidOperationException("A scheduled system cannot use a population from another World.");
+
+        if (Volatile.Read(ref _activeScheduledSystems) != 0)
+            throw new InvalidOperationException("Population access from a scheduled system must use its execution thread and scoped context.");
+
+        return null;
+    }
 
     private void EnsureNoPopulationLeases()
     {
@@ -373,6 +427,19 @@ public sealed class World
 
     internal void RecordDataEntityPropertyMutation(DataEntity entity, string propertyName, double previousValue)
     {
+        var cached = s_dataPropertyMutationCache;
+        if (!_undoing && _scopes.TryPeek(out var activeScope) && !activeScope.Closed)
+        {
+            var generation = activeScope.Generation;
+            if (ReferenceEquals(cached.Scope, activeScope)
+                && cached.Generation == generation
+                && cached.EntityId == entity.Id
+                && ReferenceEquals(cached.Property, propertyName))
+            {
+                return;
+            }
+        }
+
         lock (TransactionGate)
         {
             if (_undoing || _scopes.Count == 0)
@@ -381,15 +448,22 @@ public sealed class World
             }
 
             var scope = _scopes.Peek();
-            if (scope.Touched?.Contains(entity) == true
-                || !scope.CaptureProperty(entity.Id, propertyName))
+            if (scope.Touched?.Contains(entity) != true
+                && scope.CaptureProperty(entity.Id, propertyName))
             {
-                return;
+                _journal.Add(UndoRecord.ForDataProperty(entity, propertyName, previousValue));
             }
 
-            _journal.Add(UndoRecord.ForDataProperty(entity, propertyName, previousValue));
+            s_dataPropertyMutationCache = new DataPropertyMutationCacheEntry(
+                scope, scope.Generation, entity.Id, propertyName);
         }
     }
+
+    private readonly record struct DataPropertyMutationCacheEntry(
+        ScopeState? Scope,
+        ulong Generation,
+        int EntityId,
+        string? Property);
 
     public void MarkPopulationDirty() => _populationDirty = true;
 
@@ -541,9 +615,9 @@ public sealed class World
 
     /// <summary>Begins a public mutation scope for framework systems; disposal rolls back unless committed.</summary>
     /// <remarks>
-    /// Concurrent column writes must use disjoint ranges. Finish using borrowed column views before changing
-    /// scopes, cloning or adopting a world, swapping buffers, or changing population structure. The transaction
-    /// journal does not make other World operations generally thread-safe.
+    /// Population leases and scoped callbacks must end before changing scopes, cloning or adopting a world,
+    /// swapping buffers, or changing population structure. The transaction journal does not make other World
+    /// operations generally thread-safe.
     /// </remarks>
     public WorldTransaction BeginTransaction()
     {
@@ -796,6 +870,11 @@ public sealed class World
 
     private void RemoveNonLiveSpatialEntities(List<int> results)
     {
+        if (_removalCandidates.Count == 0)
+        {
+            return;
+        }
+
         var write = 0;
         for (var read = 0; read < results.Count; read++)
         {
@@ -1942,8 +2021,8 @@ public sealed class World
 
     /// <summary>Creates an independent world branch, sharing immutable population buffers until a branch writes.</summary>
     /// <remarks>
-    /// Population spans are borrowed views. Stop using spans returned before this call; an existing writable span
-    /// cannot be revoked and can bypass copy-on-write if written after cloning.
+    /// Active population leases and scoped callbacks prevent cloning. Population spans are exposed only inside
+    /// synchronous callbacks, and every callback must finish before cloning can proceed.
     /// </remarks>
     public World Clone()
     {

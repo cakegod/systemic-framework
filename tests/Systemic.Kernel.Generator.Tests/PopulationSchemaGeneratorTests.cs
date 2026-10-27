@@ -33,8 +33,14 @@ public sealed class PopulationSchemaGeneratorTests
                         var population = ParticlePopulation.Define(world);
                         var columns = ParticlePopulation.Bind(population);
                         var rows = population.AddRange(2);
-                        columns.Position.EditNext(rows.Start, rows.Length).Clear();
-                        columns.Energy.EditRange(rows.Start, rows.Length).Fill(1.0f);
+                        using (var lease = population.Borrow())
+                        {
+                            lease.WithAccess(rows, columns, static (ParticlePopulation.Columns state, scoped ref PopulationAccessScope<Particle> access) =>
+                            {
+                                access.EditNext(state.Position).Clear();
+                                access.EditRange(state.Energy).Fill(1.0f);
+                            });
+                        }
                         var commands = new PopulationCommandBuffer<Particle>(population);
                         commands.Reserve(spawnCapacity: 1, removalCapacity: 1);
                         commands.Spawn([new Particle { Position = new Vector2(13, 17), Energy = 0.5f }]);
@@ -90,30 +96,71 @@ public sealed class PopulationSchemaGeneratorTests
                         new() { X = 30, Health = 3 }
                     });
                     var columns = ParticlePopulation.Bind(population);
-                    var snapshot = columns.ReadRow(1);
-                    var changed = snapshot;
-                    changed.X = 90;
-                    changed.Health = 42;
-                    columns.WriteRow(1, changed);
-                    if (snapshot.X != 20 || snapshot.Health != 2) return false;
-                    if (columns.ReadRow(1).X != 20 || columns.ReadRow(1).Health != 42) return false;
+                    var result = new[] { true };
+                    using (var lease = population.Borrow())
+                    {
+                        lease.WithAccess(new PopulationRange(0, 3), (columns, result),
+                            static ((ParticlePopulation.Columns Columns, bool[] Result) state, scoped ref PopulationAccessScope<Particle> access) =>
+                            {
+                                var snapshot = state.Columns.ReadRow(ref access, 1);
+                                var changed = snapshot;
+                                changed.X = 90;
+                                changed.Health = 42;
+                                state.Columns.WriteRow(ref access, 1, changed);
+                                state.Result[0] = snapshot.X == 20 && snapshot.Health == 2
+                                    && state.Columns.ReadRow(ref access, 1).X == 20
+                                    && state.Columns.ReadRow(ref access, 1).Health == 42;
+                            });
+                    }
+                    if (!result[0]) return false;
                     columns.X.Swap();
-                    if (columns.ReadRow(1).X != 90) return false;
+                    using (var lease = population.Borrow())
+                    {
+                        lease.WithAccess(new PopulationRange(0, 3), (columns, result),
+                            static ((ParticlePopulation.Columns Columns, bool[] Result) state, scoped ref PopulationAccessScope<Particle> access) =>
+                                state.Result[0] = state.Columns.ReadRow(ref access, 1).X == 90);
+                    }
+                    if (!result[0]) return false;
 
                     using (var transaction = world.BeginTransaction())
                     {
-                        var writer = columns.WriteRange(new PopulationRange(0, 2));
-                        if (writer.Length != 2) return false;
-                        writer.Write(0, new ParticlePopulation.Row { X = 101, Health = 201 });
-                        writer.Write(1, new ParticlePopulation.Row { X = 102, Health = 202 });
-                        if (columns.ReadRow(0).X != 10 || columns.ReadRow(0).Health != 201) return false;
+                        using (var lease = population.Borrow())
+                        {
+                            lease.WithAccess(new PopulationRange(0, 2), (columns, result),
+                                static ((ParticlePopulation.Columns Columns, bool[] Result) state, scoped ref PopulationAccessScope<Particle> access) =>
+                                {
+                                    var writer = state.Columns.WriteRange(ref access);
+                                    if (writer.Length != 2) { state.Result[0] = false; return; }
+                                    writer.Write(0, new ParticlePopulation.Row { X = 101, Health = 201 });
+                                    writer.Write(1, new ParticlePopulation.Row { X = 102, Health = 202 });
+                                    state.Result[0] = state.Columns.ReadRow(ref access, 0).X == 10
+                                        && state.Columns.ReadRow(ref access, 0).Health == 201;
+                                });
+                        }
+                        if (!result[0]) return false;
                         columns.X.Swap();
-                        if (columns.ReadRow(0).X != 101 || columns.ReadRow(1).X != 102) return false;
+                        using (var lease = population.Borrow())
+                        {
+                            lease.WithAccess(new PopulationRange(0, 2), (columns, result),
+                                static ((ParticlePopulation.Columns Columns, bool[] Result) state, scoped ref PopulationAccessScope<Particle> access) =>
+                                    state.Result[0] = state.Columns.ReadRow(ref access, 0).X == 101
+                                        && state.Columns.ReadRow(ref access, 1).X == 102);
+                        }
+                        if (!result[0]) return false;
                         transaction.Rollback();
                     }
-                    return columns.ReadRow(0).X == 10 && columns.ReadRow(0).Health == 1
-                        && columns.ReadRow(1).X == 90 && columns.ReadRow(1).Health == 42
-                        && columns.ReadRow(2).X == 30 && columns.ReadRow(2).Health == 3;
+                    using (var lease = population.Borrow())
+                    {
+                        lease.WithAccess(new PopulationRange(0, 3), (columns, result),
+                            static ((ParticlePopulation.Columns Columns, bool[] Result) state, scoped ref PopulationAccessScope<Particle> access) =>
+                                state.Result[0] = state.Columns.ReadRow(ref access, 0).X == 10
+                                    && state.Columns.ReadRow(ref access, 0).Health == 1
+                                    && state.Columns.ReadRow(ref access, 1).X == 90
+                                    && state.Columns.ReadRow(ref access, 1).Health == 42
+                                    && state.Columns.ReadRow(ref access, 2).X == 30
+                                    && state.Columns.ReadRow(ref access, 2).Health == 3);
+                    }
+                    return result[0];
                 }
             }
             """;
@@ -127,6 +174,84 @@ public sealed class PopulationSchemaGeneratorTests
         var method = System.Reflection.Assembly.Load(assembly.ToArray())
             .GetType("ProjectionProof.Consumer")!.GetMethod("Run")!;
         Assert.Equal(true, method.Invoke(null, [new World(seed: 1, valueScale: 1)]));
+    }
+
+    [Fact]
+    public void Generated_initializer_does_not_allocate_a_temporary_input_copy()
+    {
+        const string source = """
+            using Systemic.Kernel;
+
+            namespace AllocationProof;
+            [PopulationSchema("proof.allocations", 1)]
+            public partial struct Particle
+            {
+                [PopulationColumn("position", DoubleBuffered = true)] public int Position;
+                [PopulationColumn("health")] public int Health;
+            }
+
+            public static class Consumer
+            {
+                public static long Measure()
+                {
+                    var world = new World(seed: 44, valueScale: 1);
+                    var population = ParticlePopulation.Define(world);
+                    var range = population.AddRange(2);
+                    Particle[] values = [new() { Position = 10, Health = 1 }, new() { Position = 20, Health = 2 }];
+                    Particle.InitializeRange(population, range, values);
+                    var before = global::System.GC.GetAllocatedBytesForCurrentThread();
+                    Particle.InitializeRange(population, range, values);
+                    return global::System.GC.GetAllocatedBytesForCurrentThread() - before;
+                }
+            }
+            """;
+
+        var (driver, output) = Generate(source);
+        Assert.Empty(driver.GetRunResult().Diagnostics);
+        Assert.Empty(output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        using var assembly = new MemoryStream();
+        var emit = output.Emit(assembly);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var method = System.Reflection.Assembly.Load(assembly.ToArray())
+            .GetType("AllocationProof.Consumer")!.GetMethod("Measure")!;
+
+        Assert.Equal(0L, method.Invoke(null, null));
+    }
+
+    [Fact]
+    public void Population_scope_and_spans_cannot_escape_the_callback()
+    {
+        const string source = """
+            using System;
+            using Systemic.Kernel;
+
+            internal readonly struct Kind : IPopulationKind
+            {
+                public static string Id => "proof.escape";
+                public static int Version => 1;
+            }
+
+            internal static class Consumer
+            {
+                public static void CaptureScope(Population<Kind> population)
+                {
+                    var escaped = default(PopulationAccessScope<Kind>);
+                    population.WithAccess(new PopulationRange(0, population.Count), 0,
+                        (int state, scoped ref PopulationAccessScope<Kind> scope) => escaped = scope);
+                }
+
+                public static void CaptureSpan(Population<Kind> population, PopulationColumn<int> column)
+                {
+                    ReadOnlySpan<int> escaped = default;
+                    population.WithAccess(new PopulationRange(0, population.Count), column,
+                        (PopulationColumn<int> state, scoped ref PopulationAccessScope<Kind> scope) => escaped = scope.ReadAll(state));
+                }
+            }
+            """;
+
+        var (_, output) = Generate(source);
+        Assert.Contains(output.GetDiagnostics(), diagnostic =>
+            diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Id == "CS8175");
     }
 
     [Fact]
@@ -154,16 +279,23 @@ public sealed class PopulationSchemaGeneratorTests
                         new() { X = 10, Health = 1 }, new() { X = 20, Health = 2 }
                     });
                     var columns = ParticlePopulation.Bind(population);
-                    var failures = 0;
-                    try { columns.ReadRow(-1); } catch (ArgumentOutOfRangeException) { failures++; }
-                    try { columns.WriteRow(2, new ParticlePopulation.Row()); } catch (ArgumentOutOfRangeException) { failures++; }
-                    try { columns.WriteRange(new PopulationRange(-1, 1)); } catch (ArgumentOutOfRangeException) { failures++; }
-                    try { columns.WriteRange(new PopulationRange(1, 2)); } catch (ArgumentOutOfRangeException) { failures++; }
-                    var writer = columns.WriteRange(new PopulationRange(0, 2));
-                    try { writer.Write(2, new ParticlePopulation.Row()); } catch (ArgumentOutOfRangeException) { failures++; }
-                    var empty = columns.WriteRange(new PopulationRange(2, 0));
-                    return failures == 5 && empty.Length == 0 && columns.ReadRow(0).Health == 1
-                        && columns.ReadRow(1).Health == 2;
+                    var result = new[] { false };
+                    using (var lease = population.Borrow())
+                    {
+                        lease.WithAccess(new PopulationRange(0, 2), (columns, result),
+                            static ((ParticlePopulation.Columns Columns, bool[] Result) state, scoped ref PopulationAccessScope<Particle> access) =>
+                            {
+                                var failures = 0;
+                                try { state.Columns.ReadRow(ref access, -1); } catch (ArgumentOutOfRangeException) { failures++; }
+                                try { state.Columns.WriteRow(ref access, 2, new ParticlePopulation.Row()); } catch (ArgumentOutOfRangeException) { failures++; }
+                                var writer = state.Columns.WriteRange(ref access);
+                                try { writer.Write(2, new ParticlePopulation.Row()); } catch (ArgumentOutOfRangeException) { failures++; }
+                                state.Result[0] = failures == 3 && writer.Length == 2
+                                    && state.Columns.ReadRow(ref access, 0).Health == 1
+                                    && state.Columns.ReadRow(ref access, 1).Health == 2;
+                            });
+                    }
+                    return result[0];
                 }
             }
             """;
@@ -236,11 +368,20 @@ public sealed class PopulationSchemaGeneratorTests
                     Particle.InitializeRange(population, range, new Particle[]
                         { new() { row = 1, range = 2, population = 3, @class = 4, á = 5, a_ = 6 } });
                     var columns = ParticlePopulation.Bind(population);
-                    var value = columns.ReadRow(0);
-                    value.row += 10;
-                    columns.WriteRow(0, value);
-                    value = columns.ReadRow(0);
-                    return value.row + value.range + value.population + value.@class + value.á + value.a_;
+                    var result = new int[1];
+                    using (var lease = population.Borrow())
+                    {
+                        lease.WithAccess(range, (columns, result),
+                            static ((ParticlePopulation.Columns Columns, int[] Result) state, scoped ref PopulationAccessScope<Particle> access) =>
+                            {
+                                var value = state.Columns.ReadRow(ref access, 0);
+                                value.row += 10;
+                                state.Columns.WriteRow(ref access, 0, value);
+                                value = state.Columns.ReadRow(ref access, 0);
+                                state.Result[0] = value.row + value.range + value.population + value.@class + value.á + value.a_;
+                            });
+                    }
+                    return result[0];
                 }
             }
             """;

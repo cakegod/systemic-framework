@@ -20,6 +20,7 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
     private const string PopulationColumnMetadataName = "Systemic.Kernel.PopulationColumn`1";
     private const string DoubleBufferedPopulationColumnMetadataName = "Systemic.Kernel.DoubleBufferedPopulationColumn`1";
     private const string PopulationColumnKeyMetadataName = "Systemic.Kernel.PopulationColumnKey`1";
+    private const string PopulationAccessScopeMetadataName = "Systemic.Kernel.PopulationAccessScope`1";
     private const string WorldCommandBufferMetadataName = "Systemic.Kernel.WorldCommandBuffer";
     private const string ImmutableArrayMetadataName = "System.Collections.Immutable.ImmutableArray`1";
     private const string Guide = "https://github.com/cakegod/systemic-framework/blob/main/docs/api/analyzers.md";
@@ -67,15 +68,26 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor UnsafeRangeMutation = new(
         id: "SYSACC005",
         title: "World mutation is unsafe inside a range callback",
-        messageFormat: "Immediate World operations and shared WorldCommandBuffer mutations are unsafe inside a ForEachRange callback",
+        messageFormat: "Immediate World operations and shared WorldCommandBuffer mutations are unsafe inside a range callback",
         category: "SystemAccess",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "ForEachRange callbacks can run concurrently, so immediate World mutations and shared command-buffer writes are not safe there.",
+        description: "Range callbacks can run concurrently, so immediate World mutations and shared command-buffer writes are not safe there.",
         helpLinkUri: Guide + "#sysacc005");
 
+    private static readonly DiagnosticDescriptor ParallelWholeColumnRead = new(
+        id: "SYSACC006",
+        title: "Whole-column read overlaps parallel writes",
+        messageFormat: "Parallel range callbacks cannot read all rows of writable single-buffered column '{0}'; use ReadRange for the assigned rows or read an immutable snapshot",
+        category: "SystemAccess",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "A parallel callback may read only its assigned rows from a single-buffered column that any partition writes.",
+        helpLinkUri: Guide + "#sysacc006");
+
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        [ImmediateWorldAccess, DeferredPopulationAccess, DirectRangeMutation, ColumnAccess, UnsafeRangeMutation];
+        [ImmediateWorldAccess, DeferredPopulationAccess, DirectRangeMutation, ColumnAccess, UnsafeRangeMutation,
+            ParallelWholeColumnRead];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -90,6 +102,7 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
             var doubleBufferedPopulationColumn = GetSystemicType(
                 startContext.Compilation, DoubleBufferedPopulationColumnMetadataName, SystemicKernelAssembly);
             var populationColumnKey = GetSystemicType(startContext.Compilation, PopulationColumnKeyMetadataName, SystemicKernelAssembly);
+            var populationAccessScope = GetSystemicType(startContext.Compilation, PopulationAccessScopeMetadataName, SystemicKernelAssembly);
             var worldCommandBuffer = GetSystemicType(startContext.Compilation, WorldCommandBufferMetadataName, SystemicKernelAssembly);
             var immutableArray = startContext.Compilation.GetTypeByMetadataName(ImmutableArrayMetadataName);
             if (immutableArray?.ContainingAssembly.Identity.Name != "System.Collections.Immutable")
@@ -97,7 +110,7 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
 
             if (systemicSystem is null || systemicSystemContext is null || systemAccess is null
                 || populationColumn is null || doubleBufferedPopulationColumn is null
-                || populationColumnKey is null || worldCommandBuffer is null)
+                || populationColumnKey is null || populationAccessScope is null || worldCommandBuffer is null)
                 return;
 
             var accessProperty = systemicSystem.GetMembers("Access").OfType<IPropertySymbol>().FirstOrDefault();
@@ -106,7 +119,8 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
 
             startContext.RegisterSyntaxNodeAction(syntaxContext => AnalyzeInvocation(
                     syntaxContext, systemicSystem, accessProperty, systemicSystemContext, systemAccess,
-                    populationColumn, doubleBufferedPopulationColumn, populationColumnKey, worldCommandBuffer, immutableArray),
+                    populationColumn, doubleBufferedPopulationColumn, populationColumnKey, populationAccessScope,
+                    worldCommandBuffer, immutableArray),
                 Microsoft.CodeAnalysis.CSharp.SyntaxKind.InvocationExpression);
             startContext.RegisterSyntaxNodeAction(syntaxContext => AnalyzeColumnProperty(
                     syntaxContext, systemicSystem, accessProperty, systemAccess,
@@ -130,6 +144,7 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         INamedTypeSymbol populationColumn,
         INamedTypeSymbol doubleBufferedPopulationColumn,
         INamedTypeSymbol populationColumnKey,
+        INamedTypeSymbol populationAccessScope,
         INamedTypeSymbol worldCommandBuffer,
         INamedTypeSymbol? immutableArray)
     {
@@ -179,11 +194,44 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
                 method.Name, GetRangeMutationGuidance(method.Name)));
         }
 
-        if (IsDirectPopulationWrite(method, populationColumn, doubleBufferedPopulationColumn)
-            && TryGetDirectColumnProperty(invocationSyntax, context.SemanticModel, populationColumn,
-                doubleBufferedPopulationColumn, populationColumnKey, systemAccess, out var writeColumn))
+        if (SymbolEqualityComparer.Default.Equals(method.ContainingType?.OriginalDefinition, populationAccessScope)
+            && method.Name == "EditBoth"
+            && IsInsideForEachRangeCallback(invocationSyntax, context.SemanticModel, systemicSystemContext, context.CancellationToken))
         {
-            ReportMissingColumnAccess(context, invocationSyntax.GetLocation(), writeColumn, isWrite: true,
+            context.ReportDiagnostic(Diagnostic.Create(DirectRangeMutation, invocationSyntax.GetLocation(),
+                "EditBothBuffers", GetRangeMutationGuidance("EditBothBuffers")));
+        }
+
+        if (TryGetScopedColumnAccess(invocation, context.SemanticModel, populationAccessScope, systemAccess,
+                populationColumn, doubleBufferedPopulationColumn, populationColumnKey,
+                out var scopedColumn, out var scopedWrite, out var partitionRead))
+        {
+            var declaredAccess = GetDeclaredAccess(context, systemicSystem, accessProperty, systemAccess,
+                populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray);
+            ReportMissingColumnAccess(context, invocationSyntax.GetLocation(), scopedColumn, scopedWrite, partitionRead,
+                declaredAccess);
+            if (invocation.TargetMethod.Name == "ReadAll"
+                && (invocation.TargetMethod.Parameters.Length == 1
+                    || (invocation.TargetMethod.Parameters.Length == 2
+                        && invocation.TargetMethod.TypeArguments.Length == 2
+                        && invocation.TargetMethod.ContainingType.TypeArguments.Length == 1
+                        && SymbolEqualityComparer.Default.Equals(
+                            invocation.TargetMethod.TypeArguments[0],
+                            invocation.TargetMethod.ContainingType.TypeArguments[0])))
+                && SymbolEqualityComparer.Default.Equals(scopedColumn.Type.OriginalDefinition, populationColumn)
+                && IsInsideForEachRangeCallback(invocationSyntax, context.SemanticModel,
+                    systemicSystemContext, context.CancellationToken)
+                && ContainsColumn(declaredAccess.WriteColumns, scopedColumn))
+            {
+                context.ReportDiagnostic(Diagnostic.Create(ParallelWholeColumnRead,
+                    invocationSyntax.GetLocation(), scopedColumn.Name));
+            }
+        }
+        else if (IsDirectPopulationWrite(method, populationColumn, doubleBufferedPopulationColumn)
+            && TryGetDirectColumnProperty(invocationSyntax, context.SemanticModel, populationColumn,
+                doubleBufferedPopulationColumn, populationColumnKey, systemAccess, out var directColumn))
+        {
+            ReportMissingColumnAccess(context, invocationSyntax.GetLocation(), directColumn, isWrite: true, partitionRead: false,
                 GetDeclaredAccess(context, systemicSystem, accessProperty, systemAccess,
                     populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray));
         }
@@ -255,7 +303,7 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
                      && SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, systemAccess)
                      && methodSymbol.Name is "ReadColumn" or "WriteColumn")
             {
-                if (TryGetGeneratedGenericColumnAccess(item, semanticModel, context.CancellationToken,
+                if (TryGetGeneratedGenericColumnAccess(item, semanticModel,
                         methodSymbol, systemAccess, populationColumn, doubleBufferedPopulationColumn,
                         populationColumnKey, out var generatedColumn, out var generatedWrite))
                 {
@@ -336,7 +384,6 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
     private static bool TryGetGeneratedGenericColumnAccess(
         ExpressionSyntax accessExpression,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken,
         IMethodSymbol accessMethod,
         INamedTypeSymbol systemAccess,
         INamedTypeSymbol populationColumn,
@@ -440,6 +487,42 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         return true;
     }
 
+    private static bool TryGetScopedColumnAccess(
+        IInvocationOperation invocation,
+        SemanticModel semanticModel,
+        INamedTypeSymbol populationAccessScope,
+        INamedTypeSymbol systemAccess,
+        INamedTypeSymbol populationColumn,
+        INamedTypeSymbol doubleBufferedPopulationColumn,
+        INamedTypeSymbol populationColumnKey,
+        out IPropertySymbol columnProperty,
+        out bool isWrite,
+        out bool partitionRead)
+    {
+        columnProperty = null!;
+        isWrite = false;
+        partitionRead = false;
+        var method = invocation.TargetMethod;
+        if (!SymbolEqualityComparer.Default.Equals(method.ContainingType?.OriginalDefinition, populationAccessScope)
+            || method.Name is not ("ReadAll" or "ReadRange" or "ReadCurrent" or "ReadCurrentRange"
+                or "EditRange" or "EditNext" or "EditBoth")
+            || invocation.Arguments.Length == 0)
+            return false;
+
+        if (invocation.Arguments[invocation.Arguments.Length - 1].Value.Syntax is not ExpressionSyntax columnExpression || GetSymbol(semanticModel, columnExpression) is not IPropertySymbol property
+            || !IsGeneratedColumnProperty(property, systemAccess, populationColumn,
+                doubleBufferedPopulationColumn, populationColumnKey))
+            return false;
+
+        isWrite = method.Name is "EditRange" or "EditNext" or "EditBoth";
+        partitionRead = (method.Name is "ReadRange" or "ReadCurrent" or "ReadCurrentRange")
+            && !(method.Name == "ReadCurrent" && method.Parameters.Length > 1);
+        if (method.Name == "ReadAll" && method.Parameters.Length > 1)
+            partitionRead = false;
+        columnProperty = property;
+        return true;
+    }
+
     private static ISymbol? GetSymbol(SemanticModel semanticModel, ExpressionSyntax expression)
     {
         while (expression is ParenthesizedExpressionSyntax parenthesized)
@@ -467,7 +550,8 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
 
         var access = GetDeclaredAccess(context, systemicSystem, accessProperty, systemAccess,
             populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray);
-        ReportMissingColumnAccess(context, memberAccess.GetLocation(), columnProperty, isWrite: false, access);
+        ReportMissingColumnAccess(context, memberAccess.GetLocation(), columnProperty,
+            isWrite: false, partitionRead: false, access);
     }
 
     private static bool IsReadOnlyColumnView(
@@ -487,21 +571,25 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         Location location,
         IPropertySymbol columnProperty,
         bool isWrite,
+        bool partitionRead,
         AccessAnalysis access)
     {
-        if (!access.IsKnown || access.HasWriteWorld)
+        if (!access.IsKnown)
             return;
 
         var allowed = isWrite
             ? ContainsColumn(access.WriteColumns, columnProperty)
-            : ContainsColumn(access.ReadColumns, columnProperty) || ContainsColumn(access.WriteColumns, columnProperty);
+            : ContainsColumn(access.ReadColumns, columnProperty)
+                || (partitionRead && ContainsColumn(access.WriteColumns, columnProperty));
         if (allowed)
             return;
 
         var companionName = columnProperty.ContainingType.ContainingType.Name;
         var required = isWrite
             ? companionName + ".Write" + columnProperty.Name
-            : companionName + ".Read" + columnProperty.Name + " or " + companionName + ".Write" + columnProperty.Name;
+            : partitionRead
+                ? companionName + ".Read" + columnProperty.Name + " or " + companionName + ".Write" + columnProperty.Name
+                : companionName + ".Read" + columnProperty.Name;
         context.ReportDiagnostic(Diagnostic.Create(ColumnAccess, location,
             columnProperty.Name, isWrite ? "write" : "read", required));
     }
@@ -648,9 +736,9 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
 
     private static string GetRangeMutationGuidance(string methodName) => methodName switch
     {
-        "EditBothBuffers" => "Initialize both buffers outside the callback; use generated Columns.WriteRange(range).Write(...) for bounded row writes",
-        "Swap" => "Move buffer swaps outside the callback; generated Columns.WriteRange(range).Write(...) is for bounded row writes",
-        _ => "Use generated Columns.WriteRange(range).Write(...) to bound writes to the worker's assigned range",
+        "EditBothBuffers" => "Initialize both buffers outside the callback; use generated Columns.WriteRange(ref scope).Write(...) for bounded row writes",
+        "Swap" => "Move buffer swaps outside the callback; generated Columns.WriteRange(ref scope).Write(...) writes only the assigned rows",
+        _ => "Use generated Columns.WriteRange(ref scope).Write(...) to write only the worker's assigned range",
     };
 
     private static bool IsInsideForEachRangeCallback(
@@ -676,7 +764,7 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
 
         if (semanticModel.GetSymbolInfo(forEachInvocation, cancellationToken).Symbol is not IMethodSymbol method
             || !SymbolEqualityComparer.Default.Equals(method.ContainingType?.OriginalDefinition, systemicSystemContext)
-            || method.Name != "ForEachRange")
+            || method.Name is not ("ForEachRange" or "ForEachPopulationRange"))
             return false;
 
         return semanticModel.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter.Ordinal: 2 };

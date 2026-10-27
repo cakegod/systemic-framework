@@ -251,6 +251,10 @@ public sealed class RuleEngine
         var cutOff = false;
         string? cutoffReason = null;
         var emitter = new SimulationFactEmitter(this, _dispatchGeneration);
+        // Built-in effects can change entities, but cannot replace IDs; observers still get a fresh cache per fact.
+        var resolvedEntities = new FactEntityCache();
+        string? cachedEventType = null;
+        var cachedEventRules = ImmutableArray<CompiledRule>.Empty;
         for (var readIndex = 0; readIndex < _queue.Count && !cutOff; readIndex++)
         {
             var fact = _queue[readIndex];
@@ -269,7 +273,11 @@ public sealed class RuleEngine
 
             List<string>? matchedRuleIds = trace is null ? null : [];
             beforeEachFact?.Invoke(fact, emitter);
-            var resolvedEntities = new FactEntityCache();
+            if (beforeEachFact is not null)
+            {
+                resolvedEntities = default;
+            }
+
             if (_invalidFact)
             {
                 trace?.Add(new RuleTraceFact(factsProcessed - 1, fact, []));
@@ -286,7 +294,13 @@ public sealed class RuleEngine
                 break;
             }
 
-            foreach (var rule in _rules.ForEvent(fact.Type))
+            if (!ReferenceEquals(cachedEventType, fact.Type))
+            {
+                cachedEventType = fact.Type;
+                cachedEventRules = _rules.ForEvent(fact.Type);
+            }
+
+            foreach (var rule in cachedEventRules)
             {
                 if (!Matches(world, fact, rule, ref resolvedEntities))
                 {
@@ -691,7 +705,16 @@ public sealed class RuleEngine
         switch (effect.Kind)
         {
             case RuleEffectKind.AdjustProperty:
-                if (entity.TryGetProperty(world, effect.Name, out var value))
+                if (entity is DataEntity dataEntity
+                    && dataEntity.TryAdjustProperty(world, effect.Name, effect.Value, out var dataUpdated))
+                {
+                    if (!double.IsFinite(dataUpdated))
+                    {
+                        cutOff = true;
+                        cutoffReason = "non_finite_property";
+                    }
+                }
+                else if (entity.TryGetProperty(world, effect.Name, out var value))
                 {
                     var updated = value + effect.Value;
                     if (!double.IsFinite(updated))
@@ -728,6 +751,8 @@ public sealed class RuleEngine
     {
         private Entity? _source;
         private Entity? _target;
+        private int _sourceId;
+        private int _targetId;
         private bool _sourceResolved;
         private bool _targetResolved;
 
@@ -735,18 +760,20 @@ public sealed class RuleEngine
         {
             if (subject == RuleSubject.Source)
             {
-                if (!_sourceResolved)
+                if (!_sourceResolved || _sourceId != fact.SourceId)
                 {
                     _source = world.ById(fact.SourceId);
+                    _sourceId = fact.SourceId;
                     _sourceResolved = true;
                 }
 
                 return _source;
             }
 
-            if (!_targetResolved)
+            if (!_targetResolved || _targetId != fact.TargetId)
             {
                 _target = world.ById(fact.TargetId);
+                _targetId = fact.TargetId;
                 _targetResolved = true;
             }
 

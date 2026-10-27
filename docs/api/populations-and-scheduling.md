@@ -20,32 +20,35 @@ var columns = AgentPopulation.Bind(agents);
 
 Each generated column has a stable key and `Read*` and `Write*` `SystemAccess` declarations. Use those declarations in `ISystemicSystem.Access` or `IScheduledKernelSystem.Access` so the scheduler can order systems that share data.
 
-## Borrow and edit rows
+## Scoped population access
 
-`Population<TKind>.Borrow` and `SystemicSystemContext.BorrowPopulation` return a `PopulationLease<TKind>`. Read a normal column with `Read`, and write it with `Edit`; double-buffered columns use `ReadCurrent` and `EditNext`. `EditBoth` is for structural initialization such as spawning, while ordinary updates should write to the next buffer.
+`Population<TKind>.Borrow` and `SystemicSystemContext.BorrowPopulation` return a `PopulationLease<TKind>`. The lease exposes no spans or memories. Use `Population.WithAccess` for serial work, or `SystemicSystemContext.ForEachPopulationRange(population, ...)` for scheduler-assigned parallel partitions. Both APIs avoid a separate lease object. Keep an explicit lease when row identity must span multiple phases or the callback reads another population. Every access callback receives a `scoped ref PopulationAccessScope<TKind>`; spans from it expire when the callback returns.
+
+When migrating code that previously read or edited columns through a lease, move those operations into `WithAccess` and use `ReadAll`/`ReadRange` or `ReadCurrent`/`ReadCurrentRange` for reads and `EditRange`/`EditNext` for writes. The lease may still protect row identity across phases, but column spans and memories are available only inside the synchronous callback.
 
 ```csharp
-using var lease = context.BorrowPopulation(agents);
-context.ForEachRange((Lease: lease, Columns: columns), agents.Count,
-    static (state, _, range) =>
+context.ForEachPopulationRange(agents, columns,
+    static (AgentPopulation.Columns state, int _, scoped ref PopulationAccessScope<Agent> access) =>
     {
-        var positions = state.Lease.ReadCurrent(state.Columns.Position);
-        var velocities = state.Lease.Read(state.Columns.Velocity);
-        var writer = state.Columns.WriteRange(range);
+        var range = access.Range;
+        var positions = access.ReadCurrentRange(state.Position);
+        var velocities = access.ReadRange(state.Velocity);
+        var writer = state.WriteRange(ref access);
 
         for (var offset = 0; offset < range.Length; offset++)
         {
-            var row = range.Start + offset;
             writer.Write(offset, new AgentPopulation.Row
             {
-                Position = positions[row] + velocities[row],
-                Velocity = velocities[row]
+                Position = positions[offset] + velocities[offset],
+                Velocity = velocities[offset]
             });
         }
     });
 ```
 
-`Columns.WriteRange(range)` bounds edits to that range and writes double-buffered values to `Next`. A `PopulationLease<TKind>` keeps row identity and buffers stable while borrowed views are in use. Do not keep spans or memories beyond the lease lifetime or across structural changes, buffer swaps, cloning, or World adoption. Concurrent writes must target disjoint row ranges. `ForEachRange` helps assign disjoint ranges; it does not make arbitrary shared state safe.
+`Columns.WriteRange(ref access)` is bound to the exact assigned rows, writes double-buffered values to `Next`, and checks the callback token on each write. For single-buffered columns, `ReadAll` requires a read declaration. A parallel callback cannot read all rows of a single-buffered column that the same system writes, even when both read and write are declared; use `ReadRange` to stay within the assigned rows. The current buffer of a double-buffered column can be read across all rows while the callback writes its assigned rows to `Next`.
+
+Serial initialization uses the same scope. Generated `InitializeRange` binds columns before access, reads the caller's input span directly without copying it, writes only the requested range, and initializes both buffers. Structural changes, buffer swaps, transactions, and cloning remain blocked until the callback returns and its access scope is released.
 
 The system must declare every column touched by this example:
 
@@ -63,7 +66,7 @@ private static readonly ImmutableArray<SystemAccess> s_access =
 public IReadOnlyList<SystemAccess> Access => s_access;
 ```
 
-The complete [compile-checked population system](https://github.com/cakegod/systemic-framework/blob/main/tests/Systemic.Core.Tests/Documentation/ApiExamples.cs) exercises the same lease, range writer, generated schema, and host context.
+The complete [compile-checked population system](https://github.com/cakegod/systemic-framework/blob/main/tests/Systemic.Core.Tests/Documentation/ApiExamples.cs) exercises the scoped lease, range writer, generated schema, and host context.
 
 The range writer writes each field in the generated row, so it needs write access to both columns even though the example only changes `Position`.
 

@@ -19,8 +19,12 @@ public sealed class PopulationLeaseTransactionTests
         var branch = world.Clone();
         var lease = population.Borrow();
 
-        lease.Edit(column, 0, 1)[0] = 4;
-        Assert.Equal(new[] { 4, 1 }, lease.Read(column).ToArray());
+        lease.WithAccess(new PopulationRange(0, 2), column,
+            static (PopulationColumn<int> target, scoped ref PopulationAccessScope<Kind> scope) =>
+            {
+                scope.EditRange(target)[0] = 4;
+                Assert.Equal([4, 1], scope.ReadAll(target).ToArray());
+            });
         Assert.Throws<InvalidOperationException>(() => population.AddRange(1));
         Assert.Throws<InvalidOperationException>(() => population.RemoveSwapBack(0));
         Assert.Throws<InvalidOperationException>(() => population.Reserve(population.Capacity + 1));
@@ -33,7 +37,9 @@ public sealed class PopulationLeaseTransactionTests
 
         lease.Dispose();
         lease.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => { _ = lease.Read(column); });
+        Assert.Throws<ObjectDisposedException>(() => lease.WithAccess(new PopulationRange(0, 1), column,
+            static (PopulationColumn<int> target, scoped ref PopulationAccessScope<Kind> scope) =>
+                _ = scope.ReadAll(target)));
         population.RemoveSwapBack(0);
         Assert.Equal(1, population.Count);
     }
@@ -47,7 +53,9 @@ public sealed class PopulationLeaseTransactionTests
         population.AddRange(1);
         using var transaction = world.BeginTransaction();
         var lease = population.Borrow();
-        lease.Edit(column, 0, 1)[0] = 8;
+        lease.WithAccess(new PopulationRange(0, 1), column,
+            static (PopulationColumn<int> target, scoped ref PopulationAccessScope<Kind> scope) =>
+                scope.EditRange(target)[0] = 8);
 
         Assert.Throws<InvalidOperationException>(transaction.Rollback);
         Assert.Throws<InvalidOperationException>(transaction.Commit);
@@ -67,8 +75,12 @@ public sealed class PopulationLeaseTransactionTests
         second.AddRange(1);
         using var lease = first.Borrow();
 
-        Assert.Throws<ArgumentException>(() => { _ = lease.Read(foreign); });
-        Assert.Throws<ArgumentException>(() => { _ = lease.Edit(foreign, 0, 1); });
+        Assert.Throws<ArgumentException>(() => lease.WithAccess(new PopulationRange(0, 1), foreign,
+            static (PopulationColumn<int> target, scoped ref PopulationAccessScope<Kind> scope) =>
+                _ = scope.ReadAll(target)));
+        Assert.Throws<ArgumentException>(() => lease.WithAccess(new PopulationRange(0, 1), foreign,
+            static (PopulationColumn<int> target, scoped ref PopulationAccessScope<Kind> scope) =>
+                _ = scope.EditRange(target)));
     }
 
     [Fact]
