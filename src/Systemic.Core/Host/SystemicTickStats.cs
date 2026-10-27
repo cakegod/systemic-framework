@@ -7,6 +7,17 @@ public readonly record struct SystemTickStats(string SystemId, long Count, TimeS
     TimeSpan P95, TimeSpan Max, long AllocatedBytes, long BudgetExceededCount);
 
 public sealed record SystemicTickFailure(string? SystemId, int Tick, bool Committed, Exception Exception);
+
+/// <summary>Distinguishes a failure raised by this tick's commit from a nested world's commit.</summary>
+internal static class SystemicTickCommitState
+{
+    private const string NestedCommitKey = "Systemic.NestedCommit";
+
+    public static void MarkNestedCommit(Exception exception) => exception.Data[NestedCommitKey] = true;
+
+    public static bool IsNestedCommit(Exception exception) => exception.Data[NestedCommitKey] is true;
+}
+
 public readonly record struct SystemicTickResult(bool Succeeded, SystemicTickFailure? Failure);
 
 /// <summary>Bounded per-system timing history; worker-thread allocations are not included.</summary>

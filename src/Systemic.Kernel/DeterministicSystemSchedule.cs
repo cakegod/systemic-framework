@@ -250,33 +250,55 @@ public sealed class DeterministicSystemSchedule : IDisposable
 
         try
         {
-            using var transaction = world.BeginTransaction();
-            foreach (var wave in _waves)
+            var transaction = world.BeginTransaction();
+            try
             {
-                Array.Clear(_failures);
+                foreach (var wave in _waves)
+                {
+                    Array.Clear(_failures);
+                    try
+                    {
+                        RunWave(wave, world, tick);
+                        ThrowFirstFailure(wave);
+                        foreach (var node in wave) _contexts[node.Order].ReleasePopulationLeases();
+                        FlushDeferredPopulationCommands(wave);
+                        foreach (var node in wave)
+                        {
+                            _contexts[node.Order].FlushCommands(world);
+                        }
+                    }
+                    finally
+                    {
+                        foreach (var node in wave)
+                        {
+                            var context = _contexts[node.Order];
+                            context.RegisterRollbackActions(transaction);
+                            context.EndExecution();
+                        }
+                    }
+                }
+
+                transaction.Commit();
+            }
+            catch (Exception failure)
+            {
                 try
                 {
-                    RunWave(wave, world, tick);
-                    ThrowFirstFailure(wave);
-                    foreach (var node in wave) _contexts[node.Order].ReleasePopulationLeases();
-                    FlushDeferredPopulationCommands(wave);
-                    foreach (var node in wave)
-                    {
-                        _contexts[node.Order].FlushCommands(world);
-                    }
+                    transaction.Rollback();
                 }
-                finally
+                catch (Exception rollbackFailure)
                 {
-                    foreach (var node in wave)
-                    {
-                        var context = _contexts[node.Order];
-                        context.RegisterRollbackActions(transaction);
-                        context.EndExecution();
-                    }
+                    // Disposal would otherwise replace the system failure with the rollback failure.
+                    throw new AggregateException("The tick failed and rollback also failed.",
+                        failure, rollbackFailure);
                 }
-            }
 
-            transaction.Commit();
+                throw;
+            }
+            finally
+            {
+                transaction.Dispose();
+            }
         }
         finally
         {

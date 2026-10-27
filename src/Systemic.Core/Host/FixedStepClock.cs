@@ -74,14 +74,26 @@ public sealed class FixedStepClock
         var steps = 0;
         while (_phaseUnits >= TimeSpan.TicksPerSecond && steps < _maxCatchUpSteps)
         {
-            try { step(); }
-            catch (WorldCommitCallbackException)
+            // Consume the tick's phase before running it so a save taken from a commit callback
+            // captures the committed time rather than the time the tick just used.
+            _phaseUnits -= TimeSpan.TicksPerSecond;
+            try
+            {
+                step();
+            }
+            catch (WorldCommitCallbackException exception)
+                when (!SystemicTickCommitState.IsNestedCommit(exception))
             {
                 // The world is already committed; retrying this tick would run it twice.
-                _phaseUnits -= TimeSpan.TicksPerSecond;
                 throw;
             }
-            _phaseUnits -= TimeSpan.TicksPerSecond;
+            catch
+            {
+                // The tick rolled back; keep its pending time so a retry can run it.
+                _phaseUnits += TimeSpan.TicksPerSecond;
+                throw;
+            }
+
             steps++;
         }
 

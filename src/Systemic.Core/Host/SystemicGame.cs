@@ -597,6 +597,7 @@ public sealed class SystemicGameBuilder
             .Concat(_statefulExtensions)
             .Append(new ClockStatefulExtension(clock))
             .Append(new RuleHistoryStatefulExtension(contentRules, () => World.LogicalTick))
+            .Append(new EventEngineStatefulExtension(extensionEngine))
             .Concat(populationStateExtension is null ? [] : [populationStateExtension])
             .Distinct<ISystemicStatefulExtension>(ReferenceEqualityComparer.Instance)
             .OrderBy(extension => extension.Id, StringComparer.Ordinal)
@@ -766,24 +767,57 @@ public sealed class SystemicGame : IDisposable
         try
         {
             StepWithinTransaction(transaction);
-            transaction.Commit();
         }
-        catch (WorldCommitCallbackException)
+        catch (WorldCommitCallbackException failure)
         {
-            // State is already committed, so rollback cannot undo this tick.
+            // A nested world committed, but this tick has not: the enclosing transaction can still
+            // undo it, so mark the failure and report the tick as rolled back.
+            RollBackTick(transaction, failure);
+            SystemicTickCommitState.MarkNestedCommit(failure);
             throw;
         }
         catch (Exception failure)
         {
-            try { transaction.Rollback(); }
-            catch (Exception rollbackFailure)
-            {
-                var combined = new AggregateException("The tick failed and rollback also failed.", failure, rollbackFailure);
-                if (failure.Data["Systemic.SystemId"] is { } systemId)
-                    combined.Data["Systemic.SystemId"] = systemId;
-                throw combined;
-            }
+            RollBackTick(transaction, failure);
             throw;
+        }
+
+        try
+        {
+            // Only this commit belongs to this tick. A failure here left the world committed,
+            // so it must not be rolled back or retried.
+            transaction.Commit();
+        }
+        catch (WorldCommitCallbackException)
+        {
+            throw;
+        }
+        catch (Exception failure)
+        {
+            RollBackTick(transaction, failure);
+            throw;
+        }
+    }
+
+    private static void RollBackTick(WorldTransaction transaction, Exception failure)
+    {
+        try
+        {
+            transaction.Rollback();
+        }
+        catch (Exception rollbackFailure)
+        {
+            var combined = new AggregateException("The tick failed and rollback also failed.", failure, rollbackFailure);
+            CopySystemId(failure, combined);
+            throw combined;
+        }
+    }
+
+    private static void CopySystemId(Exception source, Exception target)
+    {
+        if (source.Data["Systemic.SystemId"] is { } systemId)
+        {
+            target.Data["Systemic.SystemId"] = systemId;
         }
     }
 
@@ -792,9 +826,11 @@ public sealed class SystemicGame : IDisposable
         for (var index = 0; index < StatefulExtensions.Count; index++)
         {
             var extension = StatefulExtensions[index];
-            // Kernel populations and rule history already enlist in the journal, while the
-            // clock advances outside Step. Snapshot registered domain state before any system runs.
-            if (extension is PopulationStatefulExtension or RuleHistoryStatefulExtension or ClockStatefulExtension) continue;
+            // Kernel populations and rule history already enlist in the journal, the clock advances
+            // outside Step, and the event engine journals its counters with the tick. Snapshot
+            // registered domain state before any system runs.
+            if (extension is PopulationStatefulExtension or RuleHistoryStatefulExtension
+                or ClockStatefulExtension or EventEngineStatefulExtension) continue;
             if (extension is ISystemicReusableTransactionalState reusable)
             {
                 var snapshot = reusable.CaptureTransactionSnapshot();
@@ -824,7 +860,8 @@ public sealed class SystemicGame : IDisposable
         catch (Exception exception)
         {
             return new(false, new SystemicTickFailure(exception.Data["Systemic.SystemId"] as string,
-                attemptedTick, exception is WorldCommitCallbackException, exception));
+                attemptedTick, exception is WorldCommitCallbackException
+                    && !SystemicTickCommitState.IsNestedCommit(exception), exception));
         }
     }
 

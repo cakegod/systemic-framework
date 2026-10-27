@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Systemic.Content;
+using Systemic.Extensions;
 using Systemic.Host;
+using Systemic.Kernel;
 using Systemic.Save;
 using Systemic.Tests.Content;
 
@@ -71,6 +73,41 @@ public sealed class SystemicSaveExtensionTests
         _ = new SystemicGameBuilder(content, materialized).AddService(restoredCounter).Build();
 
         Assert.Equal(42, restoredCounter.Value);
+    }
+
+    [Fact]
+    public void Event_ids_continue_identically_after_save_and_load()
+    {
+        using var pack = CoreOnlyPack.Create();
+        var content = ContentPackLoader.Load(pack.Root);
+        var codec = new SystemicSaveCodec();
+        var liveModule = new SerialModule();
+        using var live = new SystemicGameBuilder(content, content.CreateWorld(seed: 9, valueScale: 1))
+            .AddExtension(liveModule).Build();
+        live.Execute(new SerialEvent(1));
+        live.Execute(new SerialEvent(1));
+        Assert.Equal(2, liveModule.LastEventId);
+
+        var restoredModule = new SerialModule();
+        using var restored = new SystemicGameBuilder(content, codec.Load(content, codec.Save(live)))
+            .AddExtension(restoredModule).Build();
+
+        live.Execute(new SerialEvent(1));
+        restored.Execute(new SerialEvent(1));
+
+        Assert.Equal(3, liveModule.LastEventId);
+        Assert.Equal(3, restoredModule.LastEventId);
+    }
+
+    private sealed record SerialEvent(int SourceId) : KernelEvent(SourceId);
+
+    private sealed class SerialModule : ISystemicExtensionModule
+    {
+        public string Id => "test.serial-module";
+        public long LastEventId { get; private set; }
+
+        public void Register(EngineBuilder engine) => engine.On<SerialEvent>("test.serial-module",
+            context => LastEventId = context.Event.EventId);
     }
 
     private sealed class StatefulCounter : ISystemicStatefulExtension

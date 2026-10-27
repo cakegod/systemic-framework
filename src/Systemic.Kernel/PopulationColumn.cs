@@ -559,6 +559,7 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
         return () =>
         {
             _buffer = _buffer.EnsureCapacity(count);
+            CapturePages(0, 0, _population.Count, _buffer.Values.Length);
             values.AsSpan().CopyTo(_buffer.Values);
         };
     }
@@ -743,23 +744,27 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
         lock (_population.World.TransactionGate)
         {
             _population.EnsureNoLeases();
-            if (_population.World.TryCapturePopulationRole(this))
-            {
-                var batch = _freeRoleUndoBatches.Count > 0 ? _freeRoleUndoBatches.Pop() : new BufferRoleUndoBatch(this);
-                try
-                {
-                    batch.Capture(_firstIsCurrent);
-                    _population.World.RecordPopulationUndo(batch);
-                }
-                catch
-                {
-                    batch.Release();
-                    _population.World.ReleasePopulationRoleCapture(this);
-                    throw;
-                }
-            }
-
+            CaptureRole();
             _firstIsCurrent = !_firstIsCurrent;
+        }
+    }
+
+    private void CaptureRole()
+    {
+        if (_population.World.TryCapturePopulationRole(this))
+        {
+            var batch = _freeRoleUndoBatches.Count > 0 ? _freeRoleUndoBatches.Pop() : new BufferRoleUndoBatch(this);
+            try
+            {
+                batch.Capture(_firstIsCurrent);
+                _population.World.RecordPopulationUndo(batch);
+            }
+            catch
+            {
+                batch.Release();
+                _population.World.ReleasePopulationRoleCapture(this);
+                throw;
+            }
         }
     }
 
@@ -782,6 +787,9 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
         {
             _first = _first.EnsureCapacity(count);
             _second = _second.EnsureCapacity(count);
+            CapturePages(0, 0, _population.Count, _first.Values.Length);
+            CapturePages(1, 0, _population.Count, _second.Values.Length);
+            CaptureRole();
             values.AsSpan().CopyTo(_first.Values);
             values.AsSpan().CopyTo(_second.Values);
             _firstIsCurrent = true;

@@ -380,6 +380,50 @@ public sealed class BuildChoiceRuntimeTests
         Assert.True(restoredPrimary.IsSelected);
     }
 
+    [Fact]
+    public void Failed_tick_restores_existing_additional_owners_without_duplicates()
+    {
+        var (world, runtime, _) = CreateChoiceRuntime(("choice.test", []));
+        var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
+            new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));
+        using var game = new SystemicGameBuilder(content, world)
+            .AddSystem(runtime).AddSystem(new ChoiceFailureSystem()).Build();
+        var ownerId = AddAndRegisterOwner(world, runtime);
+
+        var failure = game.TryStep().Failure;
+
+        Assert.NotNull(failure);
+        Assert.IsType<InvalidOperationException>(failure.Exception);
+        Assert.Equal("choice test failure", failure.Exception.Message);
+        Assert.Single(runtime.CaptureState().Deserialize<BuildChoiceRuntimeState>()!.Owners);
+        Assert.True(runtime.TryGetState("choice.test", ownerId, out _));
+    }
+
+    [Fact]
+    public void Rolling_back_owner_registration_removes_its_mappings_and_allows_retry()
+    {
+        var (world, runtime, _) = CreateChoiceRuntime(("choice.test", []));
+        var owner = world.Add(new DataEntity([], [], ("progress", 0)));
+        var initialCount = world.Entities.Count;
+        using (var transaction = world.BeginTransaction())
+        {
+            Assert.True(runtime.RegisterOwner("group.main", owner.Id, owner.Id).Accepted);
+            transaction.Rollback();
+        }
+
+        Assert.Equal(initialCount, world.Entities.Count);
+        Assert.False(runtime.TryGetState("choice.test", owner.Id, out _));
+        Assert.True(runtime.RegisterOwner("group.main", owner.Id, owner.Id).Accepted);
+        Assert.True(runtime.TryGetState("choice.test", owner.Id, out _));
+    }
+
+    private sealed class ChoiceFailureSystem : ISystemicSystem
+    {
+        public string Id => "test.choice-failure";
+        public int Order => 200;
+        public void Step(SystemicSystemContext context) => throw new InvalidOperationException("choice test failure");
+    }
+
     private static TestPack CreateChoicePack()
     {
         var pack = TestPack.Create();

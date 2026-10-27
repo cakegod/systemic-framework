@@ -552,6 +552,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
 
         return () =>
         {
+            CaptureStructureUndo();
             if (state.RowCount > _capacity)
             {
                 SetCapacity(state.RowCount);

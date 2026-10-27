@@ -16,6 +16,7 @@ namespace Systemic.Save;
 [JsonSerializable(typeof(RuleHistoryState))]
 [JsonSerializable(typeof(PopulationWorldState))]
 [JsonSerializable(typeof(FixedStepClockState))]
+[JsonSerializable(typeof(EventEngineState))]
 [JsonSerializable(typeof(Dictionary<string, int>))]
 [JsonSerializable(typeof(Dictionary<string, double>))]
 [JsonSerializable(typeof(Dictionary<string, System.Text.Json.JsonElement>))]

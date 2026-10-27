@@ -60,6 +60,91 @@ public sealed class SystemicGameTransactionalStateTests
         Assert.Contains(failure.InnerExceptions, error => error.Message == "restore failed");
     }
 
+    [Fact]
+    public void Foreign_commit_callback_failure_reports_a_rolled_back_tick()
+    {
+        var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
+            new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));
+        using var game = new SystemicGameBuilder(content, new World(7, 1))
+            .AddSystem(new ForeignCommitSystem()).Build();
+
+        var result = game.TryStep();
+
+        Assert.False(result.Succeeded);
+        Assert.IsType<WorldCommitCallbackException>(result.Failure!.Exception);
+        Assert.False(result.Failure.Committed);
+        Assert.Equal(0, game.World.LogicalTick);
+    }
+
+    [Fact]
+    public void Commit_callback_failure_on_this_tick_is_reported_as_committed()
+    {
+        var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
+            new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));
+        using var game = new SystemicGameBuilder(content, new World(7, 1))
+            .AddSystem(new CommitCallbackSystem()).Build();
+
+        var result = game.TryStep();
+
+        Assert.False(result.Succeeded);
+        Assert.IsType<WorldCommitCallbackException>(result.Failure!.Exception);
+        Assert.True(result.Failure.Committed);
+        Assert.Equal(1, game.World.LogicalTick);
+    }
+
+    [Fact]
+    public void Rollback_callback_failure_preserves_the_original_system_failure()
+    {
+        var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
+            new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));
+        using var game = new SystemicGameBuilder(content, new World(7, 1))
+            .AddSystem(new RollbackFailureSystem()).Build();
+
+        var failure = Assert.Throws<AggregateException>(game.Step).Flatten();
+
+        Assert.Contains(failure.InnerExceptions, error => error.Message == "system failure");
+        Assert.Contains(failure.InnerExceptions, error => error.Message == "rollback callback failure");
+        Assert.Equal(0, game.World.LogicalTick);
+    }
+
+    private sealed class ForeignCommitSystem : ISystemicSystem
+    {
+        public string Id => "foreign-commit";
+        public int Order => 1;
+
+        public void Step(SystemicSystemContext context)
+        {
+            using var transaction = new World(2, 1).BeginTransaction();
+            transaction.OnCommit(() => throw new InvalidOperationException("foreign callback"));
+            transaction.Commit();
+        }
+    }
+
+    private sealed class CommitCallbackSystem : ISystemicSystem
+    {
+        public string Id => "commit-callback";
+        public int Order => 1;
+
+        public void Step(SystemicSystemContext context)
+        {
+            using var transaction = context.GetWritableWorld().BeginTransaction();
+            transaction.OnCommit(() => throw new InvalidOperationException("commit callback"));
+            transaction.Commit();
+        }
+    }
+
+    private sealed class RollbackFailureSystem : ISystemicSystem
+    {
+        public string Id => "rollback-failure";
+        public int Order => 1;
+
+        public void Step(SystemicSystemContext context)
+        {
+            context.OnRollback(() => throw new InvalidOperationException("rollback callback failure"));
+            throw new InvalidOperationException("system failure");
+        }
+    }
+
     private sealed class StatefulSystem : ISystemicSystem, ISystemicStatefulExtension
     {
         public string Id => "stateful";

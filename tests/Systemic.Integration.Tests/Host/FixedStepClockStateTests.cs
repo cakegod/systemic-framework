@@ -66,6 +66,17 @@ public sealed class FixedStepClockStateTests
     }
 
     [Fact]
+    public void Commit_callback_observes_the_committed_tick_already_consumed()
+    {
+        var clock = new FixedStepClock(1, 4);
+        FixedStepClockState observed = default;
+
+        clock.Advance(TimeSpan.FromSeconds(1), () => observed = clock.CaptureState());
+
+        Assert.Equal((Int128)0, observed.PhaseUnits);
+    }
+
+    [Fact]
     public void Catch_up_uses_exact_integer_phase_and_reports_dropped_duration()
     {
         var clock = new FixedStepClock(tickRateHz: 60, maxCatchUpSteps: 2);

@@ -236,6 +236,12 @@ public sealed class SpatialIndex
 
     private void CacheEntry(int entityId, Entry entry)
     {
+        if (entityId < _entriesById.Length && _entriesById[entityId].CellCount > 0)
+        {
+            _entriesById[entityId] = entry;
+            return;
+        }
+
         if (entityId > DenseEntryCacheLimit || entityId > _entries.Count * 2L)
         {
             return;

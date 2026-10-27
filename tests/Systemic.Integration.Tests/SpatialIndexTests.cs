@@ -84,4 +84,23 @@ public sealed class SpatialIndexTests
 
         Assert.Equal([15], results);
     }
+
+    [Fact]
+    public void Moving_a_previously_cached_entity_after_removals_updates_its_bounds()
+    {
+        var index = new SpatialIndex(cellSize: 10);
+        index.Upsert(1, new Bounds2(0, 0, 0, 0));
+        index.Upsert(2, new Bounds2(10, 0, 0, 0));
+        index.Upsert(3, new Bounds2(20, 0, 0, 0));
+        index.Remove(1);
+        index.Remove(2);
+        index.Upsert(3, new Bounds2(100, 0, 0, 0));
+        var results = new List<int>();
+
+        index.QueryOverlaps(new Bounds2(100, 0, 0, 0), results);
+
+        Assert.Equal([3], results);
+        index.QueryNearby(new Point2(100, 0), 0, results);
+        Assert.Equal([3], results);
+    }
 }

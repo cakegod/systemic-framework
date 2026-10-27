@@ -129,12 +129,28 @@ public sealed class EventEngine
     public CommandExecutionResult ExecuteReusableDetailed(World world, KernelEvent domainEvent) =>
         ExecuteDetailedCore(world, domainEvent, reuseRootEvent: true);
 
+    /// <summary>Gets the number of event IDs assigned so far.</summary>
+    internal long Serial => _serial;
+
+    /// <summary>Gets the number of command chains dispatched so far.</summary>
+    internal int ChainId => _chainId;
+
+    /// <summary>Restores the counters captured by <see cref="Serial" /> and <see cref="ChainId" />.</summary>
+    internal void RestoreCounters(long serial, int chainId)
+    {
+        _serial = serial;
+        _chainId = chainId;
+    }
+
     private CommandExecutionResult ExecuteDetailedCore(World world, KernelEvent domainEvent, bool reuseRootEvent)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(domainEvent);
         BeginCommand();
         var publication = CapturePublication();
+        // The engine's own scope restores publication state when its command fails, but an enclosing
+        // rollback must also rewind the counters so a retried rule sees the same event ID.
+        world.JournalEventCounters(this);
         var transaction = world.BeginScope();
         try
         {
@@ -188,6 +204,7 @@ public sealed class EventEngine
     {
         BeginCommand();
         var publication = CapturePublication();
+        world.JournalEventCounters(this);
         var working = world.Clone();
         var transaction = working.BeginScope();
         try

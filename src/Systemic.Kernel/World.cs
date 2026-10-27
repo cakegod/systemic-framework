@@ -678,6 +678,24 @@ public sealed class World
         }
     }
 
+    /// <summary>
+    /// Records the event engine's counters on the active transaction so an enclosing rollback rewinds
+    /// them. Kept off the journal so event commands do not register as state changes, and skipped
+    /// when no scope is active so ordinary commands stay allocation-free.
+    /// </summary>
+    internal void JournalEventCounters(EventEngine engine)
+    {
+        lock (TransactionGate)
+        {
+            if (_undoing || _scopes.Count == 0)
+            {
+                return;
+            }
+
+            _scopes.Peek().CaptureEventCounters(engine);
+        }
+    }
+
     internal bool HasChanges(ScopeState scope, ulong generation)
     {
         lock (TransactionGate)
@@ -751,21 +769,29 @@ public sealed class World
     public Population<TKind> DefinePopulation<TKind>(bool enableHandles = false)
         where TKind : IPopulationKind
     {
-        EnsureActive();
-        ArgumentException.ThrowIfNullOrWhiteSpace(TKind.Id);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(TKind.Version);
-
-        var kind = typeof(TKind);
-        if (_populationsByKind.ContainsKey(kind) || _populationsById.ContainsKey(TKind.Id))
+        lock (TransactionGate)
         {
-            throw new InvalidOperationException($"Population '{TKind.Id}' is already defined in this world.");
-        }
+            EnsureActive();
+            ArgumentException.ThrowIfNullOrWhiteSpace(TKind.Id);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(TKind.Version);
 
-        var population = new Population<TKind>(this, enableHandles);
-        var registration = new PopulationRegistration<TKind>(population);
-        _populationsByKind.Add(kind, registration);
-        _populationsById.Add(TKind.Id, registration);
-        return population;
+            var kind = typeof(TKind);
+            if (_populationsByKind.ContainsKey(kind) || _populationsById.ContainsKey(TKind.Id))
+            {
+                throw new InvalidOperationException($"Population '{TKind.Id}' is already defined in this world.");
+            }
+
+            var population = new Population<TKind>(this, enableHandles);
+            var registration = new PopulationRegistration<TKind>(population);
+            if (!_undoing && _scopes.Count > 0)
+            {
+                _journal.Add(UndoRecord.ForPopulationDefinition(registration));
+            }
+
+            _populationsByKind.Add(kind, registration);
+            _populationsById.Add(TKind.Id, registration);
+            return population;
+        }
     }
 
     public Population<TKind> GetPopulation<TKind>()
@@ -920,7 +946,19 @@ public sealed class World
             throw new InvalidOperationException($"Role {RoleNames[role]} is already bound.");
         }
 
+        CaptureRole(role);
         _roles[role] = entity.Id;
+    }
+
+    private void CaptureRole(int role)
+    {
+        lock (TransactionGate)
+        {
+            if (!_undoing && _scopes.Count > 0)
+            {
+                _journal.Add(UndoRecord.ForRole(role, _roles[role]));
+            }
+        }
     }
 
     public Entity? Role(string role) =>
@@ -1474,7 +1512,16 @@ public sealed class World
         _nextId = nextEntityId - 1;
     }
 
-    public void MarkRequired(Entity entity) => _required.Add(entity.Id);
+    public void MarkRequired(Entity entity)
+    {
+        lock (TransactionGate)
+        {
+            if (_required.Add(entity.Id) && !_undoing && _scopes.Count > 0)
+            {
+                _journal.Add(UndoRecord.ForRequired(entity.Id));
+            }
+        }
+    }
 
     public void SetModifier(
         string source,
@@ -1987,6 +2034,7 @@ public sealed class World
         {
             if (removedIds.Contains(_roles[role]))
             {
+                CaptureRole(role);
                 _roles[role] = 0;
             }
         }
@@ -2309,6 +2357,14 @@ public sealed class World
                     _undoing = false;
                 }
 
+                if (scope.EventCounterCheckpoints is { Count: > 0 } eventCounters)
+                {
+                    for (var index = eventCounters.Count - 1; index >= 0; index--)
+                    {
+                        eventCounters[index].Restore();
+                    }
+                }
+
                 var journalEnd = _journal.Count;
                 for (var index = scope.Mark; index < journalEnd; index++)
                 {
@@ -2328,6 +2384,7 @@ public sealed class World
             {
                 var parent = _scopes.Peek();
                 parent.InheritPopulationCaptures(scope);
+                parent.InheritEventCounters(scope);
                 if (scope.RollbackActions is { Count: > 0 } rollbackActions)
                 {
                     (parent.RollbackActions ??= []).AddRange(rollbackActions);
@@ -2357,6 +2414,7 @@ public sealed class World
             scope.CapturedPopulationBuffers?.Clear();
             scope.CapturedPopulationStructures?.Clear();
             scope.CapturedPopulationRoles?.Clear();
+            scope.EventCounterCheckpoints?.Clear();
             if (_scopes.Count == 0)
             {
                 foreach (var record in _journal)
@@ -2437,6 +2495,20 @@ public sealed class World
         public HashSet<PopulationBufferKey>? CapturedPopulationBuffers { get; private set; }
         public HashSet<object>? CapturedPopulationStructures { get; private set; }
         public HashSet<PopulationColumnBase>? CapturedPopulationRoles { get; private set; }
+        public List<EventCounterCheckpoint>? EventCounterCheckpoints { get; private set; }
+
+        public void CaptureEventCounters(EventEngine engine) =>
+            (EventCounterCheckpoints ??= []).Add(
+                new EventCounterCheckpoint(engine, engine.Serial, engine.ChainId));
+
+        public void InheritEventCounters(ScopeState child)
+        {
+            if (child.EventCounterCheckpoints is { Count: > 0 } checkpoints)
+            {
+                (EventCounterCheckpoints ??= []).AddRange(checkpoints);
+            }
+        }
+
         public List<Action>? RollbackActions { get; set; }
         public List<Action>? CommitActions { get; set; }
 
@@ -2556,6 +2628,14 @@ public sealed class World
         Removed,
         Modifier,
         Grants,
+        Role,
+        Required,
+        PopulationDefinition,
+    }
+
+    internal readonly record struct EventCounterCheckpoint(EventEngine Engine, long Serial, int ChainId)
+    {
+        public void Restore() => Engine.RestoreCounters(Serial, ChainId);
     }
 
     private readonly struct UndoRecord
@@ -2573,6 +2653,7 @@ public sealed class World
         public Bounds2 SpatialBounds { get; private init; }
         public bool HadSpatialBounds { get; private init; }
         public double NumericValue { get; private init; }
+        public PopulationRegistration? Population { get; private init; }
 
         public static UndoRecord ForEntitySnapshot(Entity entity, Entity snapshot) => new()
         {
@@ -2652,6 +2733,25 @@ public sealed class World
             Grants = grants,
         };
 
+        public static UndoRecord ForRole(int role, int entityId) => new()
+        {
+            Kind = UndoKind.Role,
+            Index = role,
+            EntityId = entityId,
+        };
+
+        public static UndoRecord ForRequired(int entityId) => new()
+        {
+            Kind = UndoKind.Required,
+            EntityId = entityId,
+        };
+
+        public static UndoRecord ForPopulationDefinition(PopulationRegistration population) => new()
+        {
+            Kind = UndoKind.PopulationDefinition,
+            Population = population,
+        };
+
         public readonly void Undo(World world)
         {
             switch (Kind)
@@ -2702,6 +2802,17 @@ public sealed class World
                     break;
                 case UndoKind.Grants:
                     world.RestoreGrants(EntityId, Grants);
+                    break;
+                case UndoKind.Role:
+                    world._roles[Index] = EntityId;
+                    break;
+                case UndoKind.Required:
+                    world._required.Remove(EntityId);
+                    break;
+                case UndoKind.PopulationDefinition:
+                    world._populationsByKind.Remove(Population!.Kind);
+                    world._populationsById.Remove(Population.Id);
+                    Population.DetachWorld();
                     break;
                 default:
                     throw new InvalidOperationException($"Unknown undo kind: {Kind}.");

@@ -74,6 +74,17 @@ public sealed class SystemicSaveCodec
         var entities = world.Entities.OrderBy(entity => entity.Id)
             .Select(entity => CaptureEntity(world, entity))
             .ToArray();
+        var extensionStates = game.StatefulExtensions.ToDictionary(extension => extension.Id,
+            extension => CloneJson(extension.CaptureState()), StringComparer.Ordinal);
+        if (world.HasPopulations && !game.StatefulExtensions.Any(extension => extension is PopulationStatefulExtension))
+        {
+            var populationState = new PopulationStatefulExtension(world).CaptureState();
+            if (!extensionStates.TryAdd(PopulationStatefulExtension.ExtensionId, populationState))
+            {
+                throw new SystemicSaveException($"Stateful extension ID '{PopulationStatefulExtension.ExtensionId}' is reserved for populations.");
+            }
+        }
+
         var document = new SaveDocument(
             CurrentSchemaVersion,
             contentFingerprint,
@@ -91,8 +102,7 @@ public sealed class SystemicSaveCodec
                 world.BoundRoles.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
                 [.. world.RequiredEntityIds]),
             game.EntityIds.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
-            game.StatefulExtensions.ToDictionary(extension => extension.Id,
-                extension => CloneJson(extension.CaptureState()), StringComparer.Ordinal));
+            extensionStates);
 
         var json = JsonSerializer.Serialize(document, SystemicSaveJsonContext.Default.SaveDocument);
         var sealedJson = SaveIntegrity.Seal(JsonNode.Parse(json)!.AsObject());

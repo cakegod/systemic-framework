@@ -83,6 +83,26 @@ public sealed class PopulationSaveTests
     }
 
     [Fact]
+    public void Save_includes_populations_defined_after_the_host_was_built()
+    {
+        using var pack = CoreOnlyPack.Create();
+        var content = ContentPackLoader.Load(pack.Root);
+        using var game = new SystemicGameBuilder(content, content.CreateWorld(77, 1)).Build();
+        var source = new PopulationSetupSystem(game.World);
+        source.Particles.AddRange(1);
+        source.Energy.EditRange(0, 1)[0] = 41;
+        var codec = new SystemicSaveCodec();
+
+        var saved = codec.Save(game);
+        var materialized = codec.Load(content, saved);
+        var restored = new PopulationSetupSystem(materialized.World);
+        using var restoredGame = new SystemicGameBuilder(content, materialized).AddSystem(restored).Build();
+
+        Assert.Equal(1, restored.Particles.Count);
+        Assert.Equal(41, restored.Energy.ReadOnlySpan[0]);
+    }
+
+    [Fact]
     public void SaveRestoresDoubleBufferCurrentAndReinitializesNext()
     {
         using var pack = CoreOnlyPack.Create();
