@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "entities": [
+    {
+      "id": "pixel.mine",
+      "kind": "actor",
+      "tags": ["mine"],
+      "properties": { "wins": 0 }
+    },
+    {
+      "id": "pixel.dust",
+      "kind": "resource",
+      "tags": ["resource", "dust"],
+      "properties": { "balance": 0 }
+    },
+    {
+      "id": "pixel.prism",
+      "kind": "resource",
+      "tags": ["resource", "prism"],
+      "properties": { "balance": 0 }
+    }
+  ]
+}
