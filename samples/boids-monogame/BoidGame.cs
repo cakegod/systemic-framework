@@ -72,7 +72,7 @@ public sealed class BoidGame : Game
             content.Manifest.TickRateHz);
         _simulation = new SystemicGameBuilder(content, materialized)
             .AddService(_flockSystem)
-            .AddScheduledSystem(_flockSystem)
+            .AddSystem(_flockSystem)
             .Build();
 
         Content.RootDirectory = "Content";

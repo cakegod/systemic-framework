@@ -73,8 +73,51 @@ public sealed class PopulationSchemaGenerator : IIncrementalGenerator
         }
 
         builder.AppendLine($"    public static Columns Bind(global::Systemic.Kernel.Population<{schemaType}> population) => new(population);");
+        builder.AppendLine("    /// <summary>A detached snapshot of one row. Edit its values and pass it to WriteRow or RangeWriter.Write.</summary>");
+        builder.AppendLine("    public struct Row");
+        builder.AppendLine("    {");
+        foreach (var column in columns!)
+        {
+            builder.AppendLine($"        public {column.TypeName} {Escape(column.Name)} {{ get; set; }}");
+        }
+        builder.AppendLine("    }");
+
+        builder.AppendLine("    /// <summary>Borrowed writable views of a checked live row range.</summary>");
+        builder.AppendLine("    /// <remarks>Finish using the writer before structural changes, cloning, adoption, buffer swaps, or transaction changes. Concurrent writers must use disjoint ranges.</remarks>");
+        builder.AppendLine("    public readonly ref struct RangeWriter");
+        builder.AppendLine("    {");
+        for (var i = 0; i < columns!.Count; i++)
+        {
+            builder.AppendLine($"        private readonly global::System.Span<{columns[i].TypeName}> _column{i};");
+        }
+        builder.AppendLine("        public int Length { get; }");
+        builder.Append($"        internal RangeWriter(int length");
+        for (var i = 0; i < columns.Count; i++)
+        {
+            builder.Append($", global::System.Span<{columns[i].TypeName}> column{i}");
+        }
+        builder.AppendLine(")");
+        builder.AppendLine("        {");
+        builder.AppendLine("            Length = length;");
+        for (var i = 0; i < columns.Count; i++)
+        {
+            builder.AppendLine($"            _column{i} = column{i};");
+        }
+        builder.AppendLine("        }");
+        builder.AppendLine("        /// <summary>Writes one row by range-relative index; double-buffered columns are written to Next.</summary>");
+        builder.AppendLine("        public void Write(int index, Row value)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (index < 0 || index >= Length) throw new global::System.ArgumentOutOfRangeException(nameof(index));");
+        for (var i = 0; i < columns.Count; i++)
+        {
+            builder.AppendLine($"            _column{i}[index] = value.{Escape(columns[i].Name)};");
+        }
+        builder.AppendLine("        }");
+        builder.AppendLine("    }");
+
         builder.AppendLine("    public readonly struct Columns");
         builder.AppendLine("    {");
+        builder.AppendLine($"        private readonly global::Systemic.Kernel.Population<{schemaType}> _population;");
         foreach (var column in columns!)
         {
             var columnType = column.DoubleBuffered
@@ -85,17 +128,56 @@ public sealed class PopulationSchemaGenerator : IIncrementalGenerator
 
         builder.AppendLine($"        internal Columns(global::Systemic.Kernel.Population<{schemaType}> population)");
         builder.AppendLine("        {");
+        builder.AppendLine("            _population = population ?? throw new global::System.ArgumentNullException(nameof(population));");
         foreach (var column in columns!)
         {
             var bindMethod = column.DoubleBuffered ? "DoubleBufferedColumn" : "Column";
-            builder.AppendLine($"            {Escape(column.Name)} = population.{bindMethod}({column.KeyProperty});");
+            builder.AppendLine($"            this.{Escape(column.Name)} = population.{bindMethod}({column.KeyProperty});");
         }
 
+        builder.AppendLine("        }");
+        builder.AppendLine("        /// <summary>Copies the current values of a checked live row into a detached snapshot.</summary>");
+        builder.AppendLine("        public Row ReadRow(int row)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            ValidateRow(row);");
+        builder.AppendLine("            return new Row");
+        builder.AppendLine("            {");
+        foreach (var column in columns)
+        {
+            var readView = column.DoubleBuffered ? "Current" : "ReadOnlySpan";
+            builder.AppendLine($"                {Escape(column.Name)} = this.{Escape(column.Name)}.{readView}[row],");
+        }
+        builder.AppendLine("            };");
+        builder.AppendLine("        }");
+        builder.AppendLine("        /// <summary>Writes a checked live row. Double-buffered values are written to Next.</summary>");
+        builder.AppendLine("        public void WriteRow(int row, Row value)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            ValidateRow(row);");
+        builder.AppendLine("            WriteRange(new global::Systemic.Kernel.PopulationRange(row, 1)).Write(0, value);");
+        builder.AppendLine("        }");
+        builder.AppendLine("        /// <summary>Acquires a checked writer for a live row range; buffered columns target Next.</summary>");
+        builder.AppendLine("        public RangeWriter WriteRange(global::Systemic.Kernel.PopulationRange range)");
+        builder.AppendLine("        {");
+        builder.Append("            return new RangeWriter(range.Length");
+        foreach (var column in columns)
+        {
+            var editMethod = column.DoubleBuffered ? "EditNext" : "EditRange";
+            builder.Append($", this.{Escape(column.Name)}.{editMethod}(range.Start, range.Length)");
+        }
+        builder.AppendLine(");");
+        builder.AppendLine("        }");
+        builder.AppendLine("        private void ValidateRow(int row)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            if (row < 0 || row >= _population.Count) throw new global::System.ArgumentOutOfRangeException(nameof(row));");
         builder.AppendLine("        }");
         builder.AppendLine("    }");
         builder.AppendLine("}");
 
-        output.AddSource($"{schema.Name}.Population.g.cs", SourceText.From(builder.ToString(), Encoding.UTF8));
+        // Roslyn compares hint names case-insensitively and rejects punctuation such as '@'.
+        // Hex-encode the full name so case, keywords and non-ASCII identifiers remain distinct.
+        var hintName = new StringBuilder("Population_");
+        foreach (var octet in Encoding.UTF8.GetBytes(schemaType)) hintName.Append(octet.ToString("x2"));
+        output.AddSource($"{hintName}.g.cs", SourceText.From(builder.ToString(), Encoding.UTF8));
     }
 
     private static string? Validate(
@@ -207,6 +289,29 @@ public sealed class PopulationSchemaGenerator : IIncrementalGenerator
             return "the schema must declare at least one PopulationColumn field";
         }
 
+        // Column properties, the row snapshot, and the companion expose different sets of names.
+        // Detect collisions here so a schema error points to the declaration, rather than leaving
+        // consumers with compiler errors in generated code.
+        var columnMembers = new HashSet<string>(StringComparer.Ordinal)
+            { "Columns", "ReadRow", "WriteRow", "WriteRange", "ValidateRow", "_population" };
+        var rowMembers = new HashSet<string>(StringComparer.Ordinal) { "Row" };
+        var companionMembers = new HashSet<string>(StringComparer.Ordinal)
+            { companionName, "Define", "Bind", "Columns", "Row", "RangeWriter" };
+        foreach (var column in columns)
+        {
+            if (!columnMembers.Add(column.Name) || !rowMembers.Add(column.Name))
+            {
+                return $"column '{column.Name}' conflicts with a generated member named '{column.Name}'";
+            }
+            foreach (var name in new[] { column.Name + "Key", "Read" + column.Name, "Write" + column.Name })
+            {
+                if (!companionMembers.Add(name))
+                {
+                    return $"column '{column.Name}' conflicts with a generated member named '{name}'";
+                }
+            }
+        }
+
         return null;
     }
 
@@ -226,18 +331,20 @@ public sealed class PopulationSchemaGenerator : IIncrementalGenerator
         builder.AppendLine("            throw new global::System.ArgumentException(\"The schema value count must match the population range.\", nameof(values));");
         builder.AppendLine("        }");
         builder.AppendLine($"        var columns = {companionName}.Bind(population);");
-        foreach (var column in columns)
+        for (var columnIndex = 0; columnIndex < columns.Count; columnIndex++)
         {
-            var editName = "edit" + Sanitize(column.Name);
+            var column = columns[columnIndex];
+            var editName = "editColumn" + columnIndex;
             var editMethod = column.DoubleBuffered ? "EditBothBuffers" : "EditRange";
             builder.AppendLine($"        var {editName} = columns.{Escape(column.Name)}.{editMethod}(range.Start, range.Length);");
         }
 
         builder.AppendLine("        for (var index = 0; index < values.Length; index++)");
         builder.AppendLine("        {");
-        foreach (var column in columns)
+        for (var columnIndex = 0; columnIndex < columns.Count; columnIndex++)
         {
-            var editName = "edit" + Sanitize(column.Name);
+            var column = columns[columnIndex];
+            var editName = "editColumn" + columnIndex;
             var valueName = $"values[index].{Escape(column.Name)}";
             if (column.DoubleBuffered)
             {

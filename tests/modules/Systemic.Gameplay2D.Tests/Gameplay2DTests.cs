@@ -235,6 +235,6 @@ public sealed class Gameplay2DTests
     private static ActorDefinition Actor(string id, IReadOnlyDictionary<string, double> properties) =>
         new(id, ["target"], [], properties, 1, 1);
 
-    private static SystemicStepContext Context(World world, int tick) =>
+    private static SystemicSystemContext Context(World world, int tick) =>
         new(world, new RuleEngine(new CompiledRuleSet([])), new EngineBuilder().Build(), tick);
 }

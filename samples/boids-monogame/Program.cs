@@ -70,7 +70,7 @@ static void RunHeadlessBenchmark(
         materialized.EntityIds["flock.main"], seed, content.Manifest.TickRateHz);
     var hostBuilder = new Systemic.Host.SystemicGameBuilder(content, materialized)
         .AddService(flock)
-        .AddScheduledSystem(flock);
+        .AddSystem(flock);
     if (workerCount > 0)
     {
         hostBuilder.WithScheduledWorkerCount(workerCount);
@@ -78,12 +78,12 @@ static void RunHeadlessBenchmark(
 
     using var host = hostBuilder.Build();
     var tickMilliseconds = new double[measuredTicks];
-    SystemicStepContext[] directContexts = [];
+    SystemicSystemContext[] directContexts = [];
     if (directStep)
     {
         var rules = new Systemic.Rules.RuleEngine(content.Rules, tickRateHz: content.Manifest.TickRateHz);
         var extensions = new EventEngine([]);
-        directContexts = [.. Enumerable.Range(1, checked(warmupTicks + measuredTicks)).Select(tick => new SystemicStepContext(materialized.World, rules, extensions, tick))];
+        directContexts = [.. Enumerable.Range(1, checked(warmupTicks + measuredTicks)).Select(tick => new SystemicSystemContext(materialized.World, rules, extensions, tick))];
     }
 
     for (var tick = 0; tick < warmupTicks; tick++)

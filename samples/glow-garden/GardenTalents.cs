@@ -35,11 +35,13 @@ public sealed partial class GardenSimulation
     public int ActiveTalentCount => Enum.GetValues<Talent>().Count(IsTalentActive);
     public int CopyCount => _creatures.Count(creature => creature.IsCopy);
     public int PendingImpactCount => _pending.Count;
+    public long RejectedSeedSpawns { get; private set; }
     public IReadOnlyList<PendingImpact> PendingImpacts { get; }
     public bool IsTalentActive(Talent talent) => _garden.HasTag(TalentTag(talent));
 
     /// <summary>Reactions selected by the authored talent rules, counted by their adjustProperty effects.</summary>
-    public long EffectCount(Talent talent) => (long)ParamRaw(TalentTag(talent) + ".uses");
+    public long EffectCount(Talent talent) =>
+        _garden.TryGetProperty(_world, TalentTag(talent) + ".uses", out var value) ? (long)value : 0;
 
     private static int TalentIndex(Talent talent) => (uint)talent < 6 ? (int)talent : throw new ArgumentOutOfRangeException(nameof(talent));
     private static string TalentTag(Talent talent)
@@ -59,10 +61,15 @@ public sealed partial class GardenSimulation
     public bool ToggleTalent(Talent talent)
     {
         var tag = TalentTag(talent);
-        if (_garden.HasTag(tag)) _garden.RemoveTag(tag);
+        if (_garden.HasTag(tag))
+        {
+            CaptureCommandRollback();
+            _garden.RemoveTag(tag);
+        }
         else
         {
-            if (ActiveTalentCount >= ParamInt("garden.talents.slots", 3, 1, 6)) return false;
+            if (ActiveTalentCount >= _tuning.TalentSlots) return false;
+            CaptureCommandRollback();
             _garden.AddTag(tag);
         }
         return true;
@@ -72,11 +79,14 @@ public sealed partial class GardenSimulation
     public void ObserveFact(SimulationFact fact, SimulationFactEmitter emitter)
     {
         if (fact.SourceId != _garden.Id) return;
-        // Scheduled facts bypass Publish, so resolve their position from the authored target entity.
+        // Keep subpixel simulation coordinates for the local reaction; the fact bridge stores a
+        // stable integer-pixel snapshot for rules, replay, aggregation, and presentation.
         var impact = _publishingImpact
-            ?? (_world.TryGetSpatialBounds(fact.TargetId, out var bounds)
-                ? new Impact(new Vector2(bounds.X, bounds.Y))
-                : null);
+            ?? (fact.Position is { } position
+                ? new Impact(new Vector2(position.X, position.Y))
+                : _world.TryGetSpatialBounds(fact.TargetId, out var bounds)
+                    ? new Impact(new Vector2(bounds.X, bounds.Y))
+                    : null);
         if (impact is not { } anchor) return;
         Talent? talent = fact.Type switch
         {
@@ -96,27 +106,24 @@ public sealed partial class GardenSimulation
 
     private void Publish(string type, double amount = 0, Impact? impact = null)
     {
-        var target = _garden.Id;
-        if (impact is { } at)
-        {
-            // Presentation captures positions during dispatch, so one shared anchor entity is enough.
-            _world.SetSpatialBounds(_impact, new Bounds2(at.Position.X, at.Position.Y, 0, 0));
-            target = _impact.Id;
-        }
-
         var previous = _publishingImpact;
         _publishingImpact = impact;
         try
         {
-            _publish(new SimulationFact(type, _garden.Id, target, Amount: amount));
+            SimulationFactPosition? position = impact is { } at
+                ? new SimulationFactPosition(
+                    checked((long)Math.Round(at.Position.X, MidpointRounding.ToEven)),
+                    checked((long)Math.Round(at.Position.Y, MidpointRounding.ToEven)))
+                : null;
+            _publish(new SimulationFact(type, _garden.Id, _garden.Id, Amount: amount, Position: position));
         }
         finally { _publishingImpact = previous; }
     }
 
     private void QueueImpact(Vector2 position, bool seed)
     {
-        var delay = ParamInt(seed ? "garden.seedstorm.delay" : "garden.echo.delay", seed ? 18 : 12, 1, 600);
-        var expiry = Math.Max(delay, ParamInt(seed ? "garden.seedstorm.expiry" : "garden.echo.expiry", 60, 1, 3600));
+        var delay = seed ? _tuning.SeedstormDelay : _tuning.EchoDelay;
+        var expiry = Math.Max(delay, seed ? _tuning.SeedstormExpiry : _tuning.EchoExpiry);
         if (_pending.Count < MaxPendingImpacts)
             _pending.Add(new(position, Tick + delay, Tick + expiry, seed));
     }
@@ -147,8 +154,7 @@ public sealed partial class GardenSimulation
             }
             else
             {
-                var target = NearestRipe(impact.Position,
-                    ParamFloat("garden.echo.radius", 180, 1, 960));
+                var target = NearestRipe(impact.Position, _tuning.EchoRadius);
                 if (target >= 0)
                 {
                     BurstPlant(target, anchor: impact.Position);
@@ -163,8 +169,8 @@ public sealed partial class GardenSimulation
 
     private void ApplyMagnetism()
     {
-        var radius = ParamFloat("garden.magnetism.radius", 90, 1, 960);
-        var pull = ParamFloat("garden.magnetism.pull", 4, 1, 32);
+        var radius = _tuning.MagnetismRadius;
+        var pull = _tuning.MagnetismPull;
         // This snapshot is local to a phase with no creature movement or structural edits.
         // Mote removals elsewhere cannot stale its creature row indexes.
         _creatureGrid.Rebuild(_creatures.Columns.Position.ReadOnlySpan);
@@ -192,12 +198,12 @@ public sealed partial class GardenSimulation
         var id = _nextCreatureId++;
         _creatures.Add(new(id, CreatureKind.Burstling, position, 0, 15, true));
         _creatures.Columns.CopyExpiryTick.EditRange(_creatures.Count - 1, 1)[0] =
-            Tick + ParamInt("garden.clone.lifetime", CopyLifetime, 1, 3600);
+            Tick + _tuning.CloneLifetime;
     }
 
     private void DrainTalentIntents()
     {
-        // Invoked after the host transaction commits, outside RuleEngine dispatch. Subsequent
+        // Invoked before the host transaction commits, outside RuleEngine dispatch. Subsequent
         // publishes may enqueue more work, but cannot recursively execute domain effects.
         for (var processed = 0; processed < MaxTalentIntents && _talentIntents.TryDequeue(out var intent); processed++)
         {
@@ -210,7 +216,7 @@ public sealed partial class GardenSimulation
                 case Talent.Seedstorm:
                     // Seeds drift anywhere in the garden, keeping only a minimum distance from the parent
                     // and never settling inside a thicket, where workers could not reach the pod.
-                    var minimum = ParamFloat("garden.seedstorm.offset", 50, 0, 400);
+                    var minimum = _tuning.SeedstormOffset;
                     var spot = impact.Position;
                     for (var attempt = 0; attempt < 12; attempt++)
                     {
@@ -228,8 +234,17 @@ public sealed partial class GardenSimulation
                                 new(60, 60), new(Width - 60, Height - 60));
                         }
 
-                        if (!Obstacles.IsBlocked(spot)) break;
+                        if (!Obstacles.IsBlocked(spot)
+                            && Vector2.DistanceSquared(spot, impact.Position) >= minimum * minimum) break;
                     }
+                    if ((Obstacles.IsBlocked(spot)
+                            || Vector2.DistanceSquared(spot, impact.Position) < minimum * minimum)
+                        && !Obstacles.TryFindFreePosition(spot, impact.Position, minimum, out spot))
+                    {
+                        RejectedSeedSpawns++;
+                        break;
+                    }
+
                     QueueImpact(spot, true);
                     break;
                 case Talent.Magnetism:
@@ -252,8 +267,8 @@ public sealed partial class GardenSimulation
     private void ApplyChain(Impact impact)
     {
         if (impact.Reaction is not { } reaction || impact.Depth >= 3) return;
-        var radius = ParamFloat("garden.chain.radius", 100, 1, 960);
-        var limit = Math.Min(ParamInt("garden.chain.bursts", MaxReactionBursts, 1, 64), MaxReactionBursts);
+        var radius = _tuning.ChainRadius;
+        var limit = Math.Min(_tuning.ChainBursts, MaxReactionBursts);
         _plantGrid.QueryRadius(impact.Position, radius, _reactionPlants);
         var growth = _plants.Columns.Growth.ReadOnlySpan;
         var positions = _plants.Columns.Position.ReadOnlySpan;
@@ -271,7 +286,7 @@ public sealed partial class GardenSimulation
     private void ApplyBounce(Impact impact)
     {
         if (impact.Reaction is not { AllowBounce: true, Bounced: false } reaction) return;
-        var target = NearestRipe(impact.Position, ParamFloat("garden.projectile.radius", 240, 1, 960));
+        var target = NearestRipe(impact.Position, _tuning.ProjectileRadius);
         if (target < 0) return;
         var position = _plants[target].Position;
         BurstPlant(target, anchor: position);

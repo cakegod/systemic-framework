@@ -42,10 +42,10 @@ internal sealed class ScheduledEventSystem : ISystemicSystem
 
     public int Order => -100;
 
-    public void Step(SystemicStepContext context)
+    public void Step(SystemicSystemContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (!ReferenceEquals(context.World, _world))
+        if (!context.IsForWorld(_world))
         {
             throw new InvalidOperationException("Schedule system cannot step a different world than the one it was initialized with.");
         }

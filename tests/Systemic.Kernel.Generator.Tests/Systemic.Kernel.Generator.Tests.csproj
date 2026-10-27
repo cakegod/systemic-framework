@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/Systemic.Core/Systemic.Core.csproj" />
     <ProjectReference Include="../../src/Systemic.Kernel/Systemic.Kernel.csproj" />
     <ProjectReference Include="../../src/Systemic.Kernel.Generator/Systemic.Kernel.Generator.csproj" />
   </ItemGroup>

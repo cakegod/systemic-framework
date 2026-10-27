@@ -13,10 +13,10 @@ public sealed class Gameplay2DModule : ISystemicExtensionModule, ISystemicSystem
 
     public void Register(EngineBuilder engine) => ArgumentNullException.ThrowIfNull(engine);
 
-    public void Step(SystemicStepContext context)
+    public void Step(SystemicSystemContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var world = context.World;
+        var world = context.GetWritableWorld();
         using var transaction = world.BeginTransaction();
         foreach (var entity in world.Entities)
         {

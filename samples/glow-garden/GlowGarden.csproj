@@ -10,8 +10,6 @@
     <PackageReference Include="Gum.MonoGame" Version="2026.5.8.1" />
     <ProjectReference Include="../../src/Systemic.Core/Systemic.Core.csproj" />
     <ProjectReference Include="../../src/modules/Systemic.Presentation/Systemic.Presentation.csproj" />
-    <ProjectReference Include="../../src/Systemic.Kernel.Generator/Systemic.Kernel.Generator.csproj"
-                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <InternalsVisibleTo Include="Systemic.GlowGarden.Tests" />
     <Content Include="content/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

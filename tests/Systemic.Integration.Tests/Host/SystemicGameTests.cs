@@ -63,7 +63,7 @@ public sealed class SystemicGameTests
         var order = new List<string>();
         using var game = new SystemicGameBuilder(content, world)
             .AddSystem(new RecordingSystem("legacy", 0, _ => order.Add("legacy")))
-            .AddScheduledSystem(new ScheduledRecordingSystem(target.Id, order))
+            .AddSystem(new ScheduledRecordingSystem(target.Id, order))
             .WithScheduledWorkerCount(2)
             .Build();
 
@@ -80,7 +80,7 @@ public sealed class SystemicGameTests
             with
         { Modules = [] };
         using var game = new SystemicGameBuilder(content, new World(seed: 1, valueScale: 1))
-            .AddScheduledSystem(new ScheduledRecordingSystem(1, []))
+            .AddSystem(new ScheduledRecordingSystem(1, []))
             .WithScheduledWorkerCount(2)
             .Build();
 
@@ -99,7 +99,7 @@ public sealed class SystemicGameTests
         var entity = world.Add(new DataEntity([], [], ("value", 0)));
         var system = new PublishingScheduledSystem(entity.Id);
         using var game = new SystemicGameBuilder(content, world)
-            .AddScheduledSystem(system)
+            .AddSystem(system)
             .Build();
 
         Assert.Throws<InvalidOperationException>(game.Step);
@@ -118,8 +118,8 @@ public sealed class SystemicGameTests
         var entity = world.Add(new DataEntity([], [], ("value", 0)));
         using var game = new SystemicGameBuilder(content, world)
             .AddSystem(new RecordingSystem("legacy-write", 0, context => context.SetProperty(entity, "value", 3)))
-            .AddScheduledSystem(new ScheduledRecordingSystem(entity.Id, []))
-            .AddScheduledSystem(new ThrowingScheduledSystem())
+            .AddSystem(new ScheduledRecordingSystem(entity.Id, []))
+            .AddSystem(new ThrowingScheduledSystem())
             .WithScheduledWorkerCount(2)
             .Build();
 
@@ -162,39 +162,42 @@ public sealed class SystemicGameTests
         Assert.Equal(2, balance);
     }
 
-    private sealed class RecordingSystem(string id, int order, Action<SystemicStepContext> action) : ISystemicSystem
+    private sealed class RecordingSystem(string id, int order, Action<SystemicSystemContext> action) : ISystemicSystem
     {
         public string Id { get; } = id;
         public int Order { get; } = order;
-        public void Step(SystemicStepContext context) => action(context);
+        public void Step(SystemicSystemContext context) => action(context);
     }
 
-    private sealed class ScheduledRecordingSystem(int entityId, List<string> order) : ISystemicScheduledSystem
+    private sealed class ScheduledRecordingSystem(int entityId, List<string> order) : ISystemicSystem
     {
         public string Id => "scheduled";
+        public int Order => 1;
         public IReadOnlyList<SystemAccess> Access => [SystemAccess.DeferWorldWrites];
-        public void Step(ScheduledSystemContext _, SystemicScheduledContext gameContext)
+        public void Step(SystemicSystemContext gameContext)
         {
             order.Add("scheduled");
             gameContext.Commands.SetProperty(entityId, "value", 7);
         }
     }
 
-    private sealed class ThrowingScheduledSystem : ISystemicScheduledSystem
+    private sealed class ThrowingScheduledSystem : ISystemicSystem
     {
         public string Id => "failure";
+        public int Order => 10;
         public IReadOnlyList<SystemAccess> Access => [SystemAccess.WriteWorld];
-        void ISystemicScheduledSystem.Step(ScheduledSystemContext kernelContext, SystemicScheduledContext gameContext) =>
+        public void Step(SystemicSystemContext gameContext) =>
             throw new InvalidOperationException("expected");
     }
 
-    private sealed class PublishingScheduledSystem(int entityId) : ISystemicScheduledSystem
+    private sealed class PublishingScheduledSystem(int entityId) : ISystemicSystem
     {
         public string Id => "publishing";
+        public int Order => 0;
         public IReadOnlyList<SystemAccess> Access => [SystemAccess.DeferWorldWrites];
-        public SystemicScheduledContext? ContextAfterStep { get; private set; }
+        public SystemicSystemContext? ContextAfterStep { get; private set; }
 
-        public void Step(ScheduledSystemContext _, SystemicScheduledContext gameContext)
+        public void Step(SystemicSystemContext gameContext)
         {
             ContextAfterStep = gameContext;
             gameContext.Publish(new Systemic.Rules.SimulationFact("test", entityId, entityId));

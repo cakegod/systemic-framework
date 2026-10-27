@@ -60,5 +60,9 @@ public readonly struct WorldCommandBuffer
     public void SetSpatialBounds(int entityId, Bounds2 bounds) => Storage.SetSpatialBounds(entityId, bounds);
     public void RemoveSpatialBounds(int entityId) => Storage.RemoveSpatialBounds(entityId);
     public void Clear() => Storage.Clear();
+
+    /// <summary>Applies queued commands in insertion order.</summary>
+    /// <param name="world">World to mutate.</param>
+    /// <exception cref="InvalidOperationException">This buffer belongs to a scheduled system; scheduled commands are applied by the schedule at its wave barrier.</exception>
     public void Flush(World world) => Storage.Flush(world);
 }

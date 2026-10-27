@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Systemic.Kernel;
+using Systemic.Host;
 
 namespace Systemic.Save;
 
@@ -14,6 +15,7 @@ namespace Systemic.Save;
 [JsonSerializable(typeof(DrawStreamSnapshot))]
 [JsonSerializable(typeof(RuleHistoryState))]
 [JsonSerializable(typeof(PopulationWorldState))]
+[JsonSerializable(typeof(FixedStepClockState))]
 [JsonSerializable(typeof(Dictionary<string, int>))]
 [JsonSerializable(typeof(Dictionary<string, double>))]
 [JsonSerializable(typeof(Dictionary<string, System.Text.Json.JsonElement>))]

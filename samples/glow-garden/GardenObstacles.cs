@@ -4,7 +4,7 @@ namespace GlowGarden;
 
 /// <summary>
 /// Deterministic smooth noise field that carves organic thickets out of the garden. It derives from
-/// the World's seeded draw state without consuming draws, so obstacle layout never perturbs gameplay
+/// the world's original seed without consuming draws, so obstacle layout never perturbs gameplay
 /// randomness. After generation every disconnected pocket is joined to the colony by a carved
 /// corridor, so the free space is always one connected region. Workers slide along a thicket edge.
 /// </summary>
@@ -19,9 +19,12 @@ internal sealed class GardenObstacles
 
     private readonly float[] _field;
     private readonly int _columns, _rows;
+    private readonly float _width, _height;
 
     internal GardenObstacles(float width, float height, ulong seed, Vector2 keepClear, float clearRadius)
     {
+        _width = width;
+        _height = height;
         _columns = Math.Max(2, (int)MathF.Ceiling(width / Resolution));
         _rows = Math.Max(2, (int)MathF.Ceiling(height / Resolution));
         _field = new float[_columns * _rows];
@@ -55,6 +58,36 @@ internal sealed class GardenObstacles
     internal bool IsBlocked(float x, float y) => _field[CellIndex(x, y)] >= CoverageThreshold;
 
     /// <summary>
+    /// Finds the nearest eligible free cell centre, breaking ties by row then column.
+    /// The optional origin and distance constrain seeds away from their parent.
+    /// </summary>
+    internal bool TryFindFreePosition(Vector2 preferred, Vector2? origin, float minimumDistance, out Vector2 position)
+    {
+        var bestDistance = float.PositiveInfinity;
+        var minimumSquared = minimumDistance * minimumDistance;
+        position = default;
+        var found = false;
+        for (var row = 0; row < _rows; row++)
+        {
+            for (var column = 0; column < _columns; column++)
+            {
+                if (IsBlocked(column, row)) continue;
+                var candidate = new Vector2(
+                    MathF.Min((column + 0.5f) * Resolution, _width),
+                    MathF.Min((row + 0.5f) * Resolution, _height));
+                if (origin is { } parent && Vector2.DistanceSquared(candidate, parent) < minimumSquared) continue;
+                var distance = Vector2.DistanceSquared(candidate, preferred);
+                if (distance >= bestDistance) continue;
+                position = candidate;
+                bestDistance = distance;
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
     /// Steps toward <paramref name="to"/>, following the thicket boundary when the direct line is
     /// blocked. The tangent is chosen on the side that still makes progress toward the target, so a
     /// worker traces the edge instead of grinding into it. Returns <paramref name="from"/> only when
@@ -62,7 +95,6 @@ internal sealed class GardenObstacles
     /// </summary>
     internal Vector2 Steer(Vector2 from, Vector2 to, ref int side)
     {
-        if (side == 0 && !IsBlocked(to)) return to;
         if (ClearPath(from, to))
         {
             side = 0;
@@ -72,7 +104,7 @@ internal sealed class GardenObstacles
         if (IsBlocked(from))
         {
             side = 0;
-            return to;
+            return from;
         }
 
         var delta = to - from;
@@ -87,14 +119,14 @@ internal sealed class GardenObstacles
         foreach (var degrees in s_deviations)
         {
             var candidate = from + (Rotate(desired, side * degrees * DegreesPerRadian) * length);
-            if (!IsBlocked(candidate)) return candidate;
+            if (!IsBlocked(candidate) && ClearPath(from, candidate)) return candidate;
         }
 
         side = -side;
         foreach (var degrees in s_deviations)
         {
             var candidate = from + (Rotate(desired, side * degrees * DegreesPerRadian) * length);
-            if (!IsBlocked(candidate)) return candidate;
+            if (!IsBlocked(candidate) && ClearPath(from, candidate)) return candidate;
         }
 
         var slid = Constrain(from, to);
@@ -119,11 +151,11 @@ internal sealed class GardenObstacles
     }
 
     /// <summary>
-    /// Last resort when every direction is walled: walk to the centre of the current free cell and
-    /// then toward its best free neighbour. Because the free cells are connected by construction,
-    /// a worker can always leave a pinch instead of standing still forever.
+    /// Last resort when every candidate direction is blocked: walk to the current cell centre and
+    /// then toward the best clear cardinal neighbor. The finite search returns the current point if
+    /// no safe escape step exists.
     /// </summary>
-    private Vector2 Escape(Vector2 from, float step, Vector2 desired)
+    internal Vector2 Escape(Vector2 from, float step, Vector2 desired)
     {
         var column = Math.Clamp((int)(from.X / Resolution), 0, _columns - 1);
         var row = Math.Clamp((int)(from.Y / Resolution), 0, _rows - 1);
@@ -134,22 +166,25 @@ internal sealed class GardenObstacles
 
         var best = from;
         var bestScore = float.MinValue;
-        for (var offsetRow = -1; offsetRow <= 1; offsetRow++)
+        // Use the same four-way topology as Connect. Diagonal cell centers can be separated by
+        // two blocked cells that meet at a corner, so diagonal escape would break that guarantee.
+        ReadOnlySpan<(int Column, int Row)> neighbors = [(0, -1), (1, 0), (0, 1), (-1, 0)];
+        foreach (var (offsetColumn, offsetRow) in neighbors)
         {
-            for (var offsetColumn = -1; offsetColumn <= 1; offsetColumn++)
-            {
-                if (offsetColumn == 0 && offsetRow == 0) continue;
-                var nextColumn = column + offsetColumn;
-                var nextRow = row + offsetRow;
-                if (!InBounds(nextColumn, nextRow) || IsBlocked(nextColumn, nextRow)) continue;
-                var target = new Vector2((nextColumn + 0.5f) * Resolution, (nextRow + 0.5f) * Resolution);
-                var direction = target - from;
-                if (direction.LengthSquared() < 0.0001f) continue;
-                var score = Vector2.Dot(Vector2.Normalize(direction), desired);
-                if (score <= bestScore) continue;
-                bestScore = score;
-                best = from + (Vector2.Normalize(direction) * step);
-            }
+            var nextColumn = column + offsetColumn;
+            var nextRow = row + offsetRow;
+            if (!InBounds(nextColumn, nextRow) || IsBlocked(nextColumn, nextRow)) continue;
+            var target = new Vector2((nextColumn + 0.5f) * Resolution, (nextRow + 0.5f) * Resolution);
+            var direction = target - from;
+            var distanceSquared = direction.LengthSquared();
+            if (distanceSquared < 0.0001f) continue;
+            var distance = MathF.Sqrt(distanceSquared);
+            var candidate = from + (direction * (MathF.Min(step, distance) / distance));
+            if (IsBlocked(candidate) || !ClearPath(from, candidate)) continue;
+            var score = Vector2.Dot(Vector2.Normalize(direction), desired);
+            if (score <= bestScore) continue;
+            bestScore = score;
+            best = candidate;
         }
 
         return best;
@@ -158,7 +193,8 @@ internal sealed class GardenObstacles
     private bool InBounds(int column, int row) =>
         column >= 0 && column < _columns && row >= 0 && row < _rows;
 
-    private bool IsBlocked(int column, int row) => _field[(row * _columns) + column] >= CoverageThreshold;
+    private bool IsBlocked(int column, int row) => !InBounds(column, row)
+        || _field[(row * _columns) + column] >= CoverageThreshold;
 
     private int CellIndex(float x, float y)
     {
@@ -168,30 +204,94 @@ internal sealed class GardenObstacles
     }
 
     /// <summary>
-    /// Line-of-sight probe. Sampled every few pixels rather than at a fixed count, because a sparse
-    /// probe can miss a thin thicket and send a worker straight back into the wall it just left.
+    /// Exact grid traversal. Every touched cell is checked, including both side cells at a corner,
+    /// so long rays and diagonal corner crossings cannot skip thin thickets.
     /// </summary>
-    private bool ClearPath(Vector2 from, Vector2 to)
+    internal bool ClearPath(Vector2 from, Vector2 to)
     {
-        var delta = to - from;
-        var distance = delta.Length();
-        var steps = Math.Clamp((int)(distance / Resolution), 1, 64);
-        for (var step = 1; step <= steps; step++)
+        if (!float.IsFinite(from.X) || !float.IsFinite(from.Y)
+            || !float.IsFinite(to.X) || !float.IsFinite(to.Y)
+            || from.X < 0 || from.X > _width || from.Y < 0 || from.Y > _height
+            || to.X < 0 || to.X > _width || to.Y < 0 || to.Y > _height) return false;
+
+        var column = Math.Clamp((int)(from.X / Resolution), 0, _columns - 1);
+        var row = Math.Clamp((int)(from.Y / Resolution), 0, _rows - 1);
+        var onVerticalBoundary = from.X == MathF.Floor(from.X / Resolution) * Resolution;
+        var onHorizontalBoundary = from.Y == MathF.Floor(from.Y / Resolution) * Resolution;
+        var deltaX = (double)to.X - from.X;
+        var deltaY = (double)to.Y - from.Y;
+        var horizontalBoundaryRun = deltaY == 0 && onHorizontalBoundary;
+        var verticalBoundaryRun = deltaX == 0 && onVerticalBoundary;
+
+        // Cell squares are treated as closed: a segment on a grid line touches both adjacent
+        // cells, and a segment starting at a corner touches all four cells at that point.
+        if (onVerticalBoundary && column > 0 && IsBlocked(column - 1, row)) return false;
+        if (onHorizontalBoundary && row > 0 && IsBlocked(column, row - 1)) return false;
+        if (onVerticalBoundary && onHorizontalBoundary && column > 0 && row > 0
+            && IsBlocked(column - 1, row - 1)) return false;
+        if (IsBlockedAlongPath()) return false;
+
+        var stepX = Math.Sign(deltaX);
+        var stepY = Math.Sign(deltaY);
+        var absoluteX = Math.Abs(deltaX);
+        var absoluteY = Math.Abs(deltaY);
+        var nextX = stepX > 0
+            ? (((column + 1) * Resolution) - from.X)
+            : stepX < 0 ? (from.X - (column * Resolution)) : double.PositiveInfinity;
+        var nextY = stepY > 0
+            ? (((row + 1) * Resolution) - from.Y)
+            : stepY < 0 ? (from.Y - (row * Resolution)) : double.PositiveInfinity;
+
+        while (true)
         {
-            if (IsBlocked(from + (delta * (step / (float)steps)))) return false;
+            var crossesX = stepX != 0 && nextX <= absoluteX;
+            var crossesY = stepY != 0 && nextY <= absoluteY;
+            if (!crossesX && !crossesY) break;
+
+            // Comparing products avoids division and gives an exact corner comparison for the
+            // single-precision input coordinates (their products fit in double precision).
+            var compare = !crossesX ? 1 : !crossesY ? -1 : (nextX * absoluteY).CompareTo(nextY * absoluteX);
+            if (compare < 0)
+            {
+                column += stepX;
+                if (IsBlockedAlongPath()) return false;
+                nextX += Resolution;
+            }
+            else if (compare > 0)
+            {
+                row += stepY;
+                if (IsBlockedAlongPath()) return false;
+                nextY += Resolution;
+            }
+            else
+            {
+                // At a corner, the segment touches both side cells before entering the diagonal
+                // cell. Reject either side so movement cannot cut between two touching walls.
+                if (IsBlocked(column + stepX, row) || IsBlocked(column, row + stepY)) return false;
+                column += stepX;
+                row += stepY;
+                if (IsBlocked(column, row)) return false;
+                nextX += Resolution;
+                nextY += Resolution;
+            }
         }
 
         return true;
+
+        bool IsBlockedAlongPath() => IsBlocked(column, row)
+            || (horizontalBoundaryRun && row > 0 && IsBlocked(column, row - 1))
+            || (verticalBoundaryRun && column > 0 && IsBlocked(column - 1, row));
     }
 
     /// <summary>Moves along the unblocked axis when the direct step enters a thicket, so motes hug the edge.</summary>
     internal Vector2 Constrain(Vector2 from, Vector2 to)
     {
-        if (IsBlocked(from) || !IsBlocked(to)) return to;
+        if (IsBlocked(from)) return from;
+        if (!IsBlocked(to) && ClearPath(from, to)) return to;
         var slideX = new Vector2(to.X, from.Y);
-        if (!IsBlocked(slideX)) return slideX;
+        if (!IsBlocked(slideX) && ClearPath(from, slideX)) return slideX;
         var slideY = new Vector2(from.X, to.Y);
-        return IsBlocked(slideY) ? from : slideY;
+        return IsBlocked(slideY) || !ClearPath(from, slideY) ? from : slideY;
     }
 
     /// <summary>Flood fills the free space and carves a corridor into every pocket the colony cannot reach.</summary>

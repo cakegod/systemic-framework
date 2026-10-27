@@ -1,0 +1,4 @@
+[Save/PopulationSaveTests.cs]
+# This system is a save-test fixture that holds arbitrary floating-point column values; it does not
+# run gameplay logic. Keep strict simulation defaults enabled for other system implementations.
+systemic_determinism = relaxed

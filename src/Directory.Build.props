@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Systemic.Kernel'
+      Or '$(MSBuildProjectName)' == 'Systemic.Core'
+      Or '$(MSBuildProjectName)' == 'Systemic.Kernel.Generator'
+      Or '$(MSBuildProjectName)' == 'Systemic.Rendering'
+      Or '$(MSBuildProjectName)' == 'Systemic.Incremental'
+      Or '$(MSBuildProjectName)' == 'Systemic.Presentation'
+      Or '$(MSBuildProjectName)' == 'Systemic.Gameplay2D'">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- The focused checker enforces author-facing contracts without requiring boilerplate on the legacy surface. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>

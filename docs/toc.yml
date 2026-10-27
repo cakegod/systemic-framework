@@ -1,0 +1,14 @@
+- name: Home
+  href: index.md
+- name: Guides
+  items:
+    - name: System context
+      href: api/system-context.md
+    - name: Populations and scheduling
+      href: api/populations-and-scheduling.md
+    - name: Analyzer reference
+      href: api/analyzers.md
+- name: API reference
+  href: reference/Systemic.Kernel.yml
+- name: Contributor guidance
+  href: contributing/api-documentation.md

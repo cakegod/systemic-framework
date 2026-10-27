@@ -34,20 +34,29 @@ public sealed class FrameworkIntegrationTests
     }
 
     [Fact]
-    public void PopulationStructuralChangesRollBackWithKernelTransaction()
+    public void PopulationAndProgressionCommandsRollBackWithKernelTransaction()
     {
         using var host = GardenHost.Create(42);
-        for (var tick = 0; tick < 4000 && host.Simulation.Glow < host.Simulation.HirePrice(CreatureKind.Burstling); tick++)
+        for (var tick = 0; tick < 4000 && host.Simulation.Glow < host.Simulation.HirePrice(CreatureKind.Burstling) + host.Simulation.Price(UpgradeKind.PodYield); tick++)
             host.Step(1);
         var before = host.Simulation.Creatures.ToArray();
+        var beforeGlow = host.Simulation.Glow;
+        var beforeTreeSpend = host.Simulation.Spent(UpgradeTree.MagicGrowth);
+        var beforeYieldRank = host.Simulation.Rank(UpgradeKind.PodYield);
         using (var transaction = host.Game.World.BeginTransaction())
         {
             Assert.True(host.Simulation.Hire(CreatureKind.Burstling));
+            Assert.True(host.Simulation.Buy(UpgradeKind.PodYield));
+            Assert.True(host.Simulation.ToggleTalent(Talent.Echo));
+            Assert.True(host.Simulation.ResetTree(UpgradeTree.MagicGrowth) > 0);
             Assert.Equal(before.Length + 1, host.Simulation.Creatures.Count);
             transaction.Rollback();
         }
-        // Progression/scratch rollback is deliberately outside this population-only contract.
         Assert.Equal(before, host.Simulation.Creatures.ToArray());
+        Assert.Equal(beforeGlow, host.Simulation.Glow);
+        Assert.Equal(beforeTreeSpend, host.Simulation.Spent(UpgradeTree.MagicGrowth));
+        Assert.Equal(beforeYieldRank, host.Simulation.Rank(UpgradeKind.PodYield));
+        Assert.False(host.Simulation.IsTalentActive(Talent.Echo));
     }
 
     [Fact]

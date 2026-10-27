@@ -8,7 +8,27 @@ public readonly record struct SimulationFact(
     int SourceId,
     int TargetId,
     int Depth = 0,
-    double Amount = 0);
+    double Amount = 0,
+    SimulationFactPosition? Position = null,
+    SimulationFactPayload? Payload = null)
+{
+    public SimulationFact(FactTypeId Type, int SourceId, int TargetId, int Depth = 0, double Amount = 0,
+        SimulationFactPosition? Position = null, SimulationFactPayload? Payload = null)
+        : this(Type.Value, SourceId, TargetId, Depth, Amount, Position, Payload) { }
+
+    /// <summary>A strongly typed view of the authored event name.</summary>
+    public FactTypeId TypeId => string.IsNullOrWhiteSpace(Type) ? default : new FactTypeId(Type);
+
+    // Preserve the original five-value deconstruction when position and payload were added.
+    public void Deconstruct(out string Type, out int SourceId, out int TargetId, out int Depth, out double Amount)
+    {
+        Type = this.Type;
+        SourceId = this.SourceId;
+        TargetId = this.TargetId;
+        Depth = this.Depth;
+        Amount = this.Amount;
+    }
+}
 
 public readonly struct SimulationFactEmitter
 {
@@ -657,7 +677,8 @@ public sealed class RuleEngine
                 return;
             }
 
-            EnqueueFact(new SimulationFact(effect.Name, fact.SourceId, fact.TargetId, fact.Depth + 1, fact.Amount));
+            EnqueueFact(new SimulationFact(effect.Name, fact.SourceId, fact.TargetId, fact.Depth + 1,
+                fact.Amount, fact.Position, fact.Payload));
             return;
         }
 

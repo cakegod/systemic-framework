@@ -12,6 +12,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Systemic.Core/Systemic.Core.csproj" />
+    <ProjectReference Include="../../src/Systemic.Kernel.Generator/Systemic.Kernel.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <None Include="../../schemas/core/save.schema.json" Link="schemas/core/save.schema.json" CopyToOutputDirectory="PreserveNewest" />

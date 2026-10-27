@@ -153,7 +153,7 @@ public sealed class TalentPatternCoverageTests
     private static ActorDefinition Blueprint() =>
         new("pattern.target", ["pattern.target"], [], new Dictionary<string, double>(), 1, 1);
 
-    private static SystemicStepContext Context(World world, int tick) =>
+    private static SystemicSystemContext Context(World world, int tick) =>
         new(world, new RuleEngine(new CompiledRuleSet([])), new EngineBuilder().Build(), tick);
 
     private sealed record PatternCoverage(string Id, string Mechanic, string[] Ports);
@@ -177,6 +177,6 @@ public sealed class TalentPatternCoverageTests
         public string Id => "test.pattern-port";
         public int Order => 0;
         public int Steps { get; private set; }
-        public void Step(SystemicStepContext context) => Steps++;
+        public void Step(SystemicSystemContext context) => Steps++;
     }
 }

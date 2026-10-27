@@ -14,6 +14,10 @@ internal sealed class GardenScent
     private readonly int _rows;
     private readonly float _cellSize;
 
+    internal int Columns => _columns;
+    internal int Rows => _rows;
+    internal float CellSize => _cellSize;
+
     internal GardenScent(float width, float height, float cellSize)
     {
         _cellSize = MathF.Max(8, cellSize);
@@ -27,6 +31,13 @@ internal sealed class GardenScent
         if (factor >= 1) return;
         for (var i = 0; i < _cells.Length; i++) _cells[i] *= factor;
     }
+
+    internal float[] Capture() => (float[])_cells.Clone();
+
+    internal bool IsValidSnapshot(float[]? cells) => cells is not null
+        && cells.Length == _cells.Length && cells.All(value => float.IsFinite(value) && value >= 0);
+
+    internal void Restore(float[] cells) => cells.CopyTo(_cells, 0);
 
     /// <summary>Deposits a trail that tapers from the food outward, so uphill always means "toward food".</summary>
     internal void StampTrail(Vector2 food, Vector2 home, float strength)

@@ -11,7 +11,7 @@ namespace Systemic.Tests.Save;
 public sealed class SaveSchemaContractTests
 {
     [Fact]
-    public void Save_schema_matches_the_current_v3_codec_contract()
+    public void Save_schema_matches_the_current_v4_codec_contract()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -31,7 +31,7 @@ public sealed class SaveSchemaContractTests
         Assert.Single(new SystemicSaveCodec().Load(content, saved.RootElement.GetRawText()).World.Entities);
 
         var schemaRoot = schema.RootElement;
-        Assert.Equal(3, schemaRoot.GetProperty("properties"u8).GetProperty("schemaVersion"u8).GetProperty("const"u8).GetInt32());
+        Assert.Equal(4, schemaRoot.GetProperty("properties"u8).GetProperty("schemaVersion"u8).GetProperty("const"u8).GetInt32());
         var required = schemaRoot.GetProperty("required"u8).EnumerateArray().Select(value => value.GetString()).ToArray();
         Assert.Contains("extensionStates", required);
         Assert.DoesNotContain("presentation", required);
@@ -50,7 +50,7 @@ public sealed class SaveSchemaContractTests
         Assert.Contains("isValid", boundsRequired);
 
         var savedRoot = saved.RootElement;
-        Assert.Equal(3, savedRoot.GetProperty("schemaVersion"u8).GetInt32());
+        Assert.Equal(4, savedRoot.GetProperty("schemaVersion"u8).GetInt32());
         Assert.True(savedRoot.TryGetProperty("extensionStates"u8, out _));
         Assert.False(savedRoot.TryGetProperty("presentation"u8, out _));
         Assert.Equal("Foundation", savedRoot.GetProperty("world"u8).GetProperty("modifiers"u8)[0]
@@ -58,7 +58,7 @@ public sealed class SaveSchemaContractTests
     }
 
     [Fact]
-    public void Current_save_is_schema_validated_after_legacy_migration()
+    public void Current_save_is_schema_validated_after_checksum_verification()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -66,7 +66,7 @@ public sealed class SaveSchemaContractTests
         var save = JsonNode.Parse(new SystemicSaveCodec().Save(game))!.AsObject();
         save["world"]!["valueScale"] = -1;
 
-        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, save.ToJsonString()));
+        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, SaveTestDocument.Seal(save)));
 
         Assert.Contains("content.schema_invalid", error.Message, StringComparison.Ordinal);
         Assert.Contains("$.world.valueScale", error.Message, StringComparison.Ordinal);
@@ -82,7 +82,7 @@ public sealed class SaveSchemaContractTests
         var save = JsonNode.Parse(new SystemicSaveCodec().Save(game))!.AsObject();
         save["world"]!["draws"]!["increment"] = 2;
 
-        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, save.ToJsonString()));
+        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, SaveTestDocument.Seal(save)));
 
         Assert.Contains("random stream state", error.Message, StringComparison.Ordinal);
     }
@@ -96,7 +96,7 @@ public sealed class SaveSchemaContractTests
         var save = JsonNode.Parse(new SystemicSaveCodec().Save(game))!.AsObject();
         save["world"]!["nextEntityId"] = 1;
 
-        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, save.ToJsonString()));
+        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, SaveTestDocument.Seal(save)));
 
         Assert.Contains("Next entity ID must be greater", error.Message, StringComparison.Ordinal);
     }
@@ -116,7 +116,7 @@ public sealed class SaveSchemaContractTests
         bounds["left"] = 0;
         bounds["right"] = 6e38;
 
-        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, save.ToJsonString()));
+        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, SaveTestDocument.Seal(save)));
 
         Assert.Contains("invalid spatial bounds", error.Message, StringComparison.Ordinal);
     }
@@ -130,7 +130,7 @@ public sealed class SaveSchemaContractTests
         var save = JsonNode.Parse(new SystemicSaveCodec().Save(game))!.AsObject();
         save["world"]!["entities"]![0]!["tags"] = new JsonArray(" ");
 
-        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, save.ToJsonString()));
+        var error = Assert.Throws<SystemicSaveException>(() => new SystemicSaveCodec().Load(content, SaveTestDocument.Seal(save)));
 
         Assert.Contains("invalid or duplicate entity record", error.Message, StringComparison.Ordinal);
     }

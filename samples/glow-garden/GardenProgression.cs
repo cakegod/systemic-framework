@@ -63,6 +63,7 @@ public sealed partial class GardenSimulation
 
         if (_creatures.Count(c => !c.IsCopy) >= MaxWorkers || Glow < price) return false;
 
+        CaptureCommandRollback();
         Glow -= price;
         _creatures.Add(new CreatureState(_nextCreatureId++, kind, Colony, 0, 0, false));
         return true;
@@ -70,6 +71,8 @@ public sealed partial class GardenSimulation
 
     public bool Buy(UpgradeKind kind, bool bulk = false)
     {
+        if (Rank(kind) >= 25 || Glow < Price(kind)) return false;
+        CaptureCommandRollback();
         var bought = false;
 
         do
@@ -92,6 +95,8 @@ public sealed partial class GardenSimulation
     {
         var index = TreeIndex(tree);
         var refund = _spent[index];
+
+        if (refund != 0) CaptureCommandRollback();
 
         foreach (var kind in Enum.GetValues<UpgradeKind>()) if (Tree(kind) == tree) _ranks[(int)kind] = 0;
 

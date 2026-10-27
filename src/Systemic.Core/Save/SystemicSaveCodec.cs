@@ -29,7 +29,7 @@ public sealed class SystemicSaveException(string message, Exception? innerExcept
 /// <summary>Captures and restores portable engine-neutral world state using explicit entity codecs.</summary>
 public sealed class SystemicSaveCodec
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
     private const string SaveSchemaId = "https://press-the-button.dev/systemic/save.schema.json";
     private static readonly string s_saveSchema = ReadSchema();
 
@@ -54,15 +54,11 @@ public sealed class SystemicSaveCodec
             }
         }
 
-        _migrations = new Dictionary<int, ISaveMigration>
-        {
-            [1] = new AddPresentationMetadataMigration(),
-            [2] = new MovePresentationStateToExtensionsMigration()
-        };
+        _migrations = new Dictionary<int, ISaveMigration>();
         foreach (var migration in migrations ?? [])
         {
             ArgumentNullException.ThrowIfNull(migration);
-            if (migration.FromVersion < 1 || migration.FromVersion >= CurrentSchemaVersion
+            if (migration.FromVersion < 4
                 || !_migrations.TryAdd(migration.FromVersion, migration))
             {
                 throw new ArgumentException($"Save migration from version {migration.FromVersion} is invalid or duplicated.", nameof(migrations));
@@ -73,13 +69,17 @@ public sealed class SystemicSaveCodec
     public string Save(SystemicGame game)
     {
         ArgumentNullException.ThrowIfNull(game);
+        var contentFingerprint = RequireContentFingerprint(game.Content);
         var world = game.World;
         var entities = world.Entities.OrderBy(entity => entity.Id)
             .Select(entity => CaptureEntity(world, entity))
             .ToArray();
         var document = new SaveDocument(
             CurrentSchemaVersion,
+            contentFingerprint,
+            "",
             new SavedWorld(
+                world.Seed,
                 world.ValueScale,
                 world.SpatialCellSize,
                 world.LogicalTick,
@@ -94,7 +94,63 @@ public sealed class SystemicSaveCodec
             game.StatefulExtensions.ToDictionary(extension => extension.Id,
                 extension => CloneJson(extension.CaptureState()), StringComparer.Ordinal));
 
-        return JsonSerializer.Serialize(document, SystemicSaveJsonContext.Default.SaveDocument);
+        var json = JsonSerializer.Serialize(document, SystemicSaveJsonContext.Default.SaveDocument);
+        var sealedJson = SaveIntegrity.Seal(JsonNode.Parse(json)!.AsObject());
+        if (Encoding.UTF8.GetByteCount(sealedJson) > ContentFileReader.MaximumFileBytes)
+        {
+            throw new SystemicSaveException("Save document exceeds the 64 MiB limit.");
+        }
+        return sealedJson;
+    }
+
+    /// <summary>Writes and flushes a temporary file beside the destination, then atomically replaces it.</summary>
+    public void SaveToFile(SystemicGame game, string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var json = Save(game);
+        var destination = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(destination)!;
+        var temporary = Path.Combine(directory, $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp");
+        var temporaryCreated = false;
+        try
+        {
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write,
+                FileShare.None, 4096, FileOptions.WriteThrough))
+            {
+                temporaryCreated = true;
+                stream.Write(Encoding.UTF8.GetBytes(json));
+                stream.Flush(flushToDisk: true);
+            }
+            File.Move(temporary, destination, overwrite: true);
+            temporaryCreated = false;
+        }
+        finally
+        {
+            if (temporaryCreated)
+            {
+                try { File.Delete(temporary); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
+    }
+
+    /// <summary>Loads a size-limited UTF-8 save file using the same validation as <see cref="Load"/>.</summary>
+    public MaterializedContentWorld LoadFromFile(ContentPack content, string path)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        try
+        {
+            var bytes = ContentFileReader.ReadBytes(path, path);
+            var json = new UTF8Encoding(false, true).GetString(bytes);
+            return Load(content, json);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+            or ContentPackException or DecoderFallbackException)
+        {
+            throw new SystemicSaveException($"Could not read save file: {exception.Message}", exception);
+        }
     }
 
     public MaterializedContentWorld Load(ContentPack content, string json)
@@ -122,8 +178,19 @@ public sealed class SystemicSaveCodec
                 ?? throw new SystemicSaveException("Save document is empty.");
             ValidateSemantics(document);
 
+            var contentFingerprint = RequireContentFingerprint(content);
+            if (!string.Equals(document.ContentFingerprint, contentFingerprint, StringComparison.Ordinal))
+            {
+                throw new SystemicSaveException("Save content fingerprint does not match the loaded content pack.");
+            }
+
+            var clockState = document.ExtensionStates![ClockStatefulExtension.ExtensionId]
+                .Deserialize(SystemicSaveJsonContext.Default.FixedStepClockState);
+            var clock = new FixedStepClock(content.Manifest.TickRateHz, content.Manifest.MaxCatchUpSteps);
+            clock.RestoreState(clockState);
+
             var worldState = document.World;
-            var world = new World(seed: 0, valueScale: worldState.ValueScale,
+            var world = new World(seed: worldState.Seed, valueScale: worldState.ValueScale,
                 spatialCellSize: worldState.SpatialCellSize);
             world.Draws.RestoreState(worldState.Draws);
             world.LogicalTick = worldState.LogicalTick;
@@ -220,31 +287,36 @@ public sealed class SystemicSaveCodec
 
     private string Migrate(string json)
     {
-        var document = JsonNode.Parse(json)?.AsObject()
-            ?? throw new SystemicSaveException("Save document must be a JSON object.");
-        if (!int.TryParse(document["schemaVersion"]?.ToString(), out var version))
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object
+            || !document.RootElement.TryGetProperty("schemaVersion"u8, out var versionNode)
+            || versionNode.ValueKind != JsonValueKind.Number
+            || !versionNode.TryGetInt32(out var version))
         {
             throw new SystemicSaveException("Save document requires an integer schemaVersion.");
         }
 
-        if (version < 1 || version > CurrentSchemaVersion)
+        if (version < 4)
         {
-            throw new SystemicSaveException($"Save schema version {version} is not supported.");
+            throw new SystemicSaveException($"Save schema version {version} is no longer supported. Create a new version 4 save using the current content.");
         }
-
-        while (version < CurrentSchemaVersion)
+        if (version > CurrentSchemaVersion)
         {
-            if (!_migrations.TryGetValue(version, out var migration))
-            {
-                throw new SystemicSaveException($"No save migration is registered from version {version} to {version + 1}.");
-            }
-
-            migration.Apply(document);
-            version++;
-            document["schemaVersion"] = version;
+            throw new SystemicSaveException($"Save schema version {version} is newer than supported version {CurrentSchemaVersion}.");
         }
+        SaveIntegrity.Validate(document.RootElement);
+        return version < CurrentSchemaVersion
+            ? SystemicSaveMigration.Upgrade(json, CurrentSchemaVersion, _migrations.Values)
+            : json;
+    }
 
-        return document.ToJsonString();
+    private static string RequireContentFingerprint(ContentPack content)
+    {
+        if (!SaveIntegrity.IsDigest(content.ContentFingerprint))
+        {
+            throw new SystemicSaveException("Content pack has no valid SHA-256 fingerprint. Supply ContentFingerprint for synthetic or modified content.");
+        }
+        return content.ContentFingerprint!;
     }
 
     private static string ReadSchema()
@@ -431,57 +503,18 @@ public sealed class SystemicSaveCodec
         }
     }
 
-    private sealed class AddPresentationMetadataMigration : ISaveMigration
-    {
-        public int FromVersion => 1;
-
-        public void Apply(JsonObject document)
-        {
-            document["presentation"] ??= new JsonObject
-            {
-                ["visualRootSeed"] = 0,
-                ["nextActorVisualId"] = 0
-            };
-            document["extensionStates"] ??= new JsonObject();
-        }
-    }
-
-    private sealed class MovePresentationStateToExtensionsMigration : ISaveMigration
-    {
-        public int FromVersion => 2;
-
-        public void Apply(JsonObject document)
-        {
-            JsonObject extensionStates;
-            if (document.TryGetPropertyValue("extensionStates", out var extensionStatesNode))
-            {
-                extensionStates = extensionStatesNode as JsonObject
-                    ?? throw new SystemicSaveException("Version 2 save extensionStates must be a JSON object.");
-            }
-            else
-            {
-                extensionStates = [];
-            }
-
-            if (document["presentation"] is { } presentation
-                && !extensionStates.ContainsKey("systemic.presentation.identity"))
-            {
-                extensionStates["systemic.presentation.identity"] = presentation.DeepClone();
-            }
-
-            document.Remove("presentation");
-            document["extensionStates"] = extensionStates;
-        }
-    }
 }
 
 internal sealed record SaveDocument(
     int SchemaVersion,
+    string ContentFingerprint,
+    string Checksum,
     SavedWorld World,
     Dictionary<string, int> EntityIds,
     Dictionary<string, JsonElement>? ExtensionStates = null);
 
 internal sealed record SavedWorld(
+    int Seed,
     double ValueScale,
     float SpatialCellSize,
     int LogicalTick,

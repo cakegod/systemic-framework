@@ -2,18 +2,27 @@ using System.Threading;
 
 namespace Systemic.Kernel;
 
+/// <summary>Identifies a population schema by its stable ID and version.</summary>
 public interface IPopulationKind
 {
+    /// <summary>Gets the stable schema identifier persisted with the population.</summary>
     static abstract string Id { get; }
 
+    /// <summary>Gets the schema version persisted with the population.</summary>
     static abstract int Version { get; }
 }
 
+/// <summary>Describes a contiguous range of live population rows.</summary>
+/// <param name="Start">Zero-based index of the first row.</param>
+/// <param name="Length">Number of rows in the range.</param>
 public readonly record struct PopulationRange(int Start, int Length)
 {
+    /// <summary>Gets the first row after this range.</summary>
     public int End => checked(Start + Length);
 }
 
+/// <summary>Stores dense columns for one population kind in a World.</summary>
+/// <remarks>Structural changes are not allowed while borrowed population views are leased.</remarks>
 public sealed class Population<TKind> where TKind : IPopulationKind
 {
     private static long s_nextOwnerToken;
@@ -39,6 +48,28 @@ public sealed class Population<TKind> where TKind : IPopulationKind
 
     internal World World { get; private set; }
 
+    /// <summary>Leases this population's row identity and buffers until the returned lease is disposed.</summary>
+    /// <remarks>
+    /// Dispose the lease only after every user of its views has finished. A previously returned span cannot be
+    /// revoked after disposal. Concurrent access must use disjoint ranges whenever a range is written.
+    /// </remarks>
+    /// <summary>Leases this population's row identity and buffers until the returned lease is disposed.</summary>
+    /// <remarks>Finish all users of its views before disposing the lease; concurrent writes must use disjoint ranges.</remarks>
+    public PopulationLease<TKind> Borrow()
+    {
+        lock (World.TransactionGate)
+        {
+            EnsureActive();
+            var lease = new PopulationLease<TKind>(this, _storage);
+            _storage.AcquireLease();
+            return lease;
+        }
+    }
+
+    internal bool Owns(PopulationColumnBase column) =>
+        _columns.TryGetValue(column.Id, out var existing) && ReferenceEquals(existing, column);
+
+    /// <summary>Gets the number of live rows.</summary>
     public int Count
     {
         get
@@ -48,6 +79,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         }
     }
 
+    /// <summary>Gets the reserved row capacity.</summary>
     public int Capacity
     {
         get
@@ -57,133 +89,160 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         }
     }
 
+    /// <summary>Reserves row storage without changing the live row count.</summary>
     public void Reserve(int capacity)
     {
-        EnsureActive();
-        ArgumentOutOfRangeException.ThrowIfNegative(capacity);
-        if (capacity <= _capacity)
+        lock (World.TransactionGate)
         {
-            return;
-        }
+            EnsureActive();
+            ArgumentOutOfRangeException.ThrowIfNegative(capacity);
+            if (capacity <= _capacity)
+            {
+                return;
+            }
 
-        CaptureStructureUndo();
-        SetCapacity(capacity);
+            _storage.EnsureNoLeases();
+            CaptureStructureUndo();
+            SetCapacity(capacity);
+        }
     }
 
+    /// <summary>Adds initialized rows and returns their contiguous range.</summary>
+    /// <remarks>Use generated schema initialization or a command buffer when new rows need values.</remarks>
     public PopulationRange AddRange(int count)
     {
-        EnsureActive();
-        ArgumentOutOfRangeException.ThrowIfNegative(count);
-        if (count > int.MaxValue - Count)
+        lock (World.TransactionGate)
         {
-            throw new ArgumentOutOfRangeException(nameof(count), "The range exceeds the maximum population row count.");
-        }
-
-        var start = Count;
-        if (count == 0)
-        {
-            return new PopulationRange(start, 0);
-        }
-
-        CaptureStructureUndo();
-        var requiredCapacity = start + count;
-        if (requiredCapacity > _capacity)
-        {
-            SetCapacity(GrowCapacity(requiredCapacity));
-        }
-
-        foreach (var column in _columns.Values)
-        {
-            column.ClearRange(start, count);
-        }
-
-        if (_handlesEnabled)
-        {
-            for (var row = start; row < requiredCapacity; row++)
+            EnsureActive();
+            ArgumentOutOfRangeException.ThrowIfNegative(count);
+            if (count > int.MaxValue - Count)
             {
-                _rowToHandleSlot[row] = AllocateHandle(row);
+                throw new ArgumentOutOfRangeException(nameof(count), "The range exceeds the maximum population row count.");
             }
-        }
 
-        _storage.Count = requiredCapacity;
-        return new PopulationRange(start, count);
+            var start = Count;
+            if (count == 0)
+            {
+                return new PopulationRange(start, 0);
+            }
+
+            _storage.EnsureNoLeases();
+            CaptureStructureUndo();
+            var requiredCapacity = start + count;
+            if (requiredCapacity > _capacity)
+            {
+                SetCapacity(GrowCapacity(requiredCapacity));
+            }
+
+            foreach (var column in _columns.Values)
+            {
+                column.ClearRange(start, count);
+            }
+
+            if (_handlesEnabled)
+            {
+                for (var row = start; row < requiredCapacity; row++)
+                {
+                    _rowToHandleSlot[row] = AllocateHandle(row);
+                }
+            }
+
+            _storage.Count = requiredCapacity;
+            return new PopulationRange(start, count);
+        }
     }
 
+    /// <summary>Removes a row by moving the final row into its position.</summary>
     public void RemoveSwapBack(int row)
     {
-        EnsureActive();
-        ArgumentOutOfRangeException.ThrowIfNegative(row);
-        if (row >= Count)
+        lock (World.TransactionGate)
         {
-            throw new ArgumentOutOfRangeException(nameof(row), row, "The row is outside the live population.");
-        }
-
-        CaptureStructureUndo();
-        var lastRow = Count - 1;
-        foreach (var column in _columns.Values)
-        {
-            column.MoveRow(lastRow, row);
-        }
-
-        if (_handlesEnabled)
-        {
-            var removedSlot = _rowToHandleSlot[row];
-            if (row != lastRow)
+            EnsureActive();
+            ArgumentOutOfRangeException.ThrowIfNegative(row);
+            if (row >= Count)
             {
-                var movedSlot = _rowToHandleSlot[lastRow];
-                _rowToHandleSlot[row] = movedSlot;
-                var moved = _handleSlots[movedSlot];
-                moved.Row = row;
-                _handleSlots[movedSlot] = moved;
+                throw new ArgumentOutOfRangeException(nameof(row), row, "The row is outside the live population.");
             }
 
-            _rowToHandleSlot[lastRow] = -1;
-            ReleaseHandle(removedSlot);
-        }
+            _storage.EnsureNoLeases();
+            CaptureStructureUndo();
+            var lastRow = Count - 1;
+            foreach (var column in _columns.Values)
+            {
+                column.MoveRow(lastRow, row);
+            }
 
-        _storage.Count = lastRow;
+            if (_handlesEnabled)
+            {
+                var removedSlot = _rowToHandleSlot[row];
+                if (row != lastRow)
+                {
+                    var movedSlot = _rowToHandleSlot[lastRow];
+                    _rowToHandleSlot[row] = movedSlot;
+                    var moved = _handleSlots[movedSlot];
+                    moved.Row = row;
+                    _handleSlots[movedSlot] = moved;
+                }
+
+                _rowToHandleSlot[lastRow] = -1;
+                ReleaseHandle(removedSlot);
+            }
+
+            _storage.Count = lastRow;
+        }
     }
 
+    /// <summary>Gets or creates a single-buffered column with the supplied stable key.</summary>
     public PopulationColumn<T> Column<T>(PopulationColumnKey<T> key) where T : unmanaged
     {
-        EnsureActive();
-        ArgumentNullException.ThrowIfNull(key);
-        if (_columns.TryGetValue(key.Id, out var existing))
+        lock (World.TransactionGate)
         {
-            if (existing is PopulationColumn<T> column && MatchesDefinition(existing, key, isDoubleBuffered: false))
+            EnsureActive();
+            ArgumentNullException.ThrowIfNull(key);
+            if (_columns.TryGetValue(key.Id, out var existing))
             {
-                return column;
+                if (existing is PopulationColumn<T> column && MatchesDefinition(existing, key, isDoubleBuffered: false))
+                {
+                    return column;
+                }
+
+                throw new InvalidOperationException($"Population column ID '{key.Id}' is already defined with a different schema.");
             }
 
-            throw new InvalidOperationException($"Population column ID '{key.Id}' is already defined with a different schema.");
+            _storage.EnsureNoLeases();
+            var created = new PopulationColumn<T>(_storage, key);
+            created.EnsureCapacity(_capacity);
+            _columns.Add(key.Id, created);
+            return created;
         }
-
-        var created = new PopulationColumn<T>(_storage, key);
-        created.EnsureCapacity(_capacity);
-        _columns.Add(key.Id, created);
-        return created;
     }
 
+    /// <summary>Gets or creates a double-buffered column with the supplied stable key.</summary>
     public DoubleBufferedPopulationColumn<T> DoubleBufferedColumn<T>(PopulationColumnKey<T> key) where T : unmanaged
     {
-        EnsureActive();
-        ArgumentNullException.ThrowIfNull(key);
-        if (_columns.TryGetValue(key.Id, out var existing))
+        lock (World.TransactionGate)
         {
-            if (existing is DoubleBufferedPopulationColumn<T> column && MatchesDefinition(existing, key, isDoubleBuffered: true))
+            EnsureActive();
+            ArgumentNullException.ThrowIfNull(key);
+            if (_columns.TryGetValue(key.Id, out var existing))
             {
-                return column;
+                if (existing is DoubleBufferedPopulationColumn<T> column && MatchesDefinition(existing, key, isDoubleBuffered: true))
+                {
+                    return column;
+                }
+
+                throw new InvalidOperationException($"Population column ID '{key.Id}' is already defined with a different schema.");
             }
 
-            throw new InvalidOperationException($"Population column ID '{key.Id}' is already defined with a different schema.");
+            _storage.EnsureNoLeases();
+            var created = new DoubleBufferedPopulationColumn<T>(_storage, key);
+            created.EnsureCapacity(_capacity);
+            _columns.Add(key.Id, created);
+            return created;
         }
-
-        var created = new DoubleBufferedPopulationColumn<T>(_storage, key);
-        created.EnsureCapacity(_capacity);
-        _columns.Add(key.Id, created);
-        return created;
     }
 
+    /// <summary>Gets the stable handle currently assigned to a live row.</summary>
     public PopulationHandle<TKind> GetHandle(int row)
     {
         EnsureActive();
@@ -204,6 +263,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     }
 
     /// <summary>Creates a current-world handle from a persisted slot and generation pair.</summary>
+    /// <summary>Recreates a handle from a persisted slot and generation pair when it is still live.</summary>
     public bool TryGetHandle(int slotIndex, ulong generation, out PopulationHandle<TKind> handle)
     {
         EnsureActive();
@@ -223,6 +283,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         return true;
     }
 
+    /// <summary>Resolves a current handle to its live row index.</summary>
     public bool TryResolve(PopulationHandle<TKind> handle, out int row)
     {
         EnsureActive();
@@ -674,6 +735,97 @@ public sealed class Population<TKind> where TKind : IPopulationKind
                 Array.Resize(ref values, length);
             }
         }
+    }
+}
+
+/// <summary>A tracked lifetime for borrowed column views and stable population rows.</summary>
+/// <summary>Leases row identity and borrowed column views for one population.</summary>
+/// <remarks>
+/// Keep the lease alive while any issued view is in use. A view retained after disposal cannot be revoked;
+/// this API does not make overlapping reads and writes or unrelated World operations thread-safe.
+/// </remarks>
+public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulationKind
+{
+    private readonly Population<TKind> _population;
+    private readonly PopulationStorage _storage;
+    private readonly World _world;
+    private bool _disposed;
+
+    internal PopulationLease(Population<TKind> population, PopulationStorage storage)
+    {
+        _population = population;
+        _storage = storage;
+        _world = storage.World;
+    }
+
+    /// <summary>Reads the live rows of a single-buffered column.</summary>
+    public ReadOnlySpan<T> Read<T>(PopulationColumn<T> column) where T : unmanaged
+    {
+        lock (_world.TransactionGate)
+        {
+            Validate(column);
+            return column.ReadOnlySpan;
+        }
+    }
+
+    /// <summary>Gets a writable range from a single-buffered column.</summary>
+    public Span<T> Edit<T>(PopulationColumn<T> column, int start, int length) where T : unmanaged
+    {
+        lock (_world.TransactionGate)
+        {
+            Validate(column);
+            return column.EditRange(start, length);
+        }
+    }
+
+    /// <summary>Reads the current values of a double-buffered column.</summary>
+    public ReadOnlySpan<T> ReadCurrent<T>(DoubleBufferedPopulationColumn<T> column) where T : unmanaged
+    {
+        lock (_world.TransactionGate)
+        {
+            Validate(column);
+            return column.Current;
+        }
+    }
+
+    /// <summary>Gets a writable range from the next buffer of a double-buffered column.</summary>
+    public Span<T> EditNext<T>(DoubleBufferedPopulationColumn<T> column, int start, int length) where T : unmanaged
+    {
+        lock (_world.TransactionGate)
+        {
+            Validate(column);
+            return column.EditNext(start, length);
+        }
+    }
+
+    /// <summary>Gets writable ranges from both buffers for initializing newly created rows.</summary>
+    public DoubleBufferedPopulationEdit<T> EditBoth<T>(DoubleBufferedPopulationColumn<T> column, int start, int length)
+        where T : unmanaged
+    {
+        lock (_world.TransactionGate)
+        {
+            Validate(column);
+            return column.EditBothBuffers(start, length);
+        }
+    }
+
+    /// <summary>Ends the lease and releases the population's borrowed-view lock.</summary>
+    public void Dispose()
+    {
+        lock (_world.TransactionGate)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _storage.ReleaseLease();
+        }
+    }
+
+    private void Validate(PopulationColumnBase column)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(column);
+        if (!_population.Owns(column))
+            throw new ArgumentException("The column does not belong to the leased population.", nameof(column));
     }
 }
 

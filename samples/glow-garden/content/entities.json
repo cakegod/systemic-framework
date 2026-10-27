@@ -33,14 +33,6 @@
         "garden.talent.clone.uses": 0
       },
       "bounds": { "x": 480, "y": 320, "halfWidth": 0, "halfHeight": 0 }
-    },
-    {
-      "id": "garden.impact",
-      "kind": "prop",
-      "tags": ["garden.impact"],
-      "capabilities": [],
-      "properties": {},
-      "bounds": { "x": 480, "y": 320, "halfWidth": 0, "halfHeight": 0 }
     }
   ]
 }

@@ -41,15 +41,15 @@ The Gameplay2D module compiles actor blueprints and status profiles, and provide
 
 ## Host and save state
 
-`SystemicGame` and `HeadlessSystemicHost` provide fixed-step execution, deterministic facts, rule traces, and save operations. Presentation-specific UI and cue APIs are module facades; Core does not expose those types. Engine adapters own input, rendering, audio, physics observations, and platform services. The adapter boundary is documented in `adapters/README.md`.
+`SystemicGame` and `HeadlessSystemicHost` provide fixed-step execution, deterministic facts, rule traces, and save operations. Each `ISystemicSystem.Step` receives one `SystemicSystemContext` for host and Kernel operations: read-only World access, deferred World commands, rule and event dispatch, registered services, population leases, range work, and rollback hooks. Register a system with `SystemicGameBuilder.AddSystem`; declare its resource and generated-column access through `ISystemicSystem.Access`. Systems with undeclared access use the conservative exclusive `SystemAccess.WriteWorld` default. See the [system context guide](docs/api/system-context.md) and [population and scheduling guide](docs/api/populations-and-scheduling.md). Presentation-specific UI and cue APIs are module facades; Core does not expose those types. Engine adapters own input, rendering, audio, physics observations, and platform services. The adapter boundary is documented in `adapters/README.md`.
 
-`SystemicSaveCodec` writes versioned world state and opaque stateful-extension data. Existing save versions 1 and 2 migrate into the generic extension representation; new saves use the current version. Core does not serialize module-specific DTOs directly.
+`SystemicSaveCodec` writes versioned, checksummed world state and opaque stateful-extension data. The current schema is v4; earlier versions are rejected. Explicit sequential migrations can upgrade supported v4-and-later documents when the schema advances. Core does not serialize module-specific DTOs directly.
 
 ## Population simulation
 
 The Kernel also supports dense, row-oriented populations for large visual swarms. Annotate an unmanaged partial struct with `[PopulationSchema("stable.id", version)]` and its fields with `[PopulationColumn("column.id")]`; the generator produces typed column bindings, stable column keys, access declarations, and range initialization. Generated schemas work with `PopulationCommandBuffer<TKind>` for transactional batched spawns and removals.
 
-Reference Kernel normally and configure `Systemic.Kernel.Generator` as an analyzer with `OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`, as in the [Boids project](samples/boids-monogame/Boids.MonoGame.csproj).
+Reference Kernel normally and configure `Systemic.Kernel.Generator` as an analyzer with `OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`. Projects under `samples/` inherit this analyzer reference from [`samples/Directory.Build.targets`](samples/Directory.Build.targets); projects elsewhere add it explicitly. The analyzer also provides the determinism and system-access diagnostics described in the [analyzer reference](docs/api/analyzers.md).
 
 ```csharp
 [PopulationSchema("game.projectiles", 1)]
@@ -70,15 +70,29 @@ commands.Flush(); // removals resolve first; additions are initialized as one ba
 
 `PopulationSpatialGrid2D` builds a dense fixed-bounds 2D grid from position spans. Its short-lived snapshots expose stable exact-radius and bounds queries using caller-owned buffers; a capped candidate query supports systems that intentionally limit per-row work. Reserve grid rows and query buffers before stepping to avoid warmed allocations.
 
-`DeterministicSystemScheduleBuilder` opts systems into access-declared parallel waves while legacy `ISystemicSystem.Order` systems remain serial. `SystemicGameBuilder.AddScheduledSystem` runs the scheduled phase after legacy systems and before modifier expiry. Generated `Read*`/`Write*` declarations identify population dependencies; deferred World/entity mutations are queued per system and flushed in stable registration order at barriers. A failed game step rolls back World changes and its logical tick. Systems with persistent state outside World can register `SystemicScheduledContext.OnRollback` to restore it. Immediate rule or event dispatch requires exclusive `SystemAccess.WriteWorld`; ordinary deferred commands can share a wave. `ScheduledSystemContext.ForEachRange` partitions contiguous rows consistently across worker counts. Systems must honor their declared access and write disjoint population rows; conflicting accesses are ordered automatically. Schedules reuse owned worker threads across ticks, default to at most four workers, and are disposed by `SystemicGame.Dispose()`.
+`SystemicGameBuilder.AddSystem` places each host system in the same deterministic access-declared schedule. Systems are sorted by `Order`, and equal orders retain registration order before scheduling. Conflicting systems preserve this priority, while compatible systems may share a concurrent wave; `SystemAccess.WriteWorld` runs alone. `ISystemicSystem.Access` names World and generated population-column reads and writes. `SystemicSystemContext.ForEachRange` assigns non-overlapping row ranges to workers, and `ReduceRanges` merges partitions in their specified order. A schedule reuses its worker threads across ticks, chooses at most four by default, and is disposed with `SystemicGame`. Kernel-only users can build a lower-level schedule from `IScheduledKernelSystem` with `DeterministicSystemScheduleBuilder`.
+
+Systems must honor every access declaration and write only to their assigned rows. Use `SystemAccess.DeferWorldWrites` for deferred population commands or `SystemAccess.WriteWorld` when a system needs immediate World access, rule dispatch, or event dispatch. `SystemicSystemContext.OnRollback` restores external state when a scheduled tick fails. The analyzer catches several direct access and callback violations, but it does not prove whole-program safety; see its [scope and limitations](docs/api/analyzers.md#analysis-boundaries).
 
 Borrow contexts only during the system call. Submit World commands and rollback hooks from the system body; range callbacks write disjoint population slices. Command writers record their execution and reject later use. Cache rollback delegates when you need allocation-free ticks.
 
 ## Verify
 
-Run the full Release solution suite and C# formatting checks from the repository root:
+Run the Release solution tests, API documentation build, and C# formatting checks from the repository root. Framework libraries emit XML documentation, and the checker enforces the system-author-facing host, population, and scheduling contracts:
 
 ```sh
+dotnet build src/Systemic.Kernel/Systemic.Kernel.csproj --configuration Release
+dotnet build src/Systemic.Core/Systemic.Core.csproj --configuration Release
+dotnet build src/Systemic.Kernel.Generator/Systemic.Kernel.Generator.csproj --configuration Release
+dotnet build src/modules/Systemic.Rendering/Systemic.Rendering.csproj --configuration Release
+dotnet build src/modules/Systemic.Incremental/Systemic.Incremental.csproj --configuration Release
+dotnet build src/modules/Systemic.Presentation/Systemic.Presentation.csproj --configuration Release
+dotnet build src/modules/Systemic.Gameplay2D/Systemic.Gameplay2D.csproj --configuration Release
+dotnet build tests/Systemic.Core.Tests/Systemic.Core.Tests.csproj --configuration Release
+python3 docs/check_api_xml_docs.py --configuration Release
+dotnet tool restore
+dotnet tool run docfx -- metadata docs/docfx.json
+dotnet tool run docfx -- build docs/docfx.json
 dotnet test Systemic.sln --nologo --configuration Release -m:1
 dotnet format Systemic.sln --verify-no-changes
 dotnet format Systemic.sln style --verify-no-changes --severity info

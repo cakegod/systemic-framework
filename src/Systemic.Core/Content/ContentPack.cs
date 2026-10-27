@@ -38,6 +38,37 @@ public sealed record ContentPack(
     CompiledEntities Entities,
     ImmutableArray<CompiledSystemicModule> Modules = default)
 {
+    // A copied or modified pack must explicitly establish a new identity. In particular,
+    // record `with` expressions must never carry a file fingerprint over changed content.
+    private ContentPack(ContentPack original)
+    {
+        RootDirectory = original.RootDirectory;
+        Manifest = original.Manifest;
+        Rules = original.Rules;
+        Entities = original.Entities;
+        Modules = original.Modules;
+        TuningDocuments = ImmutableDictionary<string, TuningDocument>.Empty;
+    }
+
+    /// <summary>
+    /// SHA-256 fingerprint of the exact files consumed by the core loader and module
+    /// <see cref="ContentModuleContext"/> readers. For synthetic or modified packs,
+    /// callers must supply a lowercase 64-digit SHA-256 fingerprint covering all
+    /// effective core and module content before saving or loading. A record copy clears
+    /// the fingerprint; set a new one after any content replacement. Modules that use
+    /// other input sources, mutable in-memory content, or code with compatibility-sensitive
+    /// changes must incorporate those inputs into an explicitly supplied fingerprint.
+    /// </summary>
+    public string? ContentFingerprint { get; init; }
+
+    /// <summary>Validated, typed tuning documents registered for specific authored entities.</summary>
+    public ImmutableDictionary<string, TuningDocument> TuningDocuments { get; init; } =
+        ImmutableDictionary<string, TuningDocument>.Empty;
+
+    public TuningDocument Tuning(string entityId) => TuningDocuments.TryGetValue(entityId, out var document)
+        ? document
+        : throw new KeyNotFoundException($"No tuning schema is registered for entity '{entityId}'.");
+
     /// <summary>Creates the file-authored initial population and resolves stable content links to runtime IDs.</summary>
     public MaterializedContentWorld CreateWorld(
         int seed,
@@ -75,7 +106,8 @@ public sealed record ContentPack(
     }
 }
 
-public sealed record ContentDiagnostic(string Code, string File, string Path, string Message);
+public sealed record ContentDiagnostic(string Code, string File, string Path, string Message,
+    int? Line = null, int? Column = null);
 
 public sealed class ContentPackException : Exception
 {

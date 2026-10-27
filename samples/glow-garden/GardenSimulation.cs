@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 
 using Systemic.Host;
@@ -14,10 +15,9 @@ public readonly record struct MoteState(int Id, Vector2 Position, Vector2 Veloci
 
 /// <summary>
 /// Live plants, creatures (including copy expiry), and motes are authoritative Kernel populations.
-/// Progression, identifiers, diagnostics, delayed effects, and commit-phase talent work are not a
-/// complete save/rollback implementation; the prototype deliberately does not support save/load.
+/// Progression, identifiers, diagnostics, scent and delayed effects are captured as system state.
 /// </summary>
-public sealed partial class GardenSimulation : ISystemicSystem, ISystemicScheduledSystem
+public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransactionalState
 {
     public const int MaxWorkers = 1000, MaxPlants = 64, MaxMotes = 12000, MaxCopies = 128;
     public const int StartingPlants = 9, StartingWorkers = 9;
@@ -32,7 +32,8 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
 
     private readonly World _world;
     private readonly Entity _garden;
-    private readonly Entity _impact;
+    private readonly GardenTuning _tuning;
+    private readonly DeterministicRandomFactory _scoutRandom;
     private readonly PopulationSpatialGrid2D _plantGrid = new(new Bounds2(Width / 2, Height / 2, Width / 2, Height / 2), 64);
     private readonly PopulationSpatialGrid2D _moteGrid = new(new Bounds2(Width / 2, Height / 2, Width / 2, Height / 2), 64);
     private readonly List<int> _nearbyPlants = new(256);
@@ -45,18 +46,18 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
     internal readonly MoteStates _motes;
     private int _nextCreatureId, _nextMoteId, _nextPlantId;
 
-    public GardenSimulation(World world)
+    public GardenSimulation(World world, GardenTuning? tuning = null, bool restoring = false)
     {
         _world = world;
+        _tuning = tuning ?? GardenTuning.Default;
+        _scoutRandom = new DeterministicRandomFactory(unchecked((ulong)(long)world.Seed), "glow-garden.scouting");
         _garden = world.Entities.Single(e => e.HasTag("garden"));
-        // Facts carry this entity as their target so presentation timelines anchor where they happened.
-        _impact = world.Entities.Single(e => e.HasTag("garden.impact"));
         _plants = new PlantStates(world);
         _creatures = new CreatureStates(world);
         _motes = new MoteStates(world);
         // Noise-derived thickets: deterministic per seed, and generated before any pod is placed.
         Obstacles = new GardenObstacles(Width, Height,
-            unchecked((ulong)world.Draws.CaptureState().State), Colony, 170);
+            unchecked((ulong)(long)world.Seed), Colony, 170);
         _creatureGrid.Reserve(MaxWorkers + MaxCopies);
         _plantGrid.Reserve(MaxPlants);
         _moteGrid.Reserve(MaxMotes);
@@ -64,6 +65,10 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
         Creatures = _creatures;
         Motes = _motes;
         PendingImpacts = _pending.AsReadOnly();
+
+        // Population state is restored by the host after all schemas have been registered.
+        // In particular, do not consume the saved draw stream while constructing a restored game.
+        if (restoring) return;
 
         // Pods start across the whole garden rather than ringed around the colony, so feeding grounds
         // are spread out and workers have to travel and forage between them.
@@ -81,6 +86,10 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
                 if (!Obstacles.IsBlocked(spot)) break;
             }
 
+            if (Obstacles.IsBlocked(spot)
+                && !Obstacles.TryFindFreePosition(spot, null, 0, out spot))
+                throw new InvalidOperationException("The garden has no free position for an initial plant.");
+
             _plants.Add(new(_nextPlantId++, spot, NextFloat()));
         }
 
@@ -92,7 +101,7 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
 
     public int Order => 0;
 
-    private static readonly SystemAccess[] s_access =
+    private static readonly ImmutableArray<SystemAccess> s_access =
     [
         SystemAccess.WriteWorld,
         GardenPlantPopulation.WriteGrowth,
@@ -118,18 +127,6 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
     public int Tick { get; private set; }
 
     private float NextFloat() => _world.Draws.NextFloat();
-
-    /// <summary>Authored tuning lives on the garden entity; clamping keeps bad content finite and bounded.</summary>
-    internal int ParamInt(string name, int fallback, int min, int max) =>
-        (int)Math.Clamp(Math.Round(Param(name, fallback)), min, max);
-
-    internal float ParamFloat(string name, float fallback, float min, float max) =>
-        (float)Math.Clamp(Param(name, fallback), min, max);
-
-    private double Param(string name, double fallback) =>
-        _garden.TryGetProperty(_world, name, out var value) ? value : fallback;
-
-    internal double ParamRaw(string name) => Param(name, 0);
 
     private static Vector2 Move(Vector2 from, Vector2 to, float distance)
     {
@@ -228,26 +225,20 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
     private int _tickCooldown, _tickCapacity, _tickPatience;
     private float _tickSpeed, _tickScoutRadius, _tickTrailThreshold, _tickTrailStrength;
 
-    public void Step(SystemicStepContext context)
+    public void Step(SystemicSystemContext context)
     {
         _publish = fact => context.Publish(fact);
-        ExecuteCore(context.Tick, kernel: null);
+        ExecuteCore(context);
     }
 
-    public void Step(ScheduledSystemContext kernelContext, SystemicScheduledContext gameContext)
+    private void ExecuteCore(SystemicSystemContext context)
     {
-        _publish = fact => gameContext.Publish(fact);
-        ExecuteCore(gameContext.Tick, kernelContext);
-    }
-
-    private void ExecuteCore(int tick, ScheduledSystemContext? kernel)
-    {
-        Tick = tick;
-        _tickScoutRadius = ParamFloat("garden.worker.scoutRadius", 110, 8, Width);
-        _tickPatience = ParamInt("garden.worker.patience", 240, 0, 3600);
-        _tickTrailThreshold = ParamFloat("garden.trail.threshold", 0.8f, 0.01f, 100);
-        _tickTrailStrength = ParamFloat("garden.trail.strength", 10, 0, 100);
-        _scent.Decay(ParamFloat("garden.trail.decay", 0.99f, 0.5f, 0.9999f));
+        Tick = context.Tick;
+        _tickScoutRadius = _tuning.ScoutRadius;
+        _tickPatience = _tuning.Patience;
+        _tickTrailThreshold = _tuning.TrailThreshold;
+        _tickTrailStrength = _tuning.TrailStrength;
+        _scent.Decay(_tuning.TrailDecay);
         StepTalents();
         _plantGrid.Rebuild(_plants.Columns.Position.ReadOnlySpan);
 
@@ -276,8 +267,7 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
         _tickCapacity = 3 + Rank(UpgradeKind.GathererCapacity);
         _tickSpeed = 3 + Rank(UpgradeKind.GathererSpeed) * 0.3f;
         var count = _creatures.Count;
-        if (kernel is null) DecideRange(0, count);
-        else kernel.ForEachRange(this, count, s_decideRange);
+        context.ForEachRange(this, count, s_decideRange);
         ApplyDecisions(count);
         ResolveWorkerIntents(count);
         RemoveConsumedMotes();
@@ -310,24 +300,18 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
     }
 
     /// <summary>Deterministic per-row noise: scouting must not read the shared draw stream in parallel.</summary>
-    private static float Noise(int row, int tick, int id, int salt)
+    private float Noise(int tick, int id, int salt)
     {
-        var value = unchecked((uint)(row * 0x9E3779B1) ^ (uint)(tick * 0x85EBCA77)
-            ^ (uint)(id * 0xC2B2AE3D) ^ (uint)(salt * 0x27D4EB2F));
-        value ^= value >> 15;
-        value *= 0x2C1B3C6D;
-        value ^= value >> 12;
-        value *= 0x297A2D39;
-        value ^= value >> 15;
-        return (value & 0xFFFFFF) / (float)0x1000000;
+        var draw = _scoutRandom.ForEntity(unchecked((uint)id), unchecked((uint)tick)).At(unchecked((uint)salt));
+        return (draw >> 40) / (float)0x1000000;
     }
 
     /// <summary>Scouting: hold a heading, turn on a per-worker cadence, and bounce off the garden edge.</summary>
-    private static Vector2 Wander(int row, int tick, int id, Vector2 position, float speed, ref float heading)
+    private Vector2 Wander(int tick, int id, Vector2 position, float speed, ref float heading)
     {
-        if ((tick + row) % (20 + (id & 31)) == 0)
+        if ((tick + id) % (20 + (id & 31)) == 0)
         {
-            heading += (Noise(row, tick, id, 1) - 0.5f) * 3.2f;
+            heading += (Noise(tick, id, 1) - 0.5f) * 3.2f;
             if (heading > MathF.PI) heading -= MathF.Tau;
             else if (heading < -MathF.PI) heading += MathF.Tau;
         }
@@ -408,7 +392,7 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
                             next = Move(position, position + (trail * 16f), scoutSpeed);
                             heading = MathF.Atan2(trail.Y, trail.X);
                         }
-                        else next = Wander(row, tick, ids[row], position, scoutSpeed, ref heading);
+                        else next = Wander(tick, ids[row], position, scoutSpeed, ref heading);
                         waiting++;
                     }
                     else
@@ -457,7 +441,7 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
                 }
                 else
                 {
-                    next = Wander(row, tick, ids[row], position, scoutSpeed, ref heading);
+                    next = Wander(tick, ids[row], position, scoutSpeed, ref heading);
                     waiting++;
                 }
             }
@@ -473,7 +457,7 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicSchedul
                 heading += 2.1f;
                 if (heading > MathF.PI) heading -= MathF.Tau;
                 side = 0;
-                legal = Obstacles.Steer(position, Wander(row, tick, ids[row], position, scoutSpeed, ref heading), ref side);
+                legal = Obstacles.Steer(position, Wander(tick, ids[row], position, scoutSpeed, ref heading), ref side);
                 stall = 0;
                 waiting = _tickPatience;
             }

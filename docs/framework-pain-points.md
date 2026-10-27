@@ -1,44 +1,62 @@
 # Systemic framework: pain points, API friction, and gaps
 
-This document records what it is actually like to build a game on Systemic, written after
-building the Glow Garden sample through several rounds of real work: grid-based nearest-target
-queries, converting a system to the parallel scheduler, a 1,000,000-row population experiment,
-pheromone-trail foraging, and procedurally generated blocking terrain. Every item below was hit
-in that work or found by reading the kernel, core, and presentation sources while fixing it.
+This document records what it was like to build Glow Garden against the framework at baseline
+commit `3e1dd6a`, then tracks the fixes made during the 2026-10-27 framework overhaul. Sections
+1–9 preserve the original audit and measured evidence; present-tense descriptions there refer to
+that baseline unless marked otherwise. The current-status column below and sections 10–12
+supersede baseline statements where implementation has changed. Baseline measurements are
+historical and are not claims about the current container or a full game.
 
 Severity means: **blocker** = the straightforward design cannot be built; **major** = it can be
 built, but only with a workaround, a performance cliff, or a correctness trap; **minor** = paper
 cut that costs time.
 
-Sections 1–6 cover correctness, ergonomics, scaling, gaps and priorities. Section 9 maps where
-boilerplate concentrates, section 10 lists every bug found while building the sample, section 11
-is a production-grade gap analysis, and section 12 documents the performance limits with concrete
-proposals for extracting the best possible throughput.
+Sections 1–6 cover the original correctness, ergonomics, scaling, gaps and priorities. Section 9
+is a baseline boilerplate snapshot, section 10 updates the bug outcomes, section 11 checks the
+approved production-grade requirements against the current tree, and section 12 separates measured
+performance from unresolved optimization proposals.
 
-| # | Pain point | Severity |
-| --- | --- | --- |
-| 1.1 | Parallel per-range population writes race on undo capture | blocker |
-| 1.2 | Undo capture replaces the real exception with a `NullReferenceException` | major |
-| 1.3 | Grid rebuild throws on a bad row without naming the population | major |
-| 1.4 | One mutable draw stream, unusable from a parallel system | blocker |
-| 1.5 | Structural edits invalidate borrowed spans with no guard | major |
-| 1.6 | `RemoveSwapBack` invalidates row identity used by parallel passes | major |
-| 2.1 | Systems must implement two `Step` methods and two publish paths | major |
-| 2.2 | Per-row column writes are verbose and do one undo capture per column | major |
-| 2.3 | Content properties are stringly typed and read every tick | major |
-| 2.5 | `ForEachRange` documents parallel row writes the columns cannot support | blocker |
-| 2.6 | Facts carry no payload and no position | major |
-| 2.7 | Cue stream drops the oldest cue silently | major |
-| 3.1 | Default scheduler worker cap is four | major |
-| 3.2 | No parallel reduction or ordered-merge primitive | major |
-| 3.3 | No nearest-neighbour query in the spatial grid | major |
-| 3.5 | Double-buffered undo snapshots the whole buffer every tick | major |
-| 3.6 | No fact aggregation, so high-frequency events cannot be represented | blocker at scale |
-| 3.8 | No static-geometry index for blocking volumes | major |
+| # | Baseline finding | Severity | Current status (2026-10-27) |
+| --- | --- | --- | --- |
+| 1.1 | Parallel per-range population writes raced on undo capture | blocker | Fixed: world transaction journaling and page capture are synchronized; concurrency rollback tests cover shared-page and disjoint-range writes. |
+| 1.2 | Undo capture could replace the real exception with a `NullReferenceException` | major | Fixed: cleanup is best-effort and preserves the original capture failure. |
+| 1.3 | Grid rebuild did not identify the population or bad coordinates | major | Fixed: named rebuild diagnostics include row, coordinates and bounds; opt-in `Skip` counts invalid rows. |
+| 1.4 | No deterministic random source was available to parallel systems | blocker | Fixed at API level with counter-based per-entity/tick draws; Garden uses it for scouting, while obstacle noise still uses a separate stable hash. |
+| 1.5 | Structural edits could invalidate borrowed population storage | major | Partial: active population leases block structural changes; ordinary raw spans still cannot be tracked after the caller obtains them. |
+| 1.6 | `RemoveSwapBack` changed row identity during parallel passes | major | Partial: handles and deferred commands help, but row indexes remain transient across structural edits. |
+| 1.7 | No world seed accessor | minor | Fixed: `World.Seed` exposes the original seed independently of later draws. |
+| 1.8 | Transactions did not restore plain domain-system state | major | Partial: the host snapshots registered transactional/stateful systems and Garden includes progression, IDs, scent and pending work; unregistered state and external side effects need explicit handling. |
+| 2.1 | Systems used two `Step` methods and publish paths | major | Open: the dual hosting APIs remain. |
+| 2.2 | Per-row column writes were verbose and repeated captures | major | Partial: generated row/range writers batch writes across columns; no lifetime-enforced multi-column edit lease exists, and Garden keeps hand-written projections. |
+| 2.3 | Content properties were stringly typed and read every tick | major | Fixed for registered schemas: Garden validates tuning at load and uses a typed snapshot; ad hoc property reads remain available. |
+| 2.5 | Parallel row writes were not safely supported by the column layer | blocker | Partial: disjoint row writes no longer race during transaction capture; the API does not enforce row ownership or prevent overlapping writes. |
+| 2.6 | Facts carried no payload or position | major | Fixed: typed fact IDs, bounded primitive payloads and exact integer positions are available. |
+| 2.7 | Cue overflow silently discarded old cues | major | Fixed at API level: configurable overflow policies, counters, expiry and a bounded presentation window are available; games still choose policy and surface counters. |
+| 2.8 | Access declarations were strings and `WriteWorld` serialized the wave | minor | Partial: typed column access declarations are available and `WriteWorld` is intentionally exclusive as approved; ad hoc named resources remain string-keyed. |
+| 2.9 | Hosts had to prune presentation cues by age | minor | Partial: stream expiry and a reusable cue window exist; the host must still advance/pump the window. |
+| 2.10 | Public state projections duplicate generated column layout | minor | Partial: generated row readers/writers reduce access boilerplate; Garden projections remain hand-written. |
+| 3.1 | Default scheduler worker cap is four | major | Open: default remains capped at four and there is no startup cap report. |
+| 3.2 | No parallel reduction or ordered-merge primitive | major | Fixed: fixed logical partitions merge in partition order, independent of worker count. |
+| 3.3 | No nearest-neighbour query in the spatial grid | major | Fixed at API level for floating-point and fixed-point indexes; Garden still has custom targeting paths. |
+| 3.4 | Large-radius queries may scan the map | minor | Partial: nearest APIs can early-out but worst cases still visit the grid; Garden's fallback can scan broadly. |
+| 3.5 | Whole-buffer undo copies remained on the safe transaction path | major | Open: rollback remains safe by default; no ordinary-column whole-buffer no-copy mode was added. |
+| 3.6 | No fact aggregation for high-frequency events | blocker at scale | Fixed at API level with bounded deterministic region/type aggregation; adoption remains game-specific. |
+| 3.7 | No per-system instrumentation | minor | Fixed for bounded timing history and budgets; allocation accounting only covers the calling thread. |
+| 3.8 | No reusable static blocking geometry | major | Fixed at API level with static blocking fields and deterministic navigation; Garden still owns its custom terrain implementation. |
+
+Other current findings: `WriteWorld` deliberately excludes other systems from its scheduler wave;
+resource names remain strings. Garden now uses cue expiry, typed tuning, fact positions, rollback
+state, a debug overlay, and exact obstacle traversal. Generic reload preparation validates a
+candidate but does not replace a live host. Save integrity checksums and migrations exist, but
+save schemas below v4 are rejected; explicit v4+ migrations are supported when the schema advances.
+The strict determinism analyzer now checks gameplay-system implementations by default when the
+analyzer is included; the existing float-based samples use explicit file-level `relaxed` settings.
+Garden gameplay still uses floating-point math, so the approved cross-platform strict-determinism
+contract has not been established.
 
 ---
 
-## 1. Determinism and correctness hazards
+## 1. Determinism and correctness hazards at the audit baseline
 
 ### 1.1 Parallel per-range population writes race on undo capture (blocker)
 
@@ -158,7 +176,7 @@ cue streams, presentation identity).
 
 ---
 
-## 2. API ergonomics
+## 2. API ergonomics at the audit baseline
 
 ### 2.1 Two `Step` methods, two contexts, two publish paths (major)
 
@@ -255,7 +273,7 @@ editing the record, the getter, and the setter. Generated `TState` projections (
 
 ---
 
-## 3. Performance and scaling
+## 3. Performance and scaling at the audit baseline
 
 ### 3.1 Default scheduler worker cap is four (major)
 
@@ -330,7 +348,7 @@ validation, a walkable query, and a flow/path helper would cover a large class o
 
 ---
 
-## 4. What is missing (must-have)
+## 4. What was missing at the audit baseline (must-have)
 
 1. **Navigation and avoidance.** The framework can answer "what is near" but not "how do I get
    there". Even a coarse-grid A* or flow field would let agents path around obstacles; the
@@ -352,7 +370,7 @@ validation, a walkable query, and a flow/path helper would cover a large class o
    `Scale`/`Origin` in the renderer. A `PresentationViewport` (world bounds → screen rect, with
    culling) belongs with the visuals, not in each sample.
 
-## 5. Nice to have
+## 5. Nice to have at the audit baseline
 
 - Parallel reduce / ordered merge (3.2).
 - Generated row accessors and `TState` projections (2.2, 2.10).
@@ -368,7 +386,7 @@ validation, a walkable query, and a flow/path helper would cover a large class o
 - Event/command vocabulary validation: `Publish("garden.glow.collected")` is a magic string that
   no compiler checks; a generated event constant per content rule would catch typos.
 
-## 6. Prioritised recommendations
+## 6. Prioritised recommendations at the audit baseline
 
 | Priority | Change | Why |
 | --- | --- | --- |
@@ -383,7 +401,7 @@ validation, a walkable query, and a flow/path helper would cover a large class o
 | 9 | Per-system tick stats | makes "is it fast enough" a measurement instead of a harness |
 | 10 | Worker-cap visibility and a higher default on many-core hosts | silent 4× underuse |
 
-## 7. What worked well
+## 7. What worked well at the audit baseline
 
 Worth keeping in the same document, because the list above can read as one-sided:
 
@@ -401,9 +419,15 @@ Worth keeping in the same document, because the list above can read as one-sided
 - The spatial grid's `QueryRadius` with a reused `List<int>` is allocation-free and fast; the
   problem is only the missing nearest-neighbour and static-geometry layers on top.
 
-## 8. Evidence from Glow Garden
+## 8. Historical evidence from Glow Garden
 
-Numbers from this machine (Release, single process), so the claims above are not theoretical:
+These measurements were collected during the original sample work, before the current overhaul.
+The machine, commit, and exact benchmark protocol were not recorded with the figures, so treat
+them as directional historical observations rather than reproducible benchmark results.
+
+The original notes described these as Release, single-process measurements, but did not retain the
+machine, commit, or full test protocol. They are concrete historical observations rather than
+reproducible evidence for the current tree:
 
 - Linear nearest-target scans: 7,611 ms/tick at 50k workers / 1k plants / 12k motes.
 - Same load with grid targeting: ~15 ms/tick on four scheduled workers; ~55 ms in the legacy
@@ -420,7 +444,10 @@ Numbers from this machine (Release, single process), so the claims above are not
 
 ---
 
-## 9. Boilerplate hotspots
+## 9. Boilerplate hotspots at the audit baseline
+
+All line counts, touchpoint counts, and rankings in this section describe the baseline sample
+snapshot. They have not been recounted against the current, expanded Garden implementation.
 
 Ranked by how much of the sample is plumbing rather than game logic. Glow Garden is 2,154 lines
 across eleven files; the interesting simulation logic is a small fraction of that.
@@ -472,384 +499,210 @@ wiring points are string-keyed in different files, so a rename is a grep exercis
 
 ## 10. Bugs found while building the sample
 
-Every item below was observed in this work, not hypothesised. "Blame" distinguishes framework
-defects from sample-side mistakes the framework made easy to commit.
+The symptoms and original causes below are historical observations from the baseline sample.
+"Status" records the current code and whether the original finding was verified or corrected.
 
-| ID | Symptom | Root cause | Blame | Status |
+| ID | Historical symptom | Root cause | Blame | Current status |
 | --- | --- | --- | --- | --- |
-| B1 | `NullReferenceException` at `PopulationColumn.cs:337` on the first tick of a 1M-row rotation | Concurrent `EditNext` per worker range corrupts the shared free-batch `Stack` used by undo capture | Framework (1.1) | Worked around: capture once serially, write through disjoint `Memory<T>` slices |
-| B2 | The NRE above hid the real failure and pointed at the catch block | `CapturePageUndo`'s catch recycles a possibly-null batch and can throw while handling | Framework | Unfixed; worked around by never hitting B1 |
-| B3 | Hard crash "Position at row 6 is non-finite or outside the grid bounds" during a system step | `PopulationSpatialGrid2D.Rebuild` throws on any out-of-bounds row; message names no population, value or bounds | Framework robustness (1.3) | Unfixed; sample clamps now |
-| B4 | Plants spawned past the bottom of the map after the world grew | The 3-row scatter still divided the height by 2, from when there were two rows | Sample | Fixed (divisor 3) |
-| B5 | Worker positions left the map after wall-following | Steering rotates away from the desired direction and can step outward at the border | Sample | Fixed (clamp before writing population rows) |
-| B6 | Workers oscillated in place, looking like they had given up | Wall tangent was derived from the field gradient and multiplied by a stored side; crossing a corridor midline flipped the gradient and reversed the step | Sample | Fixed (deviate by a stored angle from the desired direction instead) |
-| B7 | Workers left a wall, then walked straight back into it | `ClearPath` sampled 12 points regardless of distance, so it missed thin thickets | Sample | Fixed (sample every grid cell, capped at 64) |
-| B8 | Workers wedged permanently in a "free" pinch | Blocking used a bilinear field while corridors were carved per cell, so a 2-cell corridor was not walkable by the point test; every axis slide was blocked | Sample + framework gap (no walkability type) | Fixed (cell-exact blocking plus an escape to the cell centre and a free neighbour) |
-| B9 | Seeds and starting pods could sit inside a thicket, unreachable | Placement sampled once and accepted the result | Sample | Fixed (bounded retries, 12 attempts) |
-| B10 | Gatherers wandered despite fresh food on the map | Trails decayed below the follow threshold at the colony end; recruitment only worked near the food | Sample tuning | Fixed (re-stamp the trail on every pickup, slower decay, threshold 0.4) |
-| B11 | Shipped worker cap was 16,000 while the README and UI said 1,000 | A temporary stress-measurement edit was never reverted | Sample | Fixed in review |
-| B12 | Smoke numbers changed (1031 bursts to a different value) with no gameplay change | Switching from linear scans to grid queries changed resolution order | Framework documentation gap | Accepted; ordering is not part of the documented contract |
+| B1 | `NullReferenceException` during the first tick of a 1M-row rotation | Concurrent `EditNext` undo capture touched shared page-journal state | Framework (1.1) | Fixed by synchronized transaction journaling and page capture; concurrent transaction regression tests cover the path. |
+| B2 | The NRE hid the original failure and pointed at the catch block | Undo cleanup could throw while handling a failed page capture | Framework | Fixed: cleanup preserves the original exception and does not recycle a failed batch. |
+| B3 | An invalid row produced a generic bounds exception during a system step | Grid validation omitted the population ID, coordinate and bounds; no skip policy existed | Framework robustness (1.3) | Fixed: named diagnostics identify the offending row and bounds; opt-in skip mode counts omitted rows. |
+| B4 | Plants spawned past the bottom of the map after it grew | Three-row scatter still divided height by two | Sample | Fixed in the sample. |
+| B5 | Worker positions left the map after wall-following | Steering could step outward at the border | Sample | Fixed in the sample; movement is bounded before population writes. |
+| B6 | Workers oscillated in place | Gradient-derived wall tangent flipped across a corridor | Sample | Fixed in the sample by steering relative to the desired direction. |
+| B7 | Workers left a wall then walked back into it | Fixed-step path probes could miss thin thickets | Sample | Fixed: obstacle traversal checks every crossed cell, including corner crossings; focused traversal tests pass. |
+| B8 | Workers wedged in a corridor that appeared open | Bilinear movement checks disagreed with cell-carved corridors | Sample plus missing reusable geometry | Fixed in the sample with cell-exact collision and escape; reusable static blocking and deterministic navigation APIs now exist. |
+| B9 | Seeds and starting pods could sit inside a thicket | Placement accepted one unchecked random position | Sample | Fixed with bounded valid-position search and counted rejection when no free location exists. |
+| B10 | Gatherers wandered while fresh food remained | The historical explanation was low scent at the colony end and recruitment range | Sample tuning | Tuning and trail stamping were changed, but the original causal claim was not independently reproduced; treat it as a plausible explanation, not an established root cause. |
+| B11 | Shipped worker cap disagreed with README and UI | A temporary stress-test value remained in sample settings | Sample | Fixed; shipped cap matches the authored documentation. |
+| B12 | Burst totals changed after targeting switched from scans to grid queries | The new traversal selected targets in a different deterministic order | Sample algorithm change | Expected behavior change, not evidence of run-to-run nondeterminism. Query APIs document their ordering; changing algorithms can change gameplay choices. |
 
-Notes on the interesting ones:
-
-- **B1/B2** are the only two that are unambiguously framework defects. B1 is a latent crash in the
-  API the framework advertises for parallel work; B2 turned a diagnosable bug into a mystery.
-- **B3, B4, B5** are the same class: data validation that throws at the point of use, far from the
-  producer, with a message that does not identify the producer.
-- **B6–B8** are the "agents look broken" class. They are sample bugs, but all three exist because
-  the framework offers spatial *queries* and nothing about *movement*, so every sample invents
-  steering, walkability and unsticking from scratch. The sample needed 441 lines for terrain plus
-  wall-following plus an escape hatch, and still had three iterations of "workers stop trying".
-- **B10** is a tuning bug that only appears at scale: the mechanic worked in a small test and
-  failed when trails had to survive long enough for foragers to use them.
-- None of these were caught by the framework's own tests. Two were hard process crashes, and one
-  (B1) was intermittent, which is the worst combination for a framework that promises determinism.
+The baseline framework defects were B1–B3; each now has a regression test and an implementation
+fix. B4–B11 were sample-side issues or tuning changes. B10's causal explanation remains
+unverified. The baseline test suite did not cover B1–B3; the current suite includes regression
+coverage for transaction capture, diagnostic row validation, and skip accounting.
 
 ---
 
-## 11. What would make this production grade
+## 11. Current production-grade status (checked 2026-10-27)
 
-"Production grade" here means: deterministic and replayable, recoverable from bad data, observable
-when slow, versioned when saved, and safe to hand to content authors. The current framework is a
-strong prototype kernel with several of those pieces present and none of them finished.
+"Production grade" here means deterministic and replayable, recoverable from bad data, observable
+when slow, versioned when saved, and safe to hand to content authors. The overhaul closes several
+baseline gaps, but the strict cross-platform determinism requirement remains open. The table is
+about implemented code and current evidence; configured CI is not the same as a successful hosted
+CI run.
 
 ### 11.1 Determinism contract
 
-Present: seeded `DrawStream`, population undo, declared-access scheduling, `CaptureState`/
-`RestoreState` on extensions, deterministic tests in the sample.
+Implemented: versioned counter-based `DeterministicRandom` values address draws by seed, system,
+entity ID, tick and draw index; ordered `ReduceRanges` uses fixed logical partitions independent of
+worker count; replay helpers hash caller-supplied canonical state; CI is configured for Linux x64,
+Windows x64 and macOS ARM64.
 
-Missing:
+Implemented: when included in a project, `StrictDeterminismAnalyzer` checks implementations of
+`ISystemicSystem`, `ISystemicScheduledSystem` and `IScheduledKernelSystem` by default. Explicit
+`[StrictSimulation]` and `systemic_determinism = strict` settings enable checks in other code;
+`systemic_determinism = relaxed` disables only the gameplay-system default for legacy files, while
+`[CosmeticOnly]` excludes presentation code. Glow Garden and Boids currently declare that relaxed
+setting because their gameplay still uses floating-point state.
 
-- Per-row randomness usable from parallel systems (see 1.4).
-- Ordered reduction for parallel passes (see 3.2).
-- A documented floating-point policy. All simulation math is `float` and `MathF`; cross-platform
-  results are untested, and `MathF.Sin/Cos` are not guaranteed identical across runtimes. A
-  fixed-point or "integer where it matters" policy, or at least a documented supported platform
-  set, is required before replay files can be trusted.
-- A replay artifact: `(seed, content hash, input log, tick count)` plus a run hash per tick.
-- A CI gate that runs the same replay on every supported platform and compares hashes.
-- Determinism across worker counts is *claimed* but the sample's tests only compare two hosts at
-  the default count. A test that runs 1, 2, 4 and 8 workers and compares state is cheap and would
-  catch regressions in the scheduler.
+Still open: the analyzer recognizes selected unsafe patterns; it is a guardrail, not a proof of
+determinism. It traces common inline LINQ pipelines, local initializers, preceding local
+assignments and C# query sources, but does not prove arbitrary data flow or aliasing. Sorting an
+unordered source is still reported because tied keys can preserve the source's unstable order.
+Glow Garden gameplay still uses
+`float`, `Vector2` and `MathF`, and does not use Q32.32 for authoritative decisions.
+The checked-in replay test is a small counter-system fixture, not a Garden replay, and does not
+compare Garden under different worker counts. The configured platform matrix has not been verified
+by a hosted CI result in this workspace. Therefore bitwise-identical gameplay across Linux x64,
+Windows x64 and macOS ARM64 is **not established**. Floating-point math also remains suitable for
+visual/gameplay prototyping, but it must not be described as cross-platform deterministic.
 
 ### 11.2 Failure containment
 
-Present: population schema validation on restore; bounded queues; clamps at content use sites.
-
-Missing:
-
-- A step-level error boundary: a failing system should fail the tick, roll back, and surface a
-  diagnostic record, not kill the process from inside a grid rebuild.
-- Validation that reports the producer: population ID, row, value and bounds in the message (B3).
-- A quarantine path for invalid rows (skip + counter + log) for decorative or non-critical
-  populations, with a strict mode for tests.
-- No `catch` block anywhere in the kernel that can throw while handling (B2).
-- Frame-budget enforcement: if a step exceeds the budget, the host should log the offending
-  systems and take a policy action (skip, degrade, slow down the clock) instead of drifting.
+`SystemicGame.TryStep` returns a structured failure with system ID and tick while the host's
+transaction path restores registered system and population state. Commit-callback failures are
+reported as possibly post-commit. Spatial-grid `Throw` diagnostics now identify population, row,
+coordinate and bounds; opt-in `InvalidPositionPolicy.Skip` preserves row indexes and counts invalid
+rows. The default remains strict and throws for invalid authoritative data by design. This is an
+exception boundary for callers to handle, not a policy that silently continues every failed tick.
 
 ### 11.3 Observability
 
-Present: `PresentationCueStream.DroppedCount`; the benchmarks project has its own gate runner.
-
-Missing:
-
-- Per-system timing and allocation stats on `SystemicGame` (mean/p95/max, allocations per tick).
-- Tick budget assertions in the sample's CI, not only in the separate benchmarks harness.
-- Counters surfaced rather than hidden: dropped cues, capped intents, rejected spawns, stuck
-  agents, out-of-bounds clamps. The sample had to hand-roll a stuck-agent detector with a
-  `StallTicks` column.
-- Structured logging with system ID, tick and entity/population context.
-- A debug overlay: draw the spatial grid, walkability field, scent field, and scheduler waves.
-  Two of the bugs above (B6, B8) would have been obvious in a ten-second visual check.
+`SystemicTickStats` records bounded per-system count, last/mean/p95/max elapsed time, current-thread
+managed allocations and budget-exceeded count. Worker-thread allocations are not included, and a
+budget records an overrun rather than automatically slowing or degrading the game. Garden's F3
+overlay shows sampled timings, current-thread allocation totals, scheduler waves and worker count,
+plus a bounded walkability/scent view. Cue overflow/expiry and rejected spawn counters exist, but
+there is no common structured logging pipeline or automatic display of every domain counter.
 
 ### 11.4 Save, load and migration
 
-Present: versioned `PopulationWorldState`, per-column codecs, `RestorePopulationState`,
-`ISystemicStatefulExtension` for extension state.
-
-Missing:
-
-- `SystemicGame.CaptureState()` composing clock, tick, draw stream, entity data, populations and
-  every registered extension, with a single version and a content hash.
-- Migrations: the save version is checked, but there is no `IMigration` story; adding a column
-  changes the schema and old saves cannot be loaded (the sample simply does not save).
-- Atomic writes, checksums, and a documented compatibility policy.
-- A sample that demonstrates save/load, rather than a README paragraph explaining why it cannot.
+`SystemicSaveCodec` composes world/entity/population data, the draw state and registered stateful
+extensions; the host adds clock and rule-history extensions, while Garden registers its domain
+state. Saves are versioned, bound to a content fingerprint, checksummed and can be written through
+a flushed temporary file followed by atomic replacement. Schema versions below v4 are rejected;
+explicit sequential migrations are supported from v4 onward when the schema advances (the current
+schema is v4, so no earlier supported migration step exists yet). Garden supports F5 save and F9
+load, and its progression commands register rollback actions while a world transaction is active.
+Presentation cue queues and
+arbitrary external side effects are not a general durable-state contract; each module must decide
+what is part of a save or rollback.
 
 ### 11.5 Content pipeline
 
-Present: JSON content, rule compilation, validation at load, clamping at use.
-
-Missing:
-
-- A schema per game module: property names, types, ranges, defaults, required tags. A typo in
-  `garden.worker.patience` currently changes behaviour silently.
-- Typed accessors generated from that schema, so systems do not do string lookups per tick.
-- Authoring diagnostics with file, line and property name.
-- Hot reload for iteration.
-- A single source of truth for tuning: today the same value lives in JSON, in a code default, and
-  in the README.
+Registered `ContentTuningSchema` definitions validate types, ranges, required tags and defaults at
+load, with file, JSON path and source location diagnostics. The loader validates and fingerprints
+the same entity bytes, and typed immutable tuning documents are available to modules. Garden
+registers a schema and resolves a typed `GardenTuning` snapshot once rather than performing string
+lookups in its simulation loop. This is opt-in per module; unschematized properties remain possible.
+`ContentReload.Prepare` compiles and validates a reload candidate without mutating the active host.
+It does not migrate live domain state or atomically replace a running game, so it is not live hot
+reload.
 
 ### 11.6 Concurrency safety
 
-Present: declared access, deterministic waves, `ForEachRange`.
-
-Missing:
-
-- A safe parallel write API (1.1) and ownership documentation.
-- Debug-mode instrumentation: record which thread captured a column's page this tick and assert
-  single ownership; assert that a structural edit did not happen while a span was borrowed.
-- Analyzers or runtime checks for the obvious mistakes: `Publish` inside a parallel pass, writing
-  an undeclared population, editing a column from two ranges of the same system.
-- A documented answer for `Draws` in parallel code.
+World transaction journaling serializes page capture and preserves disjoint parallel row writes;
+`WriteWorld` excludes all other systems from its schedule wave. Range reduction merges in a fixed
+order. A population lease prevents structural changes while held, and deferred commands are
+available. The API still cannot prove that callers only write their assigned rows, and ordinary
+raw spans can outlive the lease or be retained after the caller has stopped respecting its borrow
+contract. Column declarations have typed helpers; ad hoc named resources remain string-keyed.
 
 ### 11.7 Tooling and CI
 
-Present: benchmarks gate, sample tests, CLI smoke modes.
+Replay/hash infrastructure, a platform-matrix workflow, Garden headless/render smoke modes,
+transaction and spatial regression tests, and a bounded million-row movement benchmark now exist.
+The replay fixture is not Garden, the workflow has no result in this local checkout, render smoke
+checks only basic rendered output rather than visual correctness, and the benchmark is a narrow
+CPU movement kernel. There is no full-game cross-platform replay assertion, golden screenshot
+suite, or allocation budget covering worker threads.
 
-Missing:
+### 11.8 API stability and remaining ergonomics
 
-- A replay/diff harness usable from a test: run N ticks, hash the state, compare against a stored
-  hash. Today determinism tests instantiate two hosts in one process, which cannot catch
-  cross-run or cross-platform drift.
-- Golden screenshots for the render path; `--verify-render` checks color diversity, not appearance.
-- A headless "no agent stuck / no agent out of bounds / no unreachable free cell" invariant check
-  in the sample's test suite (all of these were ad hoc scratch tests).
-- Profiler integration and allocation budgets in the sample.
-- A documented support matrix (OS, runtime, GPU backend) with CI on each.
-
-### 11.8 API stability and analyzers
-
-- A semantic-versioning policy for kernel types; the current surface mixes stable concepts
-  (`Population<T>`, handles) with prototype ones (`EditNext` semantics).
-- Generated event constants instead of magic strings.
-- `[Obsolete]` migration paths when column schemas or access modes change.
-- Public API review for the rough edges in section 2 (`Bounds2` argument order, `EditRange(row,1)`,
-  dual `Step` hosting).
+Still open: there is no semantic-versioning policy, event IDs and access declarations still expose
+strings, there is no generated domain-event vocabulary, and the separate scheduled/unscheduled
+system hosting APIs remain. Generated row/range writers reduce repeated writes, but callers do not
+get a lifetime-enforced multi-column edit lease or an automatically generated public `TState`
+projection; Garden still maintains its hand-written projections. These are API design gaps, not
+evidence that the fixed transaction or tuning paths are unsafe.
 
 ### 11.9 Definition of done
 
-| Requirement | Status |
+| Requirement | Current status |
 | --- | --- |
-| Deterministic replay with a hash, verified in CI across platforms | missing |
-| Randomness available to parallel systems without breaking determinism | missing |
-| One bad entity cannot crash the process | missing (hard throw in grid rebuild) |
-| Every dropped/skipped/rejected event is counted and visible | partial (cue drops only) |
-| Per-system timing and allocations available at runtime | missing |
-| Full game save/load with version and migration | missing (populations only) |
-| Content schema validated with file/line diagnostics | missing |
-| Parallel population writes are safe by construction | missing (B1) |
-| Debug overlay for grids, fields and scheduler waves | missing |
-| Flagship sample demonstrates save, replay and profiling | missing |
+| Bitwise deterministic Garden replay, checked in CI across the approved platforms | Open: projects must include the analyzer; recognized system implementations are strict by default once included. Garden gameplay remains floating-point, and CI fixture is not Garden. |
+| Randomness available to parallel systems without schedule-dependent draws | Implemented at API level; Garden scouting uses stable IDs and ticks. |
+| Fixed-order reduction independent of worker count | Implemented; caller map/merge math must still be deterministic. |
+| Invalid spatial rows identify the population and can be counted/skipped | Implemented through strict named diagnostics and opt-in skip policy. |
+| Full sample save/load with version, fingerprint and integrity check | Implemented for Garden state, world and registered extensions; module-specific cue policy remains separate. |
+| Content schema validated with file/path/location diagnostics | Implemented for registered schemas; not every game property is required to opt in. |
+| Parallel population writes safe for disjoint ranges | Partial: synchronized transaction capture supports disjoint writes; overlapping writes and row ownership are not runtime-enforced. |
+| Per-system timing, bounded history and runtime display | Implemented; worker-thread allocations are excluded and budgets only count overruns. |
+| Debug view for scheduler and spatial/field state | Partial: Garden F3 shows waves, timings, walkability and scent, not every engine counter. |
+| Live content hot reload | Partial: candidate preparation/validation exists; host swap and state migration do not. |
+| Flagship sample demonstrates save, replay and profiling | Partial: Garden demonstrates save and profiling; cross-platform Garden replay is missing. |
+| Million-agent full-game performance claim | Not established. The available benchmark measures a narrow one-million-row movement loop only. |
 
-Rough sizing, if this were planned as work rather than a wish list:
-
-- **Small (days):** clamp-and-report validation, don't-throw catch blocks, `World.Seed`, worker-cap
-  log, per-system timing counters, cue counter surfacing, sample invariant tests.
-- **Medium (weeks):** nearest-neighbour queries, safe parallel writes, per-row RNG, typed content
-  accessors, ordered reduction, replay harness, debug overlay.
-- **Large (a milestone):** static geometry plus pathing, full save with migrations, event payloads
-  and aggregation, cross-platform determinism policy, analyzers and API stability guarantees.
 
 ---
 
-## 12. Performance: what is lacking, and how to get the best literal performance
+## 12. Performance: evidence and remaining tradeoffs
 
-The kernel's performance *model* is sound: unmanaged structs, per-field columns, borrowed spans,
-generated typed access, allocation-free queries with reused lists, and a declared-access scheduler.
-What is missing is the layer that turns that model into consistently fast code: the framework
-neither removes accidental costs nor makes the remaining costs visible, and it offers no
-escape hatches when a sample outgrows the safe path.
+New diagnostics and benchmark fixtures make some costs measurable, but they do not establish
+full-game throughput. Keep workload, safety mode, machine and sampling method attached to every
+number. The old figures in section 8 are historical observations with incomplete environment
+metadata; they are useful as motivation, not as current benchmark evidence.
 
-### 12.1 Where the time actually goes (measured here)
+### 12.1 Reproducible benchmark observation
 
-| Scenario | Result | What dominates |
-| --- | --- | --- |
-| 50k workers, linear nearest-target scans | ~7.6 s/tick | O(n·m) scans |
-| 50k workers, grid queries, 4 scheduled workers | ~15 ms/tick | grid queries + serial resolution tail |
-| Same, pinned to 1 worker | ~34 ms/tick | the same work, no parallelism |
-| Same, legacy serial system | ~55 ms/tick | no partitioning |
-| 1M-row rotation, double-buffered column | ~2.9 ms/tick | memory traffic: ~16 MB read/write + ~8 MB undo snapshot |
-| 50k workers with Magnetism | >1 s/tick | one creature-grid query per mote per tick |
-| 32 workers, 64 plants, 12k motes, 3 talents | ~27 ms/tick | Magnetism queries and fact dispatch |
-| Sample render, ~1000 workers | up to 16 `SpriteBatch.Draw` calls per worker (from the draw code; not measured on a display) | per-entity draw calls, not simulation |
+The checked-in million-agent benchmark measures one narrow CPU loop: one million rows with four
+32-bit integer columns, single-threaded position integration, no spatial index, rules, entities,
+renderer, scheduler or GPU. Each reported mode ran 20 warm-up and 100 measured ticks on the shared
+container (AMD EPYC 9V74, Debian 13, .NET 10.0.14 x64, four CPUs of cgroup quota). The `safe` mode
+wraps each tick in a world transaction; `optimized` deliberately runs without rollback. Exact
+workload and limitations are documented in `docs/million-agent-benchmark.md`.
 
-Two lessons from those numbers: at small scale the serial resolution tail limits how far the
-scheduler can help (4 workers bought only ~2.3×), and at large scale the bottleneck is memory
-traffic or a repeated query whose cost was never designed down. Neither is visible from inside the
-framework.
+| Mode | p50 | p95 | Maximum | Process allocations |
+| --- | ---: | ---: | ---: | ---: |
+| Safe, transactional | 1.444 ms | 5.515 ms | 23.660 ms | 0 B |
+| Optimized, no rollback | 0.881 ms | 1.278 ms | 18.444 ms | 0 B |
 
-### 12.2 Structural performance gaps
+Both runs validated all rows and produced the same final hash. These values are observations from
+one shared virtualized machine, not a guarantee for a full game or the historical Core i5 target.
+The optimized mode is explicitly unsafe on a mid-tick failure because it may leave partial state.
 
-| Gap | Cost | Evidence |
-| --- | --- | --- |
-| Validation on every call | `ValidateRange` + `EnsureActive` per `EditRange`/span access; `ValidatePositions` walks every row on every grid rebuild, in Release | grid rebuild validates all 12k mote positions per tick even when only a few moved |
-| Per-row write path | `EditRange(row, 1)` revalidates, re-captures pages and builds a span per field, per row | 29 call sites; a 7-column row write is 7 captures |
-| Undo costs are unavoidable | Full-buffer snapshot for whole-range edits, page copies even for a full rewrite, no opt-out | ~8 MB/tick for the 1M-row rotation |
-| Grid rebuild is O(n) per tick | Every position re-bucketed even when it did not move a cell | 12k motes + 1000 workers + plants, every tick |
-| Grid queries have no filter pushdown | Callers fetch candidates then test columns (ripe, value > 0, kind) | `NearestRipe` loops candidates and re-reads growth |
-| No batch column operations | Every per-row operation is scalar C#; branchy agent logic blocks auto-vectorisation | movement, clamping, decay all scalar loops |
-| Trigonometry in hot loops | `MathF.Sin/Cos/Atan2` per agent per tick for wandering and headings | ~20–40 cycles each, millions per second at scale |
-| Global scheduler default | 4 workers, and `WriteWorld` serialises the wave | sample had to opt in explicitly |
-| Serial resolution tail | All ordered effects (pickups, bursts, facts) resolve in one thread after the parallel pass | 50k-worker tick spends a large share here |
-| Per-event dispatch | String-keyed fact types, per-fact rule lookup, per-cue lock | hundreds of facts/tick at modest load |
-| Projection interfaces | `IReadOnlyList<TState>` indexers are interface calls with a span per field | `Plants`/`Creatures`/`Motes` in UI and tests |
-| Render path | One `SpriteBatch.Draw` per shadow, body, eye and carried mote; no instancing | ~1000 workers × up to 16 draws |
-| LOH pressure | 1M-row columns are 8 MB arrays; growth reallocates and copies | `Reserve` at construction helps only if you know the cap |
-| No hot/cold split | A row contains physics, AI state and presentation-only fields in separate columns, but systems touch them at the same cadence | cache lines are wasted on fields the loop does not read |
+The solution-wide Release run also exercised the existing generic performance gate with 50,000
+products and 1,000 reactive actors. It measured p50 9.148 ms, p95 15.321 ms and p99 22.599 ms
+with 0 B reported allocations, against a p95 target below 5 ms. That gate failed on this shared
+container; the other 189 Integration tests passed. Do not lower the gate based on this result, and
+do not treat it as a measurement of the historical laptop target.
 
-### 12.3 Proposals: how to make the fast path the default
+### 12.2 Costs that remain visible in the current code
 
-The goal is not "always fast" — that is not achievable — but "never accidentally slow, and always
-visible when slow". Four principles and the concrete changes behind them.
+| Area | Current behavior and evidence |
+| --- | --- |
+| Safe rollback | The one-million-row example measures 5.515 ms p95 with transactions and 1.278 ms without. The gap is evidence of this workload's rollback cost; it does not isolate every undo copy or predict other systems. |
+| Garden targeting | Garden rebuilds its population grids each tick and still has game-specific target selection. Floating and fixed-point nearest/k-nearest APIs and an incremental grid are available for other implementations. |
+| Garden resolution | Worker decisions run over disjoint scheduled ranges, then ordered bursts, pickups and deposits resolve serially to preserve first-come outcomes and fact order. No Garden benchmark isolates this tail. |
+| Dense talents | Magnetism work scales with motes and nearby creature candidates. The old claim of over one second at 50k workers is historical and was not reproduced with a recorded protocol. |
+| Scheduler | The default cap is four workers. `WriteWorld` excludes other systems from the wave by design; this is a deliberate synchronization contract with a possible throughput cost. |
+| Metrics | Runtime timing includes bounded mean/p95/max and budgets, but managed allocation totals cover the calling thread only. The Garden overlay samples rather than instrumenting every row operation. |
+| Math and data kernels | Fixed-point/decimal primitives and deterministic integer SIMD kernels exist, but Garden gameplay still uses floating-point `Vector2`/`MathF`. The SIMD kernels are not general generated population-column operations. |
+| Compute | `IPopulationComputeBackend` and a CPU reference backend define a backend-neutral contract. No GPU backend or end-to-end GPU performance result is included. |
+| Rendering | The finite render smoke checks output diversity and can capture a screenshot. No draw-call or display-frame benchmark was recorded, so the old per-worker draw-count estimate is not retained as a measured result. |
 
-**A. Zero-cost abstractions in Release**
+### 12.3 Open optimization work
 
-- Compile out range/bounds validation except in Debug or a checked mode:
-  `EditRangeUnchecked`, `GetUnchecked`, `[Conditional("DEBUG")] Validate(...)`. The generated
-  accessors should emit the unchecked form by default and the checked form under a define.
-- `MethodImpl(AggressiveInlining)` on `Vector2`-sized helpers, column indexers and query cell math.
-- Avoid interface dispatch in hot loops: concrete `Population<T>` enumerators (struct), and
-  generated `TState` indexers on the concrete type rather than through `IReadOnlyList<T>`.
-- Pre-size and reuse: thread-static scratch lists (the sample does this for grid queries), pool
-  anything larger than a few KB.
+The next performance changes should start from a workload-specific profile. The following remain candidates rather than completed capabilities:
 
-**B. Remove the copy: undo should cost what the change costs**
+- Add a transaction-safe whole-buffer rewrite path or an explicit undo policy for derived columns. Keep rollback safety as the default; any no-rollback path must name its failure semantics.
+- Add generated multi-column range editing that validates and captures once while retaining row-range ownership rules.
+- Evaluate whether Garden should use the incremental spatial index instead of rebuilding its indexes every tick; account for movement cost and row identity before changing it.
+- Measure the serial Garden resolution phase and dense Magnetism with a reproducible harness before changing ordering or aggregation semantics.
+- Make the scheduler's four-worker default visible and compare alternatives on the supported hardware matrix before changing the default.
+- Integrate fixed-point math into authoritative Garden decisions only with a replay fixture that checks behavior, not just arithmetic primitives.
+- Measure renderer submission on actual display backends before proposing instancing or a render-thread split.
+- Keep the CPU compute bridge as the reference; add another backend only with parity tests, cancellation/partial-write tests and evidence on an actual target device.
 
-- `EditNextWhole()` for double-buffered columns that rewrite every row: skip page capture entirely,
-  keep only the role-swap undo. This alone halves the cost of the 1M-row tier.
-- Per-column `UndoMode.None` for derived/cosmetic state (presentation ghosts, ambient motion,
-  cached aggregates), with the transaction recording "not restored" so the contract is explicit.
-- Sparse undo: capture only the rows actually written (a bitset + row copies), instead of whole
-  pages, when the edit is sparse. The undo batch already exists; it just needs a sparse variant.
-- Batch row writes: `EditRows(range)` returns per-column spans after a single capture, so a
-  seven-field row write is one capture and one validation, not seven.
-
-**C. Make memory traffic and math the bottleneck you chose**
-
-- Batch column operations with SIMD: `column.Add(scalar)`, `Clamp(min, max)`, `Scale`, `Lerp`,
-  `DistanceSquared(a, b, results)`, implemented with `Vector256`/`Vector128` and
-  `System.Numerics.Tensors.TensorPrimitives` (available on .NET 10). A 1M-row decay/rotation then
-  runs at memory bandwidth instead of scalar issue rate.
-- Homogeneous lanes: bucket rows by behaviour (cooldown, carrying, kind) so the inner loop has no
-  branches and vectorises. The sample's `DecideRange` is branchy by construction; a
-  "worklist per state" layout would be branch-free and much faster.
-- Replace per-tick trig with a precomputed 4,096-entry sin/cos table or integer angles; steering
-  wants a normalized direction, not an angle. This is one of the cheapest wins in agent code.
-- Hot/cold column split by update cadence (position/velocity vs. presentation fields) and keep hot
-  fields adjacent in memory; consider archetype chunking (16 KB chunks, SoA within a chunk) if
-  systems read most columns of a row anyway.
-- Incremental spatial index: `Move(row, oldPosition, newPosition)` with intrusive cell lists
-  (head/next arrays) makes insertion/removal O(1) and removes the per-tick rebuild entirely. Keep
-  `Rebuild` for cold starts and bulk changes.
-- Nearest queries with early exit and a per-cell cached minimum: `TryFindNearest` using a
-  two-level grid (coarse cells for far, fine cells for near) avoids scanning the map for a distant
-  target.
-
-**D. Parallelism without contention**
-
-- Default to all logical cores, or at least log the cap (see 3.1).
-- Deterministic work stealing: split into many small chunks, hand them out with an atomic counter,
-  and merge results by chunk index. Load balancing without sacrificing determinism.
-- Per-partition undo journals merged in partition order, instead of one global journal; the
-  contention point disappears and the merge stays deterministic.
-- `context.Reduce(seed, partitionSelector, combine)` so the resolution tail can stay parallel
-  (sums, min/max, flags) with a fixed combine order.
-- Split simulation and presentation onto separate threads with a double-buffered read model; the
-  renderer never blocks the tick, and cue sampling moves off the hot path.
-- Publish facts into a per-thread ring and merge at the step boundary instead of locking the cue
-  stream per event; aggregate by (type, region) before dispatch.
-
-**E. Make cost visible**
-
-- `SystemicGame.TickStats`: per-system wall time (mean/p95/max), allocations, queue depth, worker
-  utilisation, number of facts dispatched, cues dropped, rows validated. This is the difference
-  between "it feels slow" and "Magnetism costs 1.2 s".
-- A built-in budget mode: `TickBudget(TimeSpan)` → warn (or degrade) when a system exceeds its
-  share; per-system budgets declared alongside access.
-- A debug overlay that draws the grid, the walkability field, the scheduler waves and per-system
-  timings. Two of the bugs in section 10 would have been diagnosed in seconds.
-
-**F. Escape hatches for the last 20%**
-
-- `unsafe`/`Unsafe` accessors for raw column pointers, clearly marked, for kernels that must run at
-  memory bandwidth.
-- A `FixedUpdateLod` helper: update a fraction of rows per tick with a stable rotation, so a system
-  can trade fidelity for a linear cost reduction without rewriting the loop.
-- A GPU-compute bridge for homogeneous populations (agents as a structured buffer, economy scalars
-  read back once per frame). The framework does not need to own this, but it should not make it
-  impossible: positions in, aggregate out.
-
-### 12.4 A performance-first API sketch
-
-```csharp
-// Batch writes: one capture, one validation, spans for every column.
-using var rows = population.EditRows(range);
-var positions = rows.Span(PositionKey);
-var headings  = rows.Span(HeadingKey);
-
-// SIMD column kernels (TensorPrimitives underneath).
-positions.Add(velocity);
-headings.Clamp(-MathF.PI, MathF.PI);
-glow.Scale(0.9f);
-
-// Whole-buffer rewrite: no undo copy, role swap only.
-var next = trail.EditNextWhole();
-
-// Derived columns opt out of rollback explicitly.
-[PopulationColumn("ghost", Undo = UndoMode.None)]
-
-// Incremental index instead of a per-tick rebuild.
-index.Move(row, previous, current);
-
-// Deterministic, load-balanced reduction.
-var harvested = context.Reduce(0L, partition => partition.SumOf(picked), (a, b) => a + b);
-
-// Batched, typed facts instead of per-event strings and locks.
-context.Publish(new FactBatch(factIds, sources, targets, amounts, anchors));
-
-// Per-tick tuning resolved once, no string lookups in the loop.
-var tuning = content.Tuning<WorkerTuning>();
-```
-
-### 12.5 Determinism versus speed
-
-"Best literal performance" and determinism pull in opposite directions: SIMD-friendly math usually
-means floats, floats mean platform variance, and parallel reductions mean ordering choices. The
-defensible position for a deterministic framework:
-
-1. Fixed-point or integer math for anything that affects gameplay outcomes; floats for
-   presentation only.
-2. If floats are used, pin the supported runtime/architecture set, avoid `MathF` transcendentals
-   in simulation, and verify hashes in CI on every platform in the matrix.
-3. Use a fixed partition count for reductions regardless of worker count; merge in index order.
-4. Make the trade-off explicit per system: `[Deterministic]` versus `[Cosmetic]`, where cosmetic
-   systems may use floats, parallelism and non-ordered merges, and are excluded from save state.
-
-### 12.6 What a 60 Hz, 1M-agent budget looks like
-
-16.6 ms per tick, of which a sane split is roughly: 8 ms simulation, 3 ms facts/presentation
-enqueue, 3 ms rendering submission, 2 ms slack. At 1M agents that is ~8 ns per agent for
-simulation — about 25 cycles. That budget only works if, per agent, the tick has: no allocation,
-no virtual call, no string, no trig, no page capture, one cache-line-friendly pass over
-position/velocity, and neighbour data from an incremental cell index. Any one of those violated
-makes the budget unattainable. Of those, the framework imposes page capture, string-keyed dispatch
-and interface-based projections on the default path; trig and branching are the sample's own
-choices, but nothing in the API steers authors away from them.
-
-### 12.7 Prioritised quick wins
-
-| Win | Effort | Expected effect |
-| --- | --- | --- |
-| `EditNextWhole` / undo opt-out for derived columns | S | ~40–50% off the 1M-row tier |
-| Release-only validation on column access | S | removes per-access checks from every loop |
-| Batch row writes (`EditRows`) | S | 7× fewer captures for projection writes |
-| `TryFindNearest` with early exit | M | replaces hand-rolled expanding-radius scans |
-| Incremental spatial index (`Move`) | M | removes O(n) rebuild per tick |
-| SIMD column kernels via `TensorPrimitives` | M | memory-bandwidth-bound movement/decay |
-| Deterministic work stealing + `Reduce` | M | removes the serial resolution tail |
-| Precomputed trig table / integer angles | S | removes the most expensive per-agent math |
-| Fact type IDs instead of strings | S | turns dispatch into an array index |
-| Per-system `TickStats` | S | makes every later optimisation measurable |
-| Batching/instancing in the render path | M | 15 draws per worker down to 1–2 |
-| Homogeneous worklists (bucketed lanes) | L | branch-free, vectorisable agent loops |
+A 60 Hz, one-million-agent budget of 16.6 ms per tick is a design target, not a measured framework result. It needs separate budgets for simulation, rules, presentation and rendering, and an end-to-end workload on the intended hardware before it can be claimed.

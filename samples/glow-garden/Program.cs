@@ -39,6 +39,14 @@ public sealed record GardenOptions(bool Headless, bool VerifyRender, int Ticks, 
 public sealed class GardenSession(int seed) : IDisposable
 {
     public GardenHost Host { get; private set; } = GardenHost.Create(seed);
+    public void SaveToFile(string path) => Host.SaveToFile(path);
+    public void LoadFromFile(string path)
+    {
+        var restored = GardenHost.LoadFromFile(path);
+        var previous = Host;
+        Host = restored;
+        previous.Dispose();
+    }
     public void Restart()
     {
         var fresh = GardenHost.Create(seed);

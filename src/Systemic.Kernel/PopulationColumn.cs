@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace Systemic.Kernel;
 
+/// <summary>Encodes and decodes a population column using a stable, versioned wire format.</summary>
 public interface IPopulationCodec<T> where T : unmanaged
 {
     string Id { get; }
@@ -20,8 +21,10 @@ public interface IPopulationCodec<T> where T : unmanaged
     void Decode(ReadOnlySpan<byte> source, Span<T> values);
 }
 
+/// <summary>Defines a stable ID, version, and codec for a population column.</summary>
 public sealed class PopulationColumnKey<T> where T : unmanaged
 {
+    /// <summary>Creates a column key with its persistent schema identity.</summary>
     public PopulationColumnKey(string id, int version, IPopulationCodec<T> codec)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
@@ -36,10 +39,13 @@ public sealed class PopulationColumnKey<T> where T : unmanaged
         Codec = codec;
     }
 
+    /// <summary>Gets the stable column identifier.</summary>
     public string Id { get; }
 
+    /// <summary>Gets the column schema version.</summary>
     public int Version { get; }
 
+    /// <summary>Gets the codec used to encode this column.</summary>
     public IPopulationCodec<T> Codec { get; }
 }
 
@@ -208,6 +214,7 @@ public static class PopulationCodecs
 internal sealed class PopulationStorage(World world)
 {
     private World? _world = world;
+    private int _activeLeases;
 
     public int Count { get; set; }
 
@@ -228,6 +235,25 @@ internal sealed class PopulationStorage(World world)
 
     public void EnsureActive() => (_world ?? throw new InvalidOperationException("Population storage is detached from its world."))
         .EnsurePopulationActive();
+
+    // The owning World's TransactionGate must be held for lease and structural changes.
+    public void AcquireLease()
+    {
+        World.AcquirePopulationLease();
+        _activeLeases++;
+    }
+
+    public void ReleaseLease()
+    {
+        _activeLeases--;
+        World.ReleasePopulationLease();
+    }
+
+    public void EnsureNoLeases()
+    {
+        if (_activeLeases != 0)
+            throw new InvalidOperationException("A population cannot change structure while borrowed views are leased.");
+    }
 
     public void Rebind(World world) => _world = world;
 
@@ -334,8 +360,21 @@ public abstract class PopulationColumnBase(
         }
         catch
         {
-            batch.Reset();
-            _freePageUndoBatches.Push(batch);
+            // Cleanup is best effort: preserve the capture failure even if a damaged
+            // batch or pool also fails during cleanup.
+            try
+            {
+                batch?.Reset();
+                if (batch is not null)
+                {
+                    _freePageUndoBatches.Push(batch);
+                }
+            }
+            catch
+            {
+                // Do not return an unusable batch to the pool.
+            }
+
             throw;
         }
     }
@@ -386,6 +425,7 @@ internal sealed class PopulationPageUndoBatch(PopulationColumnBase column) : ICo
     }
 }
 
+/// <summary>Stores one unbuffered value for every live population row.</summary>
 public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanaged
 {
     private readonly PopulationStorage _population;
@@ -438,26 +478,36 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
     /// <remarks>
     /// Do not retain or use this span across world cloning, adoption, or population structural changes. An already
     /// issued span cannot be revoked and writes through it after cloning can bypass copy-on-write.
+    /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
+    /// changing transaction scopes, cloning, swapping buffers, or making structural changes.
     /// </remarks>
     public Span<T> EditRange(int start, int length)
     {
         _population.ValidateRange(start, length);
-        _buffer = _buffer.EnsureWritable();
-        CapturePages(0, start, length, _buffer.Values.Length);
-        return _buffer.Values.AsSpan(start, length);
+        lock (_population.World.TransactionGate)
+        {
+            _buffer = _buffer.EnsureWritable();
+            CapturePages(0, start, length, _buffer.Values.Length);
+            return _buffer.Values.AsSpan(start, length);
+        }
     }
 
     /// <summary>Gets a borrowed mutable memory view of a live row range.</summary>
     /// <remarks>
     /// Do not retain or use this view across world cloning, adoption, or population structural changes. An already
     /// issued view cannot be revoked and writes through it after cloning can bypass copy-on-write.
+    /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
+    /// changing transaction scopes, cloning, swapping buffers, or making structural changes.
     /// </remarks>
     public Memory<T> EditMemory(int start, int length)
     {
         _population.ValidateRange(start, length);
-        _buffer = _buffer.EnsureWritable();
-        CapturePages(0, start, length, _buffer.Values.Length);
-        return _buffer.Values.AsMemory(start, length);
+        lock (_population.World.TransactionGate)
+        {
+            _buffer = _buffer.EnsureWritable();
+            CapturePages(0, start, length, _buffer.Values.Length);
+            return _buffer.Values.AsMemory(start, length);
+        }
     }
 
     internal PopulationColumnKey<T> Key => _key;
@@ -544,6 +594,7 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
         new PopulationColumn<T>(storage, _key, _buffer.Share());
 }
 
+/// <summary>Stores current and next values for every live population row.</summary>
 public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase where T : unmanaged
 {
     private readonly PopulationStorage _population;
@@ -605,60 +656,80 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
     /// <remarks>
     /// Do not retain or use this span across world cloning, adoption, or population structural changes. An already
     /// issued span cannot be revoked and writes through it after cloning can bypass copy-on-write.
+    /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
+    /// changing transaction scopes, cloning, swapping buffers, or making structural changes.
     /// </remarks>
     public Span<T> EditNext(int start, int length)
     {
         _population.ValidateRange(start, length);
-        EnsureNextWritable();
-        CapturePages(_firstIsCurrent ? 1 : 0, start, length, NextArray.Values.Length);
-        return NextArray.Values.AsSpan(start, length);
+        lock (_population.World.TransactionGate)
+        {
+            EnsureNextWritable();
+            CapturePages(_firstIsCurrent ? 1 : 0, start, length, NextArray.Values.Length);
+            return NextArray.Values.AsSpan(start, length);
+        }
     }
 
     /// <summary>Gets writable views of both buffers for initializing newly spawned rows.</summary>
-    /// <remarks>Use for structural initialization; simulation updates should write only to <see cref="EditNext"/>.</remarks>
+    /// <remarks>Use for structural initialization; simulation updates should write only to <see cref="EditNext"/>.
+    /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
+    /// changing transaction scopes, cloning, swapping buffers, or making structural changes.</remarks>
     public DoubleBufferedPopulationEdit<T> EditBothBuffers(int start, int length)
     {
         _population.ValidateRange(start, length);
-        _first = _first.EnsureWritable();
-        _second = _second.EnsureWritable();
-        CapturePages(0, start, length, _first.Values.Length);
-        CapturePages(1, start, length, _second.Values.Length);
-        return new(CurrentArray.Values.AsSpan(start, length), NextArray.Values.AsSpan(start, length));
+        lock (_population.World.TransactionGate)
+        {
+            _first = _first.EnsureWritable();
+            _second = _second.EnsureWritable();
+            CapturePages(0, start, length, _first.Values.Length);
+            CapturePages(1, start, length, _second.Values.Length);
+            return new(CurrentArray.Values.AsSpan(start, length), NextArray.Values.AsSpan(start, length));
+        }
     }
 
     /// <summary>Gets a borrowed mutable memory view of a row range in the next buffer.</summary>
     /// <remarks>
     /// Do not retain or use this view across world cloning, adoption, or population structural changes. An already
     /// issued view cannot be revoked and writes through it after cloning can bypass copy-on-write.
+    /// Concurrent access must use disjoint ranges whenever a range is written. Finish using borrowed views before
+    /// changing transaction scopes, cloning, swapping buffers, or making structural changes.
     /// </remarks>
     public Memory<T> EditNextMemory(int start, int length)
     {
         _population.ValidateRange(start, length);
-        EnsureNextWritable();
-        CapturePages(_firstIsCurrent ? 1 : 0, start, length, NextArray.Values.Length);
-        return NextArray.Values.AsMemory(start, length);
+        lock (_population.World.TransactionGate)
+        {
+            EnsureNextWritable();
+            CapturePages(_firstIsCurrent ? 1 : 0, start, length, NextArray.Values.Length);
+            return NextArray.Values.AsMemory(start, length);
+        }
     }
 
+    /// <summary>Makes the next buffer current and the former current buffer the next buffer.</summary>
     public void Swap()
     {
         _population.EnsureActive();
-        if (_population.World.TryCapturePopulationRole(this))
+        lock (_population.World.TransactionGate)
         {
-            var batch = _freeRoleUndoBatches.Count > 0 ? _freeRoleUndoBatches.Pop() : new BufferRoleUndoBatch(this);
-            try
+            _population.EnsureNoLeases();
+            if (_population.World.TryCapturePopulationRole(this))
             {
-                batch.Capture(_firstIsCurrent);
-                _population.World.RecordPopulationUndo(batch);
+                var batch = _freeRoleUndoBatches.Count > 0 ? _freeRoleUndoBatches.Pop() : new BufferRoleUndoBatch(this);
+                try
+                {
+                    batch.Capture(_firstIsCurrent);
+                    _population.World.RecordPopulationUndo(batch);
+                }
+                catch
+                {
+                    batch.Release();
+                    _population.World.ReleasePopulationRoleCapture(this);
+                    throw;
+                }
             }
-            catch
-            {
-                batch.Release();
-                _population.World.ReleasePopulationRoleCapture(this);
-                throw;
-            }
-        }
 
-        _firstIsCurrent = !_firstIsCurrent;
+            _firstIsCurrent = !_firstIsCurrent;
+        }
     }
 
     internal PopulationColumnKey<T> Key => _key;

@@ -128,7 +128,7 @@ public sealed class SystemicBudgetTests(ITestOutputHelper output)
         var p95 = fullProfile.P95;
         _output.WriteLine($"Products={ProductCount}, actors={ActorCount}, warmup=20, samples=60");
         _output.WriteLine($"Full query + chain p50/p95/p99={fullProfile.P50:F3}/{fullProfile.P95:F3}/{fullProfile.P99:F3} ms; allocations={fullProfile.Allocations} B");
-        _output.WriteLine($"Spatial query p95={queryProfile.P95:F3} ms; empty dispatch p95={dispatchProfile.P95:F3} ms; one-effect dispatch p95={oneEffectProfile.P95:F3} ms; reaction chain p95={reactionProfile.P95:F3} ms");
+        _output.WriteLine($"Spatial query p50/p95={queryProfile.P50:F3}/{queryProfile.P95:F3} ms; empty dispatch={dispatchProfile.P50:F3}/{dispatchProfile.P95:F3} ms; one-effect dispatch={oneEffectProfile.P50:F3}/{oneEffectProfile.P95:F3} ms; reaction chain={reactionProfile.P50:F3}/{reactionProfile.P95:F3} ms");
         _output.WriteLine($"Last chain sample: effects={lastDispatchEffects}, cutoff facts={lastDispatchCutoffs} (expected {ActorCount} reaction-depth cutoffs)");
         Assert.Equal(0, invalidDispatches);
         Assert.True(p95 < 5, $"Generic 50k-product + 1k-actor step p95 was {p95:F3} ms; target is <5 ms.");

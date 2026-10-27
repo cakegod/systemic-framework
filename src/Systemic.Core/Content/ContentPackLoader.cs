@@ -37,10 +37,11 @@ public static partial class ContentPackLoader
 
         root = new DirectoryInfo(root).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? root;
         root = Path.GetFullPath(root);
+        var fingerprint = new ContentFingerprintBuilder(root);
         var diagnostics = new List<ContentDiagnostic>();
         var game = TryCompileAt(root, "game.json", "$", diagnostics, () =>
         {
-            var file = Read<GameFile>(ResolveContentPath(root, "game.json"), "game.json", GameSchemaId, s_gameSchema);
+            var file = Read<GameFile>(ResolveContentPath(root, "game.json"), "game.json", GameSchemaId, s_gameSchema, fingerprint);
             Require(file.SchemaVersion is 2 or 3,
                 $"game.json schemaVersion must be 2 or 3; found {file.SchemaVersion}.", "$.schemaVersion");
             Require(!string.IsNullOrWhiteSpace(file.Name), "game.name is required.", "$.name");
@@ -48,9 +49,17 @@ public static partial class ContentPackLoader
         }) ?? throw new ContentPackException(diagnostics);
 
         var rulesFile = TryCompileAt(root, game.Rules!, "$.rules", diagnostics,
-            () => Read<RulesFile>(ResolveContentPath(root, game.Rules!), game.Rules!, RulesSchemaId, s_rulesSchema));
+            () => Read<RulesFile>(ResolveContentPath(root, game.Rules!), game.Rules!, RulesSchemaId, s_rulesSchema, fingerprint));
+        byte[] entitiesBytes = [];
+        var tuningDocuments = ImmutableDictionary<string, TuningDocument>.Empty;
         var entitiesFile = TryCompileAt(root, game.Entities!, "$.entities", diagnostics,
-            () => Read<EntitiesFile>(ResolveContentPath(root, game.Entities!), game.Entities!, EntitiesSchemaId, s_entitiesSchema));
+            () =>
+            {
+                var file = Read<EntitiesFile>(ResolveContentPath(root, game.Entities!), game.Entities!,
+                    EntitiesSchemaId, s_entitiesSchema, fingerprint, out entitiesBytes);
+                tuningDocuments = moduleRegistry.CompileTunings(entitiesBytes, game.Entities!);
+                return file;
+            });
         var entities = entitiesFile is null
             ? null
             : TryCompileAt(root, game.Entities!, "$.entities", diagnostics, () => CompileEntities(entitiesFile, game.Entities!));
@@ -71,10 +80,15 @@ public static partial class ContentPackLoader
         }
 
         var moduleContext = new ContentModuleContext(root, manifest, entities, rules!, references,
-            game.Entities, game.Rules);
+            game.Entities, game.Rules)
+        { Fingerprint = fingerprint };
         var modules = moduleRegistry.CompileDeclared(moduleContext, game.Modules);
         references.ValidateRequired();
-        return new ContentPack(root, manifest, rules!, entities, modules);
+        return new ContentPack(root, manifest, rules!, entities, modules)
+        {
+            ContentFingerprint = fingerprint.Finish(),
+            TuningDocuments = tuningDocuments,
+        };
     }
 
     private static T? TryCompileAt<T>(
@@ -103,6 +117,12 @@ public static partial class ContentPackLoader
                 diagnostics.Add(new ContentDiagnostic("content.invalid", DiagnosticFile(root, sourceFile),
                     exception.FieldPath ?? fallbackPath, exception.Message));
             }
+        }
+        catch (ContentTuningException exception)
+        {
+            diagnostics.AddRange(exception.Diagnostics.Select(diagnostic => new ContentDiagnostic(
+                diagnostic.Code, DiagnosticFile(root, diagnostic.File), diagnostic.Path,
+                diagnostic.Message, diagnostic.Line, diagnostic.Column)));
         }
         catch (JsonException exception)
         {
@@ -535,9 +555,16 @@ public static partial class ContentPackLoader
         return ContentPathResolver.ResolveWithinRoot(root, relativePath, "Content path", "Content file");
     }
 
-    private static T Read<T>(string path, string displayPath, string schemaKey, string schemaText)
+    private static T Read<T>(string path, string displayPath, string schemaKey, string schemaText, ContentFingerprintBuilder fingerprint)
     {
-        var bytes = ContentFileReader.ReadValidatedBytes(path, displayPath, schemaKey, schemaText);
+        var bytes = ContentFileReader.ReadValidatedBytes(path, displayPath, schemaKey, schemaText, fingerprint);
+        return JsonSerializer.Deserialize<T>(bytes, JsonOptions)!;
+    }
+
+    private static T Read<T>(string path, string displayPath, string schemaKey, string schemaText,
+        ContentFingerprintBuilder fingerprint, out byte[] bytes)
+    {
+        bytes = ContentFileReader.ReadValidatedBytes(path, displayPath, schemaKey, schemaText, fingerprint);
         return JsonSerializer.Deserialize<T>(bytes, JsonOptions)!;
     }
 

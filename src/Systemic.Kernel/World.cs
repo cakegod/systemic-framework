@@ -40,6 +40,11 @@ public sealed record PropertyGrant(
     string Name,
     int RemainingTicks = -1);
 
+/// <summary>Reports failures in callbacks invoked after a world transaction has committed.</summary>
+/// <remarks>The transaction's world changes are already committed when this exception is thrown.</remarks>
+public sealed class WorldCommitCallbackException(IEnumerable<Exception> failures)
+    : AggregateException("World transaction commit callbacks failed after the state was committed.", failures);
+
 public sealed class World
 {
     public const float DefaultSpatialCellSize = 32.0f;
@@ -53,6 +58,7 @@ public sealed class World
     private static readonly Dictionary<string, int> RoleHandles = [];
     private static readonly List<string> RoleNames = ["<unbound>"];
     private static int _nextRoleHandle = 1;
+    private static readonly Lock s_adoptionGate = new();
 
     private readonly List<Entity> _entities = [];
     private readonly Dictionary<int, Bounds2> _spatialBoundsByEntity = [];
@@ -69,6 +75,11 @@ public sealed class World
     private int _nextId;
     private bool _consumed;
 
+    // Serializes scope state, the undo journal, and column detachment/snapshot preparation.
+    // Borrowed views are used outside this gate; callers must join workers before changing
+    // scopes, cloning, swapping buffers, or making structural changes.
+    internal Lock TransactionGate { get; } = new();
+    private int _activePopulationLeases;
     private readonly List<UndoRecord> _journal = [];
     private readonly Stack<ScopeState> _scopes = [];
     private readonly Stack<ScopeState> _freeScopes = [];
@@ -90,12 +101,34 @@ public sealed class World
     private readonly Dictionary<IEntityQuery, CachedQuerySnapshot> _querySnapshots = [];
     private readonly Dictionary<string, long> _linkVersions = new(StringComparer.Ordinal);
     internal long StructuralVersion { get; private set; }
-    internal int UndoRecordCount => _journal.Count;
+    internal int UndoRecordCount
+    {
+        get { lock (TransactionGate) return _journal.Count; }
+    }
     internal bool HasPendingRemovals => _removalCandidates.Count != 0;
 
     internal void MarkStructureChanged() => StructuralVersion++;
 
-    internal bool HasActiveScope => !_undoing && _scopes.Count > 0;
+    // Callers hold TransactionGate while changing or checking these counts.
+    internal void AcquirePopulationLease()
+    {
+        if (_activePopulationLeases == int.MaxValue)
+            throw new InvalidOperationException("Too many active population leases.");
+        _activePopulationLeases++;
+    }
+
+    internal void ReleasePopulationLease() => _activePopulationLeases--;
+
+    private void EnsureNoPopulationLeases()
+    {
+        if (_activePopulationLeases != 0)
+            throw new InvalidOperationException("Complete all population leases before changing world or transaction structure.");
+    }
+
+    internal bool HasActiveScope
+    {
+        get { lock (TransactionGate) return !_undoing && _scopes.Count > 0; }
+    }
 
     internal bool TryGetQuerySnapshot(IEntityQuery query, out EntityQuerySnapshot snapshot)
     {
@@ -187,14 +220,17 @@ public sealed class World
                 nameof(valueScale), valueScale, "Value scale must be finite and positive.");
         }
 
+        Seed = seed;
         ValueScale = valueScale;
         Draws = new DrawStream(seed);
         SpatialCellSize = spatialCellSize;
         _spatialIndex = new SpatialIndex(spatialCellSize);
     }
 
-    private World(double valueScale, DrawStream draws, int capacity = 0, float spatialCellSize = DefaultSpatialCellSize)
+    private World(int seed, double valueScale, DrawStream draws, int capacity = 0,
+        float spatialCellSize = DefaultSpatialCellSize)
     {
+        Seed = seed;
         ValueScale = valueScale;
         Draws = draws;
         SpatialCellSize = spatialCellSize;
@@ -207,6 +243,8 @@ public sealed class World
         }
     }
 
+    /// <summary>The original seed identifying this world and all of its cloned branches.</summary>
+    public int Seed { get; }
     public double ValueScale { get; }
     public float SpatialCellSize { get; }
     public DrawStream Draws { get; private set; }
@@ -255,10 +293,13 @@ public sealed class World
     {
         var column = GetEntityColumn<TEntity, TState>();
         EntityColumn<TEntity, TState>.ColumnUndoBatch? undoBatch = null;
-        if (!_undoing && _scopes.Count > 0)
+        lock (TransactionGate)
         {
-            undoBatch = column.RentUndoBatch();
-            _journal.Add(UndoRecord.ForColumnUndo(undoBatch));
+            if (!_undoing && _scopes.Count > 0)
+            {
+                undoBatch = column.RentUndoBatch();
+                _journal.Add(UndoRecord.ForColumnUndo(undoBatch));
+            }
         }
 
         return new ColumnMutationBatch<TEntity, TState>(this, column, undoBatch);
@@ -272,9 +313,15 @@ public sealed class World
         {
             MarkMutated(entity);
         }
-        else if (!_undoing && _scopes.Count > 0 && _journal.Count == _scopes.Peek().Mark)
+        else
         {
-            _journal.Add(UndoRecord.ForEditMarker());
+            lock (TransactionGate)
+            {
+                if (!_undoing && _scopes.Count > 0 && _journal.Count == _scopes.Peek().Mark)
+                {
+                    _journal.Add(UndoRecord.ForEditMarker());
+                }
+            }
         }
 
         return entity;
@@ -282,19 +329,22 @@ public sealed class World
 
     internal void MarkMutated(Entity entity)
     {
-        if (_undoing || _scopes.Count == 0)
+        lock (TransactionGate)
         {
-            return;
-        }
+            if (_undoing || _scopes.Count == 0)
+            {
+                return;
+            }
 
-        var scope = _scopes.Peek();
-        if (scope.Touch(entity))
-        {
-            var snapshot = entity.Clone();
-            _fullEntitySnapshotCount++;
-            var type = entity.GetType();
-            _fullEntitySnapshotCountsByType[type] = _fullEntitySnapshotCountsByType.GetValueOrDefault(type) + 1;
-            _journal.Add(UndoRecord.ForEntitySnapshot(entity, snapshot));
+            var scope = _scopes.Peek();
+            if (scope.Touch(entity))
+            {
+                var snapshot = entity.Clone();
+                _fullEntitySnapshotCount++;
+                var type = entity.GetType();
+                _fullEntitySnapshotCountsByType[type] = _fullEntitySnapshotCountsByType.GetValueOrDefault(type) + 1;
+                _journal.Add(UndoRecord.ForEntitySnapshot(entity, snapshot));
+            }
         }
     }
 
@@ -303,36 +353,42 @@ public sealed class World
         string propertyName,
         EntityPropertyUndo previousValue)
     {
-        if (_undoing || _scopes.Count == 0)
+        lock (TransactionGate)
         {
-            return;
-        }
+            if (_undoing || _scopes.Count == 0)
+            {
+                return;
+            }
 
-        var scope = _scopes.Peek();
-        if (scope.Touched?.Contains(entity) == true
-            || !scope.CaptureProperty(entity.Id, propertyName))
-        {
-            return;
-        }
+            var scope = _scopes.Peek();
+            if (scope.Touched?.Contains(entity) == true
+                || !scope.CaptureProperty(entity.Id, propertyName))
+            {
+                return;
+            }
 
-        _journal.Add(UndoRecord.ForProperty(entity, propertyName, previousValue));
+            _journal.Add(UndoRecord.ForProperty(entity, propertyName, previousValue));
+        }
     }
 
     internal void RecordDataEntityPropertyMutation(DataEntity entity, string propertyName, double previousValue)
     {
-        if (_undoing || _scopes.Count == 0)
+        lock (TransactionGate)
         {
-            return;
-        }
+            if (_undoing || _scopes.Count == 0)
+            {
+                return;
+            }
 
-        var scope = _scopes.Peek();
-        if (scope.Touched?.Contains(entity) == true
-            || !scope.CaptureProperty(entity.Id, propertyName))
-        {
-            return;
-        }
+            var scope = _scopes.Peek();
+            if (scope.Touched?.Contains(entity) == true
+                || !scope.CaptureProperty(entity.Id, propertyName))
+            {
+                return;
+            }
 
-        _journal.Add(UndoRecord.ForDataProperty(entity, propertyName, previousValue));
+            _journal.Add(UndoRecord.ForDataProperty(entity, propertyName, previousValue));
+        }
     }
 
     public void MarkPopulationDirty() => _populationDirty = true;
@@ -344,29 +400,32 @@ public sealed class World
         int start,
         int length)
     {
-        if (_undoing || _scopes.Count == 0)
+        lock (TransactionGate)
         {
-            return;
-        }
+            if (_undoing || _scopes.Count == 0)
+            {
+                return;
+            }
 
-        var scope = _scopes.Peek();
-        if (!scope.CapturePopulationPage(column, bufferIndex, pageIndex))
-        {
-            return;
-        }
+            var scope = _scopes.Peek();
+            if (!scope.CapturePopulationPage(column, bufferIndex, pageIndex))
+            {
+                return;
+            }
 
-        IColumnUndoBatch? batch = null;
-        try
-        {
-            batch = column.CapturePageUndo(bufferIndex, start, length);
-            _journal.Add(UndoRecord.ForColumnUndo(batch));
-            batch = null;
-        }
-        catch
-        {
-            batch?.Release();
-            scope.ReleasePopulationPageCapture(column, bufferIndex, pageIndex);
-            throw;
+            IColumnUndoBatch? batch = null;
+            try
+            {
+                batch = column.CapturePageUndo(bufferIndex, start, length);
+                _journal.Add(UndoRecord.ForColumnUndo(batch));
+                batch = null;
+            }
+            catch
+            {
+                try { batch?.Release(); } catch { /* Preserve the original failure. */ }
+                scope.ReleasePopulationPageCapture(column, bufferIndex, pageIndex);
+                throw;
+            }
         }
     }
 
@@ -376,117 +435,180 @@ public sealed class World
         int capacity,
         int rowsPerPage)
     {
-        if (_undoing || _scopes.Count == 0)
+        lock (TransactionGate)
         {
-            return true;
-        }
+            if (_undoing || _scopes.Count == 0)
+            {
+                return true;
+            }
 
-        var pageCount = capacity == 0 ? 0 : 1 + ((capacity - 1) / rowsPerPage);
-        var scope = _scopes.Peek();
-        if (!scope.CapturePopulationBuffer(column, bufferIndex, pageCount, out var alreadyCaptured))
-        {
-            return false;
-        }
+            var pageCount = capacity == 0 ? 0 : 1 + ((capacity - 1) / rowsPerPage);
+            var scope = _scopes.Peek();
+            if (!scope.CapturePopulationBuffer(column, bufferIndex, pageCount, out var alreadyCaptured))
+            {
+                return false;
+            }
 
-        if (alreadyCaptured)
-        {
-            return true;
-        }
+            if (alreadyCaptured)
+            {
+                return true;
+            }
 
-        IColumnUndoBatch? batch = null;
-        try
-        {
-            batch = column.CapturePageUndo(bufferIndex, 0, capacity);
-            _journal.Add(UndoRecord.ForColumnUndo(batch));
-            batch = null;
-            return true;
-        }
-        catch
-        {
-            batch?.Release();
-            scope.ReleasePopulationBufferCapture(column, bufferIndex);
-            throw;
+            IColumnUndoBatch? batch = null;
+            try
+            {
+                batch = column.CapturePageUndo(bufferIndex, 0, capacity);
+                _journal.Add(UndoRecord.ForColumnUndo(batch));
+                batch = null;
+                return true;
+            }
+            catch
+            {
+                try { batch?.Release(); } catch { /* Preserve the original failure. */ }
+                scope.ReleasePopulationBufferCapture(column, bufferIndex);
+                throw;
+            }
         }
     }
 
-    internal bool TryCapturePopulationStructure(object population) =>
-        !_undoing && _scopes.Count > 0 && _scopes.Peek().CapturePopulationStructure(population);
+    internal bool TryCapturePopulationStructure(object population)
+    {
+        lock (TransactionGate)
+            return !_undoing && _scopes.Count > 0 && _scopes.Peek().CapturePopulationStructure(population);
+    }
 
     internal void ReleasePopulationStructureCapture(object population)
     {
-        if (_scopes.Count > 0)
+        lock (TransactionGate)
         {
-            _scopes.Peek().ReleasePopulationStructureCapture(population);
+            if (_scopes.Count > 0)
+            {
+                _scopes.Peek().ReleasePopulationStructureCapture(population);
+            }
         }
     }
 
-    internal bool TryCapturePopulationRole(PopulationColumnBase column) =>
-        !_undoing && _scopes.Count > 0 && _scopes.Peek().CapturePopulationRole(column);
+    internal bool TryCapturePopulationRole(PopulationColumnBase column)
+    {
+        lock (TransactionGate)
+            return !_undoing && _scopes.Count > 0 && _scopes.Peek().CapturePopulationRole(column);
+    }
 
     internal void ReleasePopulationRoleCapture(PopulationColumnBase column)
     {
-        if (_scopes.Count > 0)
+        lock (TransactionGate)
         {
-            _scopes.Peek().ReleasePopulationRoleCapture(column);
+            if (_scopes.Count > 0)
+            {
+                _scopes.Peek().ReleasePopulationRoleCapture(column);
+            }
         }
     }
 
     internal void RecordPopulationUndo(IColumnUndoBatch batch)
     {
-        if (_undoing || _scopes.Count == 0)
+        lock (TransactionGate)
         {
-            batch.Release();
-            return;
-        }
+            if (_undoing || _scopes.Count == 0)
+            {
+                batch.Release();
+                return;
+            }
 
-        _journal.Add(UndoRecord.ForColumnUndo(batch));
+            _journal.Add(UndoRecord.ForColumnUndo(batch));
+        }
     }
 
     internal WorldScope BeginScope()
     {
-        var scope = _freeScopes.Count > 0 ? _freeScopes.Pop() : new ScopeState();
-        scope.Mark = _journal.Count;
-        scope.Draws = Draws.Capture();
-        scope.LogicalTick = LogicalTick;
-        scope.NextId = _nextId;
-        scope.Closed = false;
-        scope.RollbackActions?.Clear();
-        scope.CommitActions?.Clear();
-        _scopes.Push(scope);
+        lock (TransactionGate)
+        {
+            EnsureNoPopulationLeases();
+            var scope = _freeScopes.Count > 0 ? _freeScopes.Pop() : new ScopeState();
+            scope.Mark = _journal.Count;
+            scope.Draws = Draws.Capture();
+            scope.LogicalTick = LogicalTick;
+            scope.NextId = _nextId;
+            scope.Generation = unchecked(scope.Generation + 1);
+            scope.Closed = false;
+            scope.RollbackActions?.Clear();
+            scope.CommitActions?.Clear();
+            _scopes.Push(scope);
 
-        return new WorldScope(this, scope);
+            return new WorldScope(this, scope, scope.Generation);
+        }
     }
 
     /// <summary>Begins a public mutation scope for framework systems; disposal rolls back unless committed.</summary>
+    /// <remarks>
+    /// Concurrent column writes must use disjoint ranges. Finish using borrowed column views before changing
+    /// scopes, cloning or adopting a world, swapping buffers, or changing population structure. The transaction
+    /// journal does not make other World operations generally thread-safe.
+    /// </remarks>
     public WorldTransaction BeginTransaction()
     {
         EnsureActive();
         return new WorldTransaction(BeginScope());
     }
 
-    internal void RegisterRollbackAction(ScopeState scope, Action action)
+    /// <summary>
+    /// Registers external state restoration on the currently active transaction, if any. The
+    /// callback runs when that scope or any enclosing scope rolls back. Returns false when there
+    /// is no active transaction, so ordinary commands need not create a transaction just to track
+    /// their own state.
+    /// </summary>
+    public bool TryRegisterRollbackAction(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        if (scope.Closed || _scopes.Count == 0 || !ReferenceEquals(_scopes.Peek(), scope))
+        EnsureActive();
+        lock (TransactionGate)
         {
-            throw new InvalidOperationException("Rollback actions must be registered on the active world transaction.");
-        }
+            if (_undoing || _scopes.Count == 0)
+            {
+                return false;
+            }
 
-        (scope.RollbackActions ??= []).Add(action);
+            var scope = _scopes.Peek();
+            (scope.RollbackActions ??= []).Add(action);
+            return true;
+        }
     }
 
-    internal void RegisterCommitAction(ScopeState scope, Action action)
+    internal void RegisterRollbackAction(ScopeState scope, ulong generation, Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        if (scope.Closed || _scopes.Count == 0 || !ReferenceEquals(_scopes.Peek(), scope))
+        lock (TransactionGate)
         {
-            throw new InvalidOperationException("Commit actions must be registered on the active world transaction.");
-        }
+            if (scope.Generation != generation || scope.Closed
+                || _scopes.Count == 0 || !ReferenceEquals(_scopes.Peek(), scope))
+            {
+                throw new InvalidOperationException("Rollback actions must be registered on the active world transaction.");
+            }
 
-        (scope.CommitActions ??= []).Add(action);
+            (scope.RollbackActions ??= []).Add(action);
+        }
     }
 
-    internal bool HasChanges(ScopeState scope) => _journal.Count > scope.Mark;
+    internal void RegisterCommitAction(ScopeState scope, ulong generation, Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        lock (TransactionGate)
+        {
+            if (scope.Generation != generation || scope.Closed
+                || _scopes.Count == 0 || !ReferenceEquals(_scopes.Peek(), scope))
+            {
+                throw new InvalidOperationException("Commit actions must be registered on the active world transaction.");
+            }
+
+            (scope.CommitActions ??= []).Add(action);
+        }
+    }
+
+    internal bool HasChanges(ScopeState scope, ulong generation)
+    {
+        lock (TransactionGate)
+            return scope.Generation == generation && !scope.Closed && _journal.Count > scope.Mark;
+    }
 
     public IReadOnlyList<Entity> Entities => _entities;
 
@@ -512,39 +634,43 @@ public sealed class World
     /// <summary>Validates a complete population save before applying any population data.</summary>
     public void RestorePopulationState(PopulationWorldState state)
     {
-        EnsureActive();
-        ArgumentNullException.ThrowIfNull(state);
-        if (state.Version != PopulationWorldState.CurrentVersion || state.Populations is null)
+        lock (TransactionGate)
         {
-            throw new InvalidDataException("Population state has an unsupported schema version or missing populations.");
-        }
-
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var restorePlans = new List<Action>(state.Populations.Length);
-        foreach (var populationState in state.Populations)
-        {
-            if (populationState is null || string.IsNullOrWhiteSpace(populationState.Id)
-                || !seen.Add(populationState.Id))
+            EnsureActive();
+            EnsureNoPopulationLeases();
+            ArgumentNullException.ThrowIfNull(state);
+            if (state.Version != PopulationWorldState.CurrentVersion || state.Populations is null)
             {
-                throw new InvalidDataException("Population state contains an invalid or duplicate population ID.");
+                throw new InvalidDataException("Population state has an unsupported schema version or missing populations.");
             }
 
-            if (!_populationsById.TryGetValue(populationState.Id, out var population))
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var restorePlans = new List<Action>(state.Populations.Length);
+            foreach (var populationState in state.Populations)
             {
-                throw new InvalidDataException($"Population state references unknown population '{populationState.Id}'.");
+                if (populationState is null || string.IsNullOrWhiteSpace(populationState.Id)
+                    || !seen.Add(populationState.Id))
+                {
+                    throw new InvalidDataException("Population state contains an invalid or duplicate population ID.");
+                }
+
+                if (!_populationsById.TryGetValue(populationState.Id, out var population))
+                {
+                    throw new InvalidDataException($"Population state references unknown population '{populationState.Id}'.");
+                }
+
+                restorePlans.Add(population.PrepareRestore(populationState));
             }
 
-            restorePlans.Add(population.PrepareRestore(populationState));
-        }
+            if (seen.Count != _populationsById.Count)
+            {
+                throw new InvalidDataException("Population state does not contain every registered population.");
+            }
 
-        if (seen.Count != _populationsById.Count)
-        {
-            throw new InvalidDataException("Population state does not contain every registered population.");
-        }
-
-        foreach (var restore in restorePlans)
-        {
-            restore();
+            foreach (var restore in restorePlans)
+            {
+                restore();
+            }
         }
     }
 
@@ -642,13 +768,16 @@ public sealed class World
 
     private void CaptureSpatialBounds(int entityId)
     {
-        if (_undoing || _scopes.Count == 0)
+        lock (TransactionGate)
         {
-            return;
-        }
+            if (_undoing || _scopes.Count == 0)
+            {
+                return;
+            }
 
-        var hadBounds = _spatialBoundsByEntity.TryGetValue(entityId, out var bounds);
-        _journal.Add(UndoRecord.ForSpatial(entityId, hadBounds, bounds));
+            var hadBounds = _spatialBoundsByEntity.TryGetValue(entityId, out var bounds);
+            _journal.Add(UndoRecord.ForSpatial(entityId, hadBounds, bounds));
+        }
     }
 
     private void RestoreSpatialBounds(int entityId, bool hadBounds, Bounds2 bounds)
@@ -1237,9 +1366,12 @@ public sealed class World
             throw new InvalidOperationException($"Entity ID {id} is already attached to this world.");
         }
 
-        if (_scopes.Count > 0)
+        lock (TransactionGate)
         {
-            _journal.Add(UndoRecord.ForAdded(entity, entity.Id));
+            if (_scopes.Count > 0)
+            {
+                _journal.Add(UndoRecord.ForAdded(entity, entity.Id));
+            }
         }
         entity.Id = id;
         _nextId = Math.Max(_nextId, id);
@@ -1385,36 +1517,42 @@ public sealed class World
 
     private void CaptureModifiers((int EntityId, string Property) key)
     {
-        if (_scopes.Count == 0)
+        lock (TransactionGate)
         {
-            return;
-        }
+            if (_scopes.Count == 0)
+            {
+                return;
+            }
 
-        var scope = _scopes.Peek();
-        if (!scope.CaptureModifier(key.EntityId, key.Property))
-        {
-            return;
-        }
+            var scope = _scopes.Peek();
+            if (!scope.CaptureModifier(key.EntityId, key.Property))
+            {
+                return;
+            }
 
-        _journal.Add(UndoRecord.ForModifier(key,
-            _modifiersByKey.TryGetValue(key, out var items) ? [.. items] : null));
+            _journal.Add(UndoRecord.ForModifier(key,
+                _modifiersByKey.TryGetValue(key, out var items) ? [.. items] : null));
+        }
     }
 
     private void CaptureGrants(int entityId)
     {
-        if (_scopes.Count == 0)
+        lock (TransactionGate)
         {
-            return;
-        }
+            if (_scopes.Count == 0)
+            {
+                return;
+            }
 
-        var scope = _scopes.Peek();
-        if (!scope.CaptureGrant(entityId))
-        {
-            return;
-        }
+            var scope = _scopes.Peek();
+            if (!scope.CaptureGrant(entityId))
+            {
+                return;
+            }
 
-        _journal.Add(UndoRecord.ForGrants(entityId,
-            _grantsByEntity.TryGetValue(entityId, out var grants) ? [.. grants] : null));
+            _journal.Add(UndoRecord.ForGrants(entityId,
+                _grantsByEntity.TryGetValue(entityId, out var grants) ? [.. grants] : null));
+        }
     }
 
     private void RestoreModifierKey((int EntityId, string Property) key, PropertyModifier[]? items)
@@ -1705,14 +1843,17 @@ public sealed class World
         }
 
         var removedIds = removed.Select(entry => entry.Entity.Id).ToHashSet();
-        if (_scopes.Count > 0)
+        lock (TransactionGate)
         {
-            // WHY: scopes undo in reverse, so journal highest indexes first to restore list order.
-            for (var index = removed.Count - 1; index >= 0; index--)
+            if (_scopes.Count > 0)
             {
-                var removedEntity = removed[index].Entity;
-                var hasSpatialBounds = _spatialBoundsByEntity.TryGetValue(removedEntity.Id, out var bounds);
-                _journal.Add(UndoRecord.ForRemoved(removed[index].Index, removedEntity, hasSpatialBounds, bounds));
+                // WHY: scopes undo in reverse, so journal highest indexes first to restore list order.
+                for (var index = removed.Count - 1; index >= 0; index--)
+                {
+                    var removedEntity = removed[index].Entity;
+                    var hasSpatialBounds = _spatialBoundsByEntity.TryGetValue(removedEntity.Id, out var bounds);
+                    _journal.Add(UndoRecord.ForRemoved(removed[index].Index, removedEntity, hasSpatialBounds, bounds));
+                }
             }
         }
 
@@ -1806,34 +1947,38 @@ public sealed class World
     /// </remarks>
     public World Clone()
     {
-        EnsureActive();
-
-        var clone = new World(ValueScale, Draws.Clone(), _entities.Count, SpatialCellSize)
+        lock (TransactionGate)
         {
-            LogicalTick = LogicalTick,
-            _nextId = _nextId,
-        };
+            EnsureActive();
+            EnsureNoPopulationLeases();
 
-        foreach (var entity in _entities)
-        {
-            clone.Attach(entity.Clone());
+            var clone = new World(Seed, ValueScale, Draws.Clone(), _entities.Count, SpatialCellSize)
+            {
+                LogicalTick = LogicalTick,
+                _nextId = _nextId,
+            };
+
+            foreach (var entity in _entities)
+            {
+                clone.Attach(entity.Clone());
+            }
+
+            CopySpatialBoundsTo(clone);
+
+            clone._roles = (int[])_roles.Clone();
+
+            clone._required.UnionWith(_required);
+            clone.ValidateRoles();
+            CopyEffectsTo(clone);
+            foreach (var (kind, registration) in _populationsByKind)
+            {
+                var clonedRegistration = registration.CloneTo(clone);
+                clone._populationsByKind.Add(kind, clonedRegistration);
+                clone._populationsById.Add(clonedRegistration.Id, clonedRegistration);
+            }
+
+            return clone;
         }
-
-        CopySpatialBoundsTo(clone);
-
-        clone._roles = (int[])_roles.Clone();
-
-        clone._required.UnionWith(_required);
-        clone.ValidateRoles();
-        CopyEffectsTo(clone);
-        foreach (var (kind, registration) in _populationsByKind)
-        {
-            var clonedRegistration = registration.CloneTo(clone);
-            clone._populationsByKind.Add(kind, clonedRegistration);
-            clone._populationsById.Add(clonedRegistration.Id, clonedRegistration);
-        }
-
-        return clone;
     }
 
     private void CopySpatialBoundsTo(World target)
@@ -1847,89 +1992,101 @@ public sealed class World
 
     internal void AdoptActionWorld(World next)
     {
-        EnsureActive();
-        next.EnsureActive();
+        lock (s_adoptionGate)
+            lock (TransactionGate)
+                lock (next.TransactionGate)
+                {
+                    EnsureActive();
+                    next.EnsureActive();
+                    EnsureNoPopulationLeases();
+                    next.EnsureNoPopulationLeases();
 
-        if (ReferenceEquals(this, next))
-        {
-            return;
-        }
+                    if (ReferenceEquals(this, next))
+                    {
+                        return;
+                    }
 
-        next.ValidateRoles();
+                    if (Seed != next.Seed)
+                    {
+                        throw new InvalidOperationException("Cannot adopt a world created with a different seed.");
+                    }
 
-        foreach (var registration in _populationsByKind.Values)
-        {
-            registration.DetachWorld();
-        }
+                    next.ValidateRoles();
 
-        _populationsByKind = next._populationsByKind;
-        _populationsById = next._populationsById;
-        foreach (var registration in _populationsByKind.Values)
-        {
-            registration.RebindWorld(this);
-        }
+                    foreach (var registration in _populationsByKind.Values)
+                    {
+                        registration.DetachWorld();
+                    }
 
-        next._populationsByKind = [];
-        next._populationsById = new Dictionary<string, PopulationRegistration>(StringComparer.Ordinal);
+                    _populationsByKind = next._populationsByKind;
+                    _populationsById = next._populationsById;
+                    foreach (var registration in _populationsByKind.Values)
+                    {
+                        registration.RebindWorld(this);
+                    }
 
-        foreach (var entity in _entities)
-        {
-            if (entity is IWorldStateAttachment attachment)
-            {
-                attachment.DetachFromWorld(this);
-            }
+                    next._populationsByKind = [];
+                    next._populationsById = new Dictionary<string, PopulationRegistration>(StringComparer.Ordinal);
 
-            entity.OwnerWorld = null;
-        }
+                    foreach (var entity in _entities)
+                    {
+                        if (entity is IWorldStateAttachment attachment)
+                        {
+                            attachment.DetachFromWorld(this);
+                        }
 
-        var draws = next.Draws;
+                        entity.OwnerWorld = null;
+                    }
 
-        _entityIdsByType.Clear();
-        _querySnapshots.Clear();
-        _entities.Clear();
-        _entities.AddRange(next._entities);
-        foreach (var entity in _entities)
-        {
-            entity.OwnerWorld = this;
-        }
+                    var draws = next.Draws;
 
-        _entityColumns = next._entityColumns;
-        next._entityColumns = [];
+                    _entityIdsByType.Clear();
+                    _querySnapshots.Clear();
+                    _entities.Clear();
+                    _entities.AddRange(next._entities);
+                    foreach (var entity in _entities)
+                    {
+                        entity.OwnerWorld = this;
+                    }
 
-        _spatialBoundsByEntity.Clear();
-        _spatialIndex.Clear();
-        next.CopySpatialBoundsTo(this);
-        next._spatialBoundsByEntity.Clear();
-        next._spatialIndex.Clear();
+                    _entityColumns = next._entityColumns;
+                    next._entityColumns = [];
 
-        _byId = next._byId;
-        _entityPositions = next._entityPositions;
-        _removalCandidates = next._removalCandidates;
-        _incomingLinks = next._incomingLinks;
-        next._entityPositions = [];
-        next._removalCandidates = [];
-        next._incomingLinks = [];
-        _roles = next._roles;
-        next._roles = [];
+                    _spatialBoundsByEntity.Clear();
+                    _spatialIndex.Clear();
+                    next.CopySpatialBoundsTo(this);
+                    next._spatialBoundsByEntity.Clear();
+                    next._spatialIndex.Clear();
 
-        _required.Clear();
-        _required.UnionWith(next._required);
-        Draws = draws;
-        LogicalTick = next.LogicalTick;
-        _nextId = next._nextId;
-        CopyEffectsTo(this, next);
-        MarkPopulationDirty();
-        MarkTagIndexDirty();
+                    _byId = next._byId;
+                    _entityPositions = next._entityPositions;
+                    _removalCandidates = next._removalCandidates;
+                    _incomingLinks = next._incomingLinks;
+                    next._entityPositions = [];
+                    next._removalCandidates = [];
+                    next._incomingLinks = [];
+                    _roles = next._roles;
+                    next._roles = [];
 
-        next.Draws = draws.Clone();
-        next._entities.Clear();
-        next._byId = [];
-        next._required.Clear();
-        next._modifiersByKey.Clear();
-        next._modifierVersions.Clear();
-        next._modifierCache.Clear();
-        next._grantsByEntity.Clear();
-        next._consumed = true;
+                    _required.Clear();
+                    _required.UnionWith(next._required);
+                    Draws = draws;
+                    LogicalTick = next.LogicalTick;
+                    _nextId = next._nextId;
+                    CopyEffectsTo(this, next);
+                    MarkPopulationDirty();
+                    MarkTagIndexDirty();
+
+                    next.Draws = draws.Clone();
+                    next._entities.Clear();
+                    next._byId = [];
+                    next._required.Clear();
+                    next._modifiersByKey.Clear();
+                    next._modifierVersions.Clear();
+                    next._modifierCache.Clear();
+                    next._grantsByEntity.Clear();
+                    next._consumed = true;
+                }
     }
 
     private void CopyEffectsTo(World target, World? source = null)
@@ -2039,95 +2196,101 @@ public sealed class World
         _liveCounts[tag] = live;
     }
 
-    internal void EndScope(ScopeState scope, bool rollback)
+    internal void EndScope(ScopeState scope, ulong generation, bool rollback)
     {
-        if (scope.Closed)
-        {
-            return;
-        }
-
-        if (_scopes.Count == 0 || !ReferenceEquals(_scopes.Peek(), scope))
-        {
-            throw new InvalidOperationException("World scopes must close in order.");
-        }
-
-        scope.Closed = true;
-        _scopes.Pop();
         List<Exception>? callbackErrors = null;
         List<Action>? callbacksToRun = null;
-        if (rollback)
+        lock (TransactionGate)
         {
-            _undoing = true;
-            try
+            if (scope.Generation != generation || scope.Closed)
             {
-                for (var index = _journal.Count - 1; index >= scope.Mark; index--)
+                return;
+            }
+
+            if (_scopes.Count == 0 || !ReferenceEquals(_scopes.Peek(), scope))
+            {
+                throw new InvalidOperationException("World scopes must close in order.");
+            }
+
+            EnsureNoPopulationLeases();
+            scope.Closed = true;
+            _scopes.Pop();
+            if (rollback)
+            {
+                _undoing = true;
+                try
                 {
-                    _journal[index].Undo(this);
+                    for (var index = _journal.Count - 1; index >= scope.Mark; index--)
+                    {
+                        _journal[index].Undo(this);
+                    }
+                }
+                finally
+                {
+                    _undoing = false;
+                }
+
+                var journalEnd = _journal.Count;
+                for (var index = scope.Mark; index < journalEnd; index++)
+                {
+                    _journal[index].Release();
+                }
+
+                _journal.RemoveRange(scope.Mark, journalEnd - scope.Mark);
+
+                Draws.Restore(scope.Draws);
+                LogicalTick = scope.LogicalTick;
+                _nextId = scope.NextId;
+
+                callbacksToRun = scope.RollbackActions;
+                scope.CommitActions?.Clear();
+            }
+            else if (_scopes.Count > 0)
+            {
+                var parent = _scopes.Peek();
+                parent.InheritPopulationCaptures(scope);
+                if (scope.RollbackActions is { Count: > 0 } rollbackActions)
+                {
+                    (parent.RollbackActions ??= []).AddRange(rollbackActions);
+                }
+
+                if (scope.CommitActions is { Count: > 0 } commitActions)
+                {
+                    (parent.CommitActions ??= []).AddRange(commitActions);
                 }
             }
-            finally
+            else
             {
-                _undoing = false;
+                callbacksToRun = scope.CommitActions;
             }
 
-            var journalEnd = _journal.Count;
-            for (var index = scope.Mark; index < journalEnd; index++)
+            if (rollback)
             {
-                _journal[index].Release();
+                MarkStructureChanged();
+                MarkPopulationDirty();
             }
 
-            _journal.RemoveRange(scope.Mark, journalEnd - scope.Mark);
-
-            Draws.Restore(scope.Draws);
-            LogicalTick = scope.LogicalTick;
-            _nextId = scope.NextId;
-
-            callbacksToRun = scope.RollbackActions;
-            scope.CommitActions?.Clear();
-        }
-        else if (_scopes.Count > 0)
-        {
-            var parent = _scopes.Peek();
-            parent.InheritPopulationCaptures(scope);
-            if (scope.RollbackActions is { Count: > 0 } rollbackActions)
+            scope.CapturedProperties?.Clear();
+            scope.Touched?.Clear();
+            scope.CapturedModifierKeys?.Clear();
+            scope.CapturedGrantEntities?.Clear();
+            scope.CapturedPopulationPages?.Clear();
+            scope.CapturedPopulationBuffers?.Clear();
+            scope.CapturedPopulationStructures?.Clear();
+            scope.CapturedPopulationRoles?.Clear();
+            if (_scopes.Count == 0)
             {
-                (parent.RollbackActions ??= []).AddRange(rollbackActions);
-            }
+                foreach (var record in _journal)
+                {
+                    record.Release();
+                }
 
-            if (scope.CommitActions is { Count: > 0 } commitActions)
-            {
-                (parent.CommitActions ??= []).AddRange(commitActions);
+                _journal.Clear();
             }
         }
-        else
-        {
-            callbacksToRun = scope.CommitActions;
-        }
 
-        if (rollback)
-        {
-            MarkStructureChanged();
-            MarkPopulationDirty();
-        }
-
-        scope.CapturedProperties?.Clear();
-        scope.Touched?.Clear();
-        scope.CapturedModifierKeys?.Clear();
-        scope.CapturedGrantEntities?.Clear();
-        scope.CapturedPopulationPages?.Clear();
-        scope.CapturedPopulationBuffers?.Clear();
-        scope.CapturedPopulationStructures?.Clear();
-        scope.CapturedPopulationRoles?.Clear();
-        if (_scopes.Count == 0)
-        {
-            foreach (var record in _journal)
-            {
-                record.Release();
-            }
-
-            _journal.Clear();
-        }
-
+        // Callbacks can perform external work or enter a new transaction. Do not hold the
+        // journal gate while invoking user code.
         if (callbacksToRun is not null)
         {
             if (rollback)
@@ -2160,15 +2323,20 @@ public sealed class World
             }
         }
 
-        scope.RollbackActions?.Clear();
-        scope.CommitActions?.Clear();
-        _freeScopes.Push(scope);
+        lock (TransactionGate)
+        {
+            scope.RollbackActions?.Clear();
+            scope.CommitActions?.Clear();
+            _freeScopes.Push(scope);
+        }
         if (callbackErrors is not null)
         {
-            var description = rollback
-                ? "World transaction rollback callbacks failed."
-                : "World transaction commit callbacks failed after the state was committed.";
-            throw new AggregateException(description, callbackErrors);
+            if (rollback)
+            {
+                throw new AggregateException("World transaction rollback callbacks failed.", callbackErrors);
+            }
+
+            throw new WorldCommitCallbackException(callbackErrors);
         }
     }
 
@@ -2178,6 +2346,9 @@ public sealed class World
         public DrawStreamSnapshot Draws { get; set; }
         public int LogicalTick { get; set; }
         public int NextId { get; set; }
+        // ScopeState instances are pooled. Handles from a previous use must stay closed
+        // even if this instance is already serving a different nested transaction.
+        public ulong Generation { get; set; }
         public bool Closed { get; set; }
         public HashSet<Entity>? Touched { get; private set; }
         public HashSet<(int EntityId, string Property)>? CapturedProperties { get; private set; }
@@ -2490,17 +2661,17 @@ public sealed class World
     }
 }
 
-internal readonly struct WorldScope(World world, World.ScopeState scope) : IDisposable
+internal readonly struct WorldScope(World world, World.ScopeState scope, ulong generation) : IDisposable
 {
-    public bool HasChanges => world.HasChanges(scope);
+    public bool HasChanges => world.HasChanges(scope, generation);
 
-    public void OnRollback(Action action) => world.RegisterRollbackAction(scope, action);
+    public void OnRollback(Action action) => world.RegisterRollbackAction(scope, generation, action);
 
-    public void OnCommit(Action action) => world.RegisterCommitAction(scope, action);
+    public void OnCommit(Action action) => world.RegisterCommitAction(scope, generation, action);
 
-    public void Commit() => world.EndScope(scope, rollback: false);
+    public void Commit() => world.EndScope(scope, generation, rollback: false);
 
-    public void Rollback() => world.EndScope(scope, rollback: true);
+    public void Rollback() => world.EndScope(scope, generation, rollback: true);
 
     // WHY: an unwound scope must never publish partial work; every success path commits explicitly.
     public void Dispose() => Rollback();

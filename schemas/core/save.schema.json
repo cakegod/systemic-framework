@@ -4,18 +4,25 @@
   "title": "Versioned engine-neutral systemic save",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "world", "entityIds", "extensionStates"],
+  "required": ["schemaVersion", "contentFingerprint", "checksum", "world", "entityIds", "extensionStates"],
   "properties": {
-    "schemaVersion": { "const": 3 },
+    "schemaVersion": { "const": 4 },
+    "contentFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "entityIds": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1 } },
-    "extensionStates": { "type": "object", "additionalProperties": true },
+    "extensionStates": {
+      "type": "object", "required": ["systemic.clock", "systemic.rule-history"],
+      "properties": { "systemic.clock": { "$ref": "#/$defs/clock" } },
+      "additionalProperties": true
+    },
     "world": { "$ref": "#/$defs/world" }
   },
   "$defs": {
     "world": {
       "type": "object", "additionalProperties": false,
-      "required": ["valueScale", "spatialCellSize", "logicalTick", "nextEntityId", "draws", "entities", "modifiers", "grants", "boundRoles", "requiredEntityIds"],
+      "required": ["seed", "valueScale", "spatialCellSize", "logicalTick", "nextEntityId", "draws", "entities", "modifiers", "grants", "boundRoles", "requiredEntityIds"],
       "properties": {
+        "seed": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 },
         "valueScale": { "type": "number", "exclusiveMinimum": 0 },
         "spatialCellSize": { "type": "number", "exclusiveMinimum": 0 },
         "logicalTick": { "type": "integer", "minimum": 0 },
@@ -26,6 +33,15 @@
         "grants": { "type": "array", "items": { "$ref": "#/$defs/grant" } },
         "boundRoles": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1 } },
         "requiredEntityIds": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "minimum": 1 } }
+      }
+    },
+    "clock": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tickRateHz", "maxCatchUpSteps", "phaseUnits"],
+      "properties": {
+        "tickRateHz": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "maxCatchUpSteps": { "type": "integer", "minimum": 1, "maximum": 1024 },
+        "phaseUnits": { "type": "integer", "minimum": 0 }
       }
     },
     "draws": {

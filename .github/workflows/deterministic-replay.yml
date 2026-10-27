@@ -1,0 +1,34 @@
+name: Deterministic replay fixture
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  replay:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            architecture: X64
+          - os: windows-latest
+            architecture: X64
+          - os: macos-14-xlarge
+            architecture: Arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.403
+      - name: Verify process architecture
+        shell: pwsh
+        run: |
+          dotnet --info
+          if ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString() -ne '${{ matrix.architecture }}') {
+            throw 'Unexpected .NET process architecture'
+          }
+      - name: Verify replay fixture
+        run: dotnet test tests/Systemic.Integration.Tests -c Release --filter FullyQualifiedName~DeterministicReplayTests

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Text.Json;
 using Systemic.Kernel;
 using Systemic.Content;
@@ -9,20 +10,29 @@ using Systemic.Ui;
 
 namespace Systemic.Host;
 
-/// <summary>Typed C# phase for orchestration that is outside the bounded JSON rule vocabulary.</summary>
+/// <summary>Typed system phase for orchestration outside the bounded JSON rule vocabulary.</summary>
 public interface ISystemicSystem
 {
+    /// <summary>Stable identifier used for scheduler diagnostics and tick timing.</summary>
     string Id { get; }
-    int Order { get; }
-    void Step(SystemicStepContext context);
+    /// <summary>Sets registration priority for conflicting systems and their barrier order.</summary>
+    /// <remarks>Compatible systems may share a concurrent wave, so this value does not order independent systems.</remarks>
+    int Order => 0;
+    /// <summary>
+    /// Declares conflicts for the deterministic system schedule. Systems that do not opt in to
+    /// parallel execution run as exclusive World writers.
+    /// </summary>
+    IReadOnlyList<SystemAccess> Access => SystemicSystemDefaults.ExclusiveWorldWrite;
+
+    /// <summary>Runs the system for the current host tick.</summary>
+    /// <param name="context">Execution-scoped host and Kernel operations for this system.</param>
+    void Step(SystemicSystemContext context);
 }
 
-/// <summary>Opt-in kernel-scheduled system; World mutations go through the per-system command buffer.</summary>
-public interface ISystemicScheduledSystem
+internal static class SystemicSystemDefaults
 {
-    string Id { get; }
-    IReadOnlyList<SystemAccess> Access { get; }
-    void Step(ScheduledSystemContext kernelContext, SystemicScheduledContext gameContext);
+    public static IReadOnlyList<SystemAccess> ExclusiveWorldWrite { get; } =
+        Array.AsReadOnly([SystemAccess.WriteWorld]);
 }
 
 public interface ISystemicStatefulExtension
@@ -32,86 +42,282 @@ public interface ISystemicStatefulExtension
     void RestoreState(JsonElement state);
 }
 
-public sealed class SystemicStepContext(
-    World world,
-    RuleEngine contentRules,
-    EventEngine extensionEngine,
-    int tick,
-    SimulationFactObserver? observeFact = null)
+/// <summary>Optional in-memory snapshot path for stateful extensions with a cheaper tick snapshot.</summary>
+/// <remarks>The returned snapshot must remain immutable until the enclosing tick commits or rolls back.</remarks>
+public interface ISystemicTransactionalState : ISystemicStatefulExtension
 {
-    public World World { get; } = world;
-    public int Tick { get; private set; } = tick;
+    object CaptureTransactionState();
+    void RestoreTransactionState(object state);
+}
 
-    public RuleDispatchResult Publish(SimulationFact fact) => contentRules.Dispatch(World, fact, observeFact);
+/// <summary>A reusable snapshot retains its captured state until exactly one callback is invoked.</summary>
+public interface ISystemicTransactionSnapshot
+{
+    Action OnCommit { get; }
+    Action OnRollback { get; }
+}
 
-    public CommandExecutionResult Execute(KernelEvent command) => extensionEngine.ExecuteDetailed(World, command);
+/// <summary>Optional pooled snapshot path for systems with allocation-sensitive fixed ticks.</summary>
+public interface ISystemicReusableTransactionalState : ISystemicStatefulExtension
+{
+    ISystemicTransactionSnapshot CaptureTransactionSnapshot();
+}
 
+/// <summary>Execution-scoped host and Kernel operations for one system.</summary>
+public sealed class SystemicSystemContext
+{
+    private readonly World _world;
+    private readonly RuleEngine _contentRules;
+    private readonly EventEngine _extensionEngine;
+    private readonly IReadOnlyDictionary<Type, object> _services;
+    private readonly SimulationFactObserver? _observeFact;
+    private readonly WorldCommandBuffer _standaloneCommands;
+    private ScheduledSystemContext? _kernelContext;
+    private readonly int _standaloneTick;
+    private readonly bool _standalone;
+    private bool _canWriteWorld;
+
+    /// <summary>Creates a single-use context for a direct system test or standalone harness.</summary>
+    public SystemicSystemContext(World world, RuleEngine contentRules, EventEngine extensionEngine, int tick)
+    {
+        _world = world ?? throw new ArgumentNullException(nameof(world));
+        _contentRules = contentRules ?? throw new ArgumentNullException(nameof(contentRules));
+        _extensionEngine = extensionEngine ?? throw new ArgumentNullException(nameof(extensionEngine));
+        _services = ImmutableDictionary<Type, object>.Empty;
+        _standaloneCommands = new WorldCommandBuffer();
+        _standaloneTick = tick;
+        _standalone = true;
+        _canWriteWorld = true;
+    }
+
+    internal SystemicSystemContext(
+        World world,
+        RuleEngine contentRules,
+        EventEngine extensionEngine,
+        IReadOnlyDictionary<Type, object> services,
+        SimulationFactObserver? observeFact)
+    {
+        _world = world;
+        _contentRules = contentRules;
+        _extensionEngine = extensionEngine;
+        _services = services;
+        _observeFact = observeFact;
+        _standaloneCommands = default;
+    }
+
+    /// <summary>Gets the logical tick currently executing.</summary>
+    public int Tick => _kernelContext?.Tick ?? (_standalone
+        ? _standaloneTick
+        : throw new InvalidOperationException("System context operations are available only while the system executes."));
+
+    /// <summary>Gets the worker limit for this execution; standalone contexts use one worker.</summary>
+    public int WorkerCount => _kernelContext?.WorkerCount ?? (_standalone ? 1 :
+        throw new InvalidOperationException("System context operations are available only while the system executes."));
+
+    /// <summary>Gets a read-only view of the current World.</summary>
+    public ReadOnlyWorldView World => _kernelContext?.World ?? (_standalone
+        ? new ReadOnlyWorldView(_world)
+        : throw new InvalidOperationException("System context operations are available only while the system executes."));
+
+    /// <summary>Gets this system's execution-scoped deferred World command writer.</summary>
+    public WorldCommandBuffer Commands => _kernelContext?.Commands ?? (_standalone
+        ? _standaloneCommands
+        : throw new InvalidOperationException("System context operations are available only while the system executes."));
+
+    /// <summary>Gets whether the context is running under a host schedule.</summary>
+    public bool IsScheduledExecution => _kernelContext is not null;
+
+    /// <summary>Gets a registered host service by its registration type.</summary>
+    /// <typeparam name="TService">Service type registered with the game builder.</typeparam>
+    /// <returns>The registered service instance.</returns>
+    /// <exception cref="KeyNotFoundException">The service type has not been registered.</exception>
+    public TService GetService<TService>() where TService : notnull =>
+        _services.TryGetValue(typeof(TService), out var service)
+            ? (TService)service
+            : throw new KeyNotFoundException($"Service '{typeof(TService).FullName}' is not registered.");
+
+    /// <summary>Checks whether this context belongs to the supplied World instance.</summary>
+    public bool IsForWorld(World world) => ReferenceEquals(_world, world);
+
+    /// <summary>Returns mutable World access only to systems declaring <see cref="SystemAccess.WriteWorld"/>.</summary>
+    /// <exception cref="InvalidOperationException">The scheduled system did not declare immediate World write access.</exception>
+    public World GetWritableWorld()
+    {
+        EnsureImmediateWorldWriteAccess();
+        FlushWorldCommands();
+        return _world;
+    }
+
+    /// <summary>Sets a writable numeric entity property through immediate World access.</summary>
+    /// <exception cref="InvalidOperationException">The system lacks immediate World write access or the property is not writable.</exception>
     public void SetProperty(Entity entity, string property, double value)
     {
         ArgumentNullException.ThrowIfNull(entity);
-        if (!entity.TrySetProperty(World, property, value))
+        var world = GetWritableWorld();
+        if (!entity.TrySetProperty(world, property, value))
         {
             throw new InvalidOperationException($"Entity {entity.Id} has no writable property '{property}'.");
         }
     }
 
-    internal void Prepare(int tick)
-    {
-        Tick = tick;
-    }
-}
-
-/// <summary>Game-layer services for a scheduled system; World reads are exposed through a read-only view.</summary>
-public sealed class SystemicScheduledContext(
-    World world,
-    RuleEngine contentRules,
-    EventEngine extensionEngine,
-    int tick,
-    SimulationFactObserver? observeFact = null)
-{
-    private ScheduledSystemContext? _kernelContext;
-    private WorldCommandBuffer? _commands;
-    private bool _canWriteWorld;
-
-    public int Tick { get; private set; } = tick;
-    public ReadOnlyWorldView World { get; } = new(world);
-    public WorldCommandBuffer Commands => _commands
-        ?? throw new InvalidOperationException("Scheduled commands are available only while the system executes.");
-
-    public void OnRollback(Action restoreExternalState)
-    {
-        ArgumentNullException.ThrowIfNull(restoreExternalState);
-        (_kernelContext ?? throw new InvalidOperationException(
-            "Rollback actions can be registered only while the system executes.")).OnRollback(restoreExternalState);
-    }
-
+    /// <summary>Dispatches a simulation fact against the current World.</summary>
+    /// <exception cref="InvalidOperationException">The system did not declare immediate World write access.</exception>
     public RuleDispatchResult Publish(SimulationFact fact)
     {
         EnsureImmediateWorldWriteAccess();
-        Commands.Flush(world);
-        return contentRules.Dispatch(world, fact, observeFact);
+        FlushWorldCommands();
+        return _contentRules.Dispatch(_world, fact, _observeFact);
     }
 
+    /// <summary>Executes an extension event against the current World.</summary>
+    /// <exception cref="InvalidOperationException">The system did not declare immediate World write access.</exception>
     public CommandExecutionResult Execute(KernelEvent command)
     {
         EnsureImmediateWorldWriteAccess();
-        Commands.Flush(world);
-        return extensionEngine.ExecuteDetailed(world, command);
+        FlushWorldCommands();
+        return _extensionEngine.ExecuteDetailed(_world, command);
     }
 
-    internal void Prepare(ScheduledSystemContext context, bool canWriteWorld)
+    /// <summary>Registers recovery for external state if the enclosing scheduled tick rolls back.</summary>
+    /// <param name="restoreExternalState">Action that restores state changed by this system.</param>
+    /// <exception cref="InvalidOperationException">The context is not executing in the host schedule.</exception>
+    public void OnRollback(Action restoreExternalState)
     {
-        _kernelContext = context;
-        Tick = context.Tick;
-        _commands = context.Commands;
+        ArgumentNullException.ThrowIfNull(restoreExternalState);
+        if (_kernelContext is not { } kernelContext)
+            throw new InvalidOperationException("Rollback actions can be registered only during a host-scheduled execution.");
+        kernelContext.OnRollback(restoreExternalState);
+    }
+
+    /// <summary>Runs work over non-overlapping portions of a logical row range.</summary>
+    /// <typeparam name="TState">State shared read-only by the range callbacks.</typeparam>
+    /// <param name="state">State passed to each callback.</param>
+    /// <param name="rowCount">Number of rows to partition.</param>
+    /// <param name="executeRange">Callback receiving the state, partition index, and assigned rows.</param>
+    /// <remarks>Scheduled callbacks may run concurrently. Standalone contexts call the callback once for the whole range.</remarks>
+    public void ForEachRange<TState>(TState state, int rowCount, Action<TState, int, PopulationRange> executeRange)
+    {
+        if (_kernelContext is { } kernelContext)
+        {
+            kernelContext.ForEachRange(state, rowCount, executeRange);
+            return;
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(rowCount);
+        ArgumentNullException.ThrowIfNull(executeRange);
+        if (_standalone && rowCount > 0)
+            executeRange(state, 0, new PopulationRange(0, rowCount));
+        else if (!_standalone)
+            throw new InvalidOperationException("System context operations are available only while the system executes.");
+    }
+
+    /// <summary>Maps fixed partitions and merges their results in partition order.</summary>
+    /// <typeparam name="TState">State read by the map callback.</typeparam>
+    /// <typeparam name="TResult">Mapped value merged into the result.</typeparam>
+    /// <param name="state">State passed to each map callback.</param>
+    /// <param name="rowCount">Number of rows to partition.</param>
+    /// <param name="partitionCount">Logical partition count, independent of worker count.</param>
+    /// <param name="identity">Initial value supplied to the merge callback.</param>
+    /// <param name="map">Maps one partition to a result.</param>
+    /// <param name="merge">Combines results in ascending partition order.</param>
+    /// <remarks>Portable results still depend on deterministic map and merge operations.</remarks>
+    public TResult ReduceRanges<TState, TResult>(
+        TState state,
+        int rowCount,
+        int partitionCount,
+        TResult identity,
+        Func<TState, int, PopulationRange, TResult> map,
+        Func<TResult, TResult, TResult> merge)
+    {
+        if (_kernelContext is { } kernelContext)
+            return kernelContext.ReduceRanges(state, rowCount, partitionCount, identity, map, merge);
+        if (_standalone)
+            return ReduceStandalone(state, rowCount, partitionCount, identity, map, merge);
+        throw new InvalidOperationException("System context operations are available only while the system executes.");
+    }
+
+    /// <summary>Leases a population's row identity and column buffers for this system.</summary>
+    /// <typeparam name="TKind">Population schema type.</typeparam>
+    /// <param name="population">Population owned by the context's World.</param>
+    /// <returns>A lease that must outlive every view obtained from it.</returns>
+    public PopulationLease<TKind> BorrowPopulation<TKind>(Population<TKind> population)
+        where TKind : IPopulationKind => _kernelContext?.BorrowPopulation(population)
+            ?? (_standalone ? population.Borrow()
+                : throw new InvalidOperationException("System context operations are available only while the system executes."));
+
+    /// <summary>Creates partition-local population buffers applied at the schedule's wave barrier.</summary>
+    /// <typeparam name="TKind">Generated population schema type.</typeparam>
+    /// <param name="population">Population owned by the context's World.</param>
+    /// <param name="partitionCount">Number of buffers assigned to range partitions.</param>
+    /// <returns>Execution-scoped buffers that expire after the system call.</returns>
+    /// <remarks>Declare <see cref="SystemAccess.DeferWorldWrites"/> or <see cref="SystemAccess.WriteWorld"/> and do not flush these buffers directly.</remarks>
+    public PopulationCommandBuffer<TKind>[] DeferPopulationCommands<TKind>(
+        Population<TKind> population,
+        int partitionCount)
+        where TKind : unmanaged, IPopulationKind, IPopulationSchema<TKind>
+    {
+        if (_kernelContext is { } kernelContext)
+            return kernelContext.DeferPopulationCommands(population, partitionCount);
+        if (!_standalone)
+            throw new InvalidOperationException("System context operations are available only while the system executes.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
+        var buffers = new PopulationCommandBuffer<TKind>[partitionCount];
+        for (var index = 0; index < buffers.Length; index++)
+            buffers[index] = new PopulationCommandBuffer<TKind>(population);
+        return buffers;
+    }
+
+    internal void Prepare(ScheduledSystemContext kernelContext, bool canWriteWorld)
+    {
+        _kernelContext = kernelContext;
         _canWriteWorld = canWriteWorld;
     }
 
     internal void Finish()
     {
         _kernelContext = null;
-        _commands = null;
         _canWriteWorld = false;
+    }
+
+    private void FlushWorldCommands()
+    {
+        if (_kernelContext is { } kernelContext)
+        {
+            var commands = kernelContext.Commands;
+            if (commands.Count > 0) kernelContext.FlushCommands(_world);
+        }
+        else if (_standalone)
+        {
+            if (_standaloneCommands.Count > 0) _standaloneCommands.Flush(_world);
+        }
+    }
+
+    private static TResult ReduceStandalone<TState, TResult>(
+        TState state,
+        int rowCount,
+        int partitionCount,
+        TResult identity,
+        Func<TState, int, PopulationRange, TResult> map,
+        Func<TResult, TResult, TResult> merge)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(rowCount);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(merge);
+        if (rowCount == 0) return identity;
+        var count = Math.Min(rowCount, partitionCount);
+        var quotient = rowCount / count;
+        var remainder = rowCount % count;
+        var result = identity;
+        var start = 0;
+        for (var partition = 0; partition < count; partition++)
+        {
+            var length = quotient + (partition < remainder ? 1 : 0);
+            result = merge(result, map(state, partition, new PopulationRange(start, length)));
+            start += length;
+        }
+
+        return result;
     }
 
     private void EnsureImmediateWorldWriteAccess()
@@ -119,7 +325,7 @@ public sealed class SystemicScheduledContext(
         if (!_canWriteWorld)
         {
             throw new InvalidOperationException(
-                "Immediate rule or event dispatch requires SystemAccess.WriteWorld; deferred World commands remain available without it.");
+                "Immediate World writes, rule dispatch, and event dispatch require SystemAccess.WriteWorld; deferred World commands remain available without it.");
         }
     }
 }
@@ -128,7 +334,6 @@ public sealed class SystemicScheduledContext(
 public sealed class SystemicGameBuilder
 {
     private readonly List<ISystemicSystem> _systems = [];
-    private readonly List<ISystemicScheduledSystem> _scheduledSystems = [];
     private readonly List<ISystemicStatefulExtension> _statefulExtensions = [];
     private readonly List<FactObserverRegistration> _factObservers = [];
     private readonly List<ISystemicUiBindingProvider> _uiBindingProviders = [];
@@ -192,6 +397,8 @@ public sealed class SystemicGameBuilder
         ? (TService)service
         : throw new KeyNotFoundException($"Service '{typeof(TService).FullName}' is not registered.");
 
+    /// <summary>Registers a typed system for each host tick.</summary>
+    /// <remarks>System order and access declarations determine its position and conflicts in the deterministic schedule.</remarks>
     public SystemicGameBuilder AddSystem(ISystemicSystem system)
     {
         EnsureNotBuilt();
@@ -206,20 +413,8 @@ public sealed class SystemicGameBuilder
         return this;
     }
 
-    public SystemicGameBuilder AddScheduledSystem(ISystemicScheduledSystem system)
-    {
-        EnsureNotBuilt();
-        ArgumentNullException.ThrowIfNull(system);
-        ArgumentException.ThrowIfNullOrWhiteSpace(system.Id);
-        if (_scheduledSystems.Any(existing => string.Equals(existing.Id, system.Id, StringComparison.Ordinal)))
-        {
-            throw new InvalidOperationException($"Scheduled system '{system.Id}' is already registered.");
-        }
-
-        _scheduledSystems.Add(system);
-        return this;
-    }
-
+    /// <summary>Sets the number of workers available to scheduled systems and their range work.</summary>
+    /// <param name="workerCount">Positive worker count.</param>
     public SystemicGameBuilder WithScheduledWorkerCount(int workerCount)
     {
         EnsureNotBuilt();
@@ -277,11 +472,6 @@ public sealed class SystemicGameBuilder
             _systems.Add(addedSystem);
         }
 
-        if (module is ISystemicScheduledSystem scheduledSystem)
-        {
-            AddScheduledSystem(scheduledSystem);
-        }
-
         if (module is ISystemicStatefulExtension stateful)
         {
             RegisterStatefulExtension(stateful);
@@ -293,6 +483,7 @@ public sealed class SystemicGameBuilder
     public SystemicGameBuilder Use<TModule>()
         where TModule : ISystemicExtensionModule, new() => AddExtension(new TModule());
 
+    /// <summary>Builds the host and its deterministic schedule.</summary>
     public SystemicGame Build()
     {
         EnsureNotBuilt();
@@ -303,9 +494,8 @@ public sealed class SystemicGameBuilder
             systemsToRun.Add(new ScheduledEventSystem(Content.Rules.Schedules, World, EntityIds));
         }
 
-        var systems = systemsToRun.OrderBy(system => system.Order)
-            .ThenBy(system => system.Id, StringComparer.Ordinal)
-            .ToArray();
+        // OrderBy is stable: systems with the same Order retain their registration order.
+        var systems = systemsToRun.OrderBy(system => system.Order).ToArray();
         var duplicateSystem = systems.GroupBy(system => system.Id, StringComparer.Ordinal)
             .FirstOrDefault(group => group.Count() > 1);
         if (duplicateSystem is not null)
@@ -313,24 +503,16 @@ public sealed class SystemicGameBuilder
             throw new InvalidOperationException($"System ID '{duplicateSystem.Key}' is registered more than once.");
         }
 
-        var scheduledSystemIds = new HashSet<string>(systems.Select(system => system.Id), StringComparer.Ordinal);
-        foreach (var system in _scheduledSystems)
-        {
-            if (!scheduledSystemIds.Add(system.Id))
-            {
-                throw new InvalidOperationException($"System ID '{system.Id}' is registered more than once.");
-            }
-        }
-
         var contentRules = new RuleEngine(Content.Rules, tickRateHz: Content.Manifest.TickRateHz);
+        var clock = new FixedStepClock(Content.Manifest.TickRateHz, Content.Manifest.MaxCatchUpSteps);
         var extensionEngine = _extensions.BuildEngine();
         var hasSavedPopulationState = _extensionStates?.ContainsKey(PopulationStatefulExtension.ExtensionId) == true;
         var populationStateExtension = World.HasPopulations || hasSavedPopulationState
             ? new PopulationStatefulExtension(World)
             : null;
         var statefulExtensions = systems.OfType<ISystemicStatefulExtension>()
-            .Concat(_scheduledSystems.OfType<ISystemicStatefulExtension>())
             .Concat(_statefulExtensions)
+            .Append(new ClockStatefulExtension(clock))
             .Append(new RuleHistoryStatefulExtension(contentRules, () => World.LogicalTick))
             .Concat(populationStateExtension is null ? [] : [populationStateExtension])
             .Distinct<ISystemicStatefulExtension>(ReferenceEqualityComparer.Instance)
@@ -371,15 +553,18 @@ public sealed class SystemicGameBuilder
                     observer(fact, emitter);
                 }
             };
-        var scheduledBridges = _scheduledSystems
-            .Select(system => new SystemicScheduledSystemBridge(system,
-                new SystemicScheduledContext(World, contentRules, extensionEngine, 0, systemObserver)))
+        var tickStats = new SystemicTickStats(systems.Select(system => system.Id));
+        var systemBridges = systems
+            .Select(system => new SystemicSystemBridge(system,
+                new SystemicSystemContext(World, contentRules, extensionEngine,
+                    new Dictionary<Type, object>(_services), systemObserver),
+                tickStats.Get(system.Id)))
             .ToArray();
         DeterministicSystemSchedule? schedule = null;
-        if (scheduledBridges.Length > 0)
+        if (systemBridges.Length > 0)
         {
             var scheduleBuilder = new DeterministicSystemScheduleBuilder(_scheduledWorkerCount);
-            foreach (var bridge in scheduledBridges)
+            foreach (var bridge in systemBridges)
             {
                 scheduleBuilder.Add(bridge);
             }
@@ -387,8 +572,8 @@ public sealed class SystemicGameBuilder
             schedule = scheduleBuilder.Build();
         }
 
-        return new SystemicGame(Content, World, systems, scheduledBridges, schedule, contentRules, extensionEngine,
-            EntityIds, statefulExtensions, new Dictionary<Type, object>(_services), factObservers,
+        return new SystemicGame(Content, World, schedule, contentRules, extensionEngine,
+            EntityIds, statefulExtensions, new Dictionary<Type, object>(_services), factObservers, clock, tickStats,
             [.. _uiBindingProviders]);
     }
 
@@ -403,21 +588,16 @@ public sealed class SystemicGameBuilder
 
 public sealed class SystemicGame : IDisposable
 {
-    private readonly ISystemicSystem[] _systems;
-    private readonly SystemicScheduledSystemBridge[] _scheduledBridges;
     private readonly DeterministicSystemSchedule? _schedule;
     private readonly RuleEngine _contentRules;
     private readonly EventEngine _extensionEngine;
     private readonly IReadOnlyDictionary<Type, object> _services;
     private readonly SimulationFactObserver[] _factObservers;
-    private readonly SystemicStepContext _stepContext;
     private int _disposed;
 
     internal SystemicGame(
         ContentPack content,
         World world,
-        ISystemicSystem[] systems,
-        SystemicScheduledSystemBridge[] scheduledBridges,
         DeterministicSystemSchedule? schedule,
         RuleEngine contentRules,
         EventEngine extensionEngine,
@@ -425,12 +605,12 @@ public sealed class SystemicGame : IDisposable
         ISystemicStatefulExtension[] statefulExtensions,
         IReadOnlyDictionary<Type, object> services,
         SimulationFactObserver[] factObservers,
+        FixedStepClock clock,
+        SystemicTickStats tickStats,
         ISystemicUiBindingProvider[] uiBindingProviders)
     {
         Content = content;
         World = world;
-        _systems = systems;
-        _scheduledBridges = scheduledBridges;
         _schedule = schedule;
         _contentRules = contentRules;
         _extensionEngine = extensionEngine;
@@ -439,8 +619,8 @@ public sealed class SystemicGame : IDisposable
         _services = services;
         _factObservers = factObservers;
         UiBindingProviders = uiBindingProviders;
-        _stepContext = new SystemicStepContext(world, contentRules, extensionEngine, 0, CombineFactObservers(null));
-        Clock = new FixedStepClock(content.Manifest.TickRateHz, content.Manifest.MaxCatchUpSteps);
+        Clock = clock;
+        TickStats = tickStats;
     }
 
     public static SystemicGameBuilder FromDirectory(string rootDirectory, int seed, double valueScale = 1)
@@ -453,6 +633,10 @@ public sealed class SystemicGame : IDisposable
     public ContentPack Content { get; }
     public World World { get; }
     public FixedStepClock Clock { get; }
+    public SystemicTickStats TickStats { get; }
+    public ImmutableArray<ImmutableArray<string>> SchedulerWaves =>
+        _schedule?.Waves ?? ImmutableArray<ImmutableArray<string>>.Empty;
+    public int SchedulerWorkerCount => _schedule?.WorkerCount ?? 0;
     public ImmutableDictionary<string, int> EntityIds { get; }
     public IReadOnlyList<ISystemicStatefulExtension> StatefulExtensions { get; }
     public IReadOnlyList<ISystemicUiBindingProvider> UiBindingProviders { get; }
@@ -494,17 +678,81 @@ public sealed class SystemicGame : IDisposable
     {
         ThrowIfDisposed();
         using var transaction = World.BeginTransaction();
-        World.LogicalTick = checked(World.LogicalTick + 1);
-        _stepContext.Prepare(World.LogicalTick);
-        foreach (var system in _systems)
+        try
         {
-            system.Step(_stepContext);
+            StepWithinTransaction(transaction);
+            transaction.Commit();
         }
+        catch (WorldCommitCallbackException)
+        {
+            // State is already committed, so rollback cannot undo this tick.
+            throw;
+        }
+        catch (Exception failure)
+        {
+            try { transaction.Rollback(); }
+            catch (Exception rollbackFailure)
+            {
+                var combined = new AggregateException("The tick failed and rollback also failed.", failure, rollbackFailure);
+                if (failure.Data["Systemic.SystemId"] is { } systemId)
+                    combined.Data["Systemic.SystemId"] = systemId;
+                throw combined;
+            }
+            throw;
+        }
+    }
 
+    private void StepWithinTransaction(WorldTransaction transaction)
+    {
+        for (var index = 0; index < StatefulExtensions.Count; index++)
+        {
+            var extension = StatefulExtensions[index];
+            // Kernel populations and rule history already enlist in the journal, while the
+            // clock advances outside Step. Snapshot registered domain state before any system runs.
+            if (extension is PopulationStatefulExtension or RuleHistoryStatefulExtension or ClockStatefulExtension) continue;
+            if (extension is ISystemicReusableTransactionalState reusable)
+            {
+                var snapshot = reusable.CaptureTransactionSnapshot();
+                transaction.OnRollback(snapshot.OnRollback);
+                transaction.OnCommit(snapshot.OnCommit);
+            }
+            else if (extension is ISystemicTransactionalState participant)
+            {
+                RegisterInMemoryRollback(transaction, participant);
+            }
+            else
+            {
+                RegisterJsonRollback(transaction, extension);
+            }
+        }
+        World.LogicalTick = checked(World.LogicalTick + 1);
         _schedule?.Execute(World, World.LogicalTick);
 
         World.AdvanceModifiers();
-        transaction.Commit();
+    }
+
+    /// <summary>Runs a tick with an error boundary and reports whether a failing callback followed commit.</summary>
+    public SystemicTickResult TryStep()
+    {
+        var attemptedTick = checked(World.LogicalTick + 1);
+        try { Step(); return new(true, null); }
+        catch (Exception exception)
+        {
+            return new(false, new SystemicTickFailure(exception.Data["Systemic.SystemId"] as string,
+                attemptedTick, exception is WorldCommitCallbackException, exception));
+        }
+    }
+
+    private static void RegisterInMemoryRollback(WorldTransaction transaction, ISystemicTransactionalState participant)
+    {
+        var snapshot = participant.CaptureTransactionState();
+        transaction.OnRollback(() => participant.RestoreTransactionState(snapshot));
+    }
+
+    private static void RegisterJsonRollback(WorldTransaction transaction, ISystemicStatefulExtension extension)
+    {
+        var snapshot = extension.CaptureState().Clone();
+        transaction.OnRollback(() => extension.RestoreState(snapshot));
     }
 
     public void Dispose()
@@ -544,12 +792,13 @@ public sealed class SystemicGame : IDisposable
     }
 }
 
-internal sealed class SystemicScheduledSystemBridge(
-    ISystemicScheduledSystem system,
-    SystemicScheduledContext stepContext) : IScheduledKernelSystem
+internal sealed class SystemicSystemBridge(
+    ISystemicSystem system,
+    SystemicSystemContext stepContext,
+    SystemicTickStats.Measurement measurement) : IScheduledKernelSystem
 {
-    private readonly ISystemicScheduledSystem _system = system;
-    private readonly SystemicScheduledContext _stepContext = stepContext;
+    private readonly ISystemicSystem _system = system;
+    private readonly SystemicSystemContext _stepContext = stepContext;
     private readonly bool _canWriteWorld = system.Access.Contains(SystemAccess.WriteWorld);
 
     public string Id => _system.Id;
@@ -558,12 +807,20 @@ internal sealed class SystemicScheduledSystemBridge(
     public void Execute(ScheduledSystemContext context)
     {
         _stepContext.Prepare(context, _canWriteWorld);
+        var start = Stopwatch.GetTimestamp();
+        var allocated = GC.GetAllocatedBytesForCurrentThread();
         try
         {
-            _system.Step(context, _stepContext);
+            _system.Step(_stepContext);
+        }
+        catch (Exception exception)
+        {
+            exception.Data["Systemic.SystemId"] = _system.Id;
+            throw;
         }
         finally
         {
+            measurement.Record(Stopwatch.GetTimestamp() - start, GC.GetAllocatedBytesForCurrentThread() - allocated);
             _stepContext.Finish();
         }
     }

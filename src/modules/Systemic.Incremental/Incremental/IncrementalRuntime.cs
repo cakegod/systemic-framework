@@ -140,10 +140,10 @@ public sealed class IncrementalRuntime : ISystemicSystem
         return new(true, Reactions: reactions);
     }
 
-    public void Step(SystemicStepContext context)
+    public void Step(SystemicSystemContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (!ReferenceEquals(context.World, _world))
+        if (!context.IsForWorld(_world))
         {
             throw new InvalidOperationException("Incremental runtime cannot step a different world than the one it was initialized with.");
         }
