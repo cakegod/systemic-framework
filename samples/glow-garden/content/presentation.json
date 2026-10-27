@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 2,
+  "timelines": [
+    {
+      "id": "garden.burst-ring",
+      "visualRecipeId": "garden.burst-recipe",
+      "durationTicks": 20,
+      "loop": false,
+      "particleCount": 0,
+      "keyframes": [
+        { "tick": 0, "scale": 0.5, "opacity": 1 },
+        { "tick": 6, "scale": 1.5, "opacity": 0.9 },
+        { "tick": 19, "scale": 2.2, "opacity": 0 }
+      ]
+    },
+    {
+      "id": "garden.echo-spark",
+      "visualRecipeId": "garden.echo-recipe",
+      "durationTicks": 30,
+      "loop": false,
+      "particleCount": 3,
+      "keyframes": [
+        { "tick": 0, "scale": 0.6, "opacity": 0.8 },
+        { "tick": 12, "x": 2, "y": -3, "scale": 1.2, "opacity": 1 },
+        { "tick": 29, "x": 4, "y": -6, "scale": 0.2, "opacity": 0 }
+      ]
+    },
+    {
+      "id": "garden.seed-spark",
+      "visualRecipeId": "garden.seed-recipe",
+      "durationTicks": 24,
+      "loop": false,
+      "particleCount": 2,
+      "keyframes": [
+        { "tick": 0, "scale": 0.4, "opacity": 0.65 },
+        { "tick": 8, "x": 3, "y": -2, "scale": 1.1, "opacity": 0.9 },
+        { "tick": 23, "x": 5, "y": -5, "scale": 0.3, "opacity": 0 }
+      ]
+    },
+    {
+      "id": "garden.combo-spark",
+      "visualRecipeId": "garden.combo-recipe",
+      "durationTicks": 18,
+      "loop": false,
+      "particleCount": 4,
+      "keyframes": [
+        { "tick": 0, "scale": 0.5, "opacity": 1 },
+        { "tick": 5, "scale": 1.3, "opacity": 1 },
+        { "tick": 17, "scale": 0.3, "opacity": 0 }
+      ]
+    }
+  ],
+  "bindings": [
+    { "event": "garden.pod.burst", "timelineId": "garden.burst-ring", "anchor": "target", "seedSalt": 7 },
+    { "event": "garden.pod.secondary", "timelineId": "garden.burst-ring", "anchor": "target", "seedSalt": 11 },
+    { "event": "garden.talent.echo", "timelineId": "garden.echo-spark", "anchor": "target", "seedSalt": 13 },
+    { "event": "garden.talent.seedstorm", "timelineId": "garden.seed-spark", "anchor": "target", "seedSalt": 19 },
+    { "event": "garden.talent.chain", "timelineId": "garden.combo-spark", "anchor": "target", "seedSalt": 29 },
+    { "event": "garden.talent.projectile", "timelineId": "garden.combo-spark", "anchor": "target", "seedSalt": 31 },
+    { "event": "garden.talent.clone", "timelineId": "garden.combo-spark", "anchor": "target", "seedSalt": 37 }
+  ]
+}

@@ -40,6 +40,18 @@ internal partial struct GardenCreature
     [PopulationColumn("leapProgress")]
     public float LeapProgress;
 
+    [PopulationColumn("heading")]
+    public float Heading;
+
+    [PopulationColumn("wanderTicks")]
+    public int WanderTicks;
+
+    [PopulationColumn("stallTicks")]
+    public int StallTicks;
+
+    [PopulationColumn("slideSide")]
+    public int SlideSide;
+
     [PopulationColumn("copyExpiryTick")]
     public int CopyExpiryTick;
 }

@@ -33,7 +33,7 @@ public class CommandLineTests
         Assert.NotSame(original, session.Host);
         Assert.Equal(0, session.Host.Simulation.Tick);
         Assert.Equal(30, session.Host.Simulation.Glow);
-        Assert.Equal(6, session.Host.Simulation.Creatures.Count);
+        Assert.Equal(GardenSimulation.StartingWorkers, session.Host.Simulation.Creatures.Count);
         Assert.Equal(0, session.Host.Simulation.ActiveTalentCount);
         Assert.Equal(plants, session.Host.Simulation.Plants);
     }

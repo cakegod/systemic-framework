@@ -108,7 +108,7 @@ public sealed class GardenUi
         for (var i = 0; i < 6; i++)
         {
             var active = m.IsTalentActive((Talent)i);
-            _talents[i].Text = $"{(active ? "ON" : "off")}  {TalentNames[i]}\n{Descriptions[i]}";
+            _talents[i].Text = $"{(active ? "ON" : "off")}  {TalentNames[i]}\n{Descriptions[i]}  ·  {m.EffectCount((Talent)i)} uses";
             ((ButtonVisual)_talents[i].Visual).BackgroundColor = active ? new Color(61, 98, 69) : new Color(29, 60, 62);
         }
         _flow.Text = $"PRODUCTION: {m.BurstCount} pods total  |  Loose {m.Motes.Sum(x => x.Value)} Glow\nCOLLECTION: {m.Creatures.Sum(x => x.CarriedGlow)} carried  |  Returned {m.BankedGlow} Glow total\nAVERAGE since restart: {podsPerSecond:0.00} pods/s  |  {bankedPerSecond:0.00} banked Glow/s\nGrowth {1 + m.Rank(UpgradeKind.PodGrowth) * .12f:0.00}x  |  Gatherer speed {1 + m.Rank(UpgradeKind.GathererSpeed) * .1f:0.00}x  |  Load {3 + m.Rank(UpgradeKind.GathererCapacity)} Glow";

@@ -1,1 +1,16 @@
-{"schemaVersion":3,"id":"sample.glow-garden","name":"Glow Garden","tickRateHz":30,"maxCatchUpSteps":3,"rules":"rules.json","entities":"entities.json"}
+{
+  "schemaVersion": 3,
+  "id": "sample.glow-garden",
+  "name": "Glow Garden",
+  "tickRateHz": 60,
+  "maxCatchUpSteps": 3,
+  "rules": "rules.json",
+  "entities": "entities.json",
+  "modules": {
+    "systemic.presentation": {
+      "visuals": "visuals.json",
+      "ui": "ui.json",
+      "presentation": "presentation.json"
+    }
+  }
+}

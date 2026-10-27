@@ -23,7 +23,9 @@ public sealed class FrameworkIntegrationTests
     {
         using var a = GardenHost.Create(42);
         using var b = GardenHost.Create(42);
-        Assert.Equal(6, a.Game.World.Draws.Draws);
+        // Plant placement retries around thickets consume a seed-dependent number of draws.
+        Assert.InRange(a.Game.World.Draws.Draws, 18, 6 * 12 * 2 + 6);
+        Assert.Equal(a.Game.World.Draws.Draws, b.Game.World.Draws.Draws);
         a.Step(300);
         b.Step(300);
         Assert.True(a.Game.World.Draws.Draws > 6);
@@ -35,6 +37,8 @@ public sealed class FrameworkIntegrationTests
     public void PopulationStructuralChangesRollBackWithKernelTransaction()
     {
         using var host = GardenHost.Create(42);
+        for (var tick = 0; tick < 4000 && host.Simulation.Glow < host.Simulation.HirePrice(CreatureKind.Burstling); tick++)
+            host.Step(1);
         var before = host.Simulation.Creatures.ToArray();
         using (var transaction = host.Game.World.BeginTransaction())
         {
@@ -49,7 +53,7 @@ public sealed class FrameworkIntegrationTests
     [Fact]
     public void ActiveTalentTagsSelectAnAuthoredReaction()
     {
-        var builder = SystemicGame.FromDirectory(Path.Combine(AppContext.BaseDirectory, "content"), 42);
+        var builder = GardenHost.CreateBuilder(GardenHost.ContentDirectory, 42);
         var model = new GardenSimulation(builder.World);
         var facts = new List<SimulationFact>();
         using var game = builder.AddSystem(model)
@@ -62,7 +66,7 @@ public sealed class FrameworkIntegrationTests
         var trace = game.Trace(actualBurst);
         Assert.Contains(trace.Facts, fact => fact.MatchedRules.Contains("garden.talent.seedstorm"));
         Assert.Contains(trace.Facts, fact => fact.Fact.Type == "garden.talent.seedstorm");
-        Assert.Contains("garden.talent.seedstorm", builder.World.Entities.Single().Tags);
+        Assert.Contains("garden.talent.seedstorm", builder.World.Entities.Single(e => e.HasTag("garden")).Tags);
         Assert.Contains(model.PendingImpacts, impact => impact.IsSeed);
     }
 
@@ -86,7 +90,7 @@ public sealed class FrameworkIntegrationTests
             File.WriteAllText(path, document.ToJsonString());
 
             using var normal = GardenHost.Create(31);
-            var builder = SystemicGame.FromDirectory(directory, 31);
+            var builder = GardenHost.CreateBuilder(directory, 31);
             var changed = new GardenSimulation(builder.World);
             using var game = builder.AddSystem(changed).AddFactObserver(0, changed.ObserveFact).Build();
             foreach (var model in new[] { normal.Simulation, changed })
@@ -136,7 +140,7 @@ public sealed class FrameworkIntegrationTests
     [Fact]
     public void ProductionPublishesRealBurstCollectionAndDepositAmounts()
     {
-        var builder = SystemicGame.FromDirectory(Path.Combine(AppContext.BaseDirectory, "content"), 41);
+        var builder = GardenHost.CreateBuilder(GardenHost.ContentDirectory, 41);
         var model = new GardenSimulation(builder.World);
         var facts = new List<SimulationFact>();
         using var game = builder.AddSystem(model).AddFactObserver(100, (fact, _) => facts.Add(fact)).Build();

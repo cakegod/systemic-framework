@@ -1,4 +1,6 @@
+using Systemic.Content;
 using Systemic.Host;
+using Systemic.Presentation;
 
 namespace GlowGarden;
 
@@ -14,13 +16,26 @@ public sealed class GardenHost : IDisposable
 
     public SystemicGame Game { get; }
 
-    public static GardenHost Create(int seed)
+    public static GardenHost Create(int seed) => Create(ContentDirectory, seed);
+
+    public static GardenHost Create(string contentDirectory, int seed)
     {
-        var builder = SystemicGame.FromDirectory(Path.Combine(AppContext.BaseDirectory, "content"), seed);
+        var builder = CreateBuilder(contentDirectory, seed);
         var simulation = new GardenSimulation(builder.World);
 
-        return new GardenHost(simulation, builder.AddSystem(simulation).AddFactObserver(0, simulation.ObserveFact).Build());
+        return new GardenHost(simulation,
+            builder.AddScheduledSystem(simulation).AddFactObserver(0, simulation.ObserveFact).Build());
     }
+
+    /// <summary>Loads Core plus the Presentation module; the sample hosts its own rendering and UI.</summary>
+    internal static SystemicGameBuilder CreateBuilder(string contentDirectory, int seed)
+    {
+        var content = ContentPackLoader.Load(contentDirectory,
+            new ContentModuleRegistry().Add(new PresentationContentModule()));
+        return new SystemicGameBuilder(content, content.CreateWorld(seed, 1));
+    }
+
+    internal static string ContentDirectory => Path.Combine(AppContext.BaseDirectory, "content");
 
     public void Step(int ticks)
     {
@@ -30,4 +45,3 @@ public sealed class GardenHost : IDisposable
 
     public void Dispose() => Game.Dispose();
 }
-

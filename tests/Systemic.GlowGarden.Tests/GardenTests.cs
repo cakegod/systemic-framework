@@ -12,8 +12,8 @@ public class GardenTests
         using var a = GardenHost.Create(42);
         using var b = GardenHost.Create(42);
 
-        Assert.Equal(6, a.Simulation.Plants.Count);
-        Assert.Equal(6, a.Simulation.Creatures.Count);
+        Assert.Equal(GardenSimulation.StartingPlants, a.Simulation.Plants.Count);
+        Assert.Equal(GardenSimulation.StartingWorkers, a.Simulation.Creatures.Count);
 
         a.Step(3600);
         b.Step(3600);
@@ -131,7 +131,8 @@ public class GardenTests
     [Fact]
     public void TalentsHaveThreeIndependentSlots()
     {
-        var s = new GardenSimulation(1);
+        using var host = GardenHost.Create(1);
+        var s = host.Simulation;
         Assert.True(s.ToggleTalent(Talent.Echo));
         Assert.True(s.ToggleTalent(Talent.Clone));
         Assert.True(s.ToggleTalent(Talent.Seedstorm));
@@ -153,7 +154,7 @@ public class GardenTests
         Arrange(s);
         s.ToggleTalent(talent);
         host.Step(1);
-        if (talent is Talent.Echo or Talent.Seedstorm) Assert.Equal(0, s.EffectCount(talent));
+        if (talent is Talent.Echo or Talent.Seedstorm) Assert.True(s.PendingImpactCount > 0);
         if (talent == Talent.ChainReaction) Assert.InRange(s.BurstCount, 2, GardenSimulation.MaxReactionBursts);
         host.Step(20);
         Assert.True(s.EffectCount(talent) > 0);
@@ -177,6 +178,99 @@ public class GardenTests
         host.Step(400);
         Assert.Equal(0, s.CopyCount);
         Assert.Equal(0, s.PendingImpactCount);
+    }
+
+    [Fact]
+    public void NearestTargetsUseGridSearchAcrossCells()
+    {
+        using var host = GardenHost.Create(23);
+        var s = host.Simulation;
+        s._plants.Clear();
+        s._plants.Add(new(1, GardenSimulation.Colony + new System.Numerics.Vector2(24, 0), 0));
+        s._plants.Add(new(2, GardenSimulation.Colony + new System.Numerics.Vector2(-70, 0), 1));
+        s._plants.Add(new(3, GardenSimulation.Colony + new System.Numerics.Vector2(100, 0), 1));
+        s._creatures.Clear();
+        s._creatures.Add(new(0, CreatureKind.Burstling, GardenSimulation.Colony, 0, 0, false));
+        s._creatures.Add(new(1, CreatureKind.Gatherer, GardenSimulation.Colony, 0, 0, false));
+        s._motes.Clear();
+        s._motes.Add(new(0, GardenSimulation.Colony + new System.Numerics.Vector2(30, 0), default, 1));
+        s._motes.Add(new(1, GardenSimulation.Colony + new System.Numerics.Vector2(-80, 0), default, 1));
+
+        host.Step(1);
+
+        // The unripe plant is nearest but skipped; the nearest ripe one is across a grid cell.
+        Assert.True(s.Creatures[0].Position.X < GardenSimulation.Colony.X);
+        Assert.True(s.Creatures[1].Position.X > GardenSimulation.Colony.X);
+    }
+
+    [Fact]
+    public void StartingPodsAreSpreadAcrossTheGarden()
+    {
+        using var host = GardenHost.Create(31);
+        var plants = host.Simulation.Plants;
+
+        Assert.Equal(GardenSimulation.StartingPlants, plants.Count);
+        Assert.Contains(plants, p => p.Position.X < GardenSimulation.Width / 3);
+        Assert.Contains(plants, p => p.Position.X > GardenSimulation.Width * 2 / 3);
+        Assert.Contains(plants, p => p.Position.Y < GardenSimulation.Height / 2);
+        Assert.Contains(plants, p => p.Position.Y > GardenSimulation.Height / 2);
+    }
+
+    [Fact]
+    public void IdleWorkersWanderInsteadOfStandingStill()
+    {
+        using var host = GardenHost.Create(33);
+        var s = host.Simulation;
+        s._plants.Clear();
+        s._motes.Clear();
+        s._creatures.Clear();
+        s._creatures.Add(new(0, CreatureKind.Burstling, GardenSimulation.Colony, 0, 0, false));
+
+        host.Step(1);
+        var first = s.Creatures[0].Position;
+
+        host.Step(60);
+        var later = s.Creatures[0].Position;
+
+        Assert.NotEqual(GardenSimulation.Colony, first);
+        Assert.NotEqual(first, later);
+        Assert.InRange(first.X, 0, GardenSimulation.Width);
+        Assert.InRange(first.Y, 0, GardenSimulation.Height);
+        Assert.InRange(later.X, 0, GardenSimulation.Width);
+        Assert.InRange(later.Y, 0, GardenSimulation.Height);
+    }
+
+    [Fact]
+    public void GatherersClimbTrailsTowardDistantFood()
+    {
+        using var host = GardenHost.Create(41);
+        var s = host.Simulation;
+        var food = GardenSimulation.Colony + new System.Numerics.Vector2(240, 0);
+        s._plants.Clear();
+        s._motes.Clear();
+        s._creatures.Clear();
+        s._creatures.Add(new(0, CreatureKind.Gatherer, GardenSimulation.Colony, 0, 0, false));
+        s._scent.StampTrail(food, GardenSimulation.Colony, 10);
+
+        host.Step(1);
+
+        // The mote is outside perception, so only the trail can point this worker at it.
+        Assert.True(s.Creatures[0].Position.X > GardenSimulation.Colony.X);
+        Assert.True(s.Creatures[0].CarriedGlow == 0);
+    }
+
+    [Fact]
+    public void BurstTrailRecruitsWorkersTowardTheFood()
+    {
+        var scent = new GardenScent(GardenSimulation.Width, GardenSimulation.Height, 24);
+        var food = GardenSimulation.Colony + new System.Numerics.Vector2(220, 0);
+        scent.StampTrail(food, GardenSimulation.Colony, 10);
+
+        Assert.True(scent.TrySteer(GardenSimulation.Colony, 0.8f, out var fromNest));
+        Assert.True(fromNest.X > 0.8f);
+
+        Assert.True(scent.TrySteer(GardenSimulation.Colony + new System.Numerics.Vector2(160, 0), 0.8f, out var nearFood));
+        Assert.True(nearFood.X > 0.8f);
     }
 
     [Fact]

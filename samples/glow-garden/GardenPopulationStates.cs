@@ -79,7 +79,8 @@ internal sealed class CreatureStates : PopulationStates<GardenCreature, Creature
             Columns.CarriedGlow.ReadOnlySpan[index],
             Columns.Cooldown.ReadOnlySpan[index],
             Columns.IsCopy.ReadOnlySpan[index],
-            Columns.LeapProgress.ReadOnlySpan[index]);
+            Columns.LeapProgress.ReadOnlySpan[index],
+            Columns.Heading.ReadOnlySpan[index]);
         set
         {
             Columns.StableId.EditRange(index, 1)[0] = value.Id;
@@ -89,6 +90,7 @@ internal sealed class CreatureStates : PopulationStates<GardenCreature, Creature
             Columns.Cooldown.EditRange(index, 1)[0] = value.Cooldown;
             Columns.IsCopy.EditRange(index, 1)[0] = value.IsCopy;
             Columns.LeapProgress.EditRange(index, 1)[0] = value.LeapProgress;
+            Columns.Heading.EditRange(index, 1)[0] = value.Heading;
         }
     }
 }
