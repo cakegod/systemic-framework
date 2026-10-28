@@ -10,6 +10,15 @@ public interface IPopulationKind
 
     /// <summary>Gets the schema version persisted with the population.</summary>
     static abstract int Version { get; }
+
+    /// <summary>Gets the tag names this schema reserves mask bits for, in bit order.</summary>
+    /// <remarks>
+    /// A row rule may only add or test a tag name listed here. The position in this list is the bit
+    /// the saved mask uses, so the order is part of the persisted schema: append new names and bump
+    /// <see cref="Version"/> rather than reordering or removing them. At most
+    /// <see cref="Population{TKind}.MaximumTags"/> names are allowed.
+    /// </remarks>
+    static virtual string[] Tags => [];
 }
 
 /// <summary>Describes a contiguous range of live population rows.</summary>
@@ -25,11 +34,20 @@ public readonly record struct PopulationRange(int Start, int Length)
 /// <remarks>Column data is available only through synchronous callback-scoped access. Leases prevent structural changes and transaction boundaries until disposed.</remarks>
 public sealed class Population<TKind> where TKind : IPopulationKind
 {
+    /// <summary>Gets the number of tags a schema may reserve, one per bit of its mask column.</summary>
+    public const int MaximumTags = 64;
+
+    private static readonly PopulationColumnKey<ulong> s_tagMaskKey =
+        new("systemic.tags", 1, PopulationCodecs.UInt64);
+
     private static long s_nextOwnerToken;
     private static long s_nextHandleGeneration;
 
     private readonly PopulationStorage _storage;
     private readonly Dictionary<string, PopulationColumnBase> _columns = new(StringComparer.Ordinal);
+    private readonly string[] _tagNames;
+    private readonly Dictionary<string, int> _tagBits = new(StringComparer.Ordinal);
+    private PopulationColumn<ulong>? _tagMask;
     private readonly bool _handlesEnabled;
     private readonly long _ownerToken;
     private readonly List<HandleSlot> _handleSlots = [];
@@ -44,6 +62,33 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         _storage = new PopulationStorage(world);
         _handlesEnabled = handlesEnabled;
         _ownerToken = ownerToken ?? Interlocked.Increment(ref s_nextOwnerToken);
+        // Copied: the mask order is persisted schema, so a schema must not be able to mutate it later.
+        _tagNames = [.. TKind.Tags];
+        if (_tagNames.Length > MaximumTags)
+        {
+            throw new InvalidOperationException(
+                $"Population '{TKind.Id}' declares {_tagNames.Length} tags; a schema may declare at most {MaximumTags}.");
+        }
+
+        for (var bit = 0; bit < _tagNames.Length; bit++)
+        {
+            var tag = _tagNames[bit];
+            if (string.IsNullOrWhiteSpace(tag))
+            {
+                throw new InvalidOperationException(
+                    $"Population '{TKind.Id}' declares a blank tag name at bit {bit}.");
+            }
+
+            if (!_tagBits.TryAdd(tag, bit))
+            {
+                throw new InvalidOperationException(
+                    $"Population '{TKind.Id}' declares tag '{tag}' more than once.");
+            }
+        }
+
+        // The mask column is created with the schema, not on first use: a save's column set must be
+        // reproducible from the schema alone, or a load cannot match it before any rule binds.
+        _tagMask = _tagNames.Length > 0 ? Column(s_tagMaskKey) : null;
     }
 
     internal World World { get; private set; }
@@ -489,6 +534,77 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         return true;
     }
 
+    /// <summary>Gets the tag names this schema reserves mask bits for, in bit order.</summary>
+    public ReadOnlyMemory<string> Tags => _tagNames;
+
+    /// <summary>Gets whether a live row carries the named schema tag.</summary>
+    /// <param name="row">The row slot.</param>
+    /// <param name="tag">A tag name declared by the schema.</param>
+    /// <returns><see langword="false"/> when the row is not live.</returns>
+    /// <exception cref="InvalidOperationException"><paramref name="tag"/> is not declared by the schema.</exception>
+    public bool HasTag(int row, string tag) => TryHasTagBit(row, ResolveTagBit(tag));
+
+    /// <summary>Adds a schema tag to a live row.</summary>
+    /// <returns><see langword="false"/> when the row is not live or already carried the tag.</returns>
+    /// <exception cref="InvalidOperationException"><paramref name="tag"/> is not declared by the schema.</exception>
+    public bool AddTag(int row, string tag) => TrySetTagBit(row, ResolveTagBit(tag), value: true);
+
+    /// <summary>Removes a schema tag from a live row.</summary>
+    /// <returns><see langword="false"/> when the row is not live or did not carry the tag.</returns>
+    /// <exception cref="InvalidOperationException"><paramref name="tag"/> is not declared by the schema.</exception>
+    public bool RemoveTag(int row, string tag) => TrySetTagBit(row, ResolveTagBit(tag), value: false);
+
+    internal ReadOnlySpan<string> TagNames => _tagNames;
+
+    internal PopulationColumn<ulong>? MaskColumn => _tagMask;
+
+    internal bool TryGetTagBit(string tag, out int bit) => _tagBits.TryGetValue(tag, out bit);
+
+    internal bool TryHasTagBit(int row, int bit)
+    {
+        EnsureActive();
+        ValidateTagBit(bit);
+        return _tagMask is not null && _tagMask.TryReadRow(row, out var mask) && (mask & (1UL << bit)) != 0;
+    }
+
+    internal bool TrySetTagBit(int row, int bit, bool value)
+    {
+        EnsureActive();
+        ValidateTagBit(bit);
+        if (_tagMask is null || !_tagMask.TryReadRow(row, out var mask))
+        {
+            return false;
+        }
+
+        var updated = value ? mask | (1UL << bit) : mask & ~(1UL << bit);
+        if (updated == mask)
+        {
+            return false;
+        }
+
+        return _tagMask.TryWriteRow(row, updated);
+    }
+
+    private int ResolveTagBit(string tag)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tag);
+        if (_tagBits.TryGetValue(tag, out var bit))
+        {
+            return bit;
+        }
+
+        throw new InvalidOperationException(
+            $"Population '{TKind.Id}' does not declare tag '{tag}'. Declared tags: '{string.Join("', '", _tagNames)}'.");
+    }
+
+    private void ValidateTagBit(int bit)
+    {
+        if ((uint)bit >= (uint)_tagNames.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bit), bit, $"Population '{TKind.Id}' declares {_tagNames.Length} tags.");
+        }
+    }
+
     internal void ValidateRange(int start, int length) => _storage.ValidateRange(start, length);
 
     internal void EnsureActive() => _storage.EnsureActive();
@@ -687,8 +803,13 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         clone._storage.Count = Count;
         foreach (var (id, column) in _columns)
         {
-            clone._columns.Add(id, column.CloneTo(clone._storage));
+            // Assignment, not addition: the constructor already created the schema-declared mask column.
+            clone._columns[id] = column.CloneTo(clone._storage);
         }
+
+        clone._tagMask = clone._columns.TryGetValue(s_tagMaskKey.Id, out var clonedMask)
+            ? (PopulationColumn<ulong>)clonedMask
+            : null;
 
         if (_handlesEnabled)
         {
@@ -1099,6 +1220,14 @@ internal abstract class PopulationRegistration
 
     public abstract object Value { get; }
 
+    public abstract ReadOnlyMemory<string> TagNames { get; }
+
+    public abstract bool TryGetTagBit(string tag, out int bit);
+
+    public abstract bool TryHasTagBit(int row, int bit);
+
+    public abstract bool TrySetTagBit(int row, int bit, bool value);
+
     public abstract bool TryGetColumn(string columnId, out PopulationColumnBase column);
 
     public abstract PopulationSaveState CaptureSaveState();
@@ -1121,6 +1250,14 @@ internal sealed class PopulationRegistration<TKind>(Population<TKind> population
 
     public override object Value => population;
 
+    public override ReadOnlyMemory<string> TagNames => population.Tags;
+
+    public override bool TryGetTagBit(string tag, out int bit) => population.TryGetTagBit(tag, out bit);
+
+    public override bool TryHasTagBit(int row, int bit) => population.TryHasTagBit(row, bit);
+
+    public override bool TrySetTagBit(int row, int bit, bool value) => population.TrySetTagBit(row, bit, value);
+
     public override bool TryGetColumn(string columnId, out PopulationColumnBase column) =>
         population.TryGetColumn(columnId, out column);
 
@@ -1134,4 +1271,26 @@ internal sealed class PopulationRegistration<TKind>(Population<TKind> population
     public override void RebindWorld(World world) => population.RebindWorld(world);
 
     public override void DetachWorld() => population.DetachWorld();
+}
+
+/// <summary>Addresses the schema tags of one population without another lookup per row.</summary>
+/// <remarks>
+/// A rule binds a tag name to its bit once, then reads and writes the mask column through this
+/// handle. It is only valid while the population it was resolved from is registered in the world.
+/// </remarks>
+internal readonly struct PopulationTagAccess(PopulationRegistration registration)
+{
+    private readonly PopulationRegistration _registration = registration;
+
+    /// <summary>Gets the schema's tag names, in bit order.</summary>
+    public ReadOnlyMemory<string> Names => _registration.TagNames;
+
+    /// <summary>Resolves a tag name to its mask bit.</summary>
+    public bool TryGetBit(string tag, out int bit) => _registration.TryGetTagBit(tag, out bit);
+
+    /// <summary>Tests one row's mask bit.</summary>
+    public bool TryHasTagBit(int row, int bit) => _registration.TryHasTagBit(row, bit);
+
+    /// <summary>Sets or clears one row's mask bit.</summary>
+    public bool TrySetTagBit(int row, int bit, bool value) => _registration.TrySetTagBit(row, bit, value);
 }

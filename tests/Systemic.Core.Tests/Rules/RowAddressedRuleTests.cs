@@ -160,18 +160,107 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_tag_effects_are_rejected_at_bind_instead_of_silently_ignored()
+    public void Unknown_row_tag_fails_at_bind_with_the_rule_tag_and_declared_tags_named()
     {
         var world = new World(seed: 7, valueScale: 1);
-        CreatePrey(world, 1);
+        CreateTaggedPrey(world, 1);
         var engine = new RuleEngine(new CompiledRuleSet([
             new CompiledRule("prey.tag", "prey.tag", 0, [],
-                [RuleEffect.AddTag(RuleSubject.Row(Prey.Id, 0), "poisoned")])]));
+                [RuleEffect.AddTag(RuleSubject.Row(TaggedPrey.Id, 0), "onfire")])]));
 
         var error = Assert.Throws<InvalidOperationException>(() => engine.Bind(world));
 
         Assert.Contains("prey.tag", error.Message, StringComparison.Ordinal);
+        Assert.Contains("onfire", error.Message, StringComparison.Ordinal);
         Assert.Contains("poisoned", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Row_tag_effect_sets_the_schema_bit_for_one_row()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateTaggedPrey(world, 3);
+        var engine = Bind(world,
+            new CompiledRule("prey.envenom", "prey.envenom", 0, [],
+                [RuleEffect.AddTag(RuleSubject.Row(TaggedPrey.Id, 1), "poisoned")]));
+
+        var result = engine.Dispatch(world, new SimulationFact("prey.envenom", 0, 0));
+
+        Assert.Equal(1, result.EffectsApplied);
+        Assert.False(prey.HasTag(0, "poisoned"));
+        Assert.True(prey.HasTag(1, "poisoned"));
+        Assert.False(prey.HasTag(2, "poisoned"));
+        Assert.False(prey.HasTag(1, "feral"));
+    }
+
+    [Fact]
+    public void Row_tag_condition_reads_the_schema_bit_without_an_effect_when_unset()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateTaggedPrey(world, 2);
+        var engine = Bind(world,
+            new CompiledRule("prey.spread", "prey.spread", 0,
+                [RuleCondition.HasTag(RuleSubject.Row(TaggedPrey.Id, 1), "poisoned")],
+                [RuleEffect.AddTag(RuleSubject.Row(TaggedPrey.Id, 0), "poisoned")]));
+
+        var skipped = engine.Dispatch(world, new SimulationFact("prey.spread", 0, 0));
+        Assert.Equal(0, skipped.RulesMatched);
+        Assert.False(prey.HasTag(0, "poisoned"));
+
+        prey.AddTag(1, "poisoned");
+        var spread = engine.Dispatch(world, new SimulationFact("prey.spread", 0, 0));
+
+        Assert.Equal(1, spread.EffectsApplied);
+        Assert.True(prey.HasTag(0, "poisoned"));
+    }
+
+    [Fact]
+    public void Row_tag_effects_roll_back_with_the_dispatch_transaction()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateTaggedPrey(world, 2);
+        var engine = Bind(world,
+            new CompiledRule("prey.envenom", "prey.envenom", 0, [],
+                [RuleEffect.AddTag(RuleSubject.Row(TaggedPrey.Id, 0), "poisoned")]));
+
+        var result = engine.DispatchBatch(world,
+            [new SimulationFact("prey.envenom", 0, 0), new SimulationFact("poison", 0, 0)],
+            (fact, emitter) =>
+            {
+                if (fact.Type == "poison")
+                {
+                    Assert.False(emitter.Enqueue(new SimulationFact("invalid", -1, 0)));
+                }
+            });
+
+        Assert.True(result.RolledBack);
+        Assert.False(prey.HasTag(0, "poisoned"));
+    }
+
+    [Fact]
+    public void Row_tag_dispatch_does_not_allocate_once_warmed()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateTaggedPrey(world, 4);
+        var engine = Bind(world,
+            new CompiledRule("prey.envenom", "prey.envenom", 0,
+                [RuleCondition.HasTag(RuleSubject.Row(TaggedPrey.Id, 1), "poisoned")],
+                [RuleEffect.AddTag(RuleSubject.Row(TaggedPrey.Id, 2), "poisoned")]));
+        SimulationFact[] facts = [new("prey.envenom", 0, 0)];
+        for (var warmup = 0; warmup < 16; warmup++)
+        {
+            engine.DispatchBatch(world, facts);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var repetition = 0; repetition < 100; repetition++)
+        {
+            engine.DispatchBatch(world, facts);
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(allocated == 0, $"Row tag dispatch allocated {allocated} bytes over 100 dispatches.");
+        Assert.False(prey.HasTag(2, "poisoned"));
     }
 
     [Fact]
@@ -230,6 +319,14 @@ public sealed class RowAddressedRuleTests
         return new PreyFixture(population, health);
     }
 
+    private static Population<TaggedPrey> CreateTaggedPrey(World world, int count)
+    {
+        var population = world.DefinePopulation<TaggedPrey>();
+        population.Reserve(count);
+        population.AddRange(count);
+        return population;
+    }
+
     private static int[] ReadHealth(PreyFixture prey)
     {
         var values = new int[prey.Population.Count];
@@ -257,5 +354,14 @@ public sealed class RowAddressedRuleTests
         public static string Id => "test.prey";
 
         public static int Version => 1;
+    }
+
+    private readonly struct TaggedPrey : IPopulationKind
+    {
+        public static string Id => "test.tagged-prey";
+
+        public static int Version => 1;
+
+        public static string[] Tags => ["poisoned", "feral"];
     }
 }

@@ -594,6 +594,41 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
         return true;
     }
 
+    /// <summary>Reads one live row without converting it.</summary>
+    /// <returns><see langword="false"/> when the row is not live.</returns>
+    internal bool TryReadRow(int row, out T value)
+    {
+        if ((uint)row >= (uint)_population.Count)
+        {
+            value = default;
+            return false;
+        }
+
+        value = _buffer.Values[row];
+        return true;
+    }
+
+    /// <summary>Overwrites one live row, capturing its page for transaction undo.</summary>
+    /// <remarks>The caller owns any read-modify-write cycle; this does not merge with the prior value.</remarks>
+    /// <returns><see langword="false"/> when the row is not live.</returns>
+    internal bool TryWriteRow(int row, T value)
+    {
+        if ((uint)row >= (uint)_population.Count)
+        {
+            return false;
+        }
+
+        _population.ValidateRange(row, 1);
+        lock (_population.World.TransactionGate)
+        {
+            _buffer = _buffer.EnsureWritable();
+            CapturePages(0, row, 1, _buffer.Values.Length);
+            _buffer.Values[row] = value;
+        }
+
+        return true;
+    }
+
     internal override PopulationColumnSaveState CaptureSaveState(int count)
     {
         var data = new byte[_key.Codec.GetEncodedLength(count)];

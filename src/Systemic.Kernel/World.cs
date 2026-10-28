@@ -742,6 +742,20 @@ public sealed class World
         return registration.TryGetColumn(columnId, out column);
     }
 
+    /// <summary>Resolves a population's schema tags for row-addressed rules.</summary>
+    internal bool TryGetPopulationTags(string populationId, out PopulationTagAccess tags)
+    {
+        EnsureActive();
+        if (!_populationsById.TryGetValue(populationId, out var registration))
+        {
+            tags = default;
+            return false;
+        }
+
+        tags = new PopulationTagAccess(registration);
+        return true;
+    }
+
     internal void EnsurePopulationActive() => EnsureActive();
 
     /// <summary>Number of live entities with spatial bounds.</summary>
