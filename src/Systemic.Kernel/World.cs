@@ -729,6 +729,19 @@ public sealed class World
             : throw new KeyNotFoundException($"Population '{TKind.Id}' is not defined in this world.");
     }
 
+    /// <summary>Looks up a population column by schema ID and column ID for row-addressed rules.</summary>
+    internal bool TryGetPopulationColumn(string populationId, string columnId, out PopulationColumnBase column)
+    {
+        EnsureActive();
+        if (!_populationsById.TryGetValue(populationId, out var registration))
+        {
+            column = null!;
+            return false;
+        }
+
+        return registration.TryGetColumn(columnId, out column);
+    }
+
     internal void EnsurePopulationActive() => EnsureActive();
 
     /// <summary>Number of live entities with spatial bounds.</summary>

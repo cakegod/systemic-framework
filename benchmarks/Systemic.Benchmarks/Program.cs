@@ -13,6 +13,10 @@ else if (args.Length > 0 && string.Equals(args[0], "--million-agents", StringCom
 {
     Environment.ExitCode = MillionAgentBenchmark.Run(args[1..]);
 }
+else if (args.Length > 0 && string.Equals(args[0], "--thinking-agents", StringComparison.Ordinal))
+{
+    Environment.ExitCode = ThinkingAgentBenchmark.Run(args[1..]);
+}
 else
 {
     BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);

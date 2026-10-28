@@ -85,6 +85,9 @@ public sealed class RuleEngine
     private bool _factBudgetExceeded;
     private bool _invalidFact;
     private bool _eventHistoryIndexDirty;
+    // Rollback netcode clones the world per tick, so bindings are cached per world: rebinding
+    // one world's columns would write into the wrong clone. The cap keeps a hot but bounded set.
+    private readonly Dictionary<World, Dictionary<(string Population, string Column), PopulationColumnBase>> _rowBindings = [];
     private WorldTransaction? _activeTransaction;
     private WorldTransaction? _batchTransaction;
 
@@ -162,6 +165,125 @@ public sealed class RuleEngine
         _eventHistoryIndexDirty = true;
     }
 
+    /// <summary>Compiles and validates the rule set's row-addressed conditions and effects against a world.</summary>
+    /// <param name="world">World whose populations the rules address.</param>
+    /// <remarks>
+    /// Call this once while loading, before the first dispatch; the first dispatch into a world binds
+    /// implicitly when the caller does not. A rule naming a population, column, or column value type
+    /// this world does not provide fails here rather than mid-dispatch. A row rule's property name is
+    /// the column's stable key ID, so it is checked against the schema rather than guessed at runtime.
+    /// Row subjects support property comparisons and property adjustments; tags, modifiers, and
+    /// expressions stay on the entity path until the row storage for them exists.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="world"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">A row rule cannot be compiled against this world.</exception>
+    public void Bind(World world)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        // Validate into a local table first: a rejected rule set must not leave a half-bound
+        // entry that later dispatches would treat as successfully bound.
+        var rowColumns = new Dictionary<(string Population, string Column), PopulationColumnBase>();
+        foreach (var rule in _rules.Rules)
+        {
+            foreach (var condition in rule.Conditions)
+            {
+                if (!condition.Subject.IsRow)
+                {
+                    continue;
+                }
+
+                if (condition.Kind != RuleConditionKind.PropertyAtLeast)
+                {
+                    throw new InvalidOperationException(
+                        $"Rule '{rule.Id}' uses a {condition.Kind} condition on {condition.Subject}; "
+                        + "row subjects support property comparisons only.");
+                }
+
+                BindColumn(world, rowColumns, rule, condition.Subject, condition.Name);
+            }
+
+            foreach (var effect in rule.Effects)
+            {
+                if (!effect.Subject.IsRow)
+                {
+                    continue;
+                }
+
+                if (effect.Kind != RuleEffectKind.AdjustProperty)
+                {
+                    throw new InvalidOperationException(
+                        $"Rule '{rule.Id}' applies {effect.Kind} '{effect.Name}' to {effect.Subject}; "
+                        + "row subjects support property adjustments only.");
+                }
+
+                var column = BindColumn(world, rowColumns, rule, effect.Subject, effect.Name);
+                if (PopulationNumeric.IsIntegral(column.ValueType) && effect.Value != Math.Truncate(effect.Value))
+                {
+                    throw new InvalidOperationException(
+                        $"Rule '{rule.Id}' adjusts integer column '{effect.Name}' of '{effect.Subject.PopulationId}' by {effect.Value}; "
+                        + "a whole-number amount is required so the write stays exact.");
+                }
+            }
+        }
+
+        if (_rowBindings.Count >= 8)
+        {
+            _rowBindings.Clear();
+        }
+
+        _rowBindings[world] = rowColumns;
+    }
+
+    private static PopulationColumnBase BindColumn(World world,
+        Dictionary<(string Population, string Column), PopulationColumnBase> rowColumns,
+        CompiledRule rule,
+        RuleSubject subject,
+        string columnId)
+    {
+        if (!world.TryGetPopulationColumn(subject.PopulationId, columnId, out var column))
+        {
+            throw new InvalidOperationException(
+                $"Rule '{rule.Id}' references column '{columnId}' of population '{subject.PopulationId}', "
+                + "which this world does not define.");
+        }
+
+        if (!PopulationNumeric.IsNumeric(column.ValueType))
+        {
+            throw new InvalidOperationException(
+                $"Rule '{rule.Id}' references column '{columnId}' of population '{subject.PopulationId}', "
+                + $"which holds '{column.ValueType.Name}'; row rules need a numeric column.");
+        }
+
+        rowColumns[(subject.PopulationId, columnId)] = column;
+        return column;
+    }
+
+    // Populations are usually defined during world initialization, after the game is built, so a row
+    // rule set binds against a world on its first dispatch instead of requiring a build-order
+    // assumption. A missing column still fails before any effect applies.
+    private void EnsureBound(World world)
+    {
+        if (!_rowBindings.ContainsKey(world))
+        {
+            Bind(world);
+        }
+    }
+
+    private PopulationColumnBase ResolveRowColumn(World world, string ruleId, RuleSubject subject, string columnId,
+        string factType)
+    {
+        if (!_rowBindings.TryGetValue(world, out var rowColumns)
+            || !rowColumns.TryGetValue((subject.PopulationId, columnId), out var column))
+        {
+            throw new InvalidOperationException(
+                $"Rule '{ruleId}' addresses column '{columnId}' of population '{subject.PopulationId}' "
+                + $"but the engine is not bound to this world; call {nameof(RuleEngine)}.{nameof(Bind)} during load. "
+                + $"Fact '{factType}' was not applied.");
+        }
+
+        return column;
+    }
+
     public RuleDispatchResult Dispatch(
         World world,
         SimulationFact initialFact,
@@ -202,6 +324,7 @@ public sealed class RuleEngine
             return default;
         }
 
+        EnsureBound(world);
         if (facts.Length == 1)
         {
             return Dispatch(world, facts[0], beforeEachFact);
@@ -318,6 +441,8 @@ public sealed class RuleEngine
             throw new ArgumentOutOfRangeException(nameof(initialFact), initialFact.Amount,
                 "Fact amount must be finite.");
         }
+
+        EnsureBound(world);
 
         // A batch owns the transaction, so one scope covers every fact it dispatches.
         using var transaction = _batchTransaction is { } batch ? batch.AsBatchMember() : world.BeginTransaction();
@@ -531,6 +656,18 @@ public sealed class RuleEngine
             if (condition.Kind == RuleConditionKind.Chance)
             {
                 if (world.Draws.NextFloat() >= condition.Threshold)
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (condition.Subject.IsRow)
+            {
+                var column = ResolveRowColumn(world, rule.Id, condition.Subject, condition.Name, fact.Type);
+                if (!column.TryGetRowValue(condition.Subject.Slot, out var rowValue)
+                    || rowValue < condition.Threshold)
                 {
                     return false;
                 }
@@ -786,6 +923,15 @@ public sealed class RuleEngine
             return;
         }
 
+        if (effect.Subject.IsRow)
+        {
+            var column = ResolveRowColumn(world, ruleId, effect.Subject, effect.Name, fact.Type);
+            // A slot past the live row count is a despawned row: like a missing entity, the effect
+            // is accepted by a matched rule and has nowhere to land.
+            column.TryAddRowValue(effect.Subject.Slot, effect.Value);
+            return;
+        }
+
         var entity = resolvedEntities.Resolve(world, fact, effect.Subject);
         if (entity is null)
         {
@@ -848,6 +994,11 @@ public sealed class RuleEngine
 
         public Entity? Resolve(World world, SimulationFact fact, RuleSubject subject)
         {
+            if (subject.Kind == RuleSubjectKind.Entity)
+            {
+                return world.ById(subject.Slot);
+            }
+
             if (subject == RuleSubject.Source)
             {
                 if (!_sourceResolved || _sourceId != fact.SourceId)

@@ -29,11 +29,11 @@ Fixing findings one at a time produces thirteen fixes and no core. Fix the roots
 | P1.2 | Done | `PropertyModifier`/`PropertyGrant` store an absolute `ExpiryTick`, so the tick loop no longer rewrites or journals live modifiers. Tests: `ModifierExpiryTests` (expiry timing, live entries unchanged, zero allocation). Accepted break: the save payload names the field `expiryTick`, so documents written before this change no longer load. |
 | P1.3 | Done | `PresentationRuntime` uses typed in-memory rollback. `ISaveOnlyStateExtension` marks state the journal already covers, so the four kernel extensions and `BuildChoiceRuntime` no longer capture JSON every tick. Tests: `SaveOnlyStateTests`. |
 | P1.4 | Done | `World.EntitiesWithTag` gives the module an O(tagged) query; `Gameplay2DModule` writes through `Commands`, declares `ReadWorld` + `DeferWorldWrites`, and shares a wave. The scheduler now treats a reader beside a buffered writer as compatible. Every built-in system declares its access explicitly. Tests: `TagQueryTests`, `Module_shares_a_scheduling_wave_with_other_deferred_writers`. |
-| P1.5 | Done | Content tier in `GateTierTests` (2,000 actors, allocation and 5 ms p95). Kernel tier stays with the benchmark gate runner. The 50k/1k test is now a diagnostic under the approved tiers and reports timings without gating. The crowd tier needs P3 before it can be written. |
+| P1.5 | Done | Content tier in `GateTierTests` (2,000 actors, allocation and 5 ms p95). Kernel tier stays with the benchmark gate runner. The 50k/1k test is now a diagnostic under the approved tiers and reports timings without gating. The crowd tier needs P3 before it can be written. Its p95 gate measures the machine as much as the code: run the integration project on its own, because ten test assemblies in parallel on a loaded box miss a 5 ms target that passes 209/209 alone. |
 | P4.2 | Partial | Save schema is v6, bumped by P2; version 5 migrates and version 4 is rejected with a clear diagnostic, with no v4 migration by decision. The replay fixture was regenerated for the new state format. |
 | P5.2 | Done | `RollbackPropertyTests` uses FsCheck: random command sequences restore world state on rollback and match a parallel world on commit. |
 | P2 | Done | D3 found no user, so P2 took the gate's deletion branch: `EventEngine`, its triggers, `EngineBuilder`, `BatchTrigger`, `EntityQuery`, the `ActionPipeline` effect vocabulary, and both `Execute(KernelEvent)` entry points are gone. One dispatch path remains. Save schema is v6 with a v5 migration that drops `systemic.events`. Numbers and consequences under *Typed dispatch retired*. |
-| P3 | Started | D1 and D2 are decided: ADR 0001 (populations become rule subjects) and ADR 0002 (the expression language stays, frozen). The target is 1M agents that each evaluate a rule per tick, with a ~13.7 ns per-agent budget derived from measurement; 10M rows remains the storage and movement ceiling. See *Crowd target: one million thinking agents*. P3.1 itself is not written yet. |
+| P3 | Started | D1 and D2 are decided: ADR 0001 (populations become rule subjects) and ADR 0002 (the expression language stays, frozen). The target is 1M agents that each evaluate a rule per tick, measured against the simulation's share of the frame rather than the whole 16.7 ms; 10M rows remains the storage and movement ceiling. See *Crowd target: one million thinking agents*. P3.1 is done: row subjects bind their property names to column keys at load, dispatch with zero warmed allocations, and roll back with the dispatch transaction. Next is P3.2. |
 | P4.1, P4.3, P5.1, P5.3–P5.6 | Open | P4.3 no longer retires the expression language; P4.1 and P5.1/P5.3–P5.6 are separate integrations. |
 
 ### Spatial grid storage
@@ -179,7 +179,7 @@ stay in the Kernel, so a system can still charge costs itself.
 
 | ID | Work | Acceptance |
 | --- | --- | --- |
-| P3.1 | Introduce `RuleSubject` with two addressings (`Entity(id)` and `Row(populationId, handle)`); compile `AdjustProperty`/`SetModifier` property names to column keys per schema, and reject unknown properties at load. Content schema version bump. | A rule naming a property its schema lacks fails at load, not at runtime. |
+| P3.1 | **Done.** `RuleSubject` addresses `Source`, `Target`, `Entity(id)`, or `Row(populationId, slot)`. `RuleEngine.Bind(World)` resolves a row rule's property name to the column's stable key and rejects an unknown population, an unknown column, a non-numeric column, an unsupported row effect, and a fractional write to an integer column before any fact is dispatched; the first dispatch into a world binds implicitly so build order is not a load-order assumption. Row effects write through `PopulationColumnBase.TryAddRowValue`, which captures the page for the dispatch transaction, so rollback covers them. Remaining for later phases: row tags (P3.2), row modifiers (P3.3), and row-addressed facts (P3.5), which is why the row condition vocabulary is comparisons only. There is no content schema bump: row rules are authored in typed C#, the surface the crowd tier needs. Tests: `RowAddressedRuleTests` (dispatch, condition, despawned slot, bind failures, zero warmed allocations, rollback). | A rule naming a property its schema lacks fails at load, not at runtime. |
 | P3.2 | Tags become a `ulong` mask column with a per-schema tag registry (64 tags), replacing `ImmutableHashSet<string>` on the row path. | Tag test and tag effect are O(1) with no hashing and no allocation. |
 | P3.3 | Modifiers become fixed inline slot columns (`ModifierSlot8`: 8 × (ushort key, float value, int expiryTick)) instead of `Dictionary<(int,string), List<PropertyModifier>>`. | `SetModifier` never allocates; 100k rows carry modifiers without heap growth. |
 | P3.4 | Dirty-row journal capture. Column values already roll back: `PopulationColumn.EditRange` captures whole pages through `PopulationPageUndoBatch`, so correctness landed before P3.1. What remains is cost — a full-buffer edit spends ~0.55 ms per tick at 1M rows and ~10 ms at 10M copying pages, which is a large slice of the 13.7 ns per-agent budget — so capture touched rows instead of their pages. | Rollback property test (P5.2) passes for random value and structure edits; a sparse row edit no longer copies a page. |
@@ -204,28 +204,31 @@ four `int32` columns, `x += vx`, no AI, no spatial query, one thread — now par
 | 10M | optimized | 21.02 ms | 23.43 ms | 0 B | 196 MB |
 | 10M | safe (per-tick transaction) | 30.86 ms | 31.99 ms | 0 B | 274 MB |
 
-The 1M row is what makes the target meaningful, because a 60 Hz tick is 16.7 ms and a transactional
-movement pass at 1M already leaves most of it unspent. That leaves a per-agent rule budget:
+The 1M row is what makes the target meaningful, but **the frame is not the simulation's to spend**. At
+60 Hz the frame is 16.7 ms and presentation — HUD, visuals, effects, cue compilation, input, audio
+handoff — needs most of it; the approved kernel tier already treats 5 ms as the simulation's share. At
+30 Hz the frame is 33.3 ms, so a 10 ms simulation budget leaves 23 ms for presentation.
 
-- **60 Hz, 1M agents:** 16.7 ms tick − 3.0 ms transactional movement = **~13.7 ms**, or **~13.7 ns per
-  agent per tick** (about 41 cycles on this CPU). Column-resident work measures ~2.1 ns per row per
-  four-column pass, so a compiled predicate reading a few columns plus one column write fits with
-  room to spare.
-- **What does not fit:** string tags (`ImmutableHashSet<string>` hashing per agent costs more than the
-  whole budget, which is why P3.2 is a prerequisite rather than a polish item), dictionary property
-  lookups, any allocation, and a per-agent radius query against a cold index (a cache miss is ~100
-  cycles on its own). Neighbour interaction must be bucketed per cell or amortised across ticks.
-- **10M rows:** 31 ms transactional, and a single four-column pass is 21 ms of it. That is a storage
-  and movement ceiling, not a rule target — at 10M the rule must be aggregate-only, which is what
-  P3.7's sink is for.
+Measured transactional cost for 1M agents doing movement plus one masked condition and one
+conditional column write: **4.77 ms p95, ~4.3 ns per agent, zero allocated**. That fits a 10 ms
+simulation budget with more than half to spare. It does not fit 5 ms with anything left over — it
+consumes 95% of it — so the gate is defined at the rate where the budget is real:
 
-So the gate has two shapes and only one of them is the thesis:
+- **Primary gate (P3.8): 30 Hz.** 1M agents, one authored rule evaluated per agent from
+  column-resident state, one transaction per tick, simulation p95 ≤ 10 ms, zero warmed allocations,
+  and a fact volume that does not scale with row count. Presentation keeps 23 ms of the frame.
+- **60 Hz is headroom evidence, not a gate.** The same kernel work measures 4.77 ms p95 — inside 5 ms,
+  but with ~0.2 ms left for presentation systems and every other system in the tick. Record it; do
+  not claim a 60 Hz crowd tier on it.
+- **What does not fit at either rate:** string tags (hashing `ImmutableHashSet<string>` per agent
+  exceeds the whole rule budget, which is why P3.2 is a prerequisite), dictionary property lookups,
+  any allocation, a per-agent cold-index radius query (one cache miss is ~100 cycles), and a fact per
+  row. Neighbour interaction must be bucketed per cell or amortised across ticks.
+- **10M rows:** 31 ms transactional, and a single four-column pass is 21 ms of it. Storage and
+  movement only, at 30 Hz with no rule.
 
-1. **Thinking gate (P3.8):** 1M agents, one authored rule evaluated per agent from column-resident
-   state — a tag-mask condition plus a column effect — one transaction per tick, 60 Hz, p95 ≤ 16.7 ms,
-   zero warmed allocations, and a fact volume that does not scale with row count.
-2. **Headroom check:** 10M rows stored and moved inside 35 ms at 30 Hz, with no per-row rule, kept as
-   the documented ceiling for "dense for millions".
+The kernel's slack at 30 Hz is ~5 ms of the simulation budget, and that slack is what P3.1's compiled
+column keys and P3.2's tag masks have to fit inside.
 
 If the thinking gate cannot be met, the demo falls back to 100k thinking agents and the README claim
 stays at "systemic for dozens, dense for millions". Meeting it is what earns "systemic for a million".

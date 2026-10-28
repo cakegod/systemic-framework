@@ -28,9 +28,12 @@ replacement:
    through one `RuleEngine`, one transaction per tick and one depth budget.
 
 The target for this work is **1,000,000 agents that evaluate a rule every tick**, not one million rows
-that merely move. Measured on the target machine class, a transactional movement pass over 1M rows
-costs 3.0 ms p95, leaving ~13.7 ms of a 60 Hz tick, or ~13.7 ns per agent, for the rule itself (see
-*Crowd target: one million thinking agents* in the remediation plan).
+that merely move, at **30 Hz** — the rate at which a 10 ms simulation budget leaves real time for
+presentation in a 33.3 ms frame. Measured on the target machine class, movement plus one masked
+threshold condition and a conditional column write costs 4.77 ms p95 transactionally with zero
+allocation, which fits that budget with more than half to spare. The same work fits 5 ms at 60 Hz
+only if presentation gets nothing, so 60 Hz is recorded as headroom, not as a gate (see *Crowd
+target: one million thinking agents* in the remediation plan).
 
 Ten million rows was also measured — 31 ms per transactional tick, 274 MB — and stands as the storage
 and movement ceiling. It is not the rule target: at 10M a full-column pass alone consumes the tick, so

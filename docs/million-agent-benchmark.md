@@ -70,6 +70,30 @@ platform or cgroup format is unavailable the report says so. Record these detail
 sample counts, command and concurrent load alongside any reported result; a
 virtualized CPU model does not establish performance on an older desktop CPU.
 
+## Thinking agents
+
+`--thinking-agents` measures the per-row rule budget rather than movement: each of `--agents` rows
+owns four columns (`x`, `vx`, `health` int32 and a `ulong` tag mask), advances `x`, and — when the
+mask's low bit is set and the new `x` is positive — decrements `health`. That is one masked threshold
+condition plus one conditional column write per agent per tick, inside one `World` transaction.
+
+```sh
+dotnet run -c Release --project benchmarks/Systemic.Benchmarks -- \
+  --thinking-agents --mode both --agents 1000000 --warmup-ticks 100 --ticks 200
+```
+
+`--thinking-agents --self-test` checks hand-derived rows for each branch (mask off, mask on crossing
+the threshold, mask on staying non-positive, and leaving the threshold), and `Validate` re-derives
+every row's position plus the sampled health outcome after the run.
+
+`--target-ms` defaults to 10.0: the simulation's share of a 30 Hz frame, with the other 23 ms of the
+33.3 ms frame left to presentation. A 60 Hz frame is 16.7 ms and cannot be spent entirely on
+simulation, so 16.7 is not the budget even though this workload fits inside it.
+
+This workload is a hand-written column kernel, not rule dispatch: it establishes that the per-agent
+budget exists, and the difference between its cost and the rule path's cost is exactly the room the
+engine has for dispatch overhead.
+
 ## Example observations
 
 Intel i5-4430 at 3.0 GHz, four visible CPUs, .NET 10 Release, zero allocations in every row:
@@ -85,6 +109,17 @@ The per-row cost is flat (~2.1 ns) up to ten million, but the transaction does n
 its +0.55 ms at 1M becomes +9.8 ms at 10M, because the journal copies 160 MB that no longer fits in
 cache. This workload is movement only — no rule dispatch, spatial query, collision or rendering — so
 ten million rows here means ten million simulated positions, not ten million thinking agents.
+
+The thinking workload at 1M, same machine, zero allocations in both modes:
+
+| Mode | p50 | p95 | Per row |
+| --- | --- | --- | --- |
+| safe-transactional | 4.27 ms | 4.77 ms | 4.26 ns |
+| optimized | 3.21 ms | 3.70 ms | 3.21 ns |
+
+A column-local decision costs about twice a pure movement pass and still leaves 71% of a 60 Hz tick,
+so the one-million-agent rule target has roughly three times the headroom it needs — for a compiled
+column kernel. Rule dispatch has that difference to work with, and no more.
 
 On 2026-10-27, three safe Release runs and one optimized Release run in the shared
 development container used 20 warm-up ticks and 100 measured ticks per run. The

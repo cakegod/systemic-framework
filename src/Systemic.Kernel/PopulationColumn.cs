@@ -373,6 +373,14 @@ public abstract class PopulationColumnBase(
         }
     }
 
+    /// <summary>Reads one row as a double so rule conditions can compare columns without a generic handle.</summary>
+    /// <returns><see langword="false"/> when the column is not numeric or the row is not live.</returns>
+    internal abstract bool TryGetRowValue(int row, out double value);
+
+    /// <summary>Adds to one row as a double, capturing the page for transaction undo.</summary>
+    /// <returns><see langword="false"/> when the row is not live.</returns>
+    internal abstract bool TryAddRowValue(int row, double amount);
+
     internal abstract void ClearRange(int start, int length);
 
     internal abstract void MoveRow(int source, int destination);
@@ -542,6 +550,49 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
     }
 
     internal PopulationColumnKey<T> Key => _key;
+
+    internal override bool TryGetRowValue(int row, out double value)
+    {
+        if (!PopulationNumeric.IsNumeric(typeof(T)) || row < 0 || row >= _population.Count)
+        {
+            value = 0;
+            return false;
+        }
+
+        value = PopulationNumeric.ToDouble(in _buffer.Values[row]);
+        return true;
+    }
+
+    internal override bool TryAddRowValue(int row, double amount)
+    {
+        if (!PopulationNumeric.IsNumeric(typeof(T)))
+        {
+            throw new InvalidOperationException(
+                $"Population column '{Id}' holds '{typeof(T).Name}', which rules cannot adjust numerically.");
+        }
+
+        if (row < 0 || row >= _population.Count)
+        {
+            return false;
+        }
+
+        _population.ValidateRange(row, 1);
+        lock (_population.World.TransactionGate)
+        {
+            _buffer = _buffer.EnsureWritable();
+            // Page granularity keeps undo correct today; P3.4 narrows capture to the touched rows.
+            CapturePages(0, row, 1, _buffer.Values.Length);
+            ref var cell = ref _buffer.Values[row];
+            PopulationNumeric.Add(ref cell, amount);
+            if (!double.IsFinite(PopulationNumeric.ToDouble(in cell)))
+            {
+                throw new OverflowException(
+                    $"Population column '{Id}' overflowed to a non-finite value at row {row}.");
+            }
+        }
+
+        return true;
+    }
 
     internal override PopulationColumnSaveState CaptureSaveState(int count)
     {
@@ -770,6 +821,16 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
 
     internal PopulationColumnKey<T> Key => _key;
 
+    // Double-buffered columns hold smoothed presentation values; rules read and adjust the
+    // simulated (unbuffered) column instead, so the row-value bridge declines them.
+    internal override bool TryGetRowValue(int row, out double value)
+    {
+        value = 0;
+        return false;
+    }
+
+    internal override bool TryAddRowValue(int row, double amount) => false;
+
     internal override PopulationColumnSaveState CaptureSaveState(int count)
     {
         var data = new byte[_key.Codec.GetEncodedLength(count)];
@@ -920,4 +981,44 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
 
     internal override PopulationColumnBase CloneTo(PopulationStorage storage) =>
         new DoubleBufferedPopulationColumn<T>(storage, _key, _first.Share(), _second.Share(), _firstIsCurrent);
+}
+
+/// <summary>Reads and writes population column cells in double space for the rule path.</summary>
+internal static class PopulationNumeric
+{
+    public static bool IsNumeric(Type type) => type == typeof(double) || type == typeof(float)
+        || type == typeof(int) || type == typeof(long) || type == typeof(short) || type == typeof(sbyte)
+        || type == typeof(uint) || type == typeof(ulong) || type == typeof(ushort) || type == typeof(byte);
+
+    public static bool IsIntegral(Type type) => IsNumeric(type) && type != typeof(double) && type != typeof(float);
+
+    public static double ToDouble<T>(in T value) where T : unmanaged
+    {
+        if (typeof(T) == typeof(double)) return Unsafe.As<T, double>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(float)) return Unsafe.As<T, float>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(int)) return Unsafe.As<T, int>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(long)) return Unsafe.As<T, long>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(short)) return Unsafe.As<T, short>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(sbyte)) return Unsafe.As<T, sbyte>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(uint)) return Unsafe.As<T, uint>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(ulong)) return Unsafe.As<T, ulong>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(ushort)) return Unsafe.As<T, ushort>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(byte)) return Unsafe.As<T, byte>(ref Unsafe.AsRef(in value));
+        throw new InvalidOperationException($"'{typeof(T).Name}' is not a numeric population column type.");
+    }
+
+    public static void Add<T>(ref T cell, double amount) where T : unmanaged
+    {
+        if (typeof(T) == typeof(double)) Unsafe.As<T, double>(ref cell) += amount;
+        else if (typeof(T) == typeof(float)) Unsafe.As<T, float>(ref cell) += (float)amount;
+        else if (typeof(T) == typeof(int)) Unsafe.As<T, int>(ref cell) = checked(Unsafe.As<T, int>(ref cell) + (int)amount);
+        else if (typeof(T) == typeof(long)) Unsafe.As<T, long>(ref cell) = checked(Unsafe.As<T, long>(ref cell) + (long)amount);
+        else if (typeof(T) == typeof(short)) Unsafe.As<T, short>(ref cell) = checked((short)(Unsafe.As<T, short>(ref cell) + (short)amount));
+        else if (typeof(T) == typeof(sbyte)) Unsafe.As<T, sbyte>(ref cell) = checked((sbyte)(Unsafe.As<T, sbyte>(ref cell) + (sbyte)amount));
+        else if (typeof(T) == typeof(uint)) Unsafe.As<T, uint>(ref cell) = checked(Unsafe.As<T, uint>(ref cell) + (uint)amount);
+        else if (typeof(T) == typeof(ulong)) Unsafe.As<T, ulong>(ref cell) = checked(Unsafe.As<T, ulong>(ref cell) + (ulong)amount);
+        else if (typeof(T) == typeof(ushort)) Unsafe.As<T, ushort>(ref cell) = checked((ushort)(Unsafe.As<T, ushort>(ref cell) + (ushort)amount));
+        else if (typeof(T) == typeof(byte)) Unsafe.As<T, byte>(ref cell) = checked((byte)(Unsafe.As<T, byte>(ref cell) + (byte)amount));
+        else throw new InvalidOperationException($"'{typeof(T).Name}' is not a numeric population column type.");
+    }
 }

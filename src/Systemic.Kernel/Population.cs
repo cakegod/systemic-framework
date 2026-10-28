@@ -359,6 +359,13 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         }
     }
 
+    /// <summary>Looks up a column by its stable ID without knowing its value type.</summary>
+    internal bool TryGetColumn(string columnId, out PopulationColumnBase column)
+    {
+        EnsureActive();
+        return _columns.TryGetValue(columnId, out column!);
+    }
+
     /// <summary>Gets or creates a single-buffered column with the supplied stable key.</summary>
     public PopulationColumn<T> Column<T>(PopulationColumnKey<T> key) where T : unmanaged
     {
@@ -1092,6 +1099,8 @@ internal abstract class PopulationRegistration
 
     public abstract object Value { get; }
 
+    public abstract bool TryGetColumn(string columnId, out PopulationColumnBase column);
+
     public abstract PopulationSaveState CaptureSaveState();
 
     public abstract Action PrepareRestore(PopulationSaveState state);
@@ -1111,6 +1120,9 @@ internal sealed class PopulationRegistration<TKind>(Population<TKind> population
     public override string Id => TKind.Id;
 
     public override object Value => population;
+
+    public override bool TryGetColumn(string columnId, out PopulationColumnBase column) =>
+        population.TryGetColumn(columnId, out column);
 
     public override PopulationSaveState CaptureSaveState() => population.CaptureSaveState();
 
