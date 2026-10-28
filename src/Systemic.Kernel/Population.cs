@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using System.Threading;
 
+using Microsoft.Extensions.ObjectPool;
+
 namespace Systemic.Kernel;
 
 /// <summary>Identifies a population schema by its stable ID and version.</summary>
@@ -88,7 +90,8 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     private readonly long _ownerToken;
     private readonly List<HandleSlot> _handleSlots = [];
     private readonly Stack<int> _freeHandleSlots = new();
-    private readonly Stack<PopulationStructureUndoBatch> _freeStructureUndoBatches = new();
+    private const int MaximumPooledStructureUndoBatches = 256;
+    private readonly ObjectPool<PopulationStructureUndoBatch> _structureUndoBatches;
     private int[] _rowToHandleSlot = [];
     private int _capacity;
 
@@ -98,6 +101,8 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         _storage = new PopulationStorage(world);
         _handlesEnabled = handlesEnabled;
         _ownerToken = ownerToken ?? Interlocked.Increment(ref s_nextOwnerToken);
+        _structureUndoBatches = new DefaultObjectPool<PopulationStructureUndoBatch>(
+            new StructureUndoBatchPolicy(this), MaximumPooledStructureUndoBatches);
         // Copied: the mask order is persisted schema, so a schema must not be able to mutate it later.
         _tagNames = [.. TKind.Tags];
         if (_tagNames.Length > MaximumTags)
@@ -1113,9 +1118,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             return;
         }
 
-        var batch = _freeStructureUndoBatches.Count > 0
-            ? _freeStructureUndoBatches.Pop()
-            : new PopulationStructureUndoBatch(this);
+        var batch = _structureUndoBatches.Get();
         try
         {
             batch.Capture();
@@ -1132,7 +1135,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     private void ReleaseStructureUndo(PopulationStructureUndoBatch batch)
     {
         batch.Reset();
-        _freeStructureUndoBatches.Push(batch);
+        _structureUndoBatches.Return(batch);
     }
 
     private int GrowCapacity(int required)
@@ -1167,6 +1170,14 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         public int Row = row;
 
         public ulong Generation = generation;
+    }
+
+    private sealed class StructureUndoBatchPolicy(Population<TKind> population)
+        : PooledObjectPolicy<PopulationStructureUndoBatch>
+    {
+        public override PopulationStructureUndoBatch Create() => new(population);
+
+        public override bool Return(PopulationStructureUndoBatch obj) => true;
     }
 
     private sealed class PopulationStructureUndoBatch(Population<TKind> population) : IColumnUndoBatch

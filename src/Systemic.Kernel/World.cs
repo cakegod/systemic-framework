@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 
+using Microsoft.Extensions.ObjectPool;
+
 namespace Systemic.Kernel;
 
 public enum ModifierOperation
@@ -104,7 +106,8 @@ public sealed class World
     private int _activeScheduledSystems;
     private readonly List<UndoRecord> _journal = [];
     private readonly Stack<ScopeState> _scopes = [];
-    private readonly Stack<ScopeState> _freeScopes = [];
+    private const int MaximumPooledScopes = 256;
+    private readonly ObjectPool<ScopeState> _freeScopes;
     private readonly List<(int EntityId, string Property)> _expiringModifierKeys = [];
     private readonly List<int> _expiringGrantEntities = [];
     private bool _undoing;
@@ -208,6 +211,7 @@ public sealed class World
         Draws = new DrawStream(seed);
         SpatialCellSize = spatialCellSize;
         _spatialIndex = new SpatialIndex(spatialCellSize);
+        _freeScopes = new DefaultObjectPool<ScopeState>(new ScopeStatePolicy(), MaximumPooledScopes);
     }
 
     private World(int seed, double valueScale, DrawStream draws, int capacity = 0,
@@ -218,6 +222,7 @@ public sealed class World
         Draws = draws;
         SpatialCellSize = spatialCellSize;
         _spatialIndex = new SpatialIndex(spatialCellSize);
+        _freeScopes = new DefaultObjectPool<ScopeState>(new ScopeStatePolicy(), MaximumPooledScopes);
 
         if (capacity > 0)
         {
@@ -586,7 +591,7 @@ public sealed class World
         lock (TransactionGate)
         {
             EnsureNoPopulationLeases();
-            var scope = _freeScopes.Count > 0 ? _freeScopes.Pop() : new ScopeState();
+            var scope = _freeScopes.Get();
             scope.Mark = _journal.Count;
             scope.Draws = Draws.Capture();
             scope.LogicalTick = LogicalTick;
@@ -2473,7 +2478,7 @@ public sealed class World
         {
             scope.RollbackActions?.Clear();
             scope.CommitActions?.Clear();
-            _freeScopes.Push(scope);
+            _freeScopes.Return(scope);
         }
         if (callbackErrors is not null)
         {
@@ -2484,6 +2489,13 @@ public sealed class World
 
             throw new WorldCommitCallbackException(callbackErrors);
         }
+    }
+
+    private sealed class ScopeStatePolicy : PooledObjectPolicy<ScopeState>
+    {
+        public override ScopeState Create() => new();
+
+        public override bool Return(ScopeState obj) => true;
     }
 
     internal sealed class ScopeState

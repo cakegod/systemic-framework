@@ -1,3 +1,5 @@
+using Microsoft.Extensions.ObjectPool;
+
 namespace Systemic.Kernel;
 
 internal interface IWorldStateAttachment
@@ -20,8 +22,15 @@ internal sealed class EntityColumn<TEntity, TState>
     where TEntity : Entity
     where TState : struct
 {
+    // Batches are pooled per column, but not without limit, so a deep transaction cannot retain
+    // them for the lifetime of the column.
+    private const int MaximumPooledUndoBatches = 4_096;
+
     private TState[] _values = new TState[16];
-    private readonly Stack<ColumnUndoBatch> _freeUndoBatches = new();
+    private readonly ObjectPool<ColumnUndoBatch> _undoBatches;
+
+    public EntityColumn() =>
+        _undoBatches = new DefaultObjectPool<ColumnUndoBatch>(new UndoBatchPolicy(this), MaximumPooledUndoBatches);
 
     public ref TState ById(int entityId)
     {
@@ -54,8 +63,7 @@ internal sealed class EntityColumn<TEntity, TState>
         }
     }
 
-    public ColumnUndoBatch RentUndoBatch() =>
-        _freeUndoBatches.Count > 0 ? _freeUndoBatches.Pop() : new ColumnUndoBatch(this);
+    public ColumnUndoBatch RentUndoBatch() => _undoBatches.Get();
 
     internal sealed class ColumnUndoBatch(EntityColumn<TEntity, TState> column) : IColumnUndoBatch
     {
@@ -75,8 +83,15 @@ internal sealed class EntityColumn<TEntity, TState>
         public void Release()
         {
             _rows.Clear();
-            column._freeUndoBatches.Push(this);
+            column._undoBatches.Return(this);
         }
+    }
+
+    private sealed class UndoBatchPolicy(EntityColumn<TEntity, TState> column) : PooledObjectPolicy<ColumnUndoBatch>
+    {
+        public override ColumnUndoBatch Create() => new(column);
+
+        public override bool Return(ColumnUndoBatch obj) => true;
     }
 }
 

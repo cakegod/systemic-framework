@@ -1,0 +1,99 @@
+using System.Numerics;
+using Systemic.Kernel;
+
+namespace Systemic.Tests.Kernel;
+
+public sealed class PopulationCodecTests
+{
+    private static readonly bool[] Booleans = [false, true];
+    private static readonly byte[] Bytes = [0, 255];
+    private static readonly sbyte[] SignedBytes = [sbyte.MinValue, sbyte.MaxValue];
+    private static readonly char[] Characters = ['\0', 'é'];
+    private static readonly short[] Shorts = [short.MinValue, short.MaxValue];
+    private static readonly ushort[] UnsignedShorts = [ushort.MinValue, ushort.MaxValue];
+    private static readonly int[] Integers = [int.MinValue, int.MaxValue];
+    private static readonly uint[] UnsignedIntegers = [uint.MinValue, uint.MaxValue];
+    private static readonly long[] Longs = [long.MinValue, long.MaxValue];
+    private static readonly ulong[] UnsignedLongs = [ulong.MinValue, ulong.MaxValue];
+    private static readonly float[] Singles = [float.NegativeInfinity, -0.0f, float.NaN];
+    private static readonly double[] Doubles = [double.NegativeInfinity, -0.0, double.NaN];
+    private static readonly decimal[] Decimals = [decimal.MinValue, -0.0m, decimal.MaxValue];
+    private static readonly Vector2[] Vector2s = [new Vector2(float.NaN, -0.0f)];
+    private static readonly Vector3[] Vector3s = [new Vector3(1, -2, 3)];
+    private static readonly Vector4[] Vector4s = [new Vector4(1, -2, 3, 4)];
+
+    [Fact]
+    public void Blittable_codecs_encode_the_stable_little_endian_wire_format()
+    {
+        AssertBytes(PopulationCodecs.Int32, [-2], [0xFE, 0xFF, 0xFF, 0xFF]);
+        AssertBytes(PopulationCodecs.UInt64, [0x0102_0304_0506_0708UL], [0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01]);
+        AssertBytes(PopulationCodecs.Double, [1.5, -0.0], [0, 0, 0, 0, 0, 0, 0xF8, 0x3F, 0, 0, 0, 0, 0, 0, 0, 0x80]);
+        AssertBytes(PopulationCodecs.Single, [1.5f], [0, 0, 0xC0, 0x3F]);
+        AssertBytes(PopulationCodecs.Char, ['A'], [0x41, 0x00]);
+        AssertBytes(PopulationCodecs.Vector2, [new Vector2(1, 2)], [0, 0, 0x80, 0x3F, 0, 0, 0, 0x40]);
+        AssertBytes(PopulationCodecs.Vector3, [new Vector3(1, 2, 3)],
+            [0, 0, 0x80, 0x3F, 0, 0, 0, 0x40, 0, 0, 0x40, 0x40]);
+    }
+
+    [Fact]
+    public void Non_blittable_codecs_validate_their_wire_values()
+    {
+        AssertBytes(PopulationCodecs.Boolean, [true], [1]);
+        Assert.Throws<FormatException>(() => PopulationCodecs.Boolean.Decode([2], new bool[1]));
+        AssertBytes(PopulationCodecs.Decimal, [1.5m], [0x0F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]);
+    }
+
+    [Fact]
+    public void Every_built_in_codec_round_trips_its_values()
+    {
+        RoundTrip(PopulationCodecs.Boolean, Booleans);
+        RoundTrip(PopulationCodecs.Byte, Bytes);
+        RoundTrip(PopulationCodecs.SByte, SignedBytes);
+        RoundTrip(PopulationCodecs.Char, Characters);
+        RoundTrip(PopulationCodecs.Int16, Shorts);
+        RoundTrip(PopulationCodecs.UInt16, UnsignedShorts);
+        RoundTrip(PopulationCodecs.Int32, Integers);
+        RoundTrip(PopulationCodecs.UInt32, UnsignedIntegers);
+        RoundTrip(PopulationCodecs.Int64, Longs);
+        RoundTrip(PopulationCodecs.UInt64, UnsignedLongs);
+        RoundTrip(PopulationCodecs.Single, Singles);
+        RoundTrip(PopulationCodecs.Double, Doubles);
+        RoundTrip(PopulationCodecs.Decimal, Decimals);
+        RoundTrip(PopulationCodecs.Vector2, Vector2s);
+        RoundTrip(PopulationCodecs.Vector3, Vector3s);
+        RoundTrip(PopulationCodecs.Vector4, Vector4s);
+    }
+
+    private static void AssertBytes<T>(IPopulationCodec<T> codec, T[] values, byte[] expected)
+        where T : unmanaged
+    {
+        var data = new byte[codec.GetEncodedLength(values.Length)];
+        codec.Encode(values, data);
+        Assert.Equal(expected, data);
+    }
+
+    private static void RoundTrip<T>(IPopulationCodec<T> codec, T[] values) where T : unmanaged
+    {
+        var data = new byte[codec.GetEncodedLength(values.Length)];
+        codec.Encode(values, data);
+        var restored = new T[values.Length];
+        codec.Decode(data, restored);
+        for (var index = 0; index < values.Length; index++)
+        {
+            if (typeof(T) == typeof(float))
+            {
+                Assert.Equal(BitConverter.SingleToInt32Bits((float)(object)values[index]),
+                    BitConverter.SingleToInt32Bits((float)(object)restored[index]));
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                Assert.Equal(BitConverter.DoubleToInt64Bits((double)(object)values[index]),
+                    BitConverter.DoubleToInt64Bits((double)(object)restored[index]));
+            }
+            else
+            {
+                Assert.Equal(values[index], restored[index]);
+            }
+        }
+    }
+}

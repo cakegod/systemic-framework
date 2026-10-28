@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.ObjectPool;
 
 namespace Systemic.Kernel;
 
@@ -62,49 +63,60 @@ public static class PopulationCodecs
 
     public static IPopulationCodec<byte> Byte { get; } = new Codec<byte>(
         "kernel.u8", 1, static (value, destination) => destination[0] = value,
-        static source => source[0]);
+        static source => source[0],
+            copyLayout: true);
 
     public static IPopulationCodec<sbyte> SByte { get; } = new Codec<sbyte>(
         "kernel.i8", 1, static (value, destination) => destination[0] = unchecked((byte)value),
-        static source => unchecked((sbyte)source[0]));
+        static source => unchecked((sbyte)source[0]),
+            copyLayout: true);
 
     public static IPopulationCodec<char> Char { get; } = new Codec<char>(
         "kernel.char16", 2, static (value, destination) => BinaryPrimitives.WriteUInt16LittleEndian(destination, value),
-        static source => (char)BinaryPrimitives.ReadUInt16LittleEndian(source));
+        static source => (char)BinaryPrimitives.ReadUInt16LittleEndian(source),
+            copyLayout: true);
 
     public static IPopulationCodec<short> Int16 { get; } = new Codec<short>(
         "kernel.i16", 2, static (value, destination) => BinaryPrimitives.WriteInt16LittleEndian(destination, value),
-        static source => BinaryPrimitives.ReadInt16LittleEndian(source));
+        static source => BinaryPrimitives.ReadInt16LittleEndian(source),
+            copyLayout: true);
 
     public static IPopulationCodec<ushort> UInt16 { get; } = new Codec<ushort>(
         "kernel.u16", 2, static (value, destination) => BinaryPrimitives.WriteUInt16LittleEndian(destination, value),
-        static source => BinaryPrimitives.ReadUInt16LittleEndian(source));
+        static source => BinaryPrimitives.ReadUInt16LittleEndian(source),
+            copyLayout: true);
 
     public static IPopulationCodec<int> Int32 { get; } = new Codec<int>(
         "kernel.i32", 4, static (value, destination) => BinaryPrimitives.WriteInt32LittleEndian(destination, value),
-        static source => BinaryPrimitives.ReadInt32LittleEndian(source));
+        static source => BinaryPrimitives.ReadInt32LittleEndian(source),
+            copyLayout: true);
 
     public static IPopulationCodec<uint> UInt32 { get; } = new Codec<uint>(
         "kernel.u32", 4, static (value, destination) => BinaryPrimitives.WriteUInt32LittleEndian(destination, value),
-        static source => BinaryPrimitives.ReadUInt32LittleEndian(source));
+        static source => BinaryPrimitives.ReadUInt32LittleEndian(source),
+            copyLayout: true);
 
     public static IPopulationCodec<long> Int64 { get; } = new Codec<long>(
         "kernel.i64", 8, static (value, destination) => BinaryPrimitives.WriteInt64LittleEndian(destination, value),
-        static source => BinaryPrimitives.ReadInt64LittleEndian(source));
+        static source => BinaryPrimitives.ReadInt64LittleEndian(source),
+            copyLayout: true);
 
     public static IPopulationCodec<ulong> UInt64 { get; } = new Codec<ulong>(
         "kernel.u64", 8, static (value, destination) => BinaryPrimitives.WriteUInt64LittleEndian(destination, value),
-        static source => BinaryPrimitives.ReadUInt64LittleEndian(source));
+        static source => BinaryPrimitives.ReadUInt64LittleEndian(source),
+            copyLayout: true);
 
     public static IPopulationCodec<float> Single { get; } = new Codec<float>(
         "kernel.f32", 4,
         static (value, destination) => BinaryPrimitives.WriteInt32LittleEndian(destination, BitConverter.SingleToInt32Bits(value)),
-        static source => BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(source)));
+        static source => BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(source)),
+            copyLayout: true);
 
     public static IPopulationCodec<double> Double { get; } = new Codec<double>(
         "kernel.f64", 8,
         static (value, destination) => BinaryPrimitives.WriteInt64LittleEndian(destination, BitConverter.DoubleToInt64Bits(value)),
-        static source => BitConverter.Int64BitsToDouble(BinaryPrimitives.ReadInt64LittleEndian(source)));
+        static source => BitConverter.Int64BitsToDouble(BinaryPrimitives.ReadInt64LittleEndian(source)),
+            copyLayout: true);
 
     public static IPopulationCodec<decimal> Decimal { get; } = new Codec<decimal>(
         "kernel.decimal128", 16,
@@ -135,7 +147,8 @@ public static class PopulationCodecs
             WriteSingle(value.X, destination);
             WriteSingle(value.Y, destination[4..]);
         },
-        static source => new(ReadSingle(source), ReadSingle(source[4..])));
+        static source => new(ReadSingle(source), ReadSingle(source[4..])),
+            copyLayout: true);
 
     public static IPopulationCodec<Vector3> Vector3 { get; } = new Codec<System.Numerics.Vector3>(
         "system.numerics.vector3.f32", 12,
@@ -145,7 +158,8 @@ public static class PopulationCodecs
             WriteSingle(value.Y, destination[4..]);
             WriteSingle(value.Z, destination[8..]);
         },
-        static source => new(ReadSingle(source), ReadSingle(source[4..]), ReadSingle(source[8..])));
+        static source => new(ReadSingle(source), ReadSingle(source[4..]), ReadSingle(source[8..])),
+            copyLayout: true);
 
     public static IPopulationCodec<Vector4> Vector4 { get; } = new Codec<System.Numerics.Vector4>(
         "system.numerics.vector4.f32", 16,
@@ -156,7 +170,8 @@ public static class PopulationCodecs
             WriteSingle(value.Z, destination[8..]);
             WriteSingle(value.W, destination[12..]);
         },
-        static source => new(ReadSingle(source), ReadSingle(source[4..]), ReadSingle(source[8..]), ReadSingle(source[12..])));
+        static source => new(ReadSingle(source), ReadSingle(source[4..]), ReadSingle(source[8..]), ReadSingle(source[12..])),
+            copyLayout: true);
 
     private static void WriteSingle(float value, Span<byte> destination) =>
         BinaryPrimitives.WriteInt32LittleEndian(destination, BitConverter.SingleToInt32Bits(value));
@@ -164,7 +179,11 @@ public static class PopulationCodecs
     private static float ReadSingle(ReadOnlySpan<byte> source) =>
         BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(source));
 
-    private sealed class Codec<T>(string id, int elementSize, ValueWriter<T> write, ValueReader<T> read)
+    // A column whose in-memory little-endian layout is exactly its wire layout is copied with
+    // MemoryMarshal rather than one value at a time. Skip this for bool (the wire form validates
+    // 0/1) and decimal (its in-memory field order is not the GetBits order).
+    private sealed class Codec<T>(string id, int elementSize, ValueWriter<T> write, ValueReader<T> read,
+        bool copyLayout = false)
         : IPopulationCodec<T> where T : unmanaged
     {
         public string Id { get; } = id;
@@ -186,6 +205,12 @@ public static class PopulationCodecs
                 throw new ArgumentException("The destination length does not match the value count.", nameof(destination));
             }
 
+            if (copyLayout && BitConverter.IsLittleEndian && ElementSize == Unsafe.SizeOf<T>())
+            {
+                MemoryMarshal.AsBytes(values).CopyTo(destination);
+                return;
+            }
+
             for (var index = 0; index < values.Length; index++)
             {
                 write(values[index], destination.Slice(index * ElementSize, ElementSize));
@@ -197,6 +222,12 @@ public static class PopulationCodecs
             if (source.Length != GetEncodedLength(values.Length))
             {
                 throw new ArgumentException("The source length does not match the value count.", nameof(source));
+            }
+
+            if (copyLayout && BitConverter.IsLittleEndian && ElementSize == Unsafe.SizeOf<T>())
+            {
+                source.CopyTo(MemoryMarshal.AsBytes(values));
+                return;
             }
 
             for (var index = 0; index < values.Length; index++)
@@ -335,12 +366,20 @@ public abstract class PopulationColumnBase(
     int elementSize,
     bool isDoubleBuffered)
 {
-    // Row batches are pooled per column, but not without limit: a transaction that writes a million
+    // Batches are pooled per column, but not without limit: a transaction that writes a million
     // distinct rows would otherwise pin a million batches for the lifetime of the column.
     private const int MaximumPooledRowUndoBatches = 4_096;
+    private const int MaximumPooledPageUndoBatches = 1_024;
 
-    private readonly Stack<PopulationPageUndoBatch> _freePageUndoBatches = new();
-    private readonly Stack<PopulationRowsUndoBatch> _freeRowsUndoBatches = new();
+    // Created on first use because a primary constructor cannot hand `this` to a pool policy.
+    private ObjectPool<PopulationPageUndoBatch>? _pageUndoBatches;
+    private ObjectPool<PopulationRowsUndoBatch>? _rowsUndoBatches;
+
+    private ObjectPool<PopulationPageUndoBatch> PageUndoBatches => _pageUndoBatches ??=
+        new DefaultObjectPool<PopulationPageUndoBatch>(new PageUndoBatchPolicy(this), MaximumPooledPageUndoBatches);
+
+    private ObjectPool<PopulationRowsUndoBatch> RowsUndoBatches => _rowsUndoBatches ??=
+        new DefaultObjectPool<PopulationRowsUndoBatch>(new RowsUndoBatchPolicy(this), MaximumPooledRowUndoBatches);
 
     public string Id { get; } = id;
 
@@ -401,9 +440,7 @@ public abstract class PopulationColumnBase(
 
     internal IColumnUndoBatch CapturePageUndo(int bufferIndex, int start, int length)
     {
-        var batch = _freePageUndoBatches.Count > 0
-            ? _freePageUndoBatches.Pop()
-            : new PopulationPageUndoBatch(this);
+        var batch = PageUndoBatches.Get();
         try
         {
             batch.Capture(bufferIndex, start, length);
@@ -418,7 +455,7 @@ public abstract class PopulationColumnBase(
                 batch?.Reset();
                 if (batch is not null)
                 {
-                    _freePageUndoBatches.Push(batch);
+                    PageUndoBatches.Return(batch);
                 }
             }
             catch
@@ -440,18 +477,15 @@ public abstract class PopulationColumnBase(
     /// </remarks>
     internal PopulationRowsUndoBatch CaptureRowsUndo(int bufferIndex)
     {
-        var batch = _freeRowsUndoBatches.Count > 0 ? _freeRowsUndoBatches.Pop() : new PopulationRowsUndoBatch(this);
+        var batch = RowsUndoBatches.Get();
         batch.Reset(bufferIndex);
         return batch;
     }
 
     internal void ReleaseRowsUndo(PopulationRowsUndoBatch batch)
     {
-        var bufferIndex = batch.Reset(default);
-        if (_freeRowsUndoBatches.Count < MaximumPooledRowUndoBatches)
-        {
-            _freeRowsUndoBatches.Push(batch);
-        }
+        batch.Reset(default);
+        RowsUndoBatches.Return(batch);
     }
 
     internal abstract int GetPageSnapshotByteLength(int rowCount);
@@ -463,7 +497,21 @@ public abstract class PopulationColumnBase(
     internal void ReleasePageUndo(PopulationPageUndoBatch batch)
     {
         batch.Reset();
-        _freePageUndoBatches.Push(batch);
+        PageUndoBatches.Return(batch);
+    }
+
+    private sealed class PageUndoBatchPolicy(PopulationColumnBase column) : PooledObjectPolicy<PopulationPageUndoBatch>
+    {
+        public override PopulationPageUndoBatch Create() => new(column);
+
+        public override bool Return(PopulationPageUndoBatch obj) => true;
+    }
+
+    private sealed class RowsUndoBatchPolicy(PopulationColumnBase column) : PooledObjectPolicy<PopulationRowsUndoBatch>
+    {
+        public override PopulationRowsUndoBatch Create() => new(column);
+
+        public override bool Return(PopulationRowsUndoBatch obj) => true;
     }
 }
 
@@ -846,7 +894,11 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
     private SharedPopulationBuffer<T> _first = new([]);
     private SharedPopulationBuffer<T> _second = new([]);
     private bool _firstIsCurrent = true;
-    private readonly Stack<BufferRoleUndoBatch> _freeRoleUndoBatches = new();
+    private const int MaximumPooledRoleUndoBatches = 1_024;
+    private ObjectPool<BufferRoleUndoBatch>? _roleUndoBatches;
+
+    private ObjectPool<BufferRoleUndoBatch> RoleUndoBatches => _roleUndoBatches ??=
+        new DefaultObjectPool<BufferRoleUndoBatch>(new RoleUndoBatchPolicy(this), MaximumPooledRoleUndoBatches);
 
     internal DoubleBufferedPopulationColumn(PopulationStorage population, PopulationColumnKey<T> key)
         : base(key.Id, key.Version, typeof(T), key.Codec.Id, key.Codec.Version, key.Codec.ElementSize,
@@ -980,7 +1032,7 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
     {
         if (_population.World.TryCapturePopulationRole(this))
         {
-            var batch = _freeRoleUndoBatches.Count > 0 ? _freeRoleUndoBatches.Pop() : new BufferRoleUndoBatch(this);
+            var batch = RoleUndoBatches.Get();
             try
             {
                 batch.Capture(_firstIsCurrent);
@@ -1139,7 +1191,15 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
     private void ReleaseRoleUndo(BufferRoleUndoBatch batch)
     {
         batch.Reset();
-        _freeRoleUndoBatches.Push(batch);
+        RoleUndoBatches.Return(batch);
+    }
+
+    private sealed class RoleUndoBatchPolicy(DoubleBufferedPopulationColumn<T> column)
+        : PooledObjectPolicy<BufferRoleUndoBatch>
+    {
+        public override BufferRoleUndoBatch Create() => new(column);
+
+        public override bool Return(BufferRoleUndoBatch obj) => true;
     }
 
     private sealed class BufferRoleUndoBatch(DoubleBufferedPopulationColumn<T> column) : IColumnUndoBatch

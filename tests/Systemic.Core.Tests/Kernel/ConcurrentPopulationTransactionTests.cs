@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using Microsoft.Extensions.ObjectPool;
 using Systemic.Kernel;
 
 namespace Systemic.Tests.Kernel;
@@ -230,20 +231,23 @@ public sealed class ConcurrentPopulationTransactionTests
         var population = world.DefinePopulation<ConcurrentKind>();
         var column = population.Column(s_first);
         population.AddRange(1);
-        var field = typeof(PopulationColumnBase).GetField("_freePageUndoBatches",
+        var field = typeof(PopulationColumnBase).GetField("_pageUndoBatches",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var pool = (Stack<PopulationPageUndoBatch>)field.GetValue(column)!;
-        pool.Push(null!); // Fault injection: a damaged pool makes both capture and cleanup fail.
+        // Fault injection: a damaged pool hands out no batch, so capture fails and cleanup must not
+        // replace that failure with its own.
+        field.SetValue(column, new NullBatchPool());
         using var transaction = world.BeginTransaction();
         Exception? firstFailure = null;
         var thread = Environment.CurrentManagedThreadId;
-        EventHandler<FirstChanceExceptionEventArgs> listener = (_, args) =>
+        void Listener(object? sender, FirstChanceExceptionEventArgs args)
         {
             if (Environment.CurrentManagedThreadId == thread && args.Exception is NullReferenceException)
             {
                 firstFailure ??= args.Exception;
             }
-        };
+        }
+
+        EventHandler<FirstChanceExceptionEventArgs> listener = Listener;
 
         AppDomain.CurrentDomain.FirstChanceException += listener;
         NullReferenceException thrown;
@@ -258,6 +262,15 @@ public sealed class ConcurrentPopulationTransactionTests
 
         Assert.NotNull(firstFailure);
         Assert.Same(firstFailure, thrown);
+    }
+
+    private sealed class NullBatchPool : ObjectPool<PopulationPageUndoBatch>
+    {
+        public override PopulationPageUndoBatch Get() => null!;
+
+        public override void Return(PopulationPageUndoBatch obj)
+        {
+        }
     }
 
     [Fact]
