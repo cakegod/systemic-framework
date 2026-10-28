@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 2,
+  "rules": [
+    {
+      "id": "crowd.prey.burn",
+      "on": "crowd.prey.think",
+      "priority": 0,
+      "when": [
+        { "kind": "hasTag", "factRow": "crowd.prey", "tag": "burning" },
+        { "kind": "propertyAtLeast", "factRow": "crowd.prey", "property": "crowd.prey.energy", "value": 1 }
+      ],
+      "effects": [
+        { "kind": "adjustProperty", "factRow": "crowd.prey", "property": "crowd.prey.energy", "amount": -1 }
+      ]
+    },
+    {
+      "id": "crowd.report.standing",
+      "on": "crowd.prey.standing",
+      "priority": 0,
+      "effects": [
+        { "kind": "adjustProperty", "factRow": "crowd.prey", "property": "crowd.prey.report", "amount": 1 }
+      ]
+    }
+  ]
+}

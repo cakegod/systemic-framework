@@ -212,12 +212,14 @@ public static partial class ContentPackLoader
                 switch (condition.Kind)
                 {
                     case "hasTag":
-                        var tagSubject = ParseSubject(condition.Subject, $"Rule '{rule.Id}' condition", $"{conditionPath}.subject");
+                        var tagSubject = ParseSubject(condition.Subject, condition.Row, condition.FactRow,
+                            $"Rule '{rule.Id}' condition", $"{conditionPath}.subject");
                         Require(!string.IsNullOrWhiteSpace(condition.Tag), $"Rule '{rule.Id}' hasTag requires tag.", $"{conditionPath}.tag");
                         conditions.Add(RuleCondition.HasTag(tagSubject, condition.Tag!));
                         break;
                     case "propertyAtLeast":
-                        var propertySubject = ParseSubject(condition.Subject, $"Rule '{rule.Id}' condition", $"{conditionPath}.subject");
+                        var propertySubject = ParseSubject(condition.Subject, condition.Row, condition.FactRow,
+                            $"Rule '{rule.Id}' condition", $"{conditionPath}.subject");
                         Require(!string.IsNullOrWhiteSpace(condition.Property), $"Rule '{rule.Id}' propertyAtLeast requires property.", $"{conditionPath}.property");
                         Require(condition.Value is { } threshold && double.IsFinite(threshold), $"Rule '{rule.Id}' condition value must be finite.", $"{conditionPath}.value");
                         conditions.Add(RuleCondition.PropertyAtLeast(propertySubject, condition.Property!, condition.Value!.Value));
@@ -262,13 +264,15 @@ public static partial class ContentPackLoader
                 switch (effect.Kind)
                 {
                     case "adjustProperty":
-                        var adjustSubject = ParseSubject(effect.Subject, $"Rule '{rule.Id}' effect", $"{effectPath}.subject");
+                        var adjustSubject = ParseSubject(effect.Subject, effect.Row, effect.FactRow,
+                            $"Rule '{rule.Id}' effect", $"{effectPath}.subject");
                         Require(!string.IsNullOrWhiteSpace(effect.Property), $"Rule '{rule.Id}' adjustProperty requires property.", $"{effectPath}.property");
                         Require(effect.Amount is { } amount && double.IsFinite(amount), $"Rule '{rule.Id}' effect amount must be finite.", $"{effectPath}.amount");
                         effects.Add(RuleEffect.AdjustProperty(adjustSubject, effect.Property!, effect.Amount!.Value));
                         break;
                     case "setModifier":
-                        var modifierSubject = ParseSubject(effect.Subject, $"Rule '{rule.Id}' effect", $"{effectPath}.subject");
+                        var modifierSubject = ParseSubject(effect.Subject, effect.Row, effect.FactRow,
+                            $"Rule '{rule.Id}' effect", $"{effectPath}.subject");
                         Require(!string.IsNullOrWhiteSpace(effect.Property), $"Rule '{rule.Id}' setModifier requires property.", $"{effectPath}.property");
                         Require(effect.Operation is not null, $"Rule '{rule.Id}' setModifier requires operation.", $"{effectPath}.operation");
                         Require(effect.Value is { } modifierValue && double.IsFinite(modifierValue),
@@ -300,7 +304,8 @@ public static partial class ContentPackLoader
                             effect.Value!.Value, stage, durationTicks));
                         break;
                     case "addTag":
-                        var tagSubject = ParseSubject(effect.Subject, $"Rule '{rule.Id}' effect", $"{effectPath}.subject");
+                        var tagSubject = ParseSubject(effect.Subject, effect.Row, effect.FactRow,
+                            $"Rule '{rule.Id}' effect", $"{effectPath}.subject");
                         Require(!string.IsNullOrWhiteSpace(effect.Tag), $"Rule '{rule.Id}' addTag requires tag.", $"{effectPath}.tag");
                         effects.Add(RuleEffect.AddTag(tagSubject, effect.Tag!));
                         break;
@@ -539,14 +544,54 @@ public static partial class ContentPackLoader
 
     private static ImmutableArray<string> ToImmutableNames(string[] names) => [.. names];
 
-    private static RuleSubject ParseSubject(string? value, string context, string? fieldPath = null) => value switch
+    // A subject is one of four forms: the fact's source, the fact's target, a fixed population row,
+    // or the population row the fact is about. Only one form may be written; guessing between them
+    // would make an authoring mistake silently address the wrong thing.
+    private static RuleSubject ParseSubject(string? subject, RowFile? row, string? factRow,
+        string context, string? fieldPath = null)
     {
-        "source" => RuleSubject.Source,
-        "target" => RuleSubject.Target,
-        _ => fieldPath is null
-            ? throw new ContentPackException($"{context} subject must be 'source' or 'target'.")
-            : throw new ContentPackException($"{context} subject must be 'source' or 'target'.", fieldPath),
-    };
+        ContentPackException Error(string message) => fieldPath is null
+            ? new ContentPackException($"{context} {message}")
+            : new ContentPackException($"{context} {message}", fieldPath);
+
+        var forms = (subject is null ? 0 : 1) + (row is null ? 0 : 1) + (factRow is null ? 0 : 1);
+        if (forms > 1)
+        {
+            throw Error("must use only one of 'subject', 'row' or 'factRow'.");
+        }
+
+        if (row is not null)
+        {
+            if (string.IsNullOrWhiteSpace(row.Population))
+            {
+                throw Error("row subject requires a population.");
+            }
+
+            if (row.Slot < 0)
+            {
+                throw Error("row subject slot must be non-negative.");
+            }
+
+            return RuleSubject.Row(row.Population, row.Slot);
+        }
+
+        if (factRow is not null)
+        {
+            if (string.IsNullOrWhiteSpace(factRow))
+            {
+                throw Error("factRow subject requires a population id.");
+            }
+
+            return RuleSubject.FactRow(factRow);
+        }
+
+        return subject switch
+        {
+            "source" => RuleSubject.Source,
+            "target" => RuleSubject.Target,
+            _ => throw Error("subject must be 'source', 'target', or a 'row' / 'factRow' population."),
+        };
+    }
 
     private static string ResolveContentPath(string root, string relativePath)
     {
@@ -628,7 +673,9 @@ public static partial class ContentPackLoader
         string? Property = null,
         double? Value = null,
         string? Expression = null,
-        double? Probability = null);
+        double? Probability = null,
+        RowFile? Row = null,
+        string? FactRow = null);
     private sealed record EffectFile(
         string Kind,
         string? Subject = null,
@@ -639,7 +686,10 @@ public static partial class ContentPackLoader
         string? Operation = null,
         double? Value = null,
         string? Stage = null,
-        int? DurationTicks = null);
+        int? DurationTicks = null,
+        RowFile? Row = null,
+        string? FactRow = null);
+    private sealed record RowFile(string Population, int Slot = 0);
     private sealed record EntitiesFile(
         int SchemaVersion,
         EntityDefinitionFile[]? Entities = null,

@@ -340,7 +340,7 @@ public abstract class PopulationColumnBase(
     private const int MaximumPooledRowUndoBatches = 4_096;
 
     private readonly Stack<PopulationPageUndoBatch> _freePageUndoBatches = new();
-    private readonly Stack<PopulationRowUndoBatch> _freeRowUndoBatches = new();
+    private readonly Stack<PopulationRowsUndoBatch> _freeRowsUndoBatches = new();
 
     public string Id { get; } = id;
 
@@ -430,47 +430,27 @@ public abstract class PopulationColumnBase(
         }
     }
 
-    /// <summary>Captures one row's bytes for transaction undo.</summary>
+    /// <summary>Creates one row-capture batch for a column and buffer, to be filled by the caller.</summary>
     /// <remarks>
-    /// A sparse write pays for the row it touches instead of the page that holds it. Undo records
-    /// are replayed in reverse order, and every capture holds the value as of its first touch, so a
-    /// row capture and a page capture of the same region compose to the pre-transaction state.
+    /// A sparse write pays for the row it touches instead of the page that holds it, and every row
+    /// written in one scope shares a single batch, so a rule that touches ten thousand rows does not
+    /// create ten thousand undo records. Undo records are replayed in reverse order and every capture
+    /// holds the value as of its first touch, so row and page captures of the same region compose to
+    /// the pre-transaction state.
     /// </remarks>
-    internal IColumnUndoBatch CaptureRowUndo(int bufferIndex, int row)
+    internal PopulationRowsUndoBatch CaptureRowsUndo(int bufferIndex)
     {
-        var batch = _freeRowUndoBatches.Count > 0
-            ? _freeRowUndoBatches.Pop()
-            : new PopulationRowUndoBatch(this);
-        try
-        {
-            batch.Capture(bufferIndex, row);
-            return batch;
-        }
-        catch
-        {
-            try
-            {
-                batch.Reset();
-                if (_freeRowUndoBatches.Count < MaximumPooledRowUndoBatches)
-                {
-                    _freeRowUndoBatches.Push(batch);
-                }
-            }
-            catch
-            {
-                // Do not return an unusable batch to the pool.
-            }
-
-            throw;
-        }
+        var batch = _freeRowsUndoBatches.Count > 0 ? _freeRowsUndoBatches.Pop() : new PopulationRowsUndoBatch(this);
+        batch.Reset(bufferIndex);
+        return batch;
     }
 
-    internal void ReleaseRowUndo(PopulationRowUndoBatch batch)
+    internal void ReleaseRowsUndo(PopulationRowsUndoBatch batch)
     {
-        batch.Reset();
-        if (_freeRowUndoBatches.Count < MaximumPooledRowUndoBatches)
+        var bufferIndex = batch.Reset(default);
+        if (_freeRowsUndoBatches.Count < MaximumPooledRowUndoBatches)
         {
-            _freeRowUndoBatches.Push(batch);
+            _freeRowsUndoBatches.Push(batch);
         }
     }
 
@@ -487,36 +467,56 @@ public abstract class PopulationColumnBase(
     }
 }
 
-internal sealed class PopulationRowUndoBatch(PopulationColumnBase column) : IColumnUndoBatch
+internal sealed class PopulationRowsUndoBatch(PopulationColumnBase column) : IColumnUndoBatch
 {
-    private byte[] _snapshot = [];
+    private int[] _rows = [];
+    private byte[] _data = [];
     private int _bufferIndex;
-    private int _row = -1;
-    private int _byteLength;
+    private int _count;
+    private int _rowBytes = -1;
 
-    public void Capture(int bufferIndex, int row)
+    public int Count => _count;
+
+    public void Capture(int row)
     {
-        _bufferIndex = bufferIndex;
-        _row = row;
-        _byteLength = column.GetPageSnapshotByteLength(1);
-        if (_snapshot.Length < _byteLength)
+        _rowBytes = column.GetPageSnapshotByteLength(1);
+        if (_count == _rows.Length)
         {
-            Array.Resize(ref _snapshot, _byteLength);
+            Array.Resize(ref _rows, _rows.Length == 0 ? 64 : _rows.Length * 2);
         }
 
-        column.CopyPageToSnapshot(bufferIndex, row, _snapshot.AsSpan(0, _byteLength));
+        var required = checked((_count + 1) * _rowBytes);
+        if (_data.Length < required)
+        {
+            var capacity = Math.Max(required, _data.Length == 0 ? 64 * _rowBytes : _data.Length * 2);
+            Array.Resize(ref _data, capacity);
+        }
+
+        _rows[_count] = row;
+        column.CopyPageToSnapshot(_bufferIndex, row, _data.AsSpan(_count * _rowBytes, _rowBytes));
+        _count++;
     }
 
-    public void Undo() => column.RestorePageFromSnapshot(
-        _bufferIndex, _row, _snapshot.AsSpan(0, _byteLength));
-
-    public void Release() => column.ReleaseRowUndo(this);
-
-    public void Reset()
+    public void Undo()
     {
-        _bufferIndex = 0;
-        _row = -1;
-        _byteLength = 0;
+        // Reverse capture order: a row written twice restores to the value it held before the first
+        // write, and a page captured after a row still wins for that row.
+        for (var index = _count - 1; index >= 0; index--)
+        {
+            column.RestorePageFromSnapshot(_bufferIndex, _rows[index],
+                _data.AsSpan(index * _rowBytes, _rowBytes));
+        }
+    }
+
+    public void Release() => column.ReleaseRowsUndo(this);
+
+    /// <summary>Clears the batch and returns its previous buffer index.</summary>
+    public int Reset(int bufferIndex)
+    {
+        var previous = _bufferIndex;
+        _bufferIndex = bufferIndex;
+        _count = 0;
+        return previous;
     }
 }
 

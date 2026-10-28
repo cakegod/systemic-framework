@@ -73,6 +73,19 @@ public readonly struct SimulationFactEmitter
 
 public delegate void SimulationFactObserver(SimulationFact fact, SimulationFactEmitter emitter);
 
+/// <summary>Counts from one per-row rule scan.</summary>
+/// <param name="RowsEvaluated">Rows the scan visited.</param>
+/// <param name="RulesMatched">Rule matches across all rows.</param>
+/// <param name="EffectsApplied">Effects the matches applied.</param>
+/// <param name="RolledBack">Whether the scan's transaction was rolled back.</param>
+/// <param name="CutoffReason">Why the scan stopped early, when it did.</param>
+public readonly record struct RuleRowScanResult(
+    int RowsEvaluated,
+    int RulesMatched,
+    int EffectsApplied,
+    bool RolledBack = false,
+    string? CutoffReason = null);
+
 public readonly record struct RuleDispatchResult(
     int FactsProcessed,
     int RulesMatched,
@@ -112,6 +125,12 @@ public sealed class RuleEngine
     // one world's columns would write into the wrong clone. The cap keeps a hot but bounded set.
     private readonly Dictionary<World, Dictionary<(string Population, string Name, RowTargetKind Kind), RowBinding>>
         _rowBindings = [];
+
+    // A row scan resolves its bindings once per world, event and population, because doing it per row
+    // would hash every name a million times a tick. Cleared whenever the bindings are rebuilt.
+    private readonly Dictionary<(World World, string EventType, string PopulationId), ResolvedRowRule[]>
+        _rowScanPlans = [];
+
     private WorldTransaction? _activeTransaction;
     private WorldTransaction? _batchTransaction;
 
@@ -268,9 +287,11 @@ public sealed class RuleEngine
         if (_rowBindings.Count >= 8)
         {
             _rowBindings.Clear();
+            _rowScanPlans.Clear();
         }
 
         _rowBindings[world] = rowBindings;
+        _rowScanPlans.Clear();
     }
 
     private static PopulationColumnBase BindColumn(World world,
@@ -384,7 +405,10 @@ public sealed class RuleEngine
                 + "Declare the tag on the schema so its mask bit is part of the saved state.");
         }
 
-        rowBindings[(subject.PopulationId, tag, RowTargetKind.Tag)] = RowBinding.ForTag(tags, bit);
+        // The scan binds the mask column directly: it tests the same bit on every row, so it must
+        // not re-resolve the population, revalidate the tag, or check the world per row.
+        _ = world.TryGetPopulationTagMask(subject.PopulationId, tag, out var mask, out _);
+        rowBindings[(subject.PopulationId, tag, RowTargetKind.Tag)] = RowBinding.ForTag(mask, tags, bit);
     }
 
     // Populations are usually defined during world initialization, after the game is built, so a row
@@ -442,11 +466,13 @@ public sealed class RuleEngine
     private readonly struct RowBinding
     {
         private RowBinding(RowTargetKind kind, PopulationColumnBase? column, PopulationTagAccess tags,
-            int tagBit, PopulationModifierAccess modifiers, ushort modifierKey)
+            PopulationColumn<ulong>? maskColumn, int tagBit, PopulationModifierAccess modifiers,
+            ushort modifierKey)
         {
             Kind = kind;
             Column = column;
             Tags = tags;
+            MaskColumn = maskColumn;
             TagBit = tagBit;
             Modifiers = modifiers;
             ModifierKey = modifierKey;
@@ -458,6 +484,8 @@ public sealed class RuleEngine
 
         public PopulationTagAccess Tags { get; }
 
+        public PopulationColumn<ulong>? MaskColumn { get; }
+
         public int TagBit { get; }
 
         public PopulationModifierAccess Modifiers { get; }
@@ -468,14 +496,15 @@ public sealed class RuleEngine
 
         public static RowBinding ForColumn(PopulationColumnBase column, PopulationModifierAccess modifiers,
             ushort modifierKey) =>
-            new(RowTargetKind.Column, column, default, 0, modifiers, modifierKey);
+            new(RowTargetKind.Column, column, default, null, 0, modifiers, modifierKey);
 
-        public static RowBinding ForTag(PopulationTagAccess tags, int tagBit) =>
-            new(RowTargetKind.Tag, null, tags, tagBit, default, RowModifierSlot.EmptyKey);
+        public static RowBinding ForTag(PopulationColumn<ulong>? maskColumn, PopulationTagAccess tags,
+            int tagBit) =>
+            new(RowTargetKind.Tag, null, tags, maskColumn, tagBit, default, RowModifierSlot.EmptyKey);
 
         public static RowBinding ForModifier(PopulationModifierAccess modifiers, ushort modifierKey,
             PopulationColumnBase column) =>
-            new(RowTargetKind.Modifier, column, default, 0, modifiers, modifierKey);
+            new(RowTargetKind.Modifier, column, default, null, 0, modifiers, modifierKey);
     }
 
     public RuleDispatchResult Dispatch(
@@ -493,6 +522,287 @@ public sealed class RuleEngine
         var result = DispatchCore(world, initialFact, beforeEachFact, facts);
         return new RuleDispatchTrace(result, [.. facts]);
     }
+
+    /// <summary>Evaluates one event's row rules against every row of a population range.</summary>
+    /// <param name="world">World that receives the effects.</param>
+    /// <param name="eventType">The event whose rules to evaluate.</param>
+    /// <param name="populationId">The population to scan; every rule subject must be its row.</param>
+    /// <param name="range">The rows to evaluate.</param>
+    /// <returns>Counts for the scan, and whether it rolled back.</returns>
+    /// <remarks>
+    /// This is the crowd path: one authored rule evaluated per row, one transaction for the whole
+    /// range, and no fact per row. It is deliberately narrower than dispatch — a scanned rule may
+    /// only address the row being scanned with row subjects, so an entity subject or an
+    /// <c>emitEvent</c> effect is rejected before the first row instead of producing a fact per row.
+    /// The population must be defined with handles, because each row is addressed by a
+    /// generation-checked reference.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="world"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The range is not inside the population.</exception>
+    /// <exception cref="InvalidOperationException">The population, its handles, or the rule shape
+    /// cannot support a row scan, or a dispatch is already active.</exception>
+    public RuleRowScanResult EvaluateRowEvent(World world, string eventType, string populationId,
+        PopulationRange range)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(populationId);
+        if (_dispatchActive)
+        {
+            throw new InvalidOperationException("RuleEngine does not support nested or concurrent dispatches.");
+        }
+
+        if (!world.TryGetPopulationRows(populationId, out var rows))
+        {
+            throw new InvalidOperationException(
+                $"Row scan for event '{eventType}' references population '{populationId}', "
+                + "which this world does not define.");
+        }
+
+        if (!rows.HandlesEnabled)
+        {
+            throw new InvalidOperationException(
+                $"Row scan for population '{populationId}' requires handles so every row is addressed by a "
+                + "generation-checked reference; define the population with enableHandles: true.");
+        }
+
+        ArgumentOutOfRangeException.ThrowIfNegative(range.Start);
+        ArgumentOutOfRangeException.ThrowIfNegative(range.Length);
+        if (range.Start > rows.RowCount || range.Length > rows.RowCount - range.Start)
+        {
+            throw new ArgumentOutOfRangeException(nameof(range), range,
+                $"The range must fit inside population '{populationId}', which has {rows.RowCount} rows.");
+        }
+
+        var rules = _rules.ForEvent(eventType);
+        foreach (var rule in rules)
+        {
+            foreach (var condition in rule.Conditions)
+            {
+                if (!IsScannableSubject(condition.Subject, populationId))
+                {
+                    throw NotScannable(rule, condition.Subject, populationId, "condition");
+                }
+            }
+
+            foreach (var effect in rule.Effects)
+            {
+                if (!IsScannableSubject(effect.Subject, populationId))
+                {
+                    throw NotScannable(rule, effect.Subject, populationId, effect.Kind.ToString());
+                }
+            }
+        }
+
+        EnsureBound(world);
+        _dispatchActive = true;
+        try
+        {
+            // A scope, not a WorldTransaction: the scan runs every tick and a transaction object per
+            // tick would be the only allocation in an otherwise allocation-free pass.
+            var scope = world.BeginScope();
+            var evaluated = 0;
+            var matched = 0;
+            var applied = 0;
+            var cutOff = false;
+            string? cutoffReason = null;
+            var plans = GetRowScanPlan(world, eventType, populationId);
+            var end = range.End;
+            if (plans.Length == 1 && plans[0].PrefilterMask is { } maskColumn)
+            {
+                // One rule per event is the authored crowd shape, and with a single plan the tag
+                // prefilter is a span read: the loop tests one bit per row and only evaluates the
+                // rule for rows that carry it. The mask is only a filter, so the rule still runs in
+                // full for those rows, and no other rule can observe an effect of this one.
+                var masks = maskColumn.ReadOnlySpan;
+                var bit = 1UL << plans[0].PrefilterBit;
+                ref readonly var plan = ref plans[0];
+                var limit = Math.Min(end, masks.Length);
+                for (var row = range.Start; row < limit && !cutOff; row++)
+                {
+                    evaluated++;
+                    if ((masks[row] & bit) != 0 && MatchesResolvedRow(in plan, row))
+                    {
+                        matched += ApplyRowRule(in plan, row, ref applied);
+                    }
+                }
+            }
+            else
+            {
+                for (var row = range.Start; row < end && !cutOff; row++)
+                {
+                    evaluated++;
+                    for (var planIndex = 0; planIndex < plans.Length; planIndex++)
+                    {
+                        ref readonly var plan = ref plans[planIndex];
+                        if (!PassesPrefilter(in plan, row) || !MatchesResolvedRow(in plan, row))
+                        {
+                            continue;
+                        }
+
+                        matched += ApplyRowRule(in plan, row, ref applied);
+                    }
+                }
+            }
+
+            var rolledBack = cutoffReason is "non_finite_property" or "invalid_fact";
+            try
+            {
+                if (rolledBack)
+                {
+                    scope.Rollback();
+                }
+                else
+                {
+                    scope.Commit();
+                }
+            }
+            finally
+            {
+                scope.Dispose();
+            }
+
+            return new RuleRowScanResult(evaluated, matched, applied, rolledBack, cutoffReason);
+        }
+        finally
+        {
+            _dispatchActive = false;
+            _activeTransaction = null;
+        }
+    }
+
+    private ResolvedRowRule[] GetRowScanPlan(World world, string eventType, string populationId)
+    {
+        var key = (world, eventType, populationId);
+        if (_rowScanPlans.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var rules = _rules.ForEvent(eventType);
+        var plans = new ResolvedRowRule[rules.Length];
+        for (var ruleIndex = 0; ruleIndex < rules.Length; ruleIndex++)
+        {
+            var rule = rules[ruleIndex];
+            var conditions = new RowBinding[rule.Conditions.Length];
+            for (var index = 0; index < conditions.Length; index++)
+            {
+                var condition = rule.Conditions[index];
+                conditions[index] = ResolveRowBinding(world, rule.Id, condition.Subject, condition.Name,
+                    condition.Kind == RuleConditionKind.HasTag ? RowTargetKind.Tag : RowTargetKind.Column,
+                    eventType);
+            }
+
+            var effects = new RowBinding[rule.Effects.Length];
+            for (var index = 0; index < effects.Length; index++)
+            {
+                var effect = rule.Effects[index];
+                effects[index] = ResolveRowBinding(world, rule.Id, effect.Subject, effect.Name,
+                    effect.Kind switch
+                    {
+                        RuleEffectKind.AddTag => RowTargetKind.Tag,
+                        RuleEffectKind.SetModifier => RowTargetKind.Modifier,
+                        _ => RowTargetKind.Column,
+                    }, eventType);
+            }
+
+            // A leading tag condition is a mask test, so the scan reads one bit per row and only
+            // walks the rest of the rule for rows that carry it. Every other condition still runs in
+            // authored order, and a tag test has no side effects, so the skip cannot change results.
+            var prefilter = conditions.Length > 0 && rule.Conditions[0].Kind == RuleConditionKind.HasTag
+                ? conditions[0]
+                : default;
+            plans[ruleIndex] = new ResolvedRowRule(rule, conditions, effects,
+                prefilter.MaskColumn, prefilter.TagBit);
+        }
+
+        _rowScanPlans[key] = plans;
+        return plans;
+    }
+
+    // A rule whose first condition is a tag only matches rows whose mask bit is set, so the scan
+    // tests the bit before it touches the condition list. Rules without that shape pass through.
+    private static bool PassesPrefilter(in ResolvedRowRule plan, int row) =>
+        plan.PrefilterMask is not { } maskColumn
+        || (maskColumn.TryReadRow(row, out var mask) && (mask & (1UL << plan.PrefilterBit)) != 0);
+
+    // Applies one matched row's effects and reports the match. Shared by both scan loops so the
+    // effect budget and the rollback path are identical whichever one ran.
+    private static int ApplyRowRule(in ResolvedRowRule plan, int row, ref int applied)
+    {
+        for (var index = 0; index < plan.Effects.Length; index++)
+        {
+            applied++;
+            ApplyRowEffect(plan.Effects[index], plan.Rule.Effects[index], row);
+        }
+
+        return 1;
+    }
+
+    private static bool MatchesResolvedRow(in ResolvedRowRule plan, int row)
+    {
+        for (var index = 0; index < plan.Conditions.Length; index++)
+        {
+            if (!RowMatches(plan.Conditions[index], plan.Rule.Conditions[index], row))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // One row condition against an already-resolved binding: a tag bit test or a numeric read.
+    private static bool RowMatches(in RowBinding binding, RuleCondition condition, int row)
+    {
+        if (binding.Kind == RowTargetKind.Tag)
+        {
+            // One mask read against the bound column: no population lookup, tag validation or
+            // world check per row, which is what a million-row scan cannot afford.
+            return binding.MaskColumn is { } maskColumn
+                && maskColumn.TryReadRow(row, out var mask)
+                && (mask & (1UL << binding.TagBit)) != 0;
+        }
+
+        double value;
+        var read = binding.HasModifierKey
+            ? binding.Modifiers.TryGetEffectiveValue(row, binding.Column!, binding.ModifierKey, out value)
+            : binding.Column!.TryGetRowValue(row, out value);
+        return read && value >= condition.Threshold;
+    }
+
+    // One row effect against an already-resolved binding. A slot past the live row count is a
+    // despawned row: the effect is accepted and has nowhere to land, like a missing entity.
+    private static void ApplyRowEffect(in RowBinding binding, RuleEffect effect, int row)
+    {
+        switch (binding.Kind)
+        {
+            case RowTargetKind.Tag:
+                binding.Tags.TrySetTagBit(row, binding.TagBit, value: true);
+                break;
+            case RowTargetKind.Modifier:
+                binding.Modifiers.TrySet(row, binding.ModifierKey, effect.Value, effect.DurationTicks);
+                break;
+            default:
+                binding.Column!.TryAddRowValue(row, effect.Value);
+                break;
+        }
+    }
+
+    private readonly record struct ResolvedRowRule(CompiledRule Rule, RowBinding[] Conditions, RowBinding[] Effects,
+        PopulationColumn<ulong>? PrefilterMask, int PrefilterBit);
+
+    // A row scan walks rows, not the fact queue, so anything that needs an entity or would queue a
+    // fact is refused: one fact per row is exactly what the sink exists to prevent. The message is
+    // built by the throwing method, not by the test, so the success path formats nothing.
+    private static bool IsScannableSubject(RuleSubject subject, string populationId) =>
+        subject.IsFactRow && string.Equals(subject.PopulationId, populationId, StringComparison.Ordinal);
+
+    private static InvalidOperationException NotScannable(CompiledRule rule, RuleSubject subject,
+        string populationId, string member) =>
+        new($"Rule '{rule.Id}' uses {subject} in its {member}, but a row scan of population "
+            + $"'{populationId}' only accepts RuleSubject.FactRow('{populationId}'); "
+            + "entity subjects and emitted events would act once per row.");
 
     /// <summary>Dispatches a batch of facts within a single World transaction.</summary>
     /// <param name="world">World that receives the effects of every fact in the batch.</param>
@@ -832,7 +1142,8 @@ public sealed class RuleEngine
         return true;
     }
 
-    private bool Matches(World world, SimulationFact fact, CompiledRule rule, ref FactEntityCache resolvedEntities)
+    private bool Matches(World world, SimulationFact fact, CompiledRule rule, ref FactEntityCache resolvedEntities,
+        int scannedSlot = -1)
     {
         foreach (var condition in rule.Conditions)
         {
@@ -859,7 +1170,12 @@ public sealed class RuleEngine
 
             if (condition.Subject.AddressesRow)
             {
-                if (!TryResolveRowSlot(world, fact, condition.Subject, out var slot))
+                int slot;
+                if (scannedSlot >= 0)
+                {
+                    slot = scannedSlot;
+                }
+                else if (!TryResolveRowSlot(world, fact, condition.Subject, out slot))
                 {
                     return false;
                 }
@@ -867,23 +1183,9 @@ public sealed class RuleEngine
                 var binding = ResolveRowBinding(world, rule.Id, condition.Subject, condition.Name,
                     condition.Kind == RuleConditionKind.HasTag ? RowTargetKind.Tag : RowTargetKind.Column,
                     fact.Type);
-                if (binding.Kind == RowTargetKind.Tag)
+                if (!RowMatches(binding, condition, slot))
                 {
-                    if (!binding.Tags.TryHasTagBit(slot, binding.TagBit))
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    double rowValue;
-                    var read = binding.HasModifierKey
-                        ? binding.Modifiers.TryGetEffectiveValue(slot, binding.Column!, binding.ModifierKey, out rowValue)
-                        : binding.Column!.TryGetRowValue(slot, out rowValue);
-                    if (!read || rowValue < condition.Threshold)
-                    {
-                        return false;
-                    }
+                    return false;
                 }
 
                 continue;
@@ -1121,7 +1423,8 @@ public sealed class RuleEngine
         RuleEffect effect,
         ref FactEntityCache resolvedEntities,
         ref bool cutOff,
-        ref string? cutoffReason)
+        ref string? cutoffReason,
+        int scannedSlot = -1)
     {
         if (effect.Kind == RuleEffectKind.EmitEvent)
         {
@@ -1141,7 +1444,12 @@ public sealed class RuleEngine
 
         if (effect.Subject.AddressesRow)
         {
-            if (!TryResolveRowSlot(world, fact, effect.Subject, out var slot))
+            int slot;
+            if (scannedSlot >= 0)
+            {
+                slot = scannedSlot;
+            }
+            else if (!TryResolveRowSlot(world, fact, effect.Subject, out slot))
             {
                 return;
             }
@@ -1155,19 +1463,7 @@ public sealed class RuleEngine
             var binding = ResolveRowBinding(world, ruleId, effect.Subject, effect.Name, kind, fact.Type);
             // A slot past the live row count is a despawned row: like a missing entity, the effect
             // is accepted by a matched rule and has nowhere to land.
-            switch (binding.Kind)
-            {
-                case RowTargetKind.Tag:
-                    binding.Tags.TrySetTagBit(slot, binding.TagBit, value: true);
-                    break;
-                case RowTargetKind.Modifier:
-                    binding.Modifiers.TrySet(slot, binding.ModifierKey, effect.Value, effect.DurationTicks);
-                    break;
-                default:
-                    binding.Column!.TryAddRowValue(slot, effect.Value);
-                    break;
-            }
-
+            ApplyRowEffect(binding, effect, slot);
             return;
         }
 

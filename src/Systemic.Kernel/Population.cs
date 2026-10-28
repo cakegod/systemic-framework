@@ -63,6 +63,9 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     /// <summary>Gets the number of tags a schema may reserve, one per bit of its mask column.</summary>
     public const int MaximumTags = 64;
 
+    /// <summary>Gets whether this population issues generation-checked handles.</summary>
+    public bool HandlesEnabled => _handlesEnabled;
+
     private static readonly PopulationColumnKey<ulong> s_tagMaskKey =
         new("systemic.tags", 1, PopulationCodecs.UInt64);
 
@@ -1439,6 +1442,8 @@ internal abstract class PopulationRegistration
 
     public abstract ReadOnlyMemory<string> TagNames { get; }
 
+    public abstract PopulationColumn<ulong>? MaskColumn { get; }
+
     public abstract ReadOnlyMemory<string> ModifierPropertyNames { get; }
 
     public abstract bool TryGetModifierKey(string property, out ushort key);
@@ -1449,6 +1454,10 @@ internal abstract class PopulationRegistration
         out double value);
 
     public abstract bool TryResolveRow(int slotIndex, ulong generation, out int row);
+
+    public abstract bool HandlesEnabled { get; }
+
+    public abstract int RowCount { get; }
 
     public abstract bool TryGetTagBit(string tag, out int bit);
 
@@ -1480,6 +1489,8 @@ internal sealed class PopulationRegistration<TKind>(Population<TKind> population
 
     public override ReadOnlyMemory<string> TagNames => population.Tags;
 
+    public override PopulationColumn<ulong>? MaskColumn => population.MaskColumn;
+
     public override ReadOnlyMemory<string> ModifierPropertyNames => population.ModifierProperties;
 
     public override bool TryGetModifierKey(string property, out ushort key) =>
@@ -1493,6 +1504,10 @@ internal sealed class PopulationRegistration<TKind>(Population<TKind> population
 
     public override bool TryResolveRow(int slotIndex, ulong generation, out int row) =>
         population.TryResolveRow(slotIndex, generation, out row);
+
+    public override bool HandlesEnabled => population.HandlesEnabled;
+
+    public override int RowCount => population.Count;
 
     public override bool TryGetTagBit(string tag, out int bit) => population.TryGetTagBit(tag, out bit);
 
@@ -1513,6 +1528,18 @@ internal sealed class PopulationRegistration<TKind>(Population<TKind> population
     public override void RebindWorld(World world) => population.RebindWorld(world);
 
     public override void DetachWorld() => population.DetachWorld();
+}
+
+/// <summary>Addresses the rows of one population for a per-row rule scan.</summary>
+internal readonly struct PopulationRowAccess(PopulationRegistration registration)
+{
+    private readonly PopulationRegistration _registration = registration;
+
+    /// <summary>Gets whether the population can produce generation-checked references.</summary>
+    public bool HandlesEnabled => _registration.HandlesEnabled;
+
+    /// <summary>Gets the live row count.</summary>
+    public int RowCount => _registration.RowCount;
 }
 
 /// <summary>Addresses the schema tags of one population without another lookup per row.</summary>

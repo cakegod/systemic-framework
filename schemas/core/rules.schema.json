@@ -15,6 +15,21 @@
   "$defs": {
     "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" },
     "subject": { "enum": ["source", "target"] },
+    "subjectForm": {
+      "anyOf": [
+        { "required": ["subject"] },
+        { "required": ["row"] },
+        { "required": ["factRow"] }
+      ]
+    },
+    "rowSubject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["population"],
+      "properties": {
+        "population": { "$ref": "#/$defs/id" },
+        "slot": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+      }
+    },
     "schedule": {
       "type": "object", "additionalProperties": false,
       "required": ["id", "event", "everyTicks"],
@@ -54,6 +69,8 @@
       "properties": {
         "kind": { "enum": ["hasTag", "propertyAtLeast", "expression", "chance"] },
         "subject": { "$ref": "#/$defs/subject" },
+        "row": { "$ref": "#/$defs/rowSubject" },
+        "factRow": { "$ref": "#/$defs/id" },
         "tag": { "type": "string", "pattern": "\\S" },
         "property": { "type": "string", "pattern": "\\S" },
         "value": { "type": "number" },
@@ -61,8 +78,8 @@
         "probability": { "type": "number", "minimum": 0, "maximum": 1 }
       },
       "allOf": [
-        { "if": { "properties": { "kind": { "const": "hasTag" } }, "required": ["kind"] }, "then": { "required": ["subject", "tag"] } },
-        { "if": { "properties": { "kind": { "const": "propertyAtLeast" } }, "required": ["kind"] }, "then": { "required": ["subject", "property", "value"] } },
+        { "if": { "properties": { "kind": { "const": "hasTag" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["tag"] } },
+        { "if": { "properties": { "kind": { "const": "propertyAtLeast" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["property", "value"] } },
         { "if": { "properties": { "kind": { "const": "expression" } }, "required": ["kind"] }, "then": { "required": ["expression"] } },
         { "if": { "properties": { "kind": { "const": "chance" } }, "required": ["kind"] }, "then": { "required": ["probability"] } }
       ]
@@ -73,6 +90,8 @@
       "properties": {
         "kind": { "enum": ["adjustProperty", "setModifier", "addTag", "emitEvent"] },
         "subject": { "$ref": "#/$defs/subject" },
+        "row": { "$ref": "#/$defs/rowSubject" },
+        "factRow": { "$ref": "#/$defs/id" },
         "property": { "type": "string", "pattern": "\\S" },
         "amount": { "type": "number" },
         "tag": { "type": "string", "pattern": "\\S" },
@@ -83,9 +102,9 @@
         "durationTicks": { "type": "integer", "minimum": 1, "maximum": 1000000 }
       },
       "allOf": [
-        { "if": { "properties": { "kind": { "const": "adjustProperty" } }, "required": ["kind"] }, "then": { "required": ["subject", "property", "amount"] } },
-        { "if": { "properties": { "kind": { "const": "setModifier" } }, "required": ["kind"] }, "then": { "required": ["subject", "property", "operation", "value"] } },
-        { "if": { "properties": { "kind": { "const": "addTag" } }, "required": ["kind"] }, "then": { "required": ["subject", "tag"] } },
+        { "if": { "properties": { "kind": { "const": "adjustProperty" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["property", "amount"] } },
+        { "if": { "properties": { "kind": { "const": "setModifier" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["property", "operation", "value"] } },
+        { "if": { "properties": { "kind": { "const": "addTag" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["tag"] } },
         { "if": { "properties": { "kind": { "const": "emitEvent" } }, "required": ["kind"] }, "then": { "required": ["event"] } }
       ]
     }

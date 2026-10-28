@@ -430,19 +430,25 @@ public sealed class World
                 return;
             }
 
-            IColumnUndoBatch? batch = null;
-            try
+            var scope = _scopes.Peek();
+            if (!scope.TryGetRowsBatch(column, bufferIndex, out var batch))
             {
-                batch = column.CaptureRowUndo(bufferIndex, row);
-                _journal.Add(UndoRecord.ForColumnUndo(batch));
-                PopulationJournalBytes += column.GetPageSnapshotByteLength(1);
-                batch = null;
+                batch = column.CaptureRowsUndo(bufferIndex);
+                try
+                {
+                    _journal.Add(UndoRecord.ForColumnUndo(batch));
+                    scope.RegisterRowsBatch(column, bufferIndex, batch);
+                }
+                catch
+                {
+                    try { batch.Release(); } catch { /* Preserve the original failure. */ }
+                    scope.ReleaseRowsBatch(column, bufferIndex);
+                    throw;
+                }
             }
-            catch
-            {
-                try { batch?.Release(); } catch { /* Preserve the original failure. */ }
-                throw;
-            }
+
+            batch.Capture(row);
+            PopulationJournalBytes += column.GetPageSnapshotByteLength(1);
         }
     }
 
@@ -789,6 +795,20 @@ public sealed class World
             && registration.TryResolveRow(slotIndex, generation, out row);
     }
 
+    /// <summary>Resolves a population's row references for a per-row rule scan.</summary>
+    internal bool TryGetPopulationRows(string populationId, out PopulationRowAccess rows)
+    {
+        EnsureActive();
+        if (!_populationsById.TryGetValue(populationId, out var registration))
+        {
+            rows = default;
+            return false;
+        }
+
+        rows = new PopulationRowAccess(registration);
+        return true;
+    }
+
     /// <summary>Resolves a population's row modifier slots for row-addressed rules.</summary>
     internal bool TryGetPopulationModifiers(string populationId, out PopulationModifierAccess modifiers)
     {
@@ -814,6 +834,27 @@ public sealed class World
 
         tags = new PopulationTagAccess(registration);
         return true;
+    }
+
+    /// <summary>Resolves a population's tag mask column and one tag's bit for a per-row scan.</summary>
+    /// <remarks>
+    /// A row scan tests the same mask bit for every row, so it binds the column once instead of
+    /// resolving the population, validating the tag and checking the world on every row.
+    /// </remarks>
+    internal bool TryGetPopulationTagMask(string populationId, string tag,
+        out PopulationColumn<ulong>? mask, out int bit)
+    {
+        EnsureActive();
+        if (!_populationsById.TryGetValue(populationId, out var registration)
+            || !registration.TryGetTagBit(tag, out bit))
+        {
+            mask = null;
+            bit = 0;
+            return false;
+        }
+
+        mask = registration.MaskColumn;
+        return mask is not null;
     }
 
     internal void EnsurePopulationActive() => EnsureActive();
@@ -2351,6 +2392,7 @@ public sealed class World
             scope.CapturedGrantEntities?.Clear();
             scope.CapturedPopulationPages?.Clear();
             scope.CapturedPopulationBuffers?.Clear();
+            scope.CapturedPopulationRows?.Clear();
             scope.CapturedPopulationStructures?.Clear();
             scope.CapturedPopulationRoles?.Clear();
             if (_scopes.Count == 0)
@@ -2430,6 +2472,7 @@ public sealed class World
         public HashSet<(int EntityId, string Property)>? CapturedModifierKeys { get; private set; }
         public HashSet<int>? CapturedGrantEntities { get; private set; }
         public HashSet<PopulationPageKey>? CapturedPopulationPages { get; private set; }
+        public Dictionary<PopulationRowsKey, PopulationRowsUndoBatch>? CapturedPopulationRows { get; private set; }
         public HashSet<PopulationBufferKey>? CapturedPopulationBuffers { get; private set; }
         public HashSet<object>? CapturedPopulationStructures { get; private set; }
         public HashSet<PopulationColumnBase>? CapturedPopulationRoles { get; private set; }
@@ -2447,6 +2490,27 @@ public sealed class World
             (CapturedProperties ??= []).Add((entityId, property));
 
         public bool CaptureGrant(int entityId) => (CapturedGrantEntities ??= []).Add(entityId);
+
+        public bool TryGetRowsBatch(PopulationColumnBase column, int bufferIndex,
+            out PopulationRowsUndoBatch batch)
+        {
+            if (CapturedPopulationRows is not null
+                && CapturedPopulationRows.TryGetValue(new PopulationRowsKey(column, bufferIndex), out var found))
+            {
+                batch = found;
+                return true;
+            }
+
+            batch = null!;
+            return false;
+        }
+
+        public void RegisterRowsBatch(PopulationColumnBase column, int bufferIndex,
+            PopulationRowsUndoBatch batch) =>
+            (CapturedPopulationRows ??= []).Add(new PopulationRowsKey(column, bufferIndex), batch);
+
+        public void ReleaseRowsBatch(PopulationColumnBase column, int bufferIndex) =>
+            CapturedPopulationRows?.Remove(new PopulationRowsKey(column, bufferIndex));
 
         public bool CapturePopulationPage(PopulationColumnBase column, int bufferIndex, int pageIndex)
         {
@@ -2540,6 +2604,7 @@ public sealed class World
 
     internal readonly record struct PopulationPageKey(PopulationColumnBase Column, int BufferIndex, int PageIndex);
     internal readonly record struct PopulationBufferKey(PopulationColumnBase Column, int BufferIndex);
+    internal readonly record struct PopulationRowsKey(PopulationColumnBase Column, int BufferIndex);
 
     private enum UndoKind : byte
     {
