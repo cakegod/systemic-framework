@@ -1,6 +1,6 @@
 #nullable enable
 const Systemic.Presentation.PresentationContentModule.ModuleId = "systemic.presentation" -> string!
-const Systemic.Presentation.ProceduralRasterizer.GeneratorVersion = 2 -> int
+const Systemic.Presentation.ProceduralRasterizer.GeneratorVersion = 3 -> int
 const Systemic.Presentation.ProceduralRasterizer.MaximumPixelWork = 16777216 -> long
 override Systemic.Presentation.CompiledUi.Equals(object? obj) -> bool
 override Systemic.Presentation.CompiledUi.GetHashCode() -> int
