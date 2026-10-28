@@ -1319,6 +1319,24 @@ public sealed class World
         return found;
     }
 
+    /// <summary>Returns the entity IDs that currently carry the tag.</summary>
+    /// <param name="tag">Tag to enumerate.</param>
+    /// <returns>The matching entity IDs in ascending order, or empty memory when none match.</returns>
+    /// <remarks>
+    /// This reads the tag index instead of scanning every entity, so per-tick work scales with the
+    /// tagged population. The returned memory stays valid when the index is rebuilt during the call.
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="tag"/> is null, empty or whitespace.</exception>
+    public ReadOnlyMemory<int> EntitiesWithTag(string tag)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tag);
+        EnsureTagIndex();
+
+        return _entityIdsByTag.TryGetValue(tag, out var bucket)
+            ? CandidateSnapshot(bucket)
+            : ReadOnlyMemory<int>.Empty;
+    }
+
     /// <summary>
     /// Returns a stable snapshot from the smallest required tag/capability bucket.
     /// Callers must revalidate all query constraints before applying behavior.

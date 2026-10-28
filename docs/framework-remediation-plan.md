@@ -28,7 +28,7 @@ Fixing findings one at a time produces thirteen fixes and no core. Fix the roots
 | P1.1 | Done | `RuleEngine.DispatchBatch` shares one transaction and one journal scope; `SystemicGame` dispatches a tick's deferred facts as one batch. Tests: `FactBatchDispatchTests`, `DeferredFactBatchTests`. |
 | P1.2 | Done | `PropertyModifier`/`PropertyGrant` store an absolute `ExpiryTick`, so the tick loop no longer rewrites or journals live modifiers. Tests: `ModifierExpiryTests` (expiry timing, live entries unchanged, zero allocation). Accepted break: the save payload names the field `expiryTick`, so documents written before this change no longer load. |
 | P1.3 | Done | `PresentationRuntime` uses typed in-memory rollback. `ISaveOnlyStateExtension` marks state the journal already covers, so the four kernel extensions and `BuildChoiceRuntime` no longer capture JSON every tick. Tests: `SaveOnlyStateTests`. |
-| P1.4 | Open | |
+| P1.4 | Partial | `World.EntitiesWithTag` gives the module an O(tagged) query, and `Gameplay2DModule` no longer scans every entity. Still open: the projectile population migration and the real `Access` declarations that would let the module share a wave. |
 | P1.5 | Partial | Content tier landed in `GateTierTests` (2,000 actors, 32 B/tick against a 4 KiB budget). Kernel tier remains with the benchmark gate runner; the crowd tier needs P3 before it can be written. |
 | P2–P5 | Open | D1 decided: B staged through A. D2 and D3 still open. |
 

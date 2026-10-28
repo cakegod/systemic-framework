@@ -18,9 +18,12 @@ public sealed class Gameplay2DModule : ISystemicExtensionModule, ISystemicSystem
         ArgumentNullException.ThrowIfNull(context);
         var world = context.GetWritableWorld();
         using var transaction = world.BeginTransaction();
-        foreach (var entity in world.Entities)
+        // WHY: the tag index bounds this loop to live projectiles; scanning every entity made the
+        // module cost O(all entities) per tick regardless of how many projectiles existed.
+        foreach (var entityId in world.EntitiesWithTag(Gameplay2D.ProjectileTag).Span)
         {
-            if (entity is not { ToRemove: false } || !world.HasTag(entity, Gameplay2D.ProjectileTag))
+            if (world.ById(entityId) is not { ToRemove: false } entity
+                || !world.HasTag(entity, Gameplay2D.ProjectileTag))
             {
                 continue;
             }
