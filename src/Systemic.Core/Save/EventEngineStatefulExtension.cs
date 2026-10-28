@@ -5,7 +5,7 @@ using Systemic.Kernel;
 namespace Systemic.Save;
 
 /// <summary>Persists the event engine's counters so event IDs continue identically after a load.</summary>
-internal sealed class EventEngineStatefulExtension(EventEngine engine) : ISystemicStatefulExtension
+internal sealed class EventEngineStatefulExtension(EventEngine engine) : ISaveOnlyStateExtension
 {
     public const string ExtensionId = "systemic.events";
     public string Id => ExtensionId;

@@ -5,7 +5,7 @@ using Systemic.Rules;
 
 namespace Systemic.Presentation;
 
-public sealed class PresentationRuntime : ISystemicStatefulExtension
+public sealed class PresentationRuntime : ISystemicTransactionalState
 {
     private readonly World _world;
     private readonly Dictionary<string, PresentationTimeline> _timelines;
@@ -72,6 +72,23 @@ public sealed class PresentationRuntime : ISystemicStatefulExtension
     }
 
     public JsonElement CaptureState() => JsonSerializer.SerializeToElement(Identity);
+
+    /// <summary>Captures the identity sequence for a tick without serializing it.</summary>
+    /// <returns>The current identity state.</returns>
+    public object CaptureTransactionState() => Identity;
+
+    /// <summary>Restores the identity sequence captured at the start of a rolled-back tick.</summary>
+    /// <param name="state">State returned by <see cref="CaptureTransactionState"/>.</param>
+    public void RestoreTransactionState(object state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (state is not PresentationIdentityState identity)
+        {
+            throw new ArgumentException("Presentation identity snapshot has an unexpected type.", nameof(state));
+        }
+
+        Identity = identity;
+    }
 
     public void RestoreState(JsonElement state)
     {

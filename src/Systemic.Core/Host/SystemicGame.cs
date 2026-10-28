@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Systemic.Kernel;
 using Systemic.Content;
@@ -40,6 +41,16 @@ public interface ISystemicStatefulExtension
     string Id { get; }
     JsonElement CaptureState();
     void RestoreState(JsonElement state);
+}
+
+/// <summary>Marks state that World transactions already journal, so the host does not snapshot it every tick.</summary>
+/// <remarks>
+/// Save and load still use <see cref="ISystemicStatefulExtension.CaptureState"/>; only the per-tick
+/// rollback snapshot is skipped. Implement this only when every mutation made during a tick is
+/// either World state covered by the journal or registers its own rollback on a World transaction.
+/// </remarks>
+public interface ISaveOnlyStateExtension : ISystemicStatefulExtension
+{
 }
 
 /// <summary>Optional in-memory snapshot path for stateful extensions with a cheaper tick snapshot.</summary>
@@ -756,6 +767,7 @@ public sealed class SystemicGame : IDisposable
     }
 
     private readonly DeferredFactQueue[] _deferredFactQueues;
+    private readonly List<SimulationFact> _factBatch = new(64);
 
     public static SystemicGameBuilder FromDirectory(string rootDirectory, int seed, double valueScale = 1)
     {
@@ -876,11 +888,9 @@ public sealed class SystemicGame : IDisposable
         for (var index = 0; index < StatefulExtensions.Count; index++)
         {
             var extension = StatefulExtensions[index];
-            // Kernel populations and rule history already enlist in the journal, the clock advances
-            // outside Step, and the event engine journals its counters with the tick. Snapshot
-            // registered domain state before any system runs.
-            if (extension is PopulationStatefulExtension or RuleHistoryStatefulExtension
-                or ClockStatefulExtension or EventEngineStatefulExtension) continue;
+            // Kernel populations, rule history, the clock and the event engine journal their own
+            // changes, so only domain state that is not journalled needs a tick snapshot.
+            if (extension is ISaveOnlyStateExtension) continue;
             if (extension is ISystemicReusableTransactionalState reusable)
             {
                 var snapshot = reusable.CaptureTransactionSnapshot();
@@ -931,18 +941,19 @@ public sealed class SystemicGame : IDisposable
         var observer = CombineFactObservers(null);
         try
         {
-            // System order, then queue order: independent of worker count and wave layout.
+            // System order, then queue order: independent of worker count and wave layout. One batch
+            // shares a single transaction, so the tick pays journal setup once instead of per fact.
+            _factBatch.Clear();
             for (var index = 0; index < _deferredFactQueues.Length; index++)
             {
-                var facts = _deferredFactQueues[index].Facts;
-                for (var factIndex = 0; factIndex < facts.Count; factIndex++)
-                {
-                    _contentRules.Dispatch(World, facts[factIndex], observer);
-                }
+                _factBatch.AddRange(_deferredFactQueues[index].Facts);
             }
+
+            _contentRules.DispatchBatch(World, CollectionsMarshal.AsSpan(_factBatch), observer);
         }
         finally
         {
+            _factBatch.Clear();
             ClearDeferredFacts();
         }
     }

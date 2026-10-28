@@ -3,7 +3,7 @@ using Systemic.Host;
 
 namespace Systemic.Save;
 
-internal sealed class ClockStatefulExtension(FixedStepClock clock) : ISystemicStatefulExtension
+internal sealed class ClockStatefulExtension(FixedStepClock clock) : ISaveOnlyStateExtension
 {
     public const string ExtensionId = "systemic.clock";
     public string Id => ExtensionId;

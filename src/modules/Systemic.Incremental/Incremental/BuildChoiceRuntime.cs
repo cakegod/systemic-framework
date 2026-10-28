@@ -6,7 +6,7 @@ using Systemic.Rules;
 
 namespace Systemic.Incremental;
 
-public sealed class BuildChoiceRuntime : ISystemicSystem, ISystemicStatefulExtension
+public sealed class BuildChoiceRuntime : ISystemicSystem, ISaveOnlyStateExtension
 {
     private const int MaximumAdditionalOwners = 1024;
     private const int MaximumAdditionalChoiceInstances = 65_536;
@@ -18,6 +18,8 @@ public sealed class BuildChoiceRuntime : ISystemicSystem, ISystemicStatefulExten
     private readonly Dictionary<string, int> _choiceEntityIds;
     private readonly Dictionary<string, int> _ownerEntityIds;
     private readonly Dictionary<string, int> _progressEntityIds;
+    // WHY: save-only state. Every owner added during a tick registers its removal on the World
+    // transaction, so a rolled-back tick restores these indexes without a per-tick snapshot.
     private readonly Dictionary<(string ChoiceId, int OwnerEntityId), int> _choiceInstanceEntityIds = [];
     private readonly Dictionary<(string GroupId, int OwnerEntityId), int> _progressEntityIdsByOwner = [];
     private readonly Dictionary<string, List<int>> _ownersByGroup;

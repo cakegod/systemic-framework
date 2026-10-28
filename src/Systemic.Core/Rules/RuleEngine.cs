@@ -86,6 +86,7 @@ public sealed class RuleEngine
     private bool _invalidFact;
     private bool _eventHistoryIndexDirty;
     private WorldTransaction? _activeTransaction;
+    private WorldTransaction? _batchTransaction;
 
     public RuleEngine(
         CompiledRuleSet rules,
@@ -177,6 +178,94 @@ public sealed class RuleEngine
         return new RuleDispatchTrace(result, [.. facts]);
     }
 
+    /// <summary>Dispatches a batch of facts within a single World transaction.</summary>
+    /// <param name="world">World that receives the effects of every fact in the batch.</param>
+    /// <param name="facts">Facts to dispatch in span order.</param>
+    /// <param name="beforeEachFact">Observer invoked before each rule match, as for a single dispatch.</param>
+    /// <returns>Aggregate counters for every fact the batch processed.</returns>
+    /// <remarks>
+    /// A batch shares one transaction and one journal scope, so a tick that queues many facts pays
+    /// transaction setup once. If any fact in the batch rolls back, the whole batch rolls back: no
+    /// fact in it is committed, and <see cref="RuleDispatchResult.RolledBack"/> reports the failure.
+    /// The fact and effect budgets apply per fact, matching single dispatch.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="world"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">A dispatch is already active.</exception>
+    public RuleDispatchResult DispatchBatch(
+        World world,
+        ReadOnlySpan<SimulationFact> facts,
+        SimulationFactObserver? beforeEachFact = null)
+    {
+        ArgumentNullException.ThrowIfNull(world);
+        if (facts.Length == 0)
+        {
+            return default;
+        }
+
+        if (facts.Length == 1)
+        {
+            return Dispatch(world, facts[0], beforeEachFact);
+        }
+
+        if (_dispatchActive)
+        {
+            throw new InvalidOperationException("RuleEngine does not support nested or concurrent dispatches.");
+        }
+
+        _dispatchActive = true;
+        using var transaction = world.BeginTransaction();
+        _batchTransaction = transaction;
+        var factsProcessed = 0;
+        var rulesMatched = 0;
+        var effectsApplied = 0;
+        var cutOff = false;
+        string? cutoffReason = null;
+        var rolledBack = false;
+        try
+        {
+            for (var index = 0; index < facts.Length; index++)
+            {
+                // Emitters are single-dispatch, so each fact gets its own generation.
+                _dispatchGeneration = checked(_dispatchGeneration + 1);
+                _factBudgetExceeded = false;
+                _invalidFact = false;
+                var result = DispatchCoreActive(world, facts[index], beforeEachFact, trace: null);
+                factsProcessed += result.FactsProcessed;
+                rulesMatched += result.RulesMatched;
+                effectsApplied += result.EffectsApplied;
+                if (result.CutOff)
+                {
+                    cutOff = true;
+                    cutoffReason ??= result.CutoffReason;
+                }
+
+                if (result.RolledBack)
+                {
+                    rolledBack = true;
+                    cutoffReason = result.CutoffReason ?? cutoffReason;
+                    break;
+                }
+            }
+
+            if (rolledBack)
+            {
+                transaction.Rollback();
+            }
+            else
+            {
+                transaction.Commit();
+            }
+        }
+        finally
+        {
+            _batchTransaction = null;
+            _activeTransaction = null;
+            _dispatchActive = false;
+        }
+
+        return new RuleDispatchResult(factsProcessed, rulesMatched, effectsApplied, cutOff, cutoffReason, rolledBack);
+    }
+
     private RuleDispatchResult DispatchCore(
         World world,
         SimulationFact initialFact,
@@ -230,7 +319,8 @@ public sealed class RuleEngine
                 "Fact amount must be finite.");
         }
 
-        using var transaction = world.BeginTransaction();
+        // A batch owns the transaction, so one scope covers every fact it dispatches.
+        using var transaction = _batchTransaction is { } batch ? batch.AsBatchMember() : world.BeginTransaction();
         _activeTransaction = transaction;
         EnsureEventHistoryIndex();
         _eventQueryCache.Clear();

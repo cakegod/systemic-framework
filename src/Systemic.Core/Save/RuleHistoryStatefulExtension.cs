@@ -5,7 +5,7 @@ using Systemic.Rules;
 namespace Systemic.Save;
 
 internal sealed class RuleHistoryStatefulExtension(RuleEngine rules, Func<int> currentTick)
-    : ISystemicStatefulExtension
+    : ISaveOnlyStateExtension
 {
     public string Id => "systemic.rule-history";
 

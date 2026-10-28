@@ -2870,10 +2870,25 @@ internal readonly struct WorldScope(World world, World.ScopeState scope, ulong g
 public readonly struct WorldTransaction : IDisposable
 {
     private readonly WorldScope _scope;
+    private readonly bool _owned;
 
-    internal WorldTransaction(WorldScope scope) => _scope = scope;
+    internal WorldTransaction(WorldScope scope) : this(scope, owned: true)
+    {
+    }
+
+    private WorldTransaction(WorldScope scope, bool owned)
+    {
+        _scope = scope;
+        _owned = owned;
+    }
 
     public bool HasChanges => _scope.HasChanges;
+
+    /// <summary>
+    /// Shares this scope with a batch that owns commit and rollback, leaving registered rollback and
+    /// commit callbacks intact.
+    /// </summary>
+    internal WorldTransaction AsBatchMember() => new(_scope, owned: false);
 
     /// <summary>Registers cleanup for external state when this scope or an enclosing scope rolls back.</summary>
     public void OnRollback(Action action) => _scope.OnRollback(action);
@@ -2881,9 +2896,18 @@ public readonly struct WorldTransaction : IDisposable
     /// <summary>Registers external publication to run only after this scope and all enclosing scopes commit.</summary>
     public void OnCommit(Action action) => _scope.OnCommit(action);
 
-    public void Commit() => _scope.Commit();
+    public void Commit()
+    {
+        if (_owned) _scope.Commit();
+    }
 
-    public void Rollback() => _scope.Rollback();
+    public void Rollback()
+    {
+        if (_owned) _scope.Rollback();
+    }
 
-    public void Dispose() => _scope.Dispose();
+    public void Dispose()
+    {
+        if (_owned) _scope.Dispose();
+    }
 }
