@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Systemic.Kernel;
 
 /// <summary>Runs synchronous serial work with a stack-scoped view of population rows.</summary>
@@ -251,7 +253,7 @@ public readonly struct PopulationAccessGuard
 internal sealed class PopulationScopeLifetime
 {
     private PopulationStorage? _storage;
-    private SystemAccess[]? _access;
+    private ImmutableArray<SystemAccess>? _access;
     private PopulationStorage[] _dependencies = new PopulationStorage[2];
     private int _dependencyCount;
     private object? _group;
@@ -263,7 +265,8 @@ internal sealed class PopulationScopeLifetime
 
     public bool IsParallel { get; private set; }
 
-    public long Activate(PopulationStorage storage, PopulationRange range, SystemAccess[]? access, bool parallel, object? group)
+    public long Activate(PopulationStorage storage, PopulationRange range,
+        ImmutableArray<SystemAccess>? access, bool parallel, object? group)
     {
         _storage = storage;
         Range = range;

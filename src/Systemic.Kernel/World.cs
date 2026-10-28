@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Systemic.Kernel;
 
 public enum ModifierOperation
@@ -61,7 +63,7 @@ public sealed class World
     private static World? s_currentSystemWorld;
 
     [ThreadStatic]
-    private static SystemAccess[]? s_currentSystemAccess;
+    private static ImmutableArray<SystemAccess>? s_currentSystemAccess;
 
     [ThreadStatic]
     private static DataPropertyMutationCacheEntry s_dataPropertyMutationCache;
@@ -138,11 +140,10 @@ public sealed class World
     internal void ReleasePopulationLease() => _activePopulationLeases--;
 
     internal void EnterScheduledSystem(
-        SystemAccess[] access,
+        ImmutableArray<SystemAccess> access,
         out World? previousWorld,
-        out SystemAccess[]? previousAccess)
+        out ImmutableArray<SystemAccess>? previousAccess)
     {
-        ArgumentNullException.ThrowIfNull(access);
         lock (TransactionGate)
         {
             if (_activeScheduledSystems == int.MaxValue)
@@ -153,10 +154,10 @@ public sealed class World
         previousWorld = s_currentSystemWorld;
         previousAccess = s_currentSystemAccess;
         s_currentSystemWorld = this;
-        s_currentSystemAccess = access;
+        s_currentSystemAccess = access.IsDefault ? ImmutableArray<SystemAccess>.Empty : access;
     }
 
-    internal void ExitScheduledSystem(World? previousWorld, SystemAccess[]? previousAccess)
+    internal void ExitScheduledSystem(World? previousWorld, ImmutableArray<SystemAccess>? previousAccess)
     {
         if (!ReferenceEquals(s_currentSystemWorld, this))
             throw new InvalidOperationException("Scheduled system access must end on the thread that started it.");
@@ -167,10 +168,10 @@ public sealed class World
             _activeScheduledSystems--;
     }
 
-    internal SystemAccess[]? GetCurrentSystemAccess()
+    internal ImmutableArray<SystemAccess>? GetCurrentSystemAccess()
     {
         if (ReferenceEquals(s_currentSystemWorld, this))
-            return s_currentSystemAccess ?? [];
+            return s_currentSystemAccess ?? ImmutableArray<SystemAccess>.Empty;
 
         if (s_currentSystemWorld is not null)
             throw new InvalidOperationException("A scheduled system cannot use a population from another World.");

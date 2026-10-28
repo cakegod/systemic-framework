@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Systemic.Kernel;
 
 namespace Systemic.Tests.Kernel;
@@ -168,7 +169,7 @@ public sealed class PopulationScopedAccessTests
         var population = new World(seed: 813, valueScale: 1).DefinePopulation<DelimiterScopedKind>();
         var values = population.Column(s_valueKey);
         population.AddRange(1);
-        var access = new[] { SystemAccess.WriteColumn<DelimiterScopedKind, int>(s_valueKey) };
+        ImmutableArray<SystemAccess> access = [SystemAccess.WriteColumn<DelimiterScopedKind, int>(s_valueKey)];
         var lifetime = population.StorageIdentity.SerialScopeLifetime;
         var group = new object();
         var generation = population.BeginScheduledRangeScope(new PopulationRange(0, 1), lifetime, access, group);

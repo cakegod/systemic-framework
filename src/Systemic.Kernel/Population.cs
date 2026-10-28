@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Threading;
 
 namespace Systemic.Kernel;
@@ -166,8 +167,8 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             _storage.AcquireLease();
         }
 
-        if (systemAccess is not null)
-            lease.BindSystemAccess(systemAccess, Environment.CurrentManagedThreadId);
+        if (systemAccess is { } declaredAccess)
+            lease.BindSystemAccess(declaredAccess, Environment.CurrentManagedThreadId);
         return lease;
     }
 
@@ -301,7 +302,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     internal long BeginScheduledRangeScope(
         PopulationRange range,
         PopulationScopeLifetime lifetime,
-        SystemAccess[] access,
+        ImmutableArray<SystemAccess> access,
         object group)
     {
         lock (World.TransactionGate)
@@ -1267,7 +1268,7 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
     private bool _disposed;
     private bool _systemBound;
     private int _systemThreadId;
-    private SystemAccess[]? _systemAccess;
+    private ImmutableArray<SystemAccess>? _systemAccess;
 
     internal PopulationLease(Population<TKind> population, PopulationStorage storage)
     {
@@ -1364,7 +1365,7 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
 
     internal PopulationStorage StorageIdentity => _storage;
 
-    internal void BindSystemAccess(SystemAccess[] access, int executionThreadId)
+    internal void BindSystemAccess(ImmutableArray<SystemAccess> access, int executionThreadId)
     {
         lock (_world.TransactionGate)
         {
@@ -1378,7 +1379,7 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
     internal long BeginScopedAccess(
         PopulationRange range,
         PopulationScopeLifetime lifetime,
-        SystemAccess[]? access,
+        ImmutableArray<SystemAccess>? access,
         bool parallel,
         object? group)
     {

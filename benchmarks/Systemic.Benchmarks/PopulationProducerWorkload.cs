@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Systemic.Kernel;
 
 namespace Systemic.Benchmarks;
@@ -62,7 +63,7 @@ internal sealed class PopulationProducerWorkload : IDisposable
         Population<ProducerKind> population,
         PopulationColumn<double> produced) : IScheduledKernelSystem
     {
-        private static readonly SystemAccess[] s_access =
+        private static readonly ImmutableArray<SystemAccess> s_access =
             [SystemAccess.WriteColumn<ProducerKind, double>(s_producedKey)];
         private static readonly PopulationRangeAction<ProducerKind, PopulationColumn<double>> s_incrementRange = IncrementRange;
 

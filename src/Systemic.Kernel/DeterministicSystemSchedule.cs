@@ -107,7 +107,7 @@ public sealed class DeterministicSystemScheduleBuilder
         }
 
         ArgumentNullException.ThrowIfNull(system.Access);
-        var access = system.Access.ToArray();
+        ImmutableArray<SystemAccess> access = [.. system.Access];
         if (access.Any(item => string.IsNullOrWhiteSpace(item.Resource)
             || !Enum.IsDefined(item.Mode)))
         {
@@ -149,7 +149,7 @@ public sealed class DeterministicSystemScheduleBuilder
         return new DeterministicSystemSchedule(waves, _workerCount);
     }
 
-    private static bool Conflicts(SystemAccess[] left, SystemAccess[] right)
+    private static bool Conflicts(ImmutableArray<SystemAccess> left, ImmutableArray<SystemAccess> right)
     {
         // An immediate World writer excludes every other system, including systems that
         // declare no World access (or no resources at all).
@@ -194,7 +194,7 @@ public sealed class DeterministicSystemScheduleBuilder
         return false;
     }
 
-    internal sealed record SystemNode(IScheduledKernelSystem System, SystemAccess[] Access, int Order);
+    internal sealed record SystemNode(IScheduledKernelSystem System, ImmutableArray<SystemAccess> Access, int Order);
 }
 
 /// <summary>
@@ -654,9 +654,9 @@ public sealed class ScheduledSystemContext
     private readonly Dictionary<(Type State, Type Result), IReusableDynamicBatch> _reductionBatches = [];
     private readonly List<IDeferredPopulationCommands> _deferredPopulationCommands = [];
     private readonly List<IDisposable> _populationLeases = [];
-    private SystemAccess[] _access = [];
+    private ImmutableArray<SystemAccess> _access = [];
     private World? _previousSystemWorld;
-    private SystemAccess[]? _previousSystemAccess;
+    private ImmutableArray<SystemAccess>? _previousSystemAccess;
     private bool _systemAccessEntered;
 
     internal ScheduledSystemContext(WorldCommandStorage commands, ReusableWorkerPool workerPool)
@@ -931,7 +931,7 @@ public sealed class ScheduledSystemContext
             throw new InvalidOperationException("Range dispatch belongs to the executing system thread and cannot be nested.");
     }
 
-    internal void Prepare(World world, int tick, int workerCount, SystemAccess[] access)
+    internal void Prepare(World world, int tick, int workerCount, ImmutableArray<SystemAccess> access)
     {
         _world = world;
         Tick = tick;
@@ -1054,7 +1054,7 @@ public sealed class ScheduledSystemContext
         private Population<TKind>? _population;
         private TState _state = default!;
         private int _rowCount;
-        private SystemAccess[] _access = [];
+        private ImmutableArray<SystemAccess> _access = [];
         private PopulationRangeAction<TKind, TState> _executeRange = null!;
         private PopulationScopeLifetime[] _lifetimes = [];
         private ExceptionDispatchInfo?[] _failures = [];
@@ -1066,7 +1066,7 @@ public sealed class ScheduledSystemContext
             TState state,
             int rowCount,
             int partitionCount,
-            SystemAccess[] access,
+            ImmutableArray<SystemAccess> access,
             PopulationRangeAction<TKind, TState> executeRange)
         {
             _lease = lease;
@@ -1079,7 +1079,7 @@ public sealed class ScheduledSystemContext
             TState state,
             int rowCount,
             int partitionCount,
-            SystemAccess[] access,
+            ImmutableArray<SystemAccess> access,
             PopulationRangeAction<TKind, TState> executeRange)
         {
             _population = population;
@@ -1091,7 +1091,7 @@ public sealed class ScheduledSystemContext
             TState state,
             int rowCount,
             int partitionCount,
-            SystemAccess[] access,
+            ImmutableArray<SystemAccess> access,
             PopulationRangeAction<TKind, TState> executeRange)
         {
             _state = state;
