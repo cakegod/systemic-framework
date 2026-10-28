@@ -53,9 +53,8 @@ public sealed class BoidEcologyTests
         var (world, flock) = CreateFlock(setup);
         using var disposeFlock = flock;
         var rules = new RuleEngine(new CompiledRuleSet([]));
-        var extensions = new EventEngine([]);
         var contexts = Enumerable.Range(0, warmupTicks + measuredTicks)
-            .Select(tick => new SystemicSystemContext(world, rules, extensions, tick))
+            .Select(tick => new SystemicSystemContext(world, rules, tick))
             .ToArray();
         for (var tick = 0; tick < warmupTicks; tick++)
         {
@@ -513,10 +512,9 @@ public sealed class BoidEcologyTests
     private static void Step(BoidFlockSystem flock, World world, int ticks, int firstTick = 0)
     {
         var rules = new RuleEngine(new CompiledRuleSet([]));
-        var extensions = new EventEngine([]);
         for (var tick = firstTick; tick < firstTick + ticks; tick++)
         {
-            flock.Step(new SystemicSystemContext(world, rules, extensions, tick));
+            flock.Step(new SystemicSystemContext(world, rules, tick));
         }
     }
 

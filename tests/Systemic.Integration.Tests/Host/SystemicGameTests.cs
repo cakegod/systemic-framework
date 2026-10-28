@@ -130,26 +130,6 @@ public sealed class SystemicGameTests
     }
 
     [Fact]
-    public void Host_routes_input_to_explicit_typed_kernel_modules()
-    {
-        var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"))
-            with
-        { Modules = [] };
-        var world = new World(seed: 2, valueScale: 1);
-        var source = world.Add(new DataEntity([], []));
-        var target = world.Add(new DataEntity([], [], ("value", 0)));
-        using var game = new SystemicGameBuilder(content, world)
-            .AddExtension(new IncrementValueModule())
-            .Build();
-
-        var result = game.Execute(new IncrementValueFact(source.Id, target.Id));
-
-        Assert.True(result.Accepted);
-        Assert.True(target.TryGetProperty(world, "value", out var value));
-        Assert.Equal(1, value);
-    }
-
-    [Fact]
     public void Registered_module_content_runs_through_the_core_builder()
     {
         var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
@@ -202,24 +182,6 @@ public sealed class SystemicGameTests
             ContextAfterStep = gameContext;
             gameContext.Publish(new Systemic.Rules.SimulationFact("test", entityId, entityId));
         }
-    }
-
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1067:Override Object.Equals when implementing IEquatable",
-        Justification = "Record declarations synthesize object equality and matching hash codes.")]
-    private sealed record IncrementValueFact(int SourceId, int TargetId) : KernelEvent(SourceId, TargetId);
-
-    private sealed class IncrementValueModule : ISystemicExtensionModule
-    {
-        public string Id => "sample.increment";
-
-        public void Register(EngineBuilder engine) => engine.On<IncrementValueFact>("sample.increment.value", context =>
-        {
-            if (context.World.ById(context.Event.TargetId) is { } target
-                && target.TryGetProperty(context.World, "value", out var value))
-            {
-                target.TrySetProperty(context.World, "value", value + 1);
-            }
-        });
     }
 
 }

@@ -481,24 +481,17 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Typed_extensions_are_explicit_and_duplicate_modules_are_rejected()
+    public void Extensions_are_explicit_and_duplicate_modules_are_rejected()
     {
         var catalog = new ExtensionModuleCatalog().Add(new TestExtension());
 
-        Assert.Contains("sample.typed", catalog.ModuleIds);
+        Assert.Contains("sample.extension", catalog.ModuleIds);
         Assert.Throws<InvalidOperationException>(() => catalog.Add(new TestExtension()));
-        Assert.Single(catalog.BuildEngine().Triggers);
     }
-
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1067:Override Object.Equals when implementing IEquatable",
-        Justification = "Record declarations synthesize object equality and matching hash codes.")]
-    private sealed record TestFact(int SourceId) : KernelEvent(SourceId);
 
     private sealed class TestExtension : ISystemicExtensionModule
     {
-        public string Id => "sample.typed";
-
-        public void Register(EngineBuilder engine) => engine.On<TestFact>("sample.typed.observe", _ => { });
+        public string Id => "sample.extension";
     }
 }
 

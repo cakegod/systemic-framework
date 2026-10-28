@@ -10,6 +10,8 @@ public sealed class SystemicBudgetTests(ITestOutputHelper output)
 {
     private const int ProductCount = 50_000;
     private const int ActorCount = 1_000;
+    // RuleEngine's default per-dispatch effect budget; the engine under test is built with defaults.
+    private const int MaxEffectsPerDispatch = 1024;
     private readonly ITestOutputHelper _output = output;
 
     /// <summary>
@@ -107,7 +109,7 @@ public sealed class SystemicBudgetTests(ITestOutputHelper output)
 
                 if (requireReactionCutoff
                     && (!result.CutOff || result.CutoffReason != "reaction_depth"
-                        || result.EffectsApplied is < 1 or > EngineLimits.MaxEffectsPerCommand))
+                        || result.EffectsApplied is < 1 or > MaxEffectsPerDispatch))
                 {
                     invalidDispatches++;
                 }

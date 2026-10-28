@@ -183,7 +183,6 @@ public sealed class SystemicSaveCodecTests
     {
         public string Id => "test.counter";
         public int Value { get; set; }
-        public void Register(EngineBuilder _) { }
         public JsonElement CaptureState() => JsonSerializer.SerializeToElement(Value);
         public void RestoreState(JsonElement state) => Value = state.GetInt32();
     }
@@ -193,7 +192,6 @@ public sealed class SystemicSaveCodecTests
         public string Id => "test.stateful-system";
         public int Order => 10;
         public int Value { get; set; }
-        public void Register(EngineBuilder _) { }
         public void Step(SystemicSystemContext context) => Value++;
         public JsonElement CaptureState() => JsonSerializer.SerializeToElement(Value);
         public void RestoreState(JsonElement state) => Value = state.GetInt32();

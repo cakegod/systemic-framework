@@ -30,9 +30,10 @@ Fixing findings one at a time produces thirteen fixes and no core. Fix the roots
 | P1.3 | Done | `PresentationRuntime` uses typed in-memory rollback. `ISaveOnlyStateExtension` marks state the journal already covers, so the four kernel extensions and `BuildChoiceRuntime` no longer capture JSON every tick. Tests: `SaveOnlyStateTests`. |
 | P1.4 | Done | `World.EntitiesWithTag` gives the module an O(tagged) query; `Gameplay2DModule` writes through `Commands`, declares `ReadWorld` + `DeferWorldWrites`, and shares a wave. The scheduler now treats a reader beside a buffered writer as compatible. Every built-in system declares its access explicitly. Tests: `TagQueryTests`, `Module_shares_a_scheduling_wave_with_other_deferred_writers`. |
 | P1.5 | Done | Content tier in `GateTierTests` (2,000 actors, allocation and 5 ms p95). Kernel tier stays with the benchmark gate runner. The 50k/1k test is now a diagnostic under the approved tiers and reports timings without gating. The crowd tier needs P3 before it can be written. |
-| P4.2 | Partial | Save schema is v5 and version 4 is rejected with a clear diagnostic; there is no v4 migration by decision. The replay fixture was regenerated for the new state format. |
+| P4.2 | Partial | Save schema is v6, bumped by P2; version 5 migrates and version 4 is rejected with a clear diagnostic, with no v4 migration by decision. The replay fixture was regenerated for the new state format. |
 | P5.2 | Done | `RollbackPropertyTests` uses FsCheck: random command sequences restore world state on rollback and match a parallel world on commit. |
-| P2, P3, P4.1, P4.3, P5.1, P5.3–P5.6 | Open | P3 needs the 6–8 weeks the plan budgets; P2 depends on D2/D3; P4.1 and P5.1/P5.3–P5.6 are separate integrations. |
+| P2 | Done | D3 found no user, so P2 took the gate's deletion branch: `EventEngine`, its triggers, `EngineBuilder`, `BatchTrigger`, `EntityQuery`, the `ActionPipeline` effect vocabulary, and both `Execute(KernelEvent)` entry points are gone. One dispatch path remains. Save schema is v6 with a v5 migration that drops `systemic.events`. Numbers and consequences under *Typed dispatch retired*. |
+| P3, P4.1, P4.3, P5.1, P5.3–P5.6 | Open | P3 needs the 6–8 weeks the plan budgets; P4.1 and P5.1/P5.3–P5.6 are separate integrations. |
 
 ### Spatial grid storage
 
@@ -106,7 +107,7 @@ is what makes this safe for `BuildChoiceRuntime`.
 | --- | --- | --- | --- |
 | D1 | Subject model: A tiered handoff, B populations as rule subjects, C populations only | **B, shipped as A first** | P3.* |
 | D2 | Keep the 898-line expression language or keep only `RuleEffectKind` | **Delete the language, keep the effect list** unless a named content feature needs it | P3.1 |
-| D3 | Does the typed `EventEngine` path have a user outside the Boids sample? | Investigate; if no, P2 becomes a deletion and saves a week | P2.1 |
+| D3 | Does the typed `EventEngine` path have a user outside the Boids sample? | **Resolved: no.** Nothing in `src/modules` or the samples registers a typed trigger; the Boids sample passed an empty engine only to satisfy the context constructor. P2 shipped as a deletion | P2.1 |
 
 D1 is recorded as an ADR before P3.1 starts. P3.8 is the stop point: if the 100k-crowd demo cannot
 be built on the bridge, stop at A and narrow the README claim to *"systemic for dozens, dense for
@@ -135,12 +136,43 @@ Acceptance: build clean, suite green, no public API removed. Met; see *Spatial g
 Phase 1 is the point where the red gate should turn green for the kernel tier. Stop and measure
 before Phase 2.
 
-## Phase 2 — one dispatch path (2 weeks)
+## Phase 2 — one dispatch path (done by deletion)
 
 | ID | Work | Acceptance |
 | --- | --- | --- |
-| P2.1 | Route `EventEngine` emissions into the same fact batch and transaction as content rules, with one depth budget and one ordering. Remove `_extensionEngine` and `EventEngineStatefulExtension` once the typed path is a facade over the batch. | One transaction per tick with both content rules and typed triggers active; a content fact chain and a typed chain observe each other in the same tick. |
-| P2.2 | If `ActionPipeline`, `Selectors`, `IPayment`, `IActionEffect` and `ActionContext` have no caller outside `EventEngine` after P2.1, delete them. | Public API loses the second effect vocabulary, or a documented typed-trigger user justifies keeping it. |
+| P2.1 | ~~Route `EventEngine` emissions into the same fact batch and transaction as content rules.~~ D3 had no user to serve, so the engine and its queue, depth budget, transaction and save state were deleted instead. | One dispatch path: `Publish` for immediate rule dispatch, `DeferFact` for the end-of-tick batch, both through `RuleEngine`. |
+| P2.2 | Deleted with P2.1: `ActionPipeline`, `Selectors`, `IPayment`, `IActionEffect`, `ActionContext`, `ActionDefinition`, `BatchTrigger` and `EngineBuilder` had no caller outside `EventEngine`. | Public API loses the second effect vocabulary. |
+
+### Typed dispatch retired
+
+D3 asked whether the typed `EventEngine` path had a user outside the Boids sample. It did not. The host always built an
+engine and every `SystemicSystemContext` carried one, but the only registrations lived in the kernel's own tests, one
+benchmark workload and two test doubles. `Gameplay2DModule.Register` was an empty body, and the Boids sample constructed
+`new EventEngine([])` solely to fill the context constructor's parameter. With no consumer, P2.1's facade would have
+preserved a second vocabulary together with the second queue, depth budget, diagnostic window and event counters, so P2
+took the deletion branch the gate reserved for this finding.
+
+What went with it: `EventEngine`, `Trigger`/`TriggerContext`, `BatchTrigger`/`BatchContext`, `EngineBuilder`,
+`EntityQuery`, `KernelEvent` and its `ContactFact`/`ContactPhase`, and the World hooks only they used
+(`JournalEventCounters`, the query-snapshot cache and its link versions, and both `AllTaggedCandidates` overloads).
+`ISystemicExtensionModule` keeps only `Id`; modules still join the schedule and save state through it, and the analyzer
+no longer recognises `Execute` as an immediate World operation.
+
+The tick now has one dispatch path. A system calls `Publish` for immediate rule dispatch or `DeferFact` for the
+end-of-tick batch, and `RuleEngine` owns the transaction, depth budget and ordering. Nothing in the content vocabulary
+changed: schedules, modifiers, tags, links, populations and `rules.json` effects were always `RuleEngine`'s, not the
+retired engine's.
+
+Save state changed with the deletion. `systemic.events` is gone, so the schema is v6 and
+`RetiredEventEngineStateMigration` upgrades a v5 document by dropping that entry, which is what keeps a v5 save loading
+instead of failing as an unregistered extension; a caller-supplied migration replaces that default. The replay fixture
+was regenerated for the new state format, and two ports in `talent-pattern-coverage.json` were renamed because
+`typed.system` no longer exists: pattern-10 now names `rules.schedule` and pattern-27 names `rules.event`.
+
+Accepted break: a downstream game that authored rules in C# through `EngineBuilder.On<TEvent>` — including
+`IPayment` cost planning, `Selectors` and multi-effect actions — loses that surface with no direct replacement. It
+moves to content rules plus `DeferFact`, or to its own `ISystemicSystem`. `ResourceEntity.TrySpend` and its siblings
+stay in the Kernel, so a system can still charge costs itself.
 
 ## Phase 3 — the bridge that makes the thesis true (6–8 weeks)
 

@@ -29,7 +29,7 @@ public sealed class SystemicSaveException(string message, Exception? innerExcept
 /// <summary>Captures and restores portable engine-neutral world state using explicit entity codecs.</summary>
 public sealed class SystemicSaveCodec
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
     private const string SaveSchemaId = "https://press-the-button.dev/systemic/save.schema.json";
     private static readonly string s_saveSchema = ReadSchema();
 
@@ -54,15 +54,22 @@ public sealed class SystemicSaveCodec
             }
         }
 
-        _migrations = new Dictionary<int, ISaveMigration>();
+        // Version 6 retired the typed event engine, so its counters are dropped on load by default.
+        // A caller-supplied migration replaces that default for the same version.
+        _migrations = new Dictionary<int, ISaveMigration>
+        {
+            [5] = new RetiredEventEngineStateMigration()
+        };
+        var provided = new HashSet<int>();
         foreach (var migration in migrations ?? [])
         {
             ArgumentNullException.ThrowIfNull(migration);
-            if (migration.FromVersion < 4
-                || !_migrations.TryAdd(migration.FromVersion, migration))
+            if (migration.FromVersion < 4 || !provided.Add(migration.FromVersion))
             {
                 throw new ArgumentException($"Save migration from version {migration.FromVersion} is invalid or duplicated.", nameof(migrations));
             }
+
+            _migrations[migration.FromVersion] = migration;
         }
     }
 
@@ -307,12 +314,14 @@ public sealed class SystemicSaveCodec
             throw new SystemicSaveException("Save document requires an integer schemaVersion.");
         }
 
-        // Version 5 renamed the modifier duration field to an absolute expiry tick. There is no
-        // migration: a version 4 document is rejected rather than silently reinterpreted.
-        if (version < CurrentSchemaVersion)
+        // Version 5 renamed the modifier duration field to an absolute expiry tick, so a version 4
+        // document is rejected rather than silently reinterpreted. Version 6 retired the typed event
+        // engine and upgrades from version 5 by dropping its counters.
+        if (version < 5)
         {
             throw new SystemicSaveException($"Save schema version {version} is no longer supported. Create a new version {CurrentSchemaVersion} save using the current content.");
         }
+
         if (version > CurrentSchemaVersion)
         {
             throw new SystemicSaveException($"Save schema version {version} is newer than supported version {CurrentSchemaVersion}.");

@@ -118,8 +118,6 @@ public sealed class World
     private readonly Dictionary<string, CandidateBucket> _entityIdsByCapability = new(StringComparer.Ordinal);
     private CandidateBucket _allEntityIds = new();
     private readonly Dictionary<Type, CandidateBucket> _entityIdsByType = [];
-    private readonly Dictionary<IEntityQuery, CachedQuerySnapshot> _querySnapshots = [];
-    private readonly Dictionary<string, long> _linkVersions = new(StringComparer.Ordinal);
     internal long StructuralVersion { get; private set; }
     internal int UndoRecordCount
     {
@@ -192,86 +190,6 @@ public sealed class World
     internal bool HasActiveScope
     {
         get { lock (TransactionGate) return !_undoing && _scopes.Count > 0; }
-    }
-
-    internal bool TryGetQuerySnapshot(IEntityQuery query, out EntityQuerySnapshot snapshot)
-    {
-        snapshot = default;
-        if (!_querySnapshots.TryGetValue(query, out var cached))
-        {
-            return false;
-        }
-
-        if (cached.Snapshot.StructuralVersion != StructuralVersion)
-        {
-            EnsureTagIndex();
-            var index = 0;
-            foreach (var membership in QueryMemberships(query))
-            {
-                if (!membership.Equals(cached.Memberships[index++]))
-                {
-                    return false;
-                }
-            }
-
-            for (index = 0; index < query.Links.Length; index++)
-            {
-                if (_linkVersions.GetValueOrDefault(query.Links[index].Link) != cached.LinkVersions[index])
-                {
-                    return false;
-                }
-            }
-
-            cached.Snapshot = cached.Snapshot with { StructuralVersion = StructuralVersion };
-        }
-
-        snapshot = cached.Snapshot;
-        return true;
-    }
-
-    internal void CacheQuerySnapshot(IEntityQuery query, EntityQuerySnapshot snapshot) =>
-        _querySnapshots[query] = new CachedQuerySnapshot(snapshot,
-            [.. QueryMemberships(query)],
-            [.. query.Links.Select(requirement => _linkVersions.GetValueOrDefault(requirement.Link))]);
-
-    private IEnumerable<ReadOnlyMemory<int>> QueryMemberships(IEntityQuery query)
-    {
-        if (query.Tags.Length == 0 && query.Capabilities.Length == 0)
-        {
-            yield return CandidateSnapshot(_allEntityIds);
-        }
-
-        foreach (var tag in query.Tags)
-        {
-            yield return MembershipSnapshot(_entityIdsByTag, tag);
-        }
-
-        foreach (var capability in query.Capabilities)
-        {
-            yield return MembershipSnapshot(_entityIdsByCapability, capability);
-        }
-
-        foreach (var link in query.Links)
-        {
-            yield return MembershipSnapshot(_entityIdsByTag, link.Tag);
-            if (link.Capability.Length != 0)
-            {
-                yield return MembershipSnapshot(_entityIdsByCapability, link.Capability);
-            }
-        }
-    }
-
-    private static ReadOnlyMemory<int> MembershipSnapshot(Dictionary<string, CandidateBucket> buckets, string name) =>
-        buckets.TryGetValue(name, out var bucket) ? CandidateSnapshot(bucket) : default;
-
-    private sealed class CachedQuerySnapshot(
-        EntityQuerySnapshot snapshot,
-        ReadOnlyMemory<int>[] memberships,
-        long[] linkVersions)
-    {
-        public EntityQuerySnapshot Snapshot { get; set; } = snapshot;
-        public ReadOnlyMemory<int>[] Memberships { get; } = memberships;
-        public long[] LinkVersions { get; } = linkVersions;
     }
 
     private bool _tagIndexDirty = true;
@@ -701,24 +619,6 @@ public sealed class World
             }
 
             (scope.CommitActions ??= []).Add(action);
-        }
-    }
-
-    /// <summary>
-    /// Records the event engine's counters on the active transaction so an enclosing rollback rewinds
-    /// them. Kept off the journal so event commands do not register as state changes, and skipped
-    /// when no scope is active so ordinary commands stay allocation-free.
-    /// </summary>
-    internal void JournalEventCounters(EventEngine engine)
-    {
-        lock (TransactionGate)
-        {
-            if (_undoing || _scopes.Count == 0)
-            {
-                return;
-            }
-
-            _scopes.Peek().CaptureEventCounters(engine);
         }
     }
 
@@ -1337,88 +1237,6 @@ public sealed class World
             : ReadOnlyMemory<int>.Empty;
     }
 
-    /// <summary>
-    /// Returns a stable snapshot from the smallest required tag/capability bucket.
-    /// Callers must revalidate all query constraints before applying behavior.
-    /// </summary>
-    internal ReadOnlyMemory<int> AllTaggedCandidates(
-        IReadOnlyList<string> tags,
-        IReadOnlyList<string> capabilities)
-    {
-        ArgumentNullException.ThrowIfNull(tags);
-        ArgumentNullException.ThrowIfNull(capabilities);
-        return AllTaggedCandidates(
-            tags as string[] ?? [.. tags],
-            capabilities as string[] ?? [.. capabilities]);
-    }
-
-    internal ReadOnlyMemory<int> AllTaggedCandidates(
-        string[] tags,
-        string[] capabilities)
-    {
-        EnsureTagIndex();
-
-        var candidates = _allEntityIds;
-        foreach (var tag in tags)
-        {
-            if (!_entityIdsByTag.TryGetValue(tag, out var indexed))
-            {
-                return ReadOnlyMemory<int>.Empty;
-            }
-
-            if (indexed.EntityIds.Count < candidates.EntityIds.Count)
-            {
-                candidates = indexed;
-                if (candidates.EntityIds.Count == 0)
-                {
-                    return ReadOnlyMemory<int>.Empty;
-                }
-            }
-        }
-
-        foreach (var capability in capabilities)
-        {
-            if (!_entityIdsByCapability.TryGetValue(capability, out var indexed))
-            {
-                return ReadOnlyMemory<int>.Empty;
-            }
-
-            if (indexed.EntityIds.Count < candidates.EntityIds.Count)
-            {
-                candidates = indexed;
-                if (candidates.EntityIds.Count == 0)
-                {
-                    return ReadOnlyMemory<int>.Empty;
-                }
-            }
-        }
-
-        return CandidateSnapshot(candidates);
-    }
-
-    internal ReadOnlyMemory<int> AllTaggedCandidates(string tag, string capability, string additionalCapability)
-    {
-        EnsureTagIndex();
-        if (tag is null || capability is null || additionalCapability is null
-            || !_entityIdsByTag.TryGetValue(tag, out var candidates)
-            || !_entityIdsByCapability.TryGetValue(capability, out var capabilityCandidates)
-            || !_entityIdsByCapability.TryGetValue(additionalCapability, out var additionalCapabilityCandidates))
-        {
-            return ReadOnlyMemory<int>.Empty;
-        }
-
-        if (capabilityCandidates.EntityIds.Count < candidates.EntityIds.Count)
-        {
-            candidates = capabilityCandidates;
-        }
-
-        if (additionalCapabilityCandidates.EntityIds.Count < candidates.EntityIds.Count)
-        {
-            candidates = additionalCapabilityCandidates;
-        }
-
-        return CandidateSnapshot(candidates);
-    }
 
     private void EnsureTagIndex()
     {
@@ -1923,7 +1741,6 @@ public sealed class World
 
         entity.MarkStructureChanged();
         MarkStructureChanged();
-        _linkVersions[link] = _linkVersions.GetValueOrDefault(link) + 1;
         if (previousTarget is { } previous && _incomingLinks.TryGetValue(previous, out var previousLinks))
         {
             previousLinks.Remove((entity.Id, link));
@@ -2210,7 +2027,6 @@ public sealed class World
                     var draws = next.Draws;
 
                     _entityIdsByType.Clear();
-                    _querySnapshots.Clear();
                     _entities.Clear();
                     _entities.AddRange(next._entities);
                     foreach (var entity in _entities)
@@ -2354,7 +2170,7 @@ public sealed class World
         }
 
         var live = 0;
-        foreach (var id in AllTaggedCandidates([tag], []).Span)
+        foreach (var id in EntitiesWithTag(tag).Span)
         {
             if (ById(id) is { ToRemove: false } entity && HasTag(entity, tag))
             {
@@ -2399,14 +2215,6 @@ public sealed class World
                     _undoing = false;
                 }
 
-                if (scope.EventCounterCheckpoints is { Count: > 0 } eventCounters)
-                {
-                    for (var index = eventCounters.Count - 1; index >= 0; index--)
-                    {
-                        eventCounters[index].Restore();
-                    }
-                }
-
                 var journalEnd = _journal.Count;
                 for (var index = scope.Mark; index < journalEnd; index++)
                 {
@@ -2426,7 +2234,6 @@ public sealed class World
             {
                 var parent = _scopes.Peek();
                 parent.InheritPopulationCaptures(scope);
-                parent.InheritEventCounters(scope);
                 if (scope.RollbackActions is { Count: > 0 } rollbackActions)
                 {
                     (parent.RollbackActions ??= []).AddRange(rollbackActions);
@@ -2456,7 +2263,6 @@ public sealed class World
             scope.CapturedPopulationBuffers?.Clear();
             scope.CapturedPopulationStructures?.Clear();
             scope.CapturedPopulationRoles?.Clear();
-            scope.EventCounterCheckpoints?.Clear();
             if (_scopes.Count == 0)
             {
                 foreach (var record in _journal)
@@ -2537,19 +2343,6 @@ public sealed class World
         public HashSet<PopulationBufferKey>? CapturedPopulationBuffers { get; private set; }
         public HashSet<object>? CapturedPopulationStructures { get; private set; }
         public HashSet<PopulationColumnBase>? CapturedPopulationRoles { get; private set; }
-        public List<EventCounterCheckpoint>? EventCounterCheckpoints { get; private set; }
-
-        public void CaptureEventCounters(EventEngine engine) =>
-            (EventCounterCheckpoints ??= []).Add(
-                new EventCounterCheckpoint(engine, engine.Serial, engine.ChainId));
-
-        public void InheritEventCounters(ScopeState child)
-        {
-            if (child.EventCounterCheckpoints is { Count: > 0 } checkpoints)
-            {
-                (EventCounterCheckpoints ??= []).AddRange(checkpoints);
-            }
-        }
 
         public List<Action>? RollbackActions { get; set; }
         public List<Action>? CommitActions { get; set; }
@@ -2673,11 +2466,6 @@ public sealed class World
         Role,
         Required,
         PopulationDefinition,
-    }
-
-    internal readonly record struct EventCounterCheckpoint(EventEngine Engine, long Serial, int ChainId)
-    {
-        public void Restore() => Engine.RestoreCounters(Serial, ChainId);
     }
 
     private readonly struct UndoRecord

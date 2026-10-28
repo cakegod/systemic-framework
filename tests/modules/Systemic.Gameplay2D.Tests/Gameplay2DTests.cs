@@ -266,5 +266,5 @@ public sealed class Gameplay2DTests
         new(id, ["target"], [], properties, 1, 1);
 
     private static SystemicSystemContext Context(World world, int tick) =>
-        new(world, new RuleEngine(new CompiledRuleSet([])), new EngineBuilder().Build(), tick);
+        new(world, new RuleEngine(new CompiledRuleSet([])), tick);
 }

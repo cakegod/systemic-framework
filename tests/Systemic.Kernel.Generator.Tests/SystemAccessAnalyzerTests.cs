@@ -48,7 +48,6 @@ public sealed class SystemAccessAnalyzerTests
                     _ = context.GetWritableWorld();
                     context.SetProperty(null!, "value", 1);
                     context.Publish(default);
-                    context.Execute(default);
                 }
             }
             """;
@@ -117,13 +116,12 @@ public sealed class SystemAccessAnalyzerTests
                     _ = context.GetWritableWorld();
                     context.SetProperty(null!, "value", 1);
                     context.Publish(default);
-                    context.Execute(default);
                 }
             }
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.Equal(4, diagnostics.Count(diagnostic => diagnostic.Id == "SYSACC001"));
+        Assert.Equal(3, diagnostics.Count(diagnostic => diagnostic.Id == "SYSACC001"));
     }
 
     [Fact]
@@ -749,7 +747,6 @@ public sealed class SystemAccessAnalyzerTests
                         _ = state.GetWritableWorld();
                         state.SetProperty(null!, "value", 1);
                         state.Publish(default);
-                        state.Execute(default);
                         state.Commands.AddTag(1, "inside");
                     });
                 }
@@ -767,7 +764,7 @@ public sealed class SystemAccessAnalyzerTests
             """;
 
         var diagnostics = await Analyze(source);
-        Assert.Equal(5, diagnostics.Count(diagnostic => diagnostic.Id == "SYSACC005"));
+        Assert.Equal(4, diagnostics.Count(diagnostic => diagnostic.Id == "SYSACC005"));
     }
 
     private static string At(Diagnostic diagnostic, string source) => source.Substring(

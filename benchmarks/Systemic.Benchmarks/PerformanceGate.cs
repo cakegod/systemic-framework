@@ -23,12 +23,10 @@ internal static class PerformanceGate
 
         var scenarios = scenarioName switch
         {
-            "all" => new[] { "producer", "producer-query", "reactive" },
-            "producer" or "producer-entity" or "producer-query" or "producer-base"
-                or "reactive" or "reactive-query" or "reactive-dispatch" => [scenarioName],
+            "all" => new[] { "producer", "reactive" },
+            "producer" or "reactive" or "reactive-query" or "reactive-dispatch" => [scenarioName],
             _ => throw new ArgumentException(
-                "Scenario must be 'all', 'producer', 'producer-query', 'reactive', "
-                + "'reactive-query', 'reactive-dispatch', 'producer-entity', or 'producer-base'.",
+                "Scenario must be 'all', 'producer', 'reactive', 'reactive-query', or 'reactive-dispatch'.",
                 nameof(arguments)),
         };
 
@@ -108,9 +106,6 @@ internal static class PerformanceGate
     private static GateWorkload CreateScenario(string scenario, int workerCount) => scenario switch
     {
         "producer" => CreatePopulationProducer(workerCount),
-        "producer-entity" => CreateEntityProducer(),
-        "producer-query" => CreateProducerQuery(),
-        "producer-base" => CreateProducerBase(),
         "reactive" => CreateReactiveScenario(static workload => workload.ExecuteTick()),
         "reactive-query" => CreateReactiveScenario(static workload => workload.ExecuteQueryTick()),
         "reactive-dispatch" => CreateReactiveScenario(static workload => workload.ExecuteDispatchTick()),
@@ -121,24 +116,6 @@ internal static class PerformanceGate
     {
         var workload = new PopulationProducerWorkload(workerCount);
         return new GateWorkload(workload.Tick, workload.Validate, workload);
-    }
-
-    private static GateWorkload CreateEntityProducer()
-    {
-        var workload = new ProducerBatchWorkload();
-        return new GateWorkload(workload.Tick, static _ => { });
-    }
-
-    private static GateWorkload CreateProducerQuery()
-    {
-        var workload = new ProducerBatchWorkload();
-        return new GateWorkload(workload.TickQueryOnly, static _ => { });
-    }
-
-    private static GateWorkload CreateProducerBase()
-    {
-        var workload = new ProducerBatchWorkload();
-        return new GateWorkload(workload.TickEngineBase, static _ => { });
     }
 
     private static GateWorkload CreateReactiveScenario(Action<ReactiveWorldBenchmarks> tick)

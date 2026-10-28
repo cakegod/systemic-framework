@@ -257,5 +257,5 @@ public sealed class DeterministicReplayTests
 
 internal static class HostReplayFixture
 {
-    public const string Json = """{"version":1,"seed":41,"contentFingerprint":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","initialTick":0,"initialStateHash":"6dd2fbc04d0e2ad90ef92a3cd8fd2767766678e39784c697243851cd3505846d","ticks":[{"tick":1,"inputs":[{"type":"add","value":2}],"stateHash":"b0b4804e688f126ea8af048fde1f6bf267da14b6b7342e85ace1262451a45c96"},{"tick":2,"inputs":[],"stateHash":"41b1d56dcbbf2e00d11dd838bbe65d04209b7f2a55a352e7abf71d7ec4cf0a0a"},{"tick":3,"inputs":[{"type":"add","value":1}],"stateHash":"92ba7af4d79069329be67c84ad07507c23042f2b06fc3c0de7332da2f6f53941"}]}""";
+    public const string Json = """{"version":1,"seed":41,"contentFingerprint":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","initialTick":0,"initialStateHash":"92da6c73b8418260316203abeb04ff436426d8f81253cef6290685799c596c6c","ticks":[{"tick":1,"inputs":[{"type":"add","value":2}],"stateHash":"8ee4ee1a04d4b8b24afbc691e85bea0c841022ce8f9988b4c7f81a6c0eb60682"},{"tick":2,"inputs":[],"stateHash":"6e52be43c47924ec24b712cfc438fa640ccc6c307c70e202c43a8bf3e23d4f9c"},{"tick":3,"inputs":[{"type":"add","value":1}],"stateHash":"57e41b16f9d8d86654cbe40eddae70c0c7229a1bac8b7d5c71ae6632d67d7b5b"}]}""";
 }

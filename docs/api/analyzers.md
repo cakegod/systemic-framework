@@ -35,7 +35,7 @@ Choose deterministic numeric primitives and explicit inputs for authoritative si
 
 | Rule | Diagnostic |
 | --- | --- |
-| [`SYSACC001`](#sysacc001) | Immediate `SystemicSystemContext` World operations (`GetWritableWorld`, `SetProperty`, `Publish`, and `Execute`) need `SystemAccess.WriteWorld`. |
+| [`SYSACC001`](#sysacc001) | Immediate `SystemicSystemContext` World operations (`GetWritableWorld`, `SetProperty`, and `Publish`) need `SystemAccess.WriteWorld`. |
 | [`SYSACC002`](#sysacc002) | `DeferPopulationCommands` needs `SystemAccess.DeferWorldWrites` or `SystemAccess.WriteWorld`. |
 | [`SYSACC003`](#sysacc003) | Buffer swaps and both-buffer edits are unsafe inside a range callback. |
 | [`SYSACC004`](#sysacc004) | Scoped population column reads and writes need matching per-column access declarations. |
@@ -47,7 +47,7 @@ Choose deterministic numeric primitives and explicit inputs for authoritative si
 <a id="sysacc001"></a>
 ### SYSACC001
 
-Declares missing immediate World access for direct calls to `GetWritableWorld`, `SetProperty`, `Publish`, or `Execute` on `SystemicSystemContext`. Add `SystemAccess.WriteWorld` when the operation is required.
+Declares missing immediate World access for direct calls to `GetWritableWorld`, `SetProperty`, or `Publish` on `SystemicSystemContext`. Add `SystemAccess.WriteWorld` when the operation is required.
 
 <a id="sysacc002"></a>
 ### SYSACC002

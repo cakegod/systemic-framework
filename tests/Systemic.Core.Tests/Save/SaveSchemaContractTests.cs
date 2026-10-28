@@ -11,7 +11,7 @@ namespace Systemic.Tests.Save;
 public sealed class SaveSchemaContractTests
 {
     [Fact]
-    public void Save_schema_matches_the_current_v5_codec_contract()
+    public void Save_schema_matches_the_current_v6_codec_contract()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -31,7 +31,7 @@ public sealed class SaveSchemaContractTests
         Assert.Single(new SystemicSaveCodec().Load(content, saved.RootElement.GetRawText()).World.Entities);
 
         var schemaRoot = schema.RootElement;
-        Assert.Equal(5, schemaRoot.GetProperty("properties"u8).GetProperty("schemaVersion"u8).GetProperty("const"u8).GetInt32());
+        Assert.Equal(6, schemaRoot.GetProperty("properties"u8).GetProperty("schemaVersion"u8).GetProperty("const"u8).GetInt32());
         var required = schemaRoot.GetProperty("required"u8).EnumerateArray().Select(value => value.GetString()).ToArray();
         Assert.Contains("extensionStates", required);
         Assert.DoesNotContain("presentation", required);
@@ -50,7 +50,7 @@ public sealed class SaveSchemaContractTests
         Assert.Contains("isValid", boundsRequired);
 
         var savedRoot = saved.RootElement;
-        Assert.Equal(5, savedRoot.GetProperty("schemaVersion"u8).GetInt32());
+        Assert.Equal(6, savedRoot.GetProperty("schemaVersion"u8).GetInt32());
         Assert.True(savedRoot.TryGetProperty("extensionStates"u8, out _));
         Assert.False(savedRoot.TryGetProperty("presentation"u8, out _));
         Assert.Equal("Foundation", savedRoot.GetProperty("world"u8).GetProperty("modifiers"u8)[0]

@@ -79,7 +79,6 @@ public sealed class SystemicSystemContext
 {
     private readonly World _world;
     private readonly RuleEngine _contentRules;
-    private readonly EventEngine _extensionEngine;
     private readonly IReadOnlyDictionary<Type, object> _services;
     private readonly SimulationFactObserver? _observeFact;
     private readonly WorldCommandBuffer _standaloneCommands;
@@ -91,11 +90,10 @@ public sealed class SystemicSystemContext
     private DeferredFactQueue? _deferredFacts;
 
     /// <summary>Creates a single-use context for a direct system test or standalone harness.</summary>
-    public SystemicSystemContext(World world, RuleEngine contentRules, EventEngine extensionEngine, int tick)
+    public SystemicSystemContext(World world, RuleEngine contentRules, int tick)
     {
         _world = world ?? throw new ArgumentNullException(nameof(world));
         _contentRules = contentRules ?? throw new ArgumentNullException(nameof(contentRules));
-        _extensionEngine = extensionEngine ?? throw new ArgumentNullException(nameof(extensionEngine));
         _services = ImmutableDictionary<Type, object>.Empty;
         _standaloneCommands = new WorldCommandBuffer();
         _standaloneTick = tick;
@@ -106,13 +104,11 @@ public sealed class SystemicSystemContext
     internal SystemicSystemContext(
         World world,
         RuleEngine contentRules,
-        EventEngine extensionEngine,
         IReadOnlyDictionary<Type, object> services,
         SimulationFactObserver? observeFact)
     {
         _world = world;
         _contentRules = contentRules;
-        _extensionEngine = extensionEngine;
         _services = services;
         _observeFact = observeFact;
         _standaloneCommands = default;
@@ -207,15 +203,6 @@ public sealed class SystemicSystemContext
         EnsureImmediateWorldWriteAccess();
         FlushWorldCommands();
         return _contentRules.Dispatch(_world, fact, _observeFact);
-    }
-
-    /// <summary>Executes an extension event against the current World.</summary>
-    /// <exception cref="InvalidOperationException">The system did not declare immediate World write access.</exception>
-    public CommandExecutionResult Execute(KernelEvent command)
-    {
-        EnsureImmediateWorldWriteAccess();
-        FlushWorldCommands();
-        return _extensionEngine.ExecuteDetailed(_world, command);
     }
 
     /// <summary>Registers recovery for external state if the enclosing scheduled tick rolls back.</summary>
@@ -473,7 +460,7 @@ public sealed class SystemicSystemContext
         if (!_canWriteWorld)
         {
             throw new InvalidOperationException(
-                "Immediate World writes, rule dispatch, and event dispatch require SystemAccess.WriteWorld; deferred World commands remain available without it.");
+                "Immediate World writes and rule dispatch require SystemAccess.WriteWorld; deferred World commands remain available without it.");
         }
     }
 }
@@ -659,7 +646,6 @@ public sealed class SystemicGameBuilder
 
         var contentRules = new RuleEngine(Content.Rules, tickRateHz: Content.Manifest.TickRateHz);
         var clock = new FixedStepClock(Content.Manifest.TickRateHz, Content.Manifest.MaxCatchUpSteps);
-        var extensionEngine = _extensions.BuildEngine();
         var hasSavedPopulationState = _extensionStates?.ContainsKey(PopulationStatefulExtension.ExtensionId) == true;
         var populationStateExtension = World.HasPopulations || hasSavedPopulationState
             ? new PopulationStatefulExtension(World)
@@ -668,7 +654,6 @@ public sealed class SystemicGameBuilder
             .Concat(_statefulExtensions)
             .Append(new ClockStatefulExtension(clock))
             .Append(new RuleHistoryStatefulExtension(contentRules, () => World.LogicalTick))
-            .Append(new EventEngineStatefulExtension(extensionEngine))
             .Concat(populationStateExtension is null ? [] : [populationStateExtension])
             .Distinct<ISystemicStatefulExtension>(ReferenceEqualityComparer.Instance)
             .OrderBy(extension => extension.Id, StringComparer.Ordinal)
@@ -713,7 +698,7 @@ public sealed class SystemicGameBuilder
         var tickStats = new SystemicTickStats(systems.Select(system => system.Id));
         var systemBridges = systems
             .Select(system => new SystemicSystemBridge(system,
-                new SystemicSystemContext(World, contentRules, extensionEngine,
+                new SystemicSystemContext(World, contentRules,
                     new Dictionary<Type, object>(_services), systemObserver),
                 tickStats.Get(system.Id),
                 new DeferredFactQueue()))
@@ -730,7 +715,7 @@ public sealed class SystemicGameBuilder
             schedule = scheduleBuilder.Build();
         }
 
-        return new SystemicGame(Content, World, schedule, contentRules, extensionEngine,
+        return new SystemicGame(Content, World, schedule, contentRules,
             EntityIds, statefulExtensions, new Dictionary<Type, object>(_services), factObservers, clock, tickStats,
             [.. _uiBindingProviders], [.. systemBridges.Select(bridge => bridge.DeferredFacts)]);
     }
@@ -748,7 +733,6 @@ public sealed class SystemicGame : IDisposable
 {
     private readonly DeterministicSystemSchedule? _schedule;
     private readonly RuleEngine _contentRules;
-    private readonly EventEngine _extensionEngine;
     private readonly IReadOnlyDictionary<Type, object> _services;
     private readonly SimulationFactObserver[] _factObservers;
     private int _disposed;
@@ -758,7 +742,6 @@ public sealed class SystemicGame : IDisposable
         World world,
         DeterministicSystemSchedule? schedule,
         RuleEngine contentRules,
-        EventEngine extensionEngine,
         ImmutableDictionary<string, int> entityIds,
         ISystemicStatefulExtension[] statefulExtensions,
         IReadOnlyDictionary<Type, object> services,
@@ -772,7 +755,6 @@ public sealed class SystemicGame : IDisposable
         World = world;
         _schedule = schedule;
         _contentRules = contentRules;
-        _extensionEngine = extensionEngine;
         EntityIds = entityIds;
         StatefulExtensions = statefulExtensions;
         _services = services;
@@ -829,12 +811,6 @@ public sealed class SystemicGame : IDisposable
     {
         ThrowIfDisposed();
         return _contentRules.DispatchWithTrace(World, fact, CombineFactObservers(null));
-    }
-
-    public CommandExecutionResult Execute(KernelEvent command)
-    {
-        ThrowIfDisposed();
-        return _extensionEngine.ExecuteDetailed(World, command);
     }
 
     public void Step()

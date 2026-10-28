@@ -197,7 +197,7 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         var method = invocation.TargetMethod;
         if (SymbolEqualityComparer.Default.Equals(method.ContainingType?.OriginalDefinition, systemicSystemContext))
         {
-            if (method.Name is "GetWritableWorld" or "SetProperty" or "Publish" or "Execute")
+            if (method.Name is "GetWritableWorld" or "SetProperty" or "Publish")
             {
                 var access = GetDeclaredAccess(context, systemicSystem, accessProperty, systemAccess,
                     populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray);

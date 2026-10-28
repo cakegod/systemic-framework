@@ -140,13 +140,6 @@ public sealed class TalentPatternCoverageTests
                     "pattern.active", "power", ModifierOperation.Multiply, 2, DurationTicks: 2));
                 Assert.Equal(6, statusWorld.EffectiveProperty(statusTarget, "power"));
                 break;
-            case "typed.system":
-                var systemMaterialized = Sample.CreateWorld(seed: 8, valueScale: 1);
-                var system = new CountingSystem();
-                var systemGame = new SystemicGameBuilder(Sample, systemMaterialized).AddSystem(system).Build();
-                systemGame.Step();
-                Assert.Equal(1, system.Steps);
-                break;
             default:
                 throw new InvalidOperationException($"Pattern references unregistered framework port '{port}'.");
         }
@@ -156,7 +149,7 @@ public sealed class TalentPatternCoverageTests
         new("pattern.target", ["pattern.target"], [], new Dictionary<string, double>(), 1, 1);
 
     private static SystemicSystemContext Context(World world, int tick) =>
-        new(world, new RuleEngine(new CompiledRuleSet([])), new EngineBuilder().Build(), tick);
+        new(world, new RuleEngine(new CompiledRuleSet([])), tick);
 
     private sealed record PatternCoverage(string Id, string Mechanic, string[] Ports);
 
@@ -172,13 +165,5 @@ public sealed class TalentPatternCoverageTests
         public double Count(string selector) => 1;
         public double Rate(string selector, int windowTicks) => 1;
         public double EventCount(string eventType, int windowTicks) => 1;
-    }
-
-    private sealed class CountingSystem : ISystemicSystem
-    {
-        public string Id => "test.pattern-port";
-        public int Order => 0;
-        public int Steps { get; private set; }
-        public void Step(SystemicSystemContext context) => Steps++;
     }
 }

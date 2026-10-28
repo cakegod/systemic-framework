@@ -82,8 +82,7 @@ static void RunHeadlessBenchmark(
     if (directStep)
     {
         var rules = new Systemic.Rules.RuleEngine(content.Rules, tickRateHz: content.Manifest.TickRateHz);
-        var extensions = new EventEngine([]);
-        directContexts = [.. Enumerable.Range(1, checked(warmupTicks + measuredTicks)).Select(tick => new SystemicSystemContext(materialized.World, rules, extensions, tick))];
+        directContexts = [.. Enumerable.Range(1, checked(warmupTicks + measuredTicks)).Select(tick => new SystemicSystemContext(materialized.World, rules, tick))];
     }
 
     for (var tick = 0; tick < warmupTicks; tick++)

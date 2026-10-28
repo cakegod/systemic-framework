@@ -28,7 +28,7 @@ public sealed class SystemicSaveExtensionTests
 
         var upgraded = SystemicSaveMigration.Upgrade(original, 7, migrations);
 
-        Assert.Equal(5, JsonNode.Parse(original)!["schemaVersion"]!.GetValue<int>());
+        Assert.Equal(6, JsonNode.Parse(original)!["schemaVersion"]!.GetValue<int>());
         Assert.Equal(7, JsonNode.Parse(upgraded)!["schemaVersion"]!.GetValue<int>());
         Assert.Equal(24, JsonNode.Parse(upgraded)!["extensionStates"]!["test.future"]!.GetValue<int>());
         Assert.Equal(upgraded, SystemicSaveMigration.Upgrade(upgraded, 7, []));
@@ -50,7 +50,7 @@ public sealed class SystemicSaveExtensionTests
                 [new FutureMigration(5, _ => { }), new FutureMigration(6, _ => { })])).Message,
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains("migration", Assert.Throws<SystemicSaveException>(() =>
-            SystemicSaveMigration.Upgrade(saved, 6, [new FutureMigration(4, _ => { })])).Message,
+            SystemicSaveMigration.Upgrade(saved, 7, [new FutureMigration(4, _ => { })])).Message,
             StringComparison.OrdinalIgnoreCase);
         Assert.Throws<ArgumentException>(() => new SystemicSaveCodec(migrations: [new FutureMigration(3, _ => { })]));
     }
@@ -66,7 +66,7 @@ public sealed class SystemicSaveExtensionTests
         var codec = new SystemicSaveCodec();
         var saved = codec.Save(game);
 
-        Assert.Equal(5, JsonNode.Parse(saved)!["schemaVersion"]!.GetValue<int>());
+        Assert.Equal(6, JsonNode.Parse(saved)!["schemaVersion"]!.GetValue<int>());
         Assert.Equal(42, JsonNode.Parse(saved)!["extensionStates"]!["test.counter"]!.GetValue<int>());
 
         var materialized = codec.Load(content, saved);
@@ -77,38 +77,21 @@ public sealed class SystemicSaveExtensionTests
     }
 
     [Fact]
-    public void Event_ids_continue_identically_after_save_and_load()
+    public void Version_five_documents_drop_the_retired_event_engine_state()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
-        var codec = new SystemicSaveCodec();
-        var liveModule = new SerialModule();
-        using var live = new SystemicGameBuilder(content, content.CreateWorld(seed: 9, valueScale: 1))
-            .AddExtension(liveModule).Build();
-        live.Execute(new SerialEvent(1));
-        live.Execute(new SerialEvent(1));
-        Assert.Equal(2, liveModule.LastEventId);
+        using var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 9, valueScale: 1)).Build();
+        var root = JsonNode.Parse(new SystemicSaveCodec().Save(game))!.AsObject();
+        root["schemaVersion"] = 5;
+        root["extensionStates"]!.AsObject()["systemic.events"] = JsonNode.Parse("""{"serial":4,"chainId":2}"""u8);
+        var versionFive = SaveTestDocument.Seal(root);
 
-        var restoredModule = new SerialModule();
-        using var restored = new SystemicGameBuilder(content, codec.Load(content, codec.Save(live)))
-            .AddExtension(restoredModule).Build();
+        var materialized = new SystemicSaveCodec().Load(content, versionFive);
 
-        live.Execute(new SerialEvent(1));
-        restored.Execute(new SerialEvent(1));
-
-        Assert.Equal(3, liveModule.LastEventId);
-        Assert.Equal(3, restoredModule.LastEventId);
-    }
-
-    private sealed record SerialEvent(int SourceId) : KernelEvent(SourceId);
-
-    private sealed class SerialModule : ISystemicExtensionModule
-    {
-        public string Id => "test.serial-module";
-        public long LastEventId { get; private set; }
-
-        public void Register(EngineBuilder engine) => engine.On<SerialEvent>("test.serial-module",
-            context => LastEventId = context.Event.EventId);
+        Assert.DoesNotContain("systemic.events", materialized.ExtensionStates!.Keys);
+        using var restored = new SystemicGameBuilder(content, materialized).Build();
+        Assert.Equal(0, restored.World.LogicalTick);
     }
 
     private sealed class StatefulCounter : ISystemicStatefulExtension

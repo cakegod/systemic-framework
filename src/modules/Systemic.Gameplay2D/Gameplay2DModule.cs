@@ -18,8 +18,6 @@ public sealed class Gameplay2DModule : ISystemicExtensionModule, ISystemicSystem
     /// <summary>Declares reads and deferred writes so the module can share a scheduling wave.</summary>
     public IReadOnlyList<SystemAccess> Access => s_access;
 
-    public void Register(EngineBuilder engine) => ArgumentNullException.ThrowIfNull(engine);
-
     public void Step(SystemicSystemContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
