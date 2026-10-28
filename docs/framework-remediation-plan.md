@@ -24,7 +24,7 @@ Fixing findings one at a time produces thirteen fixes and no core. Fix the roots
 | --- | --- | --- |
 | P0.1 | Done | `src/Systemic.Kernel/EventEngine.Core.cs`; the live `EventEngine` is no longer named `V2`. |
 | P0.2 | Done | `SimulationFactAggregator` and its test removed; nothing else referenced them. |
-| P0.3 | Open | |
+| P0.3 | Done | Cell arithmetic, axis windows, wrap rules, distance and result ordering live once in `SpatialGrid`/`SpatialCellRingTraversal`; all three grids use them. Parity is pinned by `SpatialGridParityTests` and by `--spatial` in the benchmark runner. Storage stays split by access pattern — numbers and reasoning under *Spatial grid storage*. |
 | P1.1 | Done | `RuleEngine.DispatchBatch` shares one transaction and one journal scope; `SystemicGame` dispatches a tick's deferred facts as one batch. Tests: `FactBatchDispatchTests`, `DeferredFactBatchTests`. |
 | P1.2 | Done | `PropertyModifier`/`PropertyGrant` store an absolute `ExpiryTick`, so the tick loop no longer rewrites or journals live modifiers. Tests: `ModifierExpiryTests` (expiry timing, live entries unchanged, zero allocation). Accepted break: the save payload names the field `expiryTick`, so documents written before this change no longer load. |
 | P1.3 | Done | `PresentationRuntime` uses typed in-memory rollback. `ISaveOnlyStateExtension` marks state the journal already covers, so the four kernel extensions and `BuildChoiceRuntime` no longer capture JSON every tick. Tests: `SaveOnlyStateTests`. |
@@ -33,6 +33,47 @@ Fixing findings one at a time produces thirteen fixes and no core. Fix the roots
 | P4.2 | Partial | Save schema is v5 and version 4 is rejected with a clear diagnostic; there is no v4 migration by decision. The replay fixture was regenerated for the new state format. |
 | P5.2 | Done | `RollbackPropertyTests` uses FsCheck: random command sequences restore world state on rollback and match a parallel world on commit. |
 | P2, P3, P4.1, P4.3, P5.1, P5.3–P5.6 | Open | P3 needs the 6–8 weeks the plan budgets; P2 depends on D2/D3; P4.1 and P5.1/P5.3–P5.6 are separate integrations. |
+
+### Spatial grid storage
+
+P0.3 named two implementations and one offset table. Measuring first changed the plan: the two
+population grids were already one algorithm — `IncrementalPopulationSpatialGrid2D` calls into
+`PopulationSpatialGrid2D` for its cell windows and ring traversal — so the duplication was the cell
+arithmetic itself, plus a storage layer per access pattern. Both halves are now explicit.
+
+What is single-sourced (`SpatialGrid`, `SpatialCellRingTraversal`): cell-count derivation for a
+bounded axis, unbounded cell mapping, clamped cell mapping, wrapped and unwrapped axis windows,
+wrapped axis and point distance, query validation, capped ascending result insertion, and the
+ring traversal with its pruning bound.
+
+What stays split, because each shape is the allocation-free one for its access pattern:
+
+- `PopulationSpatialGrid2D` — rebuilt cell-offset table over a position array. Rebuild is a fill plus
+  one link per row, so rebuilding 100k rows costs no allocation and ~1.5 ms.
+- `IncrementalPopulationSpatialGrid2D` — per-row links with one head per cell. Moves cost ~150 ns and
+  no allocation; it shares the rebuilt grid's ring traversal, not its rebuild cost.
+- `SpatialIndex` — hashed absolute cells with multi-cell entries. Entities have no bounds, so they
+  cannot use a dense table without imposing a world extent the framework does not have.
+
+Gate numbers, `dotnet run -c Release --project benchmarks/Systemic.Benchmarks -- --spatial
+--iterations 60 --repeat 3`, pinned to one core, 2,000 entity boxes / 100k rows, radius 100, median of
+runs, nanoseconds per operation:
+
+| Operation | Before | After | Delta |
+| --- | --- | --- | --- |
+| entity index, upsert churn | 2,132 | 2,018 | −5.4% |
+| entity index, radius query | 13,366 | 13,712 | +2.6% |
+| entity index, overlap query | 13,262 | 13,619 | +2.7% |
+| population grid, rebuild 100k | 1,488,543 | 1,498,873 | +0.7% |
+| population grid, radius query | 42,698 | 43,123 | +1.0% |
+| population grid, nearest | 1,217 | 1,268 | +4.2% |
+| incremental grid, update churn | 151 | 151 | 0% |
+| incremental grid, radius query (untouched path) | 83,420 | 77,272 | −7.4% |
+
+The last row is the control: a path this change does not touch moved 7.4%, so the ±5% deltas above
+are run noise, not a regression. Allocations are unchanged: zero for every query, rebuild and move;
+entity upsert churn allocates 15–16 bytes per operation before and after, because a first entry in an
+empty cell creates a bucket.
 
 ### Batch rollback semantics
 
@@ -77,9 +118,9 @@ millions."*
 | --- | --- | --- |
 | P0.1 | Rename `EventEngineV2.cs` to `EventEngine.Core.cs`. It declares the live `EventEngine`; `EventEngine.cs` declares `TriggerContext`/`Trigger<TEvent>`. No behaviour change. | `src/Systemic.Kernel/EventEngineV2.cs` |
 | P0.2 | Delete `SimulationFactAggregator` and its tests. It is referenced only by its own tests, and region-quantized fact aggregation is a gameplay decision, replaced by P3.7. | `src/Systemic.Core/Rules/SimulationFactAggregator.cs` |
-| P0.3 | Collapse `SpatialIndex` (entity bounds) and `PopulationSpatialGrid2D` (row bounds) onto one grid algorithm parameterized by an offset table. Keep both public facades; delete the second implementation. | `src/Systemic.Kernel/SpatialIndex.cs`, `src/Systemic.Kernel/PopulationSpatialGrid2D.cs` |
+| P0.3 | Collapse `SpatialIndex` (entity bounds), `PopulationSpatialGrid2D` (rebuilt row table) and `IncrementalPopulationSpatialGrid2D` (moved rows) onto one cell algorithm. Cell math, axis windows, wrap rules, distance and ordering moved into `SpatialGrid` and `SpatialCellRingTraversal`; the grids keep their own storage. | `src/Systemic.Kernel/SpatialIndex.cs`, `src/Systemic.Kernel/PopulationSpatialGrid2D.cs`, `src/Systemic.Kernel/IncrementalPopulationSpatialGrid2D.cs`, `src/Systemic.Kernel/SpatialGrid.cs` |
 
-Acceptance: build clean, suite green, no public API removed.
+Acceptance: build clean, suite green, no public API removed. Met; see *Spatial grid storage* for what was not merged and why.
 
 ## Phase 1 — make the tick cheap and honest (1 week)
 

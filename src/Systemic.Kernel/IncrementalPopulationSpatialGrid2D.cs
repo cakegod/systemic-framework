@@ -22,7 +22,6 @@ namespace Systemic.Kernel;
 /// </remarks>
 public sealed class IncrementalPopulationSpatialGrid2D
 {
-    private const int MaximumCellCount = 4_000_000;
     private readonly Bounds2 _bounds;
     private readonly float _cellSize;
     private readonly bool _wrapX;
@@ -49,10 +48,10 @@ public sealed class IncrementalPopulationSpatialGrid2D
         _cellSize = cellSize;
         _wrapX = wrapX;
         _wrapY = wrapY;
-        _cellsX = PopulationSpatialGrid2D.GetCellCount(bounds.HalfWidth * 2d, cellSize);
-        _cellsY = PopulationSpatialGrid2D.GetCellCount(bounds.HalfHeight * 2d, cellSize);
+        _cellsX = SpatialGrid.GetCellCount(bounds.HalfWidth * 2d, cellSize);
+        _cellsY = SpatialGrid.GetCellCount(bounds.HalfHeight * 2d, cellSize);
         var cellCount = (long)_cellsX * _cellsY;
-        if (cellCount > MaximumCellCount)
+        if (cellCount > SpatialGrid.MaximumCellCount)
         {
             throw new ArgumentOutOfRangeException(nameof(bounds), "Grid exceeds the supported dense cell limit.");
         }
@@ -137,7 +136,7 @@ public sealed class IncrementalPopulationSpatialGrid2D
     {
         ArgumentNullException.ThrowIfNull(results);
         ArgumentOutOfRangeException.ThrowIfNegative(maximumResults);
-        PopulationSpatialGrid2D.ValidateQuery(center, radius);
+        SpatialGrid.ValidateQuery(center, radius);
         results.Clear();
         if (maximumResults == 0)
         {
@@ -157,7 +156,7 @@ public sealed class IncrementalPopulationSpatialGrid2D
                     var entry = _entries[row];
                     if (DistanceSquared(center, entry.Position) <= radiusSquared)
                     {
-                        PopulationSpatialGrid2D.AddResult(results, row, maximumResults);
+                        SpatialGrid.AddResult(results, row, maximumResults);
                     }
                     row = entry.Next;
                 }
@@ -190,8 +189,8 @@ public sealed class IncrementalPopulationSpatialGrid2D
                 for (var row = _cellHeads[(y * _cellsX) + x]; row >= 0;)
                 {
                     var entry = _entries[row];
-                    if (PopulationSpatialGrid2D.AxisDistance(area.X, entry.Position.X, _bounds.HalfWidth * 2d, _wrapX) <= area.HalfWidth
-                        && PopulationSpatialGrid2D.AxisDistance(area.Y, entry.Position.Y, _bounds.HalfHeight * 2d, _wrapY) <= area.HalfHeight)
+                    if (SpatialGrid.AxisDistance(area.X, entry.Position.X, _bounds.HalfWidth * 2d, _wrapX) <= area.HalfWidth
+                        && SpatialGrid.AxisDistance(area.Y, entry.Position.Y, _bounds.HalfHeight * 2d, _wrapY) <= area.HalfHeight)
                     {
                         results.Add(row);
                     }
@@ -231,7 +230,7 @@ public sealed class IncrementalPopulationSpatialGrid2D
 
     private int QueryKNearest(Vector2 center, float? radius, int k, Span<int> results, Predicate<int>? filter)
     {
-        PopulationSpatialGrid2D.ValidateQuery(center, radius ?? 0);
+        SpatialGrid.ValidateQuery(center, radius ?? 0);
         ArgumentOutOfRangeException.ThrowIfNegative(k);
         var limit = Math.Min(k, results.Length);
         if (limit == 0 || _entries.Count == 0)
@@ -243,7 +242,7 @@ public sealed class IncrementalPopulationSpatialGrid2D
         var maximumDistance = radius.HasValue ? (double)radius.Value * radius.Value : double.PositiveInfinity;
         var count = 0;
         var cutoff = maximumDistance;
-        var traversal = new PopulationSpatialGrid2D.CellRingTraversal(
+        var traversal = new SpatialCellRingTraversal(
             center, _bounds, _cellSize, _cellsX, _cellsY, _wrapX, _wrapY);
         while (traversal.MoveNext(cutoff, out var cell))
         {
@@ -349,16 +348,16 @@ public sealed class IncrementalPopulationSpatialGrid2D
     }
 
     private void GetCellRanges(Vector2 center, float extentX, float extentY,
-        out PopulationSpatialGrid2D.AxisCellRange xCells, out PopulationSpatialGrid2D.AxisCellRange yCells)
+        out AxisCellRange xCells, out AxisCellRange yCells)
     {
-        xCells = PopulationSpatialGrid2D.GetAxisCells(center.X, extentX, _bounds.Left,
+        xCells = SpatialGrid.GetAxisCells(center.X, extentX, _bounds.Left,
             _bounds.HalfWidth * 2d, _cellSize, _cellsX, _wrapX);
-        yCells = PopulationSpatialGrid2D.GetAxisCells(center.Y, extentY, _bounds.Top,
+        yCells = SpatialGrid.GetAxisCells(center.Y, extentY, _bounds.Top,
             _bounds.HalfHeight * 2d, _cellSize, _cellsY, _wrapY);
     }
 
     private double DistanceSquared(Vector2 center, Vector2 position) =>
-        PopulationSpatialGrid2D.DistanceSquared(center, position, _bounds, _wrapX, _wrapY);
+        SpatialGrid.DistanceSquared(center, position, _bounds, _wrapX, _wrapY);
 
     private struct Entry(Vector2 position, int cell, int previous, int next)
     {

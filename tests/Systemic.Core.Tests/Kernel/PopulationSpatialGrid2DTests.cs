@@ -3,6 +3,7 @@ using Systemic.Kernel;
 
 namespace Systemic.Tests.Kernel;
 
+[Collection(AllocationMeasurementCollection.Name)]
 public sealed class PopulationSpatialGrid2DTests
 {
     [Fact]

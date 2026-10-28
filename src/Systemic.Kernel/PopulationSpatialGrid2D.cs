@@ -18,7 +18,6 @@ public enum InvalidPositionPolicy
 /// </summary>
 public sealed class PopulationSpatialGrid2D
 {
-    private const int MaximumCellCount = 4_000_000;
     private readonly Bounds2 _bounds;
     private readonly float _cellSize;
     private readonly bool _wrapX;
@@ -55,10 +54,10 @@ public sealed class PopulationSpatialGrid2D
         _cellSize = cellSize;
         _wrapX = wrapX;
         _wrapY = wrapY;
-        _cellsX = GetCellCount(bounds.HalfWidth * 2d, cellSize);
-        _cellsY = GetCellCount(bounds.HalfHeight * 2d, cellSize);
+        _cellsX = SpatialGrid.GetCellCount(bounds.HalfWidth * 2d, cellSize);
+        _cellsY = SpatialGrid.GetCellCount(bounds.HalfHeight * 2d, cellSize);
         var cellCount = (long)_cellsX * _cellsY;
-        if (cellCount > MaximumCellCount)
+        if (cellCount > SpatialGrid.MaximumCellCount)
         {
             throw new ArgumentOutOfRangeException(nameof(bounds), "Grid exceeds the supported dense cell limit.");
         }
@@ -111,7 +110,7 @@ public sealed class PopulationSpatialGrid2D
     internal int QueryKNearest(int version, Vector2 center, float? radius, int k, Span<int> results, Predicate<int>? filter)
     {
         ValidateSnapshot(version);
-        ValidateQuery(center, radius ?? 0);
+        SpatialGrid.ValidateQuery(center, radius ?? 0);
         ArgumentOutOfRangeException.ThrowIfNegative(k);
         var limit = Math.Min(k, results.Length);
         if (limit == 0 || _rowCount == 0)
@@ -122,7 +121,7 @@ public sealed class PopulationSpatialGrid2D
         var maximumDistance = radius.HasValue ? (double)radius.Value * radius.Value : double.PositiveInfinity;
         var count = 0;
         var cutoff = maximumDistance;
-        var traversal = new CellRingTraversal(center, _bounds, _cellSize, _cellsX, _cellsY, _wrapX, _wrapY);
+        var traversal = new SpatialCellRingTraversal(center, _bounds, _cellSize, _cellsX, _cellsY, _wrapX, _wrapY);
         while (traversal.MoveNext(cutoff, out var cell))
         {
             for (var row = _cellHeads[cell]; row >= 0; row = _nextByRow[row])
@@ -235,7 +234,9 @@ public sealed class PopulationSpatialGrid2D
                     continue;
                 }
 
-                GetCellCoordinates(positions[row], out _buildCellXByRow[row], out _buildCellYByRow[row]);
+                var position = positions[row];
+                _buildCellXByRow[row] = SpatialGrid.ToBoundedCell(position.X, _bounds.Left, _cellSize, _cellsX);
+                _buildCellYByRow[row] = SpatialGrid.ToBoundedCell(position.Y, _bounds.Top, _cellSize, _cellsY);
             }
         }
 
@@ -328,7 +329,7 @@ public sealed class PopulationSpatialGrid2D
                         }
                         else
                         {
-                            AddResult(results, row, maximumResults);
+                            SpatialGrid.AddResult(results, row, maximumResults);
                         }
                     }
                 }
@@ -351,7 +352,7 @@ public sealed class PopulationSpatialGrid2D
     internal int QueryRadiusCandidates(int version, Vector2 center, float radius, Span<int> results)
     {
         ValidateSnapshot(version);
-        ValidateQuery(center, radius);
+        SpatialGrid.ValidateQuery(center, radius);
         if (results.IsEmpty)
         {
             return 0;
@@ -437,9 +438,9 @@ public sealed class PopulationSpatialGrid2D
         }
 
         var position = _positions[centerRow];
-        xCells = GetAxisCells(position.X, _cellSize, _bounds.Left, _bounds.HalfWidth * 2d,
+        xCells = SpatialGrid.GetAxisCells(position.X, _cellSize, _bounds.Left, _bounds.HalfWidth * 2d,
             _cellSize, _cellsX, _wrapX);
-        yCells = GetAxisCells(position.Y, _cellSize, _bounds.Top, _bounds.HalfHeight * 2d,
+        yCells = SpatialGrid.GetAxisCells(position.Y, _cellSize, _bounds.Top, _bounds.HalfHeight * 2d,
             _cellSize, _cellsY, _wrapY);
     }
 
@@ -509,19 +510,10 @@ public sealed class PopulationSpatialGrid2D
             && center.Y >= _bounds.Top && center.Y <= _bounds.Bottom;
         xCells = fastWrappedCellQuery
             ? GetWrappedCellRadiusRange(center.X, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX)
-            : GetAxisCells(center.X, radius, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX, _wrapX);
+            : SpatialGrid.GetAxisCells(center.X, radius, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX, _wrapX);
         yCells = fastWrappedCellQuery
             ? GetWrappedCellRadiusRange(center.Y, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY)
-            : GetAxisCells(center.Y, radius, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY, _wrapY);
-    }
-
-    internal static void ValidateQuery(Vector2 center, float radius)
-    {
-        if (!float.IsFinite(center.X) || !float.IsFinite(center.Y) || !float.IsFinite(radius) || radius < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(radius),
-                "Query coordinates and radius must be finite; radius must be non-negative.");
-        }
+            : SpatialGrid.GetAxisCells(center.Y, radius, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY, _wrapY);
     }
 
     internal void QueryBounds(int version, Bounds2 area, List<int> results)
@@ -534,8 +526,8 @@ public sealed class PopulationSpatialGrid2D
         }
 
         results.Clear();
-        var xCells = GetAxisCells(area.X, area.HalfWidth, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX, _wrapX);
-        var yCells = GetAxisCells(area.Y, area.HalfHeight, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY, _wrapY);
+        var xCells = SpatialGrid.GetAxisCells(area.X, area.HalfWidth, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX, _wrapX);
+        var yCells = SpatialGrid.GetAxisCells(area.Y, area.HalfHeight, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY, _wrapY);
         if (xCells.Count == 0 || yCells.Count == 0)
         {
             return;
@@ -590,7 +582,8 @@ public sealed class PopulationSpatialGrid2D
 
             if (buildCellIndexes)
             {
-                GetCellCoordinates(position, out _buildCellXByRow[row], out _buildCellYByRow[row]);
+                _buildCellXByRow[row] = SpatialGrid.ToBoundedCell(position.X, _bounds.Left, _cellSize, _cellsX);
+                _buildCellYByRow[row] = SpatialGrid.ToBoundedCell(position.Y, _bounds.Top, _cellSize, _cellsY);
             }
         }
 
@@ -600,12 +593,6 @@ public sealed class PopulationSpatialGrid2D
     private bool IsValidPosition(Vector2 position) => float.IsFinite(position.X) && float.IsFinite(position.Y)
         && position.X >= _bounds.Left && position.X <= _bounds.Right
         && position.Y >= _bounds.Top && position.Y <= _bounds.Bottom;
-
-    private void GetCellCoordinates(Vector2 position, out int x, out int y)
-    {
-        x = Math.Clamp((int)(((double)position.X - _bounds.Left) / _cellSize), 0, _cellsX - 1);
-        y = Math.Clamp((int)(((double)position.Y - _bounds.Top) / _cellSize), 0, _cellsY - 1);
-    }
 
     private static AxisCellRange GetWrappedCellRadiusRange(
         double center,
@@ -668,109 +655,11 @@ public sealed class PopulationSpatialGrid2D
     }
 
     private double DistanceSquared(Vector2 center, Vector2 position) =>
-        DistanceSquared(center, position, _bounds, _wrapX, _wrapY);
-
-    internal static double DistanceSquared(Vector2 center, Vector2 position, Bounds2 bounds, bool wrapX, bool wrapY)
-    {
-        var dx = Math.Abs((double)center.X - position.X);
-        var dy = Math.Abs((double)center.Y - position.Y);
-        if (wrapX)
-        {
-            dx %= bounds.HalfWidth * 2d;
-            dx = Math.Min(dx, (bounds.HalfWidth * 2d) - dx);
-        }
-
-        if (wrapY)
-        {
-            dy %= bounds.HalfHeight * 2d;
-            dy = Math.Min(dy, (bounds.HalfHeight * 2d) - dy);
-        }
-
-        return (dx * dx) + (dy * dy);
-    }
+        SpatialGrid.DistanceSquared(center, position, _bounds, _wrapX, _wrapY);
 
     private bool Contains(Bounds2 area, Vector2 position) =>
-        AxisDistance(area.X, position.X, _bounds.HalfWidth * 2d, _wrapX) <= area.HalfWidth
-        && AxisDistance(area.Y, position.Y, _bounds.HalfHeight * 2d, _wrapY) <= area.HalfHeight;
-
-    internal static double AxisDistance(double center, double position, double size, bool wrap)
-    {
-        var distance = Math.Abs(center - position);
-        if (!wrap)
-        {
-            return distance;
-        }
-
-        distance %= size;
-        return Math.Min(distance, size - distance);
-    }
-
-    internal static AxisCellRange GetAxisCells(
-        double center,
-        double extent,
-        double minimum,
-        double size,
-        double cellSize,
-        int cellCount,
-        bool wrap)
-    {
-        var start = center - extent;
-        var end = center + extent;
-        if (wrap)
-        {
-            if (extent * 2d >= size)
-            {
-                return new AxisCellRange(0, cellCount);
-            }
-
-            var startOffset = ModDouble((start - minimum) % size, size);
-            var first = (int)Math.Floor(startOffset / cellSize);
-            var endOffset = startOffset + (extent * 2d);
-            var lastBeforeWrap = Math.Min(cellCount - 1, (int)Math.Floor(Math.Min(endOffset, size) / cellSize));
-            var count = lastBeforeWrap - first + 1;
-            if (endOffset >= size)
-            {
-                var wrappedEnd = endOffset - size;
-                var wrappedCells = Math.Min(cellCount, (int)Math.Floor(wrappedEnd / cellSize) + 1);
-                count += wrappedCells;
-            }
-
-            // Both endpoints are accepted positions. At the lower seam, the point stored at
-            // the upper endpoint is equally close, so include the final cell as well.
-            if (startOffset == 0 && count < cellCount)
-            {
-                first = cellCount - 1;
-                count++;
-            }
-
-            count = Math.Min(cellCount, count);
-            var firstWrapped = Math.Min(first, cellCount - 1);
-            return new AxisCellRange(firstWrapped, count);
-        }
-
-        var maximum = minimum + size;
-        if (end < minimum || start > maximum)
-        {
-            return default;
-        }
-
-        start = Math.Max(start, minimum);
-        end = Math.Min(end, maximum);
-        var firstCell = Math.Clamp((int)Math.Floor((start - minimum) / cellSize), 0, cellCount - 1);
-        var lastCell = Math.Clamp((int)Math.Floor((end - minimum) / cellSize), 0, cellCount - 1);
-        return new AxisCellRange(firstCell, lastCell - firstCell + 1);
-    }
-
-    internal static int GetCellCount(double size, float cellSize)
-    {
-        var count = Math.Ceiling(size / cellSize);
-        if (count > MaximumCellCount)
-        {
-            throw new ArgumentOutOfRangeException(nameof(cellSize), "Grid axis exceeds the supported cell limit.");
-        }
-
-        return Math.Max(1, (int)count);
-    }
+        SpatialGrid.AxisDistance(area.X, position.X, _bounds.HalfWidth * 2d, _wrapX) <= area.HalfWidth
+        && SpatialGrid.AxisDistance(area.Y, position.Y, _bounds.HalfHeight * 2d, _wrapY) <= area.HalfHeight;
 
     private void ValidateSnapshot(int version)
     {
@@ -780,261 +669,11 @@ public sealed class PopulationSpatialGrid2D
         }
     }
 
-    private static double ModDouble(double value, double modulus) => (value % modulus + modulus) % modulus;
-
-    internal static void AddResult(List<int> results, int row, int maximumResults)
-    {
-        if (maximumResults == int.MaxValue)
-        {
-            results.Add(row);
-            return;
-        }
-
-        var count = results.Count;
-        if (count < maximumResults)
-        {
-            var insertAt = count;
-            while (insertAt > 0 && results[insertAt - 1] > row)
-            {
-                insertAt--;
-            }
-
-            results.Insert(insertAt, row);
-            return;
-        }
-
-        if (row >= results[^1])
-        {
-            return;
-        }
-
-        var index = count - 1;
-        while (index > 0 && results[index - 1] > row)
-        {
-            results[index] = results[index - 1];
-            index--;
-        }
-
-        results[index] = row;
-    }
-
     private static void EnsureCapacity<T>(ref T[] values, int capacity)
     {
         if (capacity > values.Length)
         {
             Array.Resize(ref values, capacity);
-        }
-    }
-
-    /// <summary>
-    /// Visits each cell once in expanding Chebyshev rings. Before entering another ring, the
-    /// minimum distance to either unvisited axis provides a conservative bound for every
-    /// unvisited cell. Equality is retained so row-ID ties remain visible.
-    /// </summary>
-    internal struct CellRingTraversal
-    {
-        private readonly RingAxis _x;
-        private readonly RingAxis _y;
-        private readonly int _cellsX;
-        private int _ring;
-        private AxisCellRange _currentX;
-        private AxisCellRange _previousY;
-        private int _x0, _x1, _xCount, _y0, _y1, _yCount;
-        private int _phase, _outer, _inner;
-        private bool _finished;
-
-        public CellRingTraversal(Vector2 center, Bounds2 bounds, float cellSize,
-            int cellsX, int cellsY, bool wrapX, bool wrapY)
-        {
-            _x = new RingAxis(center.X, bounds.Left, bounds.Right, bounds.HalfWidth * 2d, cellSize, cellsX, wrapX);
-            _y = new RingAxis(center.Y, bounds.Top, bounds.Bottom, bounds.HalfHeight * 2d, cellSize, cellsY, wrapY);
-            _cellsX = cellsX;
-            _ring = -1;
-            _currentX = default;
-            _previousY = default;
-            _x0 = _x1 = _xCount = _y0 = _y1 = _yCount = 0;
-            _phase = _outer = _inner = 0;
-            _finished = false;
-        }
-
-        public bool MoveNext(double maximumDistanceSquared, out int cell)
-        {
-            while (!_finished)
-            {
-                if (_ring >= 0 && _phase == 0)
-                {
-                    if (_outer < _yCount)
-                    {
-                        var y = _outer == 0 ? _y0 : _y1;
-                        var x = _currentX.At(_inner, _x.Count, _x.Wrap);
-                        if (++_inner == _currentX.Count)
-                        {
-                            _inner = 0;
-                            _outer++;
-                        }
-                        cell = y * _cellsX + x;
-                        return true;
-                    }
-                    _phase = 1;
-                    _outer = _inner = 0;
-                }
-
-                if (_ring >= 0 && _phase == 1 && _xCount != 0 && _outer < _previousY.Count)
-                {
-                    var y = _previousY.At(_outer, _y.Count, _y.Wrap);
-                    var x = _inner == 0 ? _x0 : _x1;
-                    if (++_inner == _xCount)
-                    {
-                        _inner = 0;
-                        _outer++;
-                    }
-                    cell = y * _cellsX + x;
-                    return true;
-                }
-
-                if (_ring >= 0)
-                {
-                    var xDistance = _x.DistanceToOutside(_ring);
-                    var yDistance = _y.DistanceToOutside(_ring);
-                    var outsideDistance = Math.Min(xDistance, yDistance);
-                    if (outsideDistance * outsideDistance > maximumDistanceSquared)
-                    {
-                        _finished = true;
-                        break;
-                    }
-                }
-
-                _ring++;
-                _x.GetNewCells(_ring, out _x0, out _x1, out _xCount);
-                _y.GetNewCells(_ring, out _y0, out _y1, out _yCount);
-                if (_xCount == 0 && _yCount == 0)
-                {
-                    _finished = true;
-                    break;
-                }
-                _currentX = _x.Window(_ring);
-                _previousY = _y.Window(_ring - 1);
-                _phase = _outer = _inner = 0;
-            }
-
-            cell = -1;
-            return false;
-        }
-
-        private readonly struct RingAxis
-        {
-            private const double ErrorFactor = 16d * 2.2204460492503131e-16;
-            private readonly double _center, _minimum, _maximum, _size, _cellSize, _error;
-            private readonly int _centerCell;
-            public int Count { get; }
-            public bool Wrap { get; }
-
-            public RingAxis(double center, double minimum, double maximum, double size,
-                double cellSize, int count, bool wrap)
-            {
-                _center = center;
-                _minimum = minimum;
-                _maximum = maximum;
-                _size = size;
-                _cellSize = cellSize;
-                Count = count;
-                Wrap = wrap;
-                // Rounded interval and modulo operations must never overstate a lower bound.
-                // If coordinates dwarf the world, the error deliberately disables pruning.
-                _error = (Math.Abs(center) + Math.Abs(minimum) + Math.Abs(maximum) + size + cellSize) * ErrorFactor;
-                var offset = center - minimum;
-                if (wrap)
-                {
-                    offset = ModDouble(offset % size, size);
-                }
-                var candidate = offset <= 0 ? 0 : offset >= size ? count - 1 : (int)(offset / cellSize);
-                _centerCell = Math.Clamp(candidate, 0, count - 1);
-            }
-
-            public AxisCellRange Window(int ring)
-            {
-                if (ring < 0) return default;
-                if (Wrap)
-                {
-                    if ((2L * ring) + 1 >= Count) return new AxisCellRange(0, Count);
-                    var start = _centerCell - ring;
-                    if (start < 0) start += Count;
-                    return new AxisCellRange(start, (2 * ring) + 1);
-                }
-                var first = Math.Max(0, _centerCell - ring);
-                var last = Math.Min(Count - 1, _centerCell + ring);
-                return new AxisCellRange(first, last - first + 1);
-            }
-
-            public void GetNewCells(int ring, out int first, out int second, out int count)
-            {
-                first = second = -1;
-                if (ring == 0)
-                {
-                    first = _centerCell;
-                    count = 1;
-                    return;
-                }
-                if (Wrap && ring > Count / 2)
-                {
-                    count = 0;
-                    return;
-                }
-                var left = _centerCell - ring;
-                var right = _centerCell + ring;
-                if (Wrap)
-                {
-                    if (left < 0) left += Count;
-                    if (right >= Count) right -= Count;
-                }
-                count = 0;
-                if (left >= 0 && left < Count)
-                {
-                    first = left;
-                    count = 1;
-                }
-                if (right >= 0 && right < Count && right != left)
-                {
-                    if (count == 0) first = right;
-                    else second = right;
-                    count++;
-                }
-            }
-
-            public double DistanceToOutside(int ring)
-            {
-                GetNewCells(ring + 1, out var first, out var second, out var count);
-                if (count == 0) return double.PositiveInfinity;
-                var distance = DistanceToCell(first);
-                if (count == 2) distance = Math.Min(distance, DistanceToCell(second));
-                return Math.Max(0d, distance - _error);
-            }
-
-            private double DistanceToCell(int cell)
-            {
-                var start = _minimum + (cell * _cellSize);
-                var end = cell == Count - 1
-                    ? Math.Max(_maximum, _minimum + _size)
-                    : Math.Min(_minimum + ((cell + 1) * _cellSize), Math.Max(_maximum, _minimum + _size));
-                if (!Wrap) return IntervalDistance(_center, start, end);
-
-                var offset = ModDouble((_center - _minimum) % _size, _size);
-                var point = _minimum + offset;
-                return Math.Min(IntervalDistance(point, start, end),
-                    Math.Min(IntervalDistance(point - _size, start, end), IntervalDistance(point + _size, start, end)));
-            }
-
-            private static double IntervalDistance(double value, double start, double end) =>
-                value < start ? start - value : value > end ? value - end : 0d;
-        }
-    }
-
-    internal readonly record struct AxisCellRange(int Start, int Count)
-    {
-        public int At(int offset, int cellCount, bool wrap)
-        {
-            var index = Start + offset;
-            return wrap && index >= cellCount ? index - cellCount : index;
         }
     }
 

@@ -208,10 +208,10 @@ public sealed class SpatialIndex
 
     private Entry CreateEntry(Bounds2 bounds)
     {
-        var minX = ToCell(bounds.Left);
-        var minY = ToCell(bounds.Top);
-        var maxX = ToCell(bounds.Right);
-        var maxY = ToCell(bounds.Bottom);
+        var minX = SpatialGrid.ToUnboundedCell(bounds.Left, _cellSize);
+        var minY = SpatialGrid.ToUnboundedCell(bounds.Top, _cellSize);
+        var maxX = SpatialGrid.ToUnboundedCell(bounds.Right, _cellSize);
+        var maxY = SpatialGrid.ToUnboundedCell(bounds.Bottom, _cellSize);
         var cellWidth = (long)maxX - minX + 1;
         var cellHeight = (long)maxY - minY + 1;
         if (cellWidth > MaximumCellsPerEntry || cellHeight > MaximumCellsPerEntry
@@ -221,17 +221,6 @@ public sealed class SpatialIndex
         }
 
         return new Entry(bounds, minX, minY, maxX, maxY, cellWidth * cellHeight);
-    }
-
-    private int ToCell(float value)
-    {
-        var cell = Math.Floor(value / _cellSize);
-        if (cell <= int.MinValue || cell >= int.MaxValue)
-        {
-            throw new ArgumentOutOfRangeException(nameof(value), "Coordinate is outside the supported spatial range.");
-        }
-
-        return (int)cell;
     }
 
     private void CacheEntry(int entityId, Entry entry)
