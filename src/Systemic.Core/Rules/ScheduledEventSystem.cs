@@ -5,6 +5,10 @@ namespace Systemic.Rules;
 
 internal sealed class ScheduledEventSystem : ISystemicSystem
 {
+    // Schedules publish immediately, so they keep the exclusive wave they would get by default.
+    private static readonly System.Collections.Immutable.ImmutableArray<SystemAccess> s_access =
+        [SystemAccess.WriteWorld];
+
     private readonly World _world;
     private readonly ScheduledFact[] _facts;
 
@@ -41,6 +45,9 @@ internal sealed class ScheduledEventSystem : ISystemicSystem
     public string Id => "systemic.schedules";
 
     public int Order => -100;
+
+    /// <summary>Schedules dispatch facts immediately, which requires exclusive World access.</summary>
+    public IReadOnlyList<SystemAccess> Access => s_access;
 
     public void Step(SystemicSystemContext context)
     {

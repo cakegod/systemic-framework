@@ -13,6 +13,9 @@ public readonly record struct IncrementalCommandResult(
 /// <summary>Runs resource production, upgrade purchases, and role assignment over generic kernel entities.</summary>
 public sealed class IncrementalRuntime : ISystemicSystem
 {
+    // Production writes immediately, so the runtime keeps the exclusive wave it would get by default.
+    private static readonly ImmutableArray<SystemAccess> s_access = [SystemAccess.WriteWorld];
+
     private readonly IncrementalCatalog _catalog;
     private readonly World _world;
     private readonly ImmutableDictionary<string, int> _entityIds;
@@ -55,6 +58,9 @@ public sealed class IncrementalRuntime : ISystemicSystem
 
     public string Id => "systemic.incremental";
     public int Order { get; }
+
+    /// <summary>Production mutates World state immediately, which requires exclusive access.</summary>
+    public IReadOnlyList<SystemAccess> Access => s_access;
 
     public IncrementalCommandResult AssignRole(int entityId, string roleId)
     {

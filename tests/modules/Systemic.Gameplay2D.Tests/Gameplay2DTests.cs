@@ -11,6 +11,30 @@ namespace Systemic.Gameplay2D.Tests;
 public sealed class Gameplay2DTests
 {
     [Fact]
+    public void Module_shares_a_scheduling_wave_with_other_deferred_writers()
+    {
+        var content = ContentPackLoader.Load(
+            Path.Combine(AppContext.BaseDirectory, "samples", "systemic-sandbox"));
+        using var game = new SystemicGameBuilder(content, new World(seed: 7, valueScale: 1))
+            .AddExtension(new Gameplay2DModule())
+            .AddSystem(new DeferOnlySystem())
+            .Build();
+
+        var wave = Assert.Single(game.SchedulerWaves, wave => wave.Contains("systemic.gameplay2d"));
+
+        Assert.Contains("test.defer-only", wave);
+    }
+
+    private sealed class DeferOnlySystem : ISystemicSystem
+    {
+        public string Id => "test.defer-only";
+
+        public IReadOnlyList<SystemAccess> Access => [SystemAccess.DeferWorldWrites];
+
+        public void Step(SystemicSystemContext context) => ArgumentNullException.ThrowIfNull(context);
+    }
+
+    [Fact]
     public void Spatial_target_selection_is_nearest_and_stable_on_ties()
     {
         var world = new World(seed: 1, valueScale: 1);
@@ -79,14 +103,18 @@ public sealed class Gameplay2DTests
             new Point2(0, 2), new System.Numerics.Vector2(3, -1), lifetimeTicks: 2);
         var system = new Gameplay2DModule();
 
-        system.Step(Context(world, 1));
+        var firstTick = Context(world, 1);
+        system.Step(firstTick);
+        firstTick.ApplyDeferredCommands();
         Assert.True(projectile.TryGetProperty(world, Gameplay2D.PositionX, out var x));
         Assert.True(projectile.TryGetProperty(world, Gameplay2D.PositionY, out var y));
         Assert.Equal(3, x);
         Assert.Equal(1, y);
         Assert.False(projectile.ToRemove);
 
-        system.Step(Context(world, 2));
+        var secondTick = Context(world, 2);
+        system.Step(secondTick);
+        secondTick.ApplyDeferredCommands();
 
         Assert.True(projectile.ToRemove);
         Assert.False(world.TryGetSpatialBounds(projectile.Id, out _));

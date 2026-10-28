@@ -385,6 +385,23 @@ public sealed class SystemicSystemContext
         return buffers;
     }
 
+    /// <summary>Applies deferred World commands for a direct test or standalone harness.</summary>
+    /// <remarks>
+    /// A host schedule applies each system's commands at its wave barrier. A standalone context has
+    /// no barrier, so a caller that inspects the World after <c>Step</c> applies them explicitly.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The context is executing inside the host schedule.</exception>
+    public void ApplyDeferredCommands()
+    {
+        if (_kernelContext is not null)
+        {
+            throw new InvalidOperationException(
+                "Deferred World commands are applied by the schedule at its wave barrier; a scheduled system must not apply them.");
+        }
+
+        FlushWorldCommands();
+    }
+
     internal void Prepare(
         ScheduledSystemContext kernelContext,
         bool canWriteWorld,

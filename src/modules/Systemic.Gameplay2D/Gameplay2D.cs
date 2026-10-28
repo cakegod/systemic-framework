@@ -251,6 +251,27 @@ public static class Gameplay2D
         return Math.Min(activeIndices.Count + (activeIndices.Contains(stackIndex) ? 0 : 1), status.MaximumStacks);
     }
 
+    internal static bool TryReadProjectile(int entityId, ReadOnlyWorldView world, out ProjectileState state)
+    {
+        if (world.TryGetBaseProperty(entityId, PositionX, out var x)
+            && world.TryGetBaseProperty(entityId, PositionY, out var y)
+            && world.TryGetBaseProperty(entityId, VelocityX, out var velocityX)
+            && world.TryGetBaseProperty(entityId, VelocityY, out var velocityY)
+            && world.TryGetBaseProperty(entityId, RemainingTicks, out var remainingTicks)
+            && world.TryGetBaseProperty(entityId, HalfWidth, out var halfWidth)
+            && world.TryGetBaseProperty(entityId, HalfHeight, out var halfHeight)
+            && double.IsFinite(x) && double.IsFinite(y) && double.IsFinite(velocityX)
+            && double.IsFinite(velocityY) && double.IsFinite(remainingTicks)
+            && double.IsFinite(halfWidth) && double.IsFinite(halfHeight))
+        {
+            state = new ProjectileState(x, y, velocityX, velocityY, remainingTicks, halfWidth, halfHeight);
+            return true;
+        }
+
+        state = default;
+        return false;
+    }
+
     internal static bool TryReadProjectile(Entity entity, World world, out ProjectileState state)
     {
         if (entity.TryGetProperty(world, PositionX, out var x)

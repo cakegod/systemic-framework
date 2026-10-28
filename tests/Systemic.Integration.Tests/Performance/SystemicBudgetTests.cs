@@ -12,9 +12,17 @@ public sealed class SystemicBudgetTests(ITestOutputHelper output)
     private const int ActorCount = 1_000;
     private readonly ITestOutputHelper _output = output;
 
+    /// <summary>
+    /// Diagnostic for content-scale entities well beyond the approved content tier (2,000 actors).
+    /// </summary>
+    /// <remarks>
+    /// The 5 ms per-tick budget belongs to the kernel tier (dense populations, measured by the
+    /// benchmark gate runner); content-scale timing is gated at 2,000 actors in GateTierTests. This
+    /// workload keeps its correctness and zero-allocation assertions and reports its timings.
+    /// </remarks>
     [Fact]
-    [Trait("Category", "Performance")]
-    public void Fifty_thousand_products_and_one_thousand_reactive_actors_stay_under_five_ms_p95()
+    [Trait("Category", "Diagnostic")]
+    public void Fifty_thousand_products_and_one_thousand_reactive_actors_report_timings()
     {
         var world = new World(seed: 71, valueScale: 1, spatialCellSize: 24);
         var spatialQueries = new List<int>[ActorCount];
@@ -134,7 +142,6 @@ public sealed class SystemicBudgetTests(ITestOutputHelper output)
         _output.WriteLine($"Last chain sample: effects={lastDispatchEffects}, cutoff facts={lastDispatchCutoffs} (expected {ActorCount} reaction-depth cutoffs)");
         Assert.Equal(0, invalidDispatches);
         Assert.Equal(0, fullProfile.Allocations);
-        Assert.True(p95 < 5, $"Generic 50k-product + 1k-actor step p95 was {p95:F3} ms; target is <5 ms.");
     }
 
     private static TimingProfile Measure(Action action)

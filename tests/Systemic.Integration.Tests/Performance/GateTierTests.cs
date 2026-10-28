@@ -36,16 +36,22 @@ public sealed class GateTierTests(ITestOutputHelper output)
             game.Step();
         }
 
+        var timings = new double[TickCount];
         var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
         for (var tick = 0; tick < TickCount; tick++)
         {
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
             game.Step();
+            timings[tick] = System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds;
         }
 
         var perTick = (GC.GetAllocatedBytesForCurrentThread() - allocatedBefore) / TickCount;
-        _output.WriteLine($"Content tier: {ActorCount} actors, {perTick} B/tick");
+        Array.Sort(timings);
+        var p95 = timings[(int)Math.Ceiling(timings.Length * 0.95) - 1];
+        _output.WriteLine($"Content tier: {ActorCount} actors, {perTick} B/tick, p95 {p95:F3} ms");
         Assert.True(perTick <= MaximumBytesPerTick,
             $"Content tier allocated {perTick} B per tick for {ActorCount} actors; budget is {MaximumBytesPerTick} B.");
+        Assert.True(p95 < 5, $"Content tier p95 was {p95:F3} ms for {ActorCount} actors; target is <5 ms.");
     }
 
     private static ContentPack Content() => new("", new GameManifest("test", "Test", 30, 4),

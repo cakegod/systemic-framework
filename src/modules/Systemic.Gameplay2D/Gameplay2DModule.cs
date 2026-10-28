@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Systemic.Kernel;
 using Systemic.Extensions;
 using Systemic.Host;
@@ -7,56 +8,65 @@ namespace Systemic.Gameplay2D;
 
 public sealed class Gameplay2DModule : ISystemicExtensionModule, ISystemicSystem
 {
+    private static readonly ImmutableArray<SystemAccess> s_access =
+        [SystemAccess.ReadWorld, SystemAccess.DeferWorldWrites];
+
     public string Id => "systemic.gameplay2d";
 
     public int Order => 20;
+
+    /// <summary>Declares reads and deferred writes so the module can share a scheduling wave.</summary>
+    public IReadOnlyList<SystemAccess> Access => s_access;
 
     public void Register(EngineBuilder engine) => ArgumentNullException.ThrowIfNull(engine);
 
     public void Step(SystemicSystemContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var world = context.GetWritableWorld();
-        using var transaction = world.BeginTransaction();
+        var world = context.World;
+        var commands = context.Commands;
         // WHY: the tag index bounds this loop to live projectiles; scanning every entity made the
-        // module cost O(all entities) per tick regardless of how many projectiles existed.
+        // module cost O(all entities) per tick regardless of how many projectiles existed. Writes
+        // are deferred so the module shares a wave instead of excluding every other system.
         foreach (var entityId in world.EntitiesWithTag(Gameplay2D.ProjectileTag).Span)
         {
-            if (world.ById(entityId) is not { ToRemove: false } entity
-                || !world.HasTag(entity, Gameplay2D.ProjectileTag))
+            if (!world.HasTag(entityId, Gameplay2D.ProjectileTag)
+                || !Gameplay2D.TryReadProjectile(entityId, world, out var projectile))
             {
-                continue;
-            }
+                if (!world.HasTag(entityId, Gameplay2D.ProjectileTag))
+                {
+                    continue;
+                }
 
-            if (!Gameplay2D.TryReadProjectile(entity, world, out var projectile))
-            {
-                throw new InvalidOperationException($"Projectile {entity.Id} is missing a finite gameplay2d motion property.");
+                throw new InvalidOperationException(
+                    $"Projectile {entityId} is missing a finite gameplay2d motion property.");
             }
 
             if (projectile.RemainingTicks <= 1)
             {
-                entity.ToRemove = true;
-                _ = world.RemoveSpatialBounds(entity);
-                context.Publish(new SimulationFact("gameplay2d.projectile.expired", entity.Id, 0));
+                commands.Remove(entityId);
+                commands.RemoveSpatialBounds(entityId);
+                context.DeferFact(new SimulationFact("gameplay2d.projectile.expired", entityId, 0));
                 continue;
             }
 
             var x = projectile.X + projectile.VelocityX;
             var y = projectile.Y + projectile.VelocityY;
             if (!double.IsFinite(x) || !double.IsFinite(y)
-                || Math.Abs(x) > float.MaxValue || Math.Abs(y) > float.MaxValue
-                || !entity.TrySetProperty(world, Gameplay2D.PositionX, x)
-                || !entity.TrySetProperty(world, Gameplay2D.PositionY, y)
-                || !entity.TrySetProperty(world, Gameplay2D.RemainingTicks, projectile.RemainingTicks - 1))
+                || Math.Abs(x) > float.MaxValue || Math.Abs(y) > float.MaxValue)
             {
-                throw new InvalidOperationException($"Projectile {entity.Id} produced invalid motion state.");
+                throw new InvalidOperationException($"Projectile {entityId} produced invalid motion state.");
             }
 
-            world.SetSpatialBounds(entity, new Bounds2((float)x, (float)y,
-                (float)projectile.HalfWidth, (float)projectile.HalfHeight));
+            var bounds = new Bounds2((float)x, (float)y,
+                (float)projectile.HalfWidth, (float)projectile.HalfHeight);
+            // Validate before queueing so an unindexable position fails here rather than at the barrier.
+            world.ValidateSpatialBounds(bounds);
+            commands.SetProperty(entityId, Gameplay2D.PositionX, x);
+            commands.SetProperty(entityId, Gameplay2D.PositionY, y);
+            commands.SetProperty(entityId, Gameplay2D.RemainingTicks, projectile.RemainingTicks - 1);
+            commands.SetSpatialBounds(entityId, bounds);
         }
-
-        transaction.Commit();
     }
 }
 

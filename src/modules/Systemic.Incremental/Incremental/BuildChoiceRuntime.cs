@@ -8,6 +8,9 @@ namespace Systemic.Incremental;
 
 public sealed class BuildChoiceRuntime : ISystemicSystem, ISaveOnlyStateExtension
 {
+    // Free-choice selection writes immediately, so the runtime keeps the exclusive wave it would get by default.
+    private static readonly ImmutableArray<SystemAccess> s_access = [SystemAccess.WriteWorld];
+
     private const int MaximumAdditionalOwners = 1024;
     private const int MaximumAdditionalChoiceInstances = 65_536;
     private readonly BuildChoiceCatalog _catalog;
@@ -95,6 +98,9 @@ public sealed class BuildChoiceRuntime : ISystemicSystem, ISaveOnlyStateExtensio
 
     public string Id => "systemic.build-choices";
     public int Order { get; }
+
+    /// <summary>Free-choice selection mutates World state immediately, which requires exclusive access.</summary>
+    public IReadOnlyList<SystemAccess> Access => s_access;
 
     public bool TryGetState(string choiceId, out BuildChoiceState state)
     {

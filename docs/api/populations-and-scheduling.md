@@ -83,7 +83,7 @@ When storing access declarations in a field, use an immutable collection. The an
 
 ## System access rules
 
-For a lower-level Kernel system, use `SystemAccess.ReadColumn<TKind, TValue>` and `WriteColumn<TKind, TValue>` with the generated column key. The scheduler can run two systems together when their declarations do not conflict. Read/read access is compatible; a writer conflicts with access to the same resource. `SystemAccess.WriteWorld` is exclusive. Systems using immediate World operations, rule dispatch, or event dispatch need that declaration. Systems that only queue World changes can use `SystemAccess.DeferWorldWrites` and may share a wave with other deferred writers.
+For a lower-level Kernel system, use `SystemAccess.ReadColumn<TKind, TValue>` and `WriteColumn<TKind, TValue>` with the generated column key. The scheduler can run two systems together when their declarations do not conflict. Read/read access is compatible, and so is a reader beside a buffered writer, because buffered commands land at the wave barrier after every reader; a writer conflicts with access to the same resource. `SystemAccess.WriteWorld` is exclusive. Systems using immediate World operations, rule dispatch, or event dispatch need that declaration. Systems that only queue World changes can use `SystemAccess.DeferWorldWrites` and may share a wave with other deferred writers.
 
 The scheduler relies on declarations; it does not infer every memory access at runtime. Declare service state and any other shared resources too. The analyzer checks several direct generated-column and context-access patterns, with limits described in the [analyzer reference](analyzers.md#analysis-boundaries).
 

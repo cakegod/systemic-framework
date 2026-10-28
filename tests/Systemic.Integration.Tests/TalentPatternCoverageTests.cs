@@ -116,7 +116,9 @@ public sealed class TalentPatternCoverageTests
                 var projectileWorld = new World(seed: 5, valueScale: 1);
                 var projectile = Gameplay2D.SpawnProjectile(projectileWorld, Blueprint(), new Point2(0, 0),
                     new Vector2(2, 1), lifetimeTicks: 3);
-                new Gameplay2DModule().Step(Context(projectileWorld, 1));
+                var projectileContext = Context(projectileWorld, 1);
+                new Gameplay2DModule().Step(projectileContext);
+                projectileContext.ApplyDeferredCommands();
                 Assert.True(projectile.TryGetProperty(projectileWorld, Gameplay2D.PositionX, out var x));
                 Assert.Equal(2, x);
                 break;

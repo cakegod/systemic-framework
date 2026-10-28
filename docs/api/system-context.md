@@ -53,7 +53,7 @@ For host systems, `Order` sorts registration before the schedule is built. It se
 | Read population rows outside an access callback (rendering, UI, tests) | the generated `<Schema>Population.Snapshot(population, range, buffer)` |
 | Read a few rows inside a system | `WithAccess` + `ReadCurrent`/`ReadRange` |
 | Write disjoint rows from parallel partitions | `ForEachPopulationRange` + `Columns.WriteRange(ref access)` |
-| Change World state this tick | `Commands` (deferred, shared wave) or `Publish`/`SetProperty` (immediate, needs `WriteWorld`) |
+| Change World state this tick | `Commands` (deferred, shared wave) then `ApplyDeferredCommands()` in a standalone harness |
 | Emit a fact other systems may observe this tick | `Publish` (immediate, needs `WriteWorld`) |
 | Emit a fact only rules and observers need | `DeferFact` (needs `DeferWorldWrites`, shared wave) |
 
@@ -72,3 +72,5 @@ Systems and services that implement one of these are registered automatically. `
 ## Direct tests and standalone harnesses
 
 The public `SystemicSystemContext` constructor creates a single-use, standalone context for direct tests or small harnesses. It has one worker, and its `ForEachRange` callback runs once over the whole range. It does not emulate the host's parallel scheduler, registered services, or rollback callbacks. Use host-level integration tests when behavior depends on access declarations, wave barriers, or worker partitioning.
+
+A standalone context also has no wave barrier, so deferred World commands stay queued after `Step` returns. Call `ApplyDeferredCommands()` before inspecting the World from a direct test. A scheduled system must not call it; the schedule applies its commands at the barrier.

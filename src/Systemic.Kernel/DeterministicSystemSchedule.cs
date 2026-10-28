@@ -179,6 +179,14 @@ public sealed class DeterministicSystemScheduleBuilder
                     continue;
                 }
 
+                // A reader only observes pre-barrier state, so a buffered writer in the same wave
+                // cannot race it: the buffered commands land at the barrier, after every reader.
+                if ((first.Mode == SystemAccessMode.Read && second.Mode == SystemAccessMode.DeferredWorldWrite)
+                    || (first.Mode == SystemAccessMode.DeferredWorldWrite && second.Mode == SystemAccessMode.Read))
+                {
+                    continue;
+                }
+
                 return true;
             }
         }
@@ -1223,6 +1231,36 @@ public readonly struct ReadOnlyWorldView(World world)
     }
 
     public bool TryGetSpatialBounds(int entityId, out Bounds2 bounds) => world.TryGetSpatialBounds(entityId, out bounds);
+
+    /// <summary>Reads the stored property value without applying modifiers.</summary>
+    /// <param name="entityId">Entity to read.</param>
+    /// <param name="property">Property name.</param>
+    /// <param name="value">Stored value when the property exists.</param>
+    /// <returns><see langword="true"/> when the entity exists and stores the property.</returns>
+    /// <exception cref="ArgumentException"><paramref name="property"/> is null, empty or whitespace.</exception>
+    public bool TryGetBaseProperty(int entityId, string property, out double value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(property);
+        var entity = world.ById(entityId);
+        if (entity is { ToRemove: false })
+        {
+            return entity.TryGetProperty(world, property, out value);
+        }
+
+        value = 0;
+        return false;
+    }
+
+    /// <summary>Returns the entity IDs that currently carry the tag.</summary>
+    /// <param name="tag">Tag to enumerate.</param>
+    /// <returns>The matching entity IDs in ascending order, or empty memory when none match.</returns>
+    /// <exception cref="ArgumentException"><paramref name="tag"/> is null, empty or whitespace.</exception>
+    public ReadOnlyMemory<int> EntitiesWithTag(string tag) => world.EntitiesWithTag(tag);
+
+    /// <summary>Checks that bounds fit the spatial index without changing world state.</summary>
+    /// <param name="bounds">Bounds to validate.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The bounds cannot be indexed.</exception>
+    public void ValidateSpatialBounds(Bounds2 bounds) => world.ValidateSpatialBounds(bounds);
 }
 
 /// <summary>System-local World commands. Capacity is retained across ticks.</summary>
