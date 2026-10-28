@@ -378,6 +378,13 @@ public abstract class PopulationColumnBase(
         }
     }
 
+    /// <summary>Gets the number of live rows in the column's population.</summary>
+    internal abstract int RowCount { get; }
+
+    /// <summary>Counts live rows whose value is at least the threshold, in one pass.</summary>
+    /// <remarks>Used by the population sink, which must not read a row per fact.</remarks>
+    internal abstract int CountRowsAtLeast(double threshold);
+
     /// <summary>Reads one row as a double so rule conditions can compare columns without a generic handle.</summary>
     /// <returns><see langword="false"/> when the column is not numeric or the row is not live.</returns>
     internal abstract bool TryGetRowValue(int row, out double value);
@@ -573,6 +580,15 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
         }
     }
 
+    internal override int RowCount
+    {
+        get
+        {
+            _population.EnsureActive();
+            return _population.Count;
+        }
+    }
+
     /// <summary>Gets a borrowed read-only view of the live column rows.</summary>
     /// <remarks>Do not retain or use this span across world cloning, adoption, or population structural changes.</remarks>
     internal ReadOnlySpan<T> ReadOnlySpan
@@ -643,6 +659,27 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
 
         value = PopulationNumeric.ToDouble(in _buffer.Values[row]);
         return true;
+    }
+
+    internal override int CountRowsAtLeast(double threshold)
+    {
+        if (!PopulationNumeric.IsNumeric(typeof(T)))
+        {
+            throw new InvalidOperationException(
+                $"Population column '{Id}' holds '{typeof(T).Name}', which rules cannot compare numerically.");
+        }
+
+        var values = _buffer.Values.AsSpan(0, _population.Count);
+        var count = 0;
+        for (var row = 0; row < values.Length; row++)
+        {
+            if (PopulationNumeric.ToDouble(in values[row]) >= threshold)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     internal override bool TryAddRowValue(int row, double amount)
@@ -836,6 +873,21 @@ public sealed class DoubleBufferedPopulationColumn<T> : PopulationColumnBase whe
             return _population.Count;
         }
     }
+
+    internal override int RowCount
+    {
+        get
+        {
+            _population.EnsureActive();
+            return _population.Count;
+        }
+    }
+
+    // Double-buffered columns hold presentation values; the sink aggregates the simulated
+    // (unbuffered) column instead, so this declines rather than reading a smoothed value.
+    internal override int CountRowsAtLeast(double threshold) =>
+        throw new InvalidOperationException(
+            $"Population column '{Id}' is double buffered and cannot be used as a sink source.");
 
     /// <summary>Gets a borrowed read-only view of the current buffer.</summary>
     /// <remarks>Do not retain or use this span across world cloning, adoption, or population structural changes.</remarks>
