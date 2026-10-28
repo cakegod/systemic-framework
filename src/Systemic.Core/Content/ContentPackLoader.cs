@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Systemic.Content.Generated;
 using Systemic.Kernel;
 using Systemic.Rules;
 
@@ -39,50 +40,78 @@ public static partial class ContentPackLoader
         root = Path.GetFullPath(root);
         var fingerprint = new ContentFingerprintBuilder(root);
         var diagnostics = new List<ContentDiagnostic>();
-        var game = TryCompileAt(root, "game.json", "$", diagnostics, () =>
+        byte[] gameBytes = [];
+        if (!TryCompile(root, "game.json", "$", diagnostics, () =>
+            {
+                gameBytes = ReadGameBytes(ResolveContentPath(root, "game.json"), "game.json",
+                    GameSchemaId, s_gameSchema, fingerprint);
+            }))
         {
-            var file = Read<GameFile>(ResolveContentPath(root, "game.json"), "game.json", GameSchemaId, s_gameSchema, fingerprint);
-            Require(file.SchemaVersion is 2 or 3,
-                $"game.json schemaVersion must be 2 or 3; found {file.SchemaVersion}.", "$.schemaVersion");
-            Require(!string.IsNullOrWhiteSpace(file.Name), "game.name is required.", "$.name");
-            return file;
-        }) ?? throw new ContentPackException(diagnostics);
+            throw new ContentPackException(diagnostics);
+        }
 
-        var rulesFile = TryCompileAt(root, game.Rules!, "$.rules", diagnostics,
-            () => Read<RulesFile>(ResolveContentPath(root, game.Rules!), game.Rules!, RulesSchemaId, s_rulesSchema, fingerprint));
+        using var gameDocument = gameBytes.Length > 0
+            ? Corvus.Text.Json.ParsedJsonDocument<GameContentFile>.Parse(gameBytes)
+            : null;
+        var game = gameDocument!.RootElement;
+        if (!TryCompile(root, "game.json", "$", diagnostics, () =>
+            {
+                Require((int)game.SchemaVersion is 2 or 3,
+                    $"game.json schemaVersion must be 2 or 3; found {(int)game.SchemaVersion}.", "$.schemaVersion");
+                Require(!string.IsNullOrWhiteSpace(game.Name.GetString()), "game.name is required.", "$.name");
+            }))
+        {
+            throw new ContentPackException(diagnostics);
+        }
+
+        var gameRules = game.Rules.GetString()!;
+        var gameEntities = game.Entities.GetString()!;
+        var gameModules = ReadModuleDeclarations(gameBytes);
+
+        byte[] rulesBytes = [];
+        var rulesRead = TryCompile(root, gameRules, "$.rules", diagnostics, () =>
+        {
+            rulesBytes = ReadRulesBytes(ResolveContentPath(root, gameRules), gameRules, RulesSchemaId,
+                s_rulesSchema, fingerprint);
+        });
+        using var rulesDocument = rulesRead && rulesBytes.Length > 0
+            ? Corvus.Text.Json.ParsedJsonDocument<RulesContentFile>.Parse(rulesBytes)
+            : null;
+        var rulesFile = rulesDocument?.RootElement;
         byte[] entitiesBytes = [];
         var tuningDocuments = ImmutableDictionary<string, TuningDocument>.Empty;
-        var entitiesFile = TryCompileAt(root, game.Entities!, "$.entities", diagnostics,
+        var entitiesFile = TryCompileAt(root, gameEntities, "$.entities", diagnostics,
             () =>
             {
-                var file = Read<EntitiesFile>(ResolveContentPath(root, game.Entities!), game.Entities!,
+                var file = Read<EntitiesFile>(ResolveContentPath(root, gameEntities), gameEntities,
                     EntitiesSchemaId, s_entitiesSchema, fingerprint, out entitiesBytes);
-                tuningDocuments = moduleRegistry.CompileTunings(entitiesBytes, game.Entities!);
+                tuningDocuments = moduleRegistry.CompileTunings(entitiesBytes, gameEntities);
                 return file;
             });
         var entities = entitiesFile is null
             ? null
-            : TryCompileAt(root, game.Entities!, "$.entities", diagnostics, () => CompileEntities(entitiesFile, game.Entities!));
+            : TryCompileAt(root, gameEntities, "$.entities", diagnostics, () => CompileEntities(entitiesFile, gameEntities));
         var rules = rulesFile is null
             ? null
-            : TryCompileAt(root, game.Rules!, "$.rules", diagnostics, () => CompileRules(rulesFile, entities));
+            : TryCompileAt(root, gameRules, "$.rules", diagnostics, () => CompileRules(rulesFile.Value, entities));
 
         if (diagnostics.Count > 0)
         {
             throw new ContentPackException(diagnostics);
         }
 
-        var manifest = new GameManifest(game.Id!, game.Name!, game.TickRateHz, game.MaxCatchUpSteps);
+        var manifest = new GameManifest((string)game.IdValue, game.Name.GetString()!, (int)game.TickRateHz,
+            (int)game.MaxCatchUpSteps);
         var references = new ContentReferenceCatalog();
         foreach (var entity in entities!.Definitions)
         {
-            references.Add("entity", entity.Id, game.Entities!);
+            references.Add("entity", entity.Id, gameEntities);
         }
 
         var moduleContext = new ContentModuleContext(root, manifest, entities, rules!, references,
-            game.Entities, game.Rules)
+            gameEntities, gameRules)
         { Fingerprint = fingerprint };
-        var modules = moduleRegistry.CompileDeclared(moduleContext, game.Modules);
+        var modules = moduleRegistry.CompileDeclared(moduleContext, gameModules);
         references.ValidateRequired();
         return new ContentPack(root, manifest, rules!, entities, modules)
         {
@@ -99,9 +128,23 @@ public static partial class ContentPackLoader
         Func<T> compile)
         where T : class
     {
+        T? result = null;
+        return TryCompile(root, sourceFile, fallbackPath, diagnostics, () => result = compile())
+            ? result
+            : null;
+    }
+
+    private static bool TryCompile(
+        string root,
+        string sourceFile,
+        string fallbackPath,
+        List<ContentDiagnostic> diagnostics,
+        Action compile)
+    {
         try
         {
-            return compile();
+            compile();
+            return true;
         }
         catch (ContentPackException exception)
         {
@@ -136,7 +179,7 @@ public static partial class ContentPackLoader
                 fallbackPath, exception.Message));
         }
 
-        return null;
+        return false;
     }
 
     private static string DiagnosticFile(string root, string sourceFile)
@@ -153,44 +196,44 @@ public static partial class ContentPackLoader
         }
     }
 
-    private static CompiledRuleSet CompileRules(RulesFile file, CompiledEntities? entities)
+    private static CompiledRuleSet CompileRules(RulesContentFile file, CompiledEntities? entities)
     {
-        var fragments = new Dictionary<string, RuleFragmentFile>(StringComparer.Ordinal);
+        var fragments = new Dictionary<string, RulesContentFile.Fragment>(StringComparer.Ordinal);
         var fragmentPaths = new Dictionary<string, string>(StringComparer.Ordinal);
-        var sourceFragments = file.Fragments ?? [];
-        for (var fragmentIndex = 0; fragmentIndex < sourceFragments.Length; fragmentIndex++)
+        if (file.Fragments is { } sourceFragments)
         {
-            var sourceFragment = sourceFragments[fragmentIndex];
-            var fragmentPath = $"$.fragments[{fragmentIndex}]";
-            var fragment = sourceFragment!;
-            Require(fragment.UseFragments is not { Length: > 0 }, $"Rule fragment '{fragment.Id}' cannot reference another fragment.", $"{fragmentPath}.useFragments");
-            Require(fragments.TryAdd(fragment.Id!, fragment), $"Duplicate rule fragment id '{fragment.Id}'.", $"{fragmentPath}.id");
-            fragmentPaths.Add(fragment.Id!, fragmentPath);
-        }
-
-        var expandedRules = new List<RuleSource>();
-        var usedFragmentIds = file.UseFragments ?? [];
-        for (var useIndex = 0; useIndex < usedFragmentIds.Length; useIndex++)
-        {
-            var fragmentId = usedFragmentIds[useIndex];
-            var usePath = $"$.useFragments[{useIndex}]";
-            Require(fragments.TryGetValue(fragmentId, out var fragment), $"Unknown rule fragment '{fragmentId}'.", usePath);
-            var fragmentRules = fragment!.Rules ?? throw new ContentPackException($"Rule fragment '{fragmentId}' requires a rules array.", $"{fragmentPaths[fragmentId]}.rules");
-            for (var ruleIndex = 0; ruleIndex < fragmentRules.Length; ruleIndex++)
+            for (var fragmentIndex = 0; fragmentIndex < sourceFragments.GetArrayLength(); fragmentIndex++)
             {
-                var sourceRule = fragmentRules[ruleIndex];
-                var rulePath = $"{fragmentPaths[fragmentId]}.rules[{ruleIndex}]";
-                var rule = sourceRule!;
-                expandedRules.Add(new RuleSource(rule with { Id = $"{fragmentId}.{rule.Id}" },
-                    $"{fragmentPaths[fragmentId]}.rules[{ruleIndex}]"));
+                var fragment = sourceFragments[fragmentIndex];
+                var fragmentId = (string)fragment.IdValue;
+                var fragmentPath = $"$.fragments[{fragmentIndex}]";
+                Require(fragment.UseFragments is not { } inherited || inherited.GetArrayLength() == 0,
+                    $"Rule fragment '{fragmentId}' cannot reference another fragment.", $"{fragmentPath}.useFragments");
+                Require(fragments.TryAdd(fragmentId, fragment), $"Duplicate rule fragment id '{fragmentId}'.", $"{fragmentPath}.id");
+                fragmentPaths.Add(fragmentId, fragmentPath);
             }
         }
 
-        var localRules = file.Rules!;
-        for (var ruleIndex = 0; ruleIndex < localRules.Length; ruleIndex++)
+        var expandedRules = new List<(RulesContentFile.Rule Rule, string Path, string? Prefix)>();
+        if (file.UseFragments is { } usedFragmentIds)
         {
-            var rule = localRules[ruleIndex]!;
-            expandedRules.Add(new RuleSource(rule, $"$.rules[{ruleIndex}]"));
+            for (var useIndex = 0; useIndex < usedFragmentIds.GetArrayLength(); useIndex++)
+            {
+                var fragmentId = (string)usedFragmentIds[useIndex];
+                var usePath = $"$.useFragments[{useIndex}]";
+                Require(fragments.TryGetValue(fragmentId, out var fragment), $"Unknown rule fragment '{fragmentId}'.", usePath);
+                var fragmentRules = fragment.Rules;
+                for (var ruleIndex = 0; ruleIndex < fragmentRules.GetArrayLength(); ruleIndex++)
+                {
+                    expandedRules.Add((fragmentRules[ruleIndex], $"{fragmentPaths[fragmentId]}.rules[{ruleIndex}]", fragmentId));
+                }
+            }
+        }
+
+        var localRules = file.Rules;
+        for (var ruleIndex = 0; ruleIndex < localRules.GetArrayLength(); ruleIndex++)
+        {
+            expandedRules.Add((localRules[ruleIndex], $"$.rules[{ruleIndex}]", null));
         }
 
         Require(expandedRules.Count <= 16_384, "rules.json exceeds the 16,384-rule limit.", "$.rules");
@@ -200,92 +243,113 @@ public static partial class ContentPackLoader
         {
             var rule = source.Rule;
             var rulePath = source.Path;
-            Require(ids.Add(rule.Id!), $"Duplicate rule id '{rule.Id}'.", $"{rulePath}.id");
+            var ruleId = source.Prefix is { } prefix ? $"{prefix}.{(string)rule.IdValue}" : (string)rule.IdValue;
+            Require(ids.Add(ruleId), $"Duplicate rule id '{ruleId}'.", $"{rulePath}.id");
 
-            var sourceConditions = rule.When ?? [];
-            var conditions = ImmutableArray.CreateBuilder<RuleCondition>(sourceConditions.Length);
-            for (var conditionIndex = 0; conditionIndex < sourceConditions.Length; conditionIndex++)
+            var conditions = ImmutableArray.CreateBuilder<RuleCondition>();
+            if (rule.When is { } sourceConditions)
             {
-                var sourceCondition = sourceConditions[conditionIndex];
-                var conditionPath = $"{rulePath}.when[{conditionIndex}]";
-                var condition = sourceCondition!;
-                switch (condition.Kind)
+                for (var conditionIndex = 0; conditionIndex < sourceConditions.GetArrayLength(); conditionIndex++)
                 {
-                    case "hasTag":
-                        var tagSubject = ParseSubject(condition.Subject, condition.Row, condition.FactRow,
-                            $"Rule '{rule.Id}' condition", $"{conditionPath}.subject");
-                        Require(!string.IsNullOrWhiteSpace(condition.Tag), $"Rule '{rule.Id}' hasTag requires tag.", $"{conditionPath}.tag");
-                        conditions.Add(RuleCondition.HasTag(tagSubject, condition.Tag!));
-                        break;
-                    case "propertyAtLeast":
-                        var propertySubject = ParseSubject(condition.Subject, condition.Row, condition.FactRow,
-                            $"Rule '{rule.Id}' condition", $"{conditionPath}.subject");
-                        Require(!string.IsNullOrWhiteSpace(condition.Property), $"Rule '{rule.Id}' propertyAtLeast requires property.", $"{conditionPath}.property");
-                        Require(condition.Value is { } threshold && double.IsFinite(threshold), $"Rule '{rule.Id}' condition value must be finite.", $"{conditionPath}.value");
-                        conditions.Add(RuleCondition.PropertyAtLeast(propertySubject, condition.Property!, condition.Value!.Value));
-                        break;
-                    case "expression":
-                        Require(!string.IsNullOrWhiteSpace(condition.Expression),
-                            $"Rule '{rule.Id}' expression condition requires expression.", $"{conditionPath}.expression");
-                        CompiledExpression formula;
-                        try
-                        {
-                            formula = ExpressionCompiler.Compile(condition.Expression!);
-                        }
-                        catch (ExpressionCompileException exception)
-                        {
-                            throw new ContentPackException(
-                                $"Rule '{rule.Id}' expression is invalid: {exception.Message}", $"{conditionPath}.expression");
-                        }
+                    var condition = sourceConditions[conditionIndex];
+                    var conditionPath = $"{rulePath}.when[{conditionIndex}]";
+                    var conditionKind = condition.Kind.GetString();
+                    switch (conditionKind)
+                    {
+                        case "hasTag":
+                            var tag = condition.Tag?.GetString();
+                            var tagSubject = ParseSubject(condition.SubjectValue?.GetString(), condition.Row,
+                                condition.FactRow?.GetString(), $"Rule '{ruleId}' condition", $"{conditionPath}.subject");
+                            Require(!string.IsNullOrWhiteSpace(tag), $"Rule '{ruleId}' hasTag requires tag.", $"{conditionPath}.tag");
+                            conditions.Add(RuleCondition.HasTag(tagSubject, tag!));
+                            break;
+                        case "propertyAtLeast":
+                            var property = condition.Property?.GetString();
+                            var threshold = condition.Value is { } thresholdValue ? (double)thresholdValue : (double?)null;
+                            var propertySubject = ParseSubject(condition.SubjectValue?.GetString(), condition.Row,
+                                condition.FactRow?.GetString(), $"Rule '{ruleId}' condition", $"{conditionPath}.subject");
+                            Require(!string.IsNullOrWhiteSpace(property), $"Rule '{ruleId}' propertyAtLeast requires property.", $"{conditionPath}.property");
+                            Require(threshold is { } finiteThreshold && double.IsFinite(finiteThreshold),
+                                $"Rule '{ruleId}' condition value must be finite.", $"{conditionPath}.value");
+                            conditions.Add(RuleCondition.PropertyAtLeast(propertySubject, property!, threshold.GetValueOrDefault()));
+                            break;
+                        case "expression":
+                            var expression = condition.Expression?.GetString();
+                            Require(!string.IsNullOrWhiteSpace(expression),
+                                $"Rule '{ruleId}' expression condition requires expression.", $"{conditionPath}.expression");
+                            CompiledExpression formula;
+                            try
+                            {
+                                formula = ExpressionCompiler.Compile(expression!);
+                            }
+                            catch (ExpressionCompileException exception)
+                            {
+                                throw new ContentPackException(
+                                    $"Rule '{ruleId}' expression is invalid: {exception.Message}", $"{conditionPath}.expression");
+                            }
 
-                        Require(formula.ResultKind == ExpressionResultKind.Boolean,
-                            $"Rule '{rule.Id}' condition expression must produce a boolean.", $"{conditionPath}.expression");
-                        conditions.Add(RuleCondition.FromExpression(formula));
-                        break;
-                    case "chance":
-                        Require(condition.Probability is { } probability && double.IsFinite(probability)
-                            && probability is >= 0 and <= 1,
-                            $"Rule '{rule.Id}' chance probability must be between 0 and 1.",
-                            $"{conditionPath}.probability");
-                        conditions.Add(RuleCondition.Chance(condition.Probability!.Value));
-                        break;
-                    default:
-                        throw new ContentPackException($"Rule '{rule.Id}' uses unknown condition '{condition.Kind}'.", $"{conditionPath}.kind");
+                            Require(formula.ResultKind == ExpressionResultKind.Boolean,
+                                $"Rule '{ruleId}' condition expression must produce a boolean.", $"{conditionPath}.expression");
+                            conditions.Add(RuleCondition.FromExpression(formula));
+                            break;
+                        case "chance":
+                            var probability = condition.Probability is { } probabilityValue
+                                ? (double)probabilityValue
+                                : (double?)null;
+                            Require(probability is { } finiteProbability && double.IsFinite(finiteProbability)
+                                && finiteProbability is >= 0 and <= 1,
+                                $"Rule '{ruleId}' chance probability must be between 0 and 1.",
+                                $"{conditionPath}.probability");
+                            conditions.Add(RuleCondition.Chance(probability.GetValueOrDefault()));
+                            break;
+                        default:
+                            throw new ContentPackException($"Rule '{ruleId}' uses unknown condition '{conditionKind}'.", $"{conditionPath}.kind");
+                    }
                 }
             }
 
-            var sourceEffects = rule.Effects ?? throw new ContentPackException($"Rule '{rule.Id}' requires an effects array.", $"{rulePath}.effects");
-            var effects = ImmutableArray.CreateBuilder<RuleEffect>(sourceEffects.Length);
-            for (var effectIndex = 0; effectIndex < sourceEffects.Length; effectIndex++)
+            var sourceEffects = rule.Effects;
+            var effects = ImmutableArray.CreateBuilder<RuleEffect>(sourceEffects.GetArrayLength());
+            for (var effectIndex = 0; effectIndex < sourceEffects.GetArrayLength(); effectIndex++)
             {
-                var sourceEffect = sourceEffects[effectIndex];
+                var effect = sourceEffects[effectIndex];
                 var effectPath = $"{rulePath}.effects[{effectIndex}]";
-                var effect = sourceEffect!;
-                switch (effect.Kind)
+                var effectKind = effect.Kind.GetString();
+                switch (effectKind)
                 {
                     case "adjustProperty":
-                        var adjustSubject = ParseSubject(effect.Subject, effect.Row, effect.FactRow,
-                            $"Rule '{rule.Id}' effect", $"{effectPath}.subject");
-                        Require(!string.IsNullOrWhiteSpace(effect.Property), $"Rule '{rule.Id}' adjustProperty requires property.", $"{effectPath}.property");
-                        Require(effect.Amount is { } amount && double.IsFinite(amount), $"Rule '{rule.Id}' effect amount must be finite.", $"{effectPath}.amount");
-                        effects.Add(RuleEffect.AdjustProperty(adjustSubject, effect.Property!, effect.Amount!.Value));
+                        var adjustProperty = effect.Property?.GetString();
+                        var amount = effect.Amount is { } amountValue ? (double)amountValue : (double?)null;
+                        var adjustSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
+                            effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
+                        Require(!string.IsNullOrWhiteSpace(adjustProperty),
+                            $"Rule '{ruleId}' adjustProperty requires property.", $"{effectPath}.property");
+                        Require(amount is { } finiteAmount && double.IsFinite(finiteAmount),
+                            $"Rule '{ruleId}' effect amount must be finite.", $"{effectPath}.amount");
+                        effects.Add(RuleEffect.AdjustProperty(adjustSubject, adjustProperty!, amount.GetValueOrDefault()));
                         break;
                     case "setModifier":
-                        var modifierSubject = ParseSubject(effect.Subject, effect.Row, effect.FactRow,
-                            $"Rule '{rule.Id}' effect", $"{effectPath}.subject");
-                        Require(!string.IsNullOrWhiteSpace(effect.Property), $"Rule '{rule.Id}' setModifier requires property.", $"{effectPath}.property");
-                        Require(effect.Operation is not null, $"Rule '{rule.Id}' setModifier requires operation.", $"{effectPath}.operation");
-                        Require(effect.Value is { } modifierValue && double.IsFinite(modifierValue),
-                            $"Rule '{rule.Id}' setModifier value must be finite.", $"{effectPath}.value");
-                        var operation = effect.Operation switch
+                        var modifierProperty = effect.Property?.GetString();
+                        var modifierValue = effect.Value is { } value ? (double)value : (double?)null;
+                        var operationName = effect.Operation?.GetString();
+                        var stageName = effect.Stage?.GetString();
+                        var durationTicks = effect.DurationTicks is { } ticks ? (int)ticks : -1;
+                        var modifierSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
+                            effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
+                        Require(!string.IsNullOrWhiteSpace(modifierProperty),
+                            $"Rule '{ruleId}' setModifier requires property.", $"{effectPath}.property");
+                        Require(operationName is not null, $"Rule '{ruleId}' setModifier requires operation.", $"{effectPath}.operation");
+                        Require(modifierValue is { } finiteModifierValue && double.IsFinite(finiteModifierValue),
+                            $"Rule '{ruleId}' setModifier value must be finite.", $"{effectPath}.value");
+                        var operation = operationName switch
                         {
                             "add" => ModifierOperation.Add,
                             "multiply" => ModifierOperation.Multiply,
                             "set" => ModifierOperation.Set,
                             _ => throw new ContentPackException(
-                                $"Rule '{rule.Id}' has unknown modifier operation '{effect.Operation}'.", $"{effectPath}.operation"),
+                                $"Rule '{ruleId}' has unknown modifier operation '{operationName}'.", $"{effectPath}.operation"),
                         };
-                        var stage = effect.Stage switch
+                        var stage = stageName switch
                         {
                             null or "standard" => ModifierStage.Standard,
                             "foundation" => ModifierStage.Foundation,
@@ -294,69 +358,81 @@ public static partial class ContentPackLoader
                             "override" => ModifierStage.Override,
                             "final" => ModifierStage.Final,
                             _ => throw new ContentPackException(
-                                $"Rule '{rule.Id}' has unknown modifier stage '{effect.Stage}'.", $"{effectPath}.stage"),
+                                $"Rule '{ruleId}' has unknown modifier stage '{stageName}'.", $"{effectPath}.stage"),
                         };
-                        var durationTicks = effect.DurationTicks ?? -1;
                         Require(durationTicks is -1 or >= 1 and <= 1_000_000,
-                            $"Rule '{rule.Id}' modifier durationTicks must be between 1 and 1,000,000 when specified.",
+                            $"Rule '{ruleId}' modifier durationTicks must be between 1 and 1,000,000 when specified.",
                             $"{effectPath}.durationTicks");
-                        effects.Add(RuleEffect.SetModifier(modifierSubject, effect.Property!, operation,
-                            effect.Value!.Value, stage, durationTicks));
+                        effects.Add(RuleEffect.SetModifier(modifierSubject, modifierProperty!, operation,
+                            modifierValue.GetValueOrDefault(), stage, durationTicks));
                         break;
                     case "addTag":
-                        var tagSubject = ParseSubject(effect.Subject, effect.Row, effect.FactRow,
-                            $"Rule '{rule.Id}' effect", $"{effectPath}.subject");
-                        Require(!string.IsNullOrWhiteSpace(effect.Tag), $"Rule '{rule.Id}' addTag requires tag.", $"{effectPath}.tag");
-                        effects.Add(RuleEffect.AddTag(tagSubject, effect.Tag!));
+                        var addedTag = effect.Tag?.GetString();
+                        var tagSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
+                            effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
+                        Require(!string.IsNullOrWhiteSpace(addedTag), $"Rule '{ruleId}' addTag requires tag.", $"{effectPath}.tag");
+                        effects.Add(RuleEffect.AddTag(tagSubject, addedTag!));
                         break;
                     case "emitEvent":
-                        Require(effect.Event is not null && StableIdRegex().IsMatch(effect.Event), $"Rule '{rule.Id}' emitEvent requires a stable event ID.", $"{effectPath}.event");
-                        effects.Add(RuleEffect.Emit(effect.Event!));
+                        var emittedEvent = effect.Event?.GetString();
+                        Require(emittedEvent is not null && StableIdRegex().IsMatch(emittedEvent),
+                            $"Rule '{ruleId}' emitEvent requires a stable event ID.", $"{effectPath}.event");
+                        effects.Add(RuleEffect.Emit(emittedEvent!));
                         break;
                     default:
-                        throw new ContentPackException($"Rule '{rule.Id}' uses unknown effect '{effect.Kind}'.", $"{effectPath}.kind");
+                        throw new ContentPackException($"Rule '{ruleId}' uses unknown effect '{effectKind}'.", $"{effectPath}.kind");
                 }
             }
 
-            rules.Add(new CompiledRule(rule.Id!, rule.On!, rule.Priority, conditions.MoveToImmutable(), effects.MoveToImmutable()));
+            rules.Add(new CompiledRule(ruleId, (string)rule.On, (int)rule.Priority,
+                conditions.ToImmutable(), effects.ToImmutable()));
         }
 
-        var sourceSchedules = file.Schedules ?? [];
         var entityIds = entities?.Definitions.Select(definition => definition.Id)
             .ToHashSet(StringComparer.Ordinal);
         var scheduleIds = new HashSet<string>(StringComparer.Ordinal);
-        var schedules = ImmutableArray.CreateBuilder<RuleScheduleDefinition>(sourceSchedules.Length);
-        for (var index = 0; index < sourceSchedules.Length; index++)
+        var schedules = ImmutableArray.CreateBuilder<RuleScheduleDefinition>(
+            file.Schedules is { } scheduled ? scheduled.GetArrayLength() : 0);
+        if (file.Schedules is { } sourceSchedules)
         {
-            var schedulePath = $"$.schedules[{index}]";
-            var schedule = sourceSchedules[index]!;
-            Require(scheduleIds.Add(schedule.Id!), $"Duplicate schedule id '{schedule.Id}'.", $"{schedulePath}.id");
-            Require(schedule.OffsetTicks < schedule.EveryTicks,
-                $"Schedule '{schedule.Id}' offsetTicks must be less than everyTicks.",
-                $"{schedulePath}.offsetTicks");
-            Require(double.IsFinite(schedule.Amount), $"Schedule '{schedule.Id}' amount must be finite.",
-                $"{schedulePath}.amount");
-            ValidateScheduledEntity(schedule.SourceEntityId, "sourceEntityId");
-            ValidateScheduledEntity(schedule.TargetEntityId, "targetEntityId");
-            schedules.Add(new RuleScheduleDefinition(schedule.Id!, schedule.Event!, schedule.EveryTicks,
-                schedule.OffsetTicks, schedule.SourceEntityId, schedule.TargetEntityId, schedule.Amount));
-
-            void ValidateScheduledEntity(string? entityId, string field)
+            for (var index = 0; index < sourceSchedules.GetArrayLength(); index++)
             {
-                if (entityId is null)
-                {
-                    return;
-                }
+                var schedule = sourceSchedules[index];
+                var schedulePath = $"$.schedules[{index}]";
+                var scheduleId = (string)schedule.IdValue;
+                var everyTicks = (int)schedule.EveryTicks;
+                var offsetTicks = schedule.OffsetTicks is { } offset ? (int)offset : 0;
+                var amount = schedule.Amount is { } scheduleAmount ? (double)scheduleAmount : 0;
+                var sourceEntityId = schedule.SourceEntityId?.GetString();
+                var targetEntityId = schedule.TargetEntityId?.GetString();
+                Require(scheduleIds.Add(scheduleId), $"Duplicate schedule id '{scheduleId}'.", $"{schedulePath}.id");
+                Require(offsetTicks < everyTicks,
+                    $"Schedule '{scheduleId}' offsetTicks must be less than everyTicks.",
+                    $"{schedulePath}.offsetTicks");
+                Require(double.IsFinite(amount), $"Schedule '{scheduleId}' amount must be finite.",
+                    $"{schedulePath}.amount");
+                ValidateScheduledEntity(sourceEntityId, "sourceEntityId");
+                ValidateScheduledEntity(targetEntityId, "targetEntityId");
+                schedules.Add(new RuleScheduleDefinition(scheduleId, (string)schedule.Event, everyTicks,
+                    offsetTicks, sourceEntityId, targetEntityId, amount));
 
-                if (entityIds is not null)
+                void ValidateScheduledEntity(string? entityId, string field)
                 {
-                    Require(entityIds.Contains(entityId),
-                        $"Schedule '{schedule.Id}' references unknown entity '{entityId}'.", $"{schedulePath}.{field}");
+                    if (entityId is null)
+                    {
+                        return;
+                    }
+
+                    if (entityIds is not null)
+                    {
+                        Require(entityIds.Contains(entityId),
+                            $"Schedule '{scheduleId}' references unknown entity '{entityId}'.", $"{schedulePath}.{field}");
+                    }
                 }
             }
         }
 
-        return new CompiledRuleSet(rules.MoveToImmutable(), schedules.MoveToImmutable());
+        return new CompiledRuleSet(rules.MoveToImmutable(), schedules.ToImmutable());
     }
 
     private static CompiledEntities CompileEntities(EntitiesFile file, string sourceFile)
@@ -547,7 +623,7 @@ public static partial class ContentPackLoader
     // A subject is one of four forms: the fact's source, the fact's target, a fixed population row,
     // or the population row the fact is about. Only one form may be written; guessing between them
     // would make an authoring mistake silently address the wrong thing.
-    private static RuleSubject ParseSubject(string? subject, RowFile? row, string? factRow,
+    private static RuleSubject ParseSubject(string? subject, RulesContentFile.RowSubject? row, string? factRow,
         string context, string? fieldPath = null)
     {
         ContentPackException Error(string message) => fieldPath is null
@@ -560,19 +636,21 @@ public static partial class ContentPackLoader
             throw Error("must use only one of 'subject', 'row' or 'factRow'.");
         }
 
-        if (row is not null)
+        if (row is { } rowSubject)
         {
-            if (string.IsNullOrWhiteSpace(row.Population))
+            var population = rowSubject.Population.GetString();
+            var slot = rowSubject.Slot is { } slotValue ? (int)slotValue : 0;
+            if (string.IsNullOrWhiteSpace(population))
             {
                 throw Error("row subject requires a population.");
             }
 
-            if (row.Slot < 0)
+            if (slot < 0)
             {
                 throw Error("row subject slot must be non-negative.");
             }
 
-            return RuleSubject.Row(row.Population, row.Slot);
+            return RuleSubject.Row(population, slot);
         }
 
         if (factRow is not null)
@@ -598,6 +676,40 @@ public static partial class ContentPackLoader
         Require(!string.IsNullOrWhiteSpace(relativePath) && !Path.IsPathRooted(relativePath),
             "Content file paths must be relative to the pack root.");
         return ContentPathResolver.ResolveWithinRoot(root, relativePath, "Content path", "Content file");
+    }
+
+    private static byte[] ReadGameBytes(
+        string path,
+        string displayPath,
+        string schemaKey,
+        string schemaText,
+        ContentFingerprintBuilder fingerprint) =>
+        ContentFileReader.ReadValidatedBytes(path, displayPath, schemaKey, schemaText, fingerprint);
+
+    private static byte[] ReadRulesBytes(
+        string path,
+        string displayPath,
+        string schemaKey,
+        string schemaText,
+        ContentFingerprintBuilder fingerprint) =>
+        ContentFileReader.ReadValidatedBytes(path, displayPath, schemaKey, schemaText, fingerprint);
+
+    // Modules receive their declaration as a detached JsonElement, so it outlives the parsed game document.
+    private static Dictionary<string, JsonElement>? ReadModuleDeclarations(byte[] gameBytes)
+    {
+        using var document = JsonDocument.Parse(gameBytes);
+        if (!document.RootElement.TryGetProperty("modules"u8, out var modules))
+        {
+            return null;
+        }
+
+        var result = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var declaration in modules.EnumerateObject())
+        {
+            result[declaration.Name] = declaration.Value.Clone();
+        }
+
+        return result;
     }
 
     private static T Read<T>(string path, string displayPath, string schemaKey, string schemaText, ContentFingerprintBuilder fingerprint)
@@ -638,58 +750,6 @@ public static partial class ContentPackLoader
     private static partial Regex StableIdRegex();
 
 
-    private sealed record GameFile(
-        int SchemaVersion,
-        string? Id,
-        string? Name,
-        int TickRateHz,
-        int MaxCatchUpSteps,
-        string? Rules,
-        string? Entities,
-        Dictionary<string, JsonElement>? Modules = null);
-
-    private sealed record RulesFile(
-        int SchemaVersion,
-        RuleFile[]? Rules = null,
-        RuleFragmentFile[]? Fragments = null,
-        string[]? UseFragments = null,
-        ScheduleFile[]? Schedules = null);
-
-    private sealed record RuleSource(RuleFile Rule, string Path);
-    private sealed record RuleFragmentFile(string Id, RuleFile[]? Rules = null, string[]? UseFragments = null);
-    private sealed record ScheduleFile(
-        string Id,
-        string Event,
-        int EveryTicks,
-        int OffsetTicks = 0,
-        string? SourceEntityId = null,
-        string? TargetEntityId = null,
-        double Amount = 0);
-    private sealed record RuleFile(string Id, string On, int Priority, ConditionFile[]? When = null, EffectFile[]? Effects = null);
-    private sealed record ConditionFile(
-        string Kind,
-        string? Subject = null,
-        string? Tag = null,
-        string? Property = null,
-        double? Value = null,
-        string? Expression = null,
-        double? Probability = null,
-        RowFile? Row = null,
-        string? FactRow = null);
-    private sealed record EffectFile(
-        string Kind,
-        string? Subject = null,
-        string? Property = null,
-        double? Amount = null,
-        string? Tag = null,
-        string? Event = null,
-        string? Operation = null,
-        double? Value = null,
-        string? Stage = null,
-        int? DurationTicks = null,
-        RowFile? Row = null,
-        string? FactRow = null);
-    private sealed record RowFile(string Population, int Slot = 0);
     private sealed record EntitiesFile(
         int SchemaVersion,
         EntityDefinitionFile[]? Entities = null,
