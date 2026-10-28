@@ -7,6 +7,9 @@ public sealed class RowAddressedRuleTests
 {
     private static readonly PopulationColumnKey<int> s_healthKey = new("test.prey.health", 1, PopulationCodecs.Int32);
 
+    private static readonly PopulationColumnKey<int> s_buffHealthKey =
+        new("test.buff.health", 1, PopulationCodecs.Int32);
+
     [Fact]
     public void Entity_subject_addresses_one_entity_regardless_of_the_fact()
     {
@@ -319,6 +322,158 @@ public sealed class RowAddressedRuleTests
         return new PreyFixture(population, health);
     }
 
+    [Fact]
+    public void Row_modifier_effect_changes_the_effective_value_and_not_the_column()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateBuffPrey(world, 3);
+        var engine = Bind(world,
+            new CompiledRule("prey.drain", "prey.drain", 0, [],
+                [RuleEffect.SetModifier(RuleSubject.Row(BuffPrey.Id, 1), "test.buff.health",
+                    ModifierOperation.Add, -60)]));
+
+        var result = engine.Dispatch(world, new SimulationFact("prey.drain", 0, 0));
+
+        Assert.Equal(1, result.EffectsApplied);
+        Assert.Equal(40, prey.EffectiveValue(1, "test.buff.health"));
+        Assert.Equal(100, prey.EffectiveValue(0, "test.buff.health"));
+        Assert.Equal([100, 100, 100], ReadBuffHealth(prey));
+    }
+
+    [Fact]
+    public void Row_condition_reads_the_effective_value_so_a_modifier_changes_the_match()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateBuffPrey(world, 2);
+        var engine = Bind(world,
+            new CompiledRule("prey.weaken", "prey.weaken", 0,
+                [RuleCondition.PropertyAtLeast(RuleSubject.Row(BuffPrey.Id, 1), "test.buff.health", 50)],
+                [RuleEffect.AdjustProperty(RuleSubject.Row(BuffPrey.Id, 1), "test.buff.health", -1)]));
+
+        Assert.Equal(1, engine.Dispatch(world, new SimulationFact("prey.weaken", 0, 0)).RulesMatched);
+
+        prey.SetModifier(1, "test.buff.health", -60);
+        var drained = engine.Dispatch(world, new SimulationFact("prey.weaken", 0, 0));
+
+        Assert.Equal(0, drained.RulesMatched);
+        Assert.Equal(0, drained.EffectsApplied);
+    }
+
+    [Fact]
+    public void Row_modifier_effects_roll_back_with_the_dispatch_transaction()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateBuffPrey(world, 2);
+        var engine = Bind(world,
+            new CompiledRule("prey.drain", "prey.drain", 0, [],
+                [RuleEffect.SetModifier(RuleSubject.Row(BuffPrey.Id, 0), "test.buff.health",
+                    ModifierOperation.Add, -60)]));
+
+        var result = engine.DispatchBatch(world,
+            [new SimulationFact("prey.drain", 0, 0), new SimulationFact("poison", 0, 0)],
+            (fact, emitter) =>
+            {
+                if (fact.Type == "poison")
+                {
+                    Assert.False(emitter.Enqueue(new SimulationFact("invalid", -1, 0)));
+                }
+            });
+
+        Assert.True(result.RolledBack);
+        Assert.Equal(100, prey.EffectiveValue(0, "test.buff.health"));
+    }
+
+    [Fact]
+    public void Row_modifier_on_an_undeclared_property_fails_at_bind_with_the_declared_list_named()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        CreateBuffPrey(world, 1);
+        var engine = new RuleEngine(new CompiledRuleSet([
+            new CompiledRule("prey.drain", "prey.drain", 0, [],
+                [RuleEffect.SetModifier(RuleSubject.Row(BuffPrey.Id, 0), "test.buff.stamina",
+                    ModifierOperation.Add, -1)])]));
+
+        var error = Assert.Throws<InvalidOperationException>(() => engine.Bind(world));
+
+        Assert.Contains("test.buff.stamina", error.Message, StringComparison.Ordinal);
+        Assert.Contains("test.buff.health", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Row_modifier_operation_other_than_add_fails_at_bind()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        CreateBuffPrey(world, 1);
+        var engine = new RuleEngine(new CompiledRuleSet([
+            new CompiledRule("prey.mark", "prey.mark", 0, [],
+                [RuleEffect.SetModifier(RuleSubject.Row(BuffPrey.Id, 0), "test.buff.health",
+                    ModifierOperation.Multiply, 2)])]));
+
+        var error = Assert.Throws<InvalidOperationException>(() => engine.Bind(world));
+
+        Assert.Contains("Multiply", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Add", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Row_modifier_dispatch_does_not_allocate_once_warmed()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateBuffPrey(world, 2);
+        var engine = Bind(world,
+            new CompiledRule("prey.drain", "prey.drain", 0, [],
+                [RuleEffect.SetModifier(RuleSubject.Row(BuffPrey.Id, 0), "test.buff.health",
+                    ModifierOperation.Add, -1, durationTicks: 4)]));
+        SimulationFact[] facts = [new("prey.drain", 0, 0)];
+        for (var warmup = 0; warmup < 16; warmup++)
+        {
+            engine.DispatchBatch(world, facts);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var repetition = 0; repetition < 100; repetition++)
+        {
+            engine.DispatchBatch(world, facts);
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(allocated == 0, $"Row modifier dispatch allocated {allocated} bytes over 100 dispatches.");
+        Assert.Equal(99, prey.EffectiveValue(0, "test.buff.health"));
+    }
+
+    private static Population<BuffPrey> CreateBuffPrey(World world, int count)
+    {
+        var population = world.DefinePopulation<BuffPrey>();
+        var health = population.Column(s_buffHealthKey);
+        population.Reserve(count);
+        population.AddRange(count);
+        population.WithAccess(new PopulationRange(0, count), health,
+            static (PopulationColumn<int> column, scoped ref PopulationAccessScope<BuffPrey> scope) =>
+            {
+                var values = scope.EditRange(column);
+                for (var row = 0; row < values.Length; row++)
+                {
+                    values[row] = 100;
+                }
+            });
+        return population;
+    }
+
+    private static int[] ReadBuffHealth(Population<BuffPrey> population)
+    {
+        var values = new int[population.Count];
+        population.WithAccess(new PopulationRange(0, values.Length), (Column: population.Column(s_buffHealthKey), Values: values),
+            static ((PopulationColumn<int> Column, int[] Values) state, scoped ref PopulationAccessScope<BuffPrey> scope) =>
+            {
+                var health = scope.ReadAll(state.Column);
+                for (var row = 0; row < state.Values.Length; row++)
+                {
+                    state.Values[row] = health[row];
+                }
+            });
+        return values;
+    }
+
     private static Population<TaggedPrey> CreateTaggedPrey(World world, int count)
     {
         var population = world.DefinePopulation<TaggedPrey>();
@@ -354,6 +509,15 @@ public sealed class RowAddressedRuleTests
         public static string Id => "test.prey";
 
         public static int Version => 1;
+    }
+
+    private readonly struct BuffPrey : IPopulationKind
+    {
+        public static string Id => "test.buff-prey";
+
+        public static int Version => 1;
+
+        public static string[] ModifierProperties => ["test.buff.health"];
     }
 
     private readonly struct TaggedPrey : IPopulationKind

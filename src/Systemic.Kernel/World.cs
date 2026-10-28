@@ -743,6 +743,20 @@ public sealed class World
     }
 
     /// <summary>Resolves a population's schema tags for row-addressed rules.</summary>
+    /// <summary>Resolves a population's row modifier slots for row-addressed rules.</summary>
+    internal bool TryGetPopulationModifiers(string populationId, out PopulationModifierAccess modifiers)
+    {
+        EnsureActive();
+        if (!_populationsById.TryGetValue(populationId, out var registration))
+        {
+            modifiers = default;
+            return false;
+        }
+
+        modifiers = new PopulationModifierAccess(registration);
+        return true;
+    }
+
     internal bool TryGetPopulationTags(string populationId, out PopulationTagAccess tags)
     {
         EnsureActive();
@@ -1452,6 +1466,9 @@ public sealed class World
 
         return checked(firstTick + remainingTicks - 1);
     }
+
+    /// <summary>Converts an authored duration into the absolute expiry tick row modifiers store.</summary>
+    internal int ExpiryFromRemainingTicks(int remainingTicks) => ExpiryFromRemaining(remainingTicks);
 
     public void RemoveModifier(string source, Entity entity, string property)
     {

@@ -19,6 +19,16 @@ public interface IPopulationKind
     /// <see cref="Population{TKind}.MaximumTags"/> names are allowed.
     /// </remarks>
     static virtual string[] Tags => [];
+
+    /// <summary>Gets the property names this schema accepts row modifiers for, in key order.</summary>
+    /// <remarks>
+    /// A row modifier is stored inline in the row's fixed slot block, so the property must be listed
+    /// here to be addressable: the order decides the slot key and is therefore part of the persisted
+    /// schema. Each named property is also a numeric column of the same ID, which the modifier adds
+    /// to when the effective value is read. At most <see cref="RowModifiers.SlotsPerRow"/> modifiers
+    /// can be live on one row at a time.
+    /// </remarks>
+    static virtual string[] ModifierProperties => [];
 }
 
 /// <summary>Describes a contiguous range of live population rows.</summary>
@@ -40,6 +50,9 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     private static readonly PopulationColumnKey<ulong> s_tagMaskKey =
         new("systemic.tags", 1, PopulationCodecs.UInt64);
 
+    private static readonly PopulationColumnKey<ModifierSlot8> s_modifierKey =
+        new("systemic.modifiers", 1, PopulationModifierCodec.Instance);
+
     private static long s_nextOwnerToken;
     private static long s_nextHandleGeneration;
 
@@ -47,7 +60,10 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     private readonly Dictionary<string, PopulationColumnBase> _columns = new(StringComparer.Ordinal);
     private readonly string[] _tagNames;
     private readonly Dictionary<string, int> _tagBits = new(StringComparer.Ordinal);
+    private readonly string[] _modifierProperties;
+    private readonly Dictionary<string, ushort> _modifierKeys = new(StringComparer.Ordinal);
     private PopulationColumn<ulong>? _tagMask;
+    private PopulationColumn<ModifierSlot8>? _modifierSlots;
     private readonly bool _handlesEnabled;
     private readonly long _ownerToken;
     private readonly List<HandleSlot> _handleSlots = [];
@@ -86,9 +102,34 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             }
         }
 
-        // The mask column is created with the schema, not on first use: a save's column set must be
-        // reproducible from the schema alone, or a load cannot match it before any rule binds.
+        _modifierProperties = [.. TKind.ModifierProperties];
+        if (_modifierProperties.Length > ushort.MaxValue - 1)
+        {
+            throw new InvalidOperationException(
+                $"Population '{TKind.Id}' declares more than {ushort.MaxValue - 1} modifier properties.");
+        }
+
+        for (var index = 0; index < _modifierProperties.Length; index++)
+        {
+            var property = _modifierProperties[index];
+            if (string.IsNullOrWhiteSpace(property))
+            {
+                throw new InvalidOperationException(
+                    $"Population '{TKind.Id}' declares a blank modifier property at key {index + 1}.");
+            }
+
+            if (!_modifierKeys.TryAdd(property, (ushort)(index + 1)))
+            {
+                throw new InvalidOperationException(
+                    $"Population '{TKind.Id}' declares modifier property '{property}' more than once.");
+            }
+        }
+
+        // The mask and modifier columns are created with the schema, not on first use: a save's
+        // column set must be reproducible from the schema alone, or a load cannot match it before
+        // any rule binds.
         _tagMask = _tagNames.Length > 0 ? Column(s_tagMaskKey) : null;
+        _modifierSlots = _modifierProperties.Length > 0 ? Column(s_modifierKey) : null;
     }
 
     internal World World { get; private set; }
@@ -554,9 +595,130 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     /// <exception cref="InvalidOperationException"><paramref name="tag"/> is not declared by the schema.</exception>
     public bool RemoveTag(int row, string tag) => TrySetTagBit(row, ResolveTagBit(tag), value: false);
 
+    /// <summary>Gets the property names this schema accepts row modifiers for, in key order.</summary>
+    public ReadOnlyMemory<string> ModifierProperties => _modifierProperties;
+
+    /// <summary>Gets the number of modifiers one row of this schema can carry at once.</summary>
+    public static int MaximumRowModifiers => RowModifiers.SlotsPerRow;
+
+    /// <summary>Adds an additive modifier to a live row's named property.</summary>
+    /// <param name="row">The row slot.</param>
+    /// <param name="property">A property declared in <see cref="IPopulationKind.ModifierProperties"/>.</param>
+    /// <param name="value">The additive amount.</param>
+    /// <param name="remainingTicks">Lifetime in ticks; a negative value never expires.</param>
+    /// <returns><see langword="false"/> when the row is not live.</returns>
+    /// <remarks>Setting the same property again replaces that row's existing modifier for it.</remarks>
+    /// <exception cref="InvalidOperationException">The property is not declared, or the row already
+    /// carries <see cref="MaximumRowModifiers"/> different modifiers.</exception>
+    public bool SetModifier(int row, string property, double value, int remainingTicks = -1)
+    {
+        EnsureActive();
+        if (!double.IsFinite(value) || !float.IsFinite((float)value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(value), value,
+                $"Row modifier values for population '{TKind.Id}' must be finite single-precision numbers.");
+        }
+
+        return TrySetRowModifier(row, ResolveModifierKey(property), value,
+            World.ExpiryFromRemainingTicks(remainingTicks));
+    }
+
+    /// <summary>Reads a live row's column value with its active modifiers applied.</summary>
+    /// <param name="row">The row slot.</param>
+    /// <param name="property">A numeric column ID.</param>
+    /// <returns>The column value plus every active modifier declared for that property.</returns>
+    /// <exception cref="InvalidOperationException">The column is unknown or the row is not live.</exception>
+    public double EffectiveValue(int row, string property)
+    {
+        EnsureActive();
+        if (!_columns.TryGetValue(property, out var column)
+            || !TryGetEffectiveRowValue(row, column, ResolveModifierKeyOrEmpty(property), out var value))
+        {
+            throw new InvalidOperationException(
+                $"Population '{TKind.Id}' has no live row {row} with column '{property}'.");
+        }
+
+        return value;
+    }
+
     internal ReadOnlySpan<string> TagNames => _tagNames;
 
     internal PopulationColumn<ulong>? MaskColumn => _tagMask;
+
+    internal ReadOnlySpan<string> ModifierPropertyNames => _modifierProperties;
+
+    internal PopulationColumn<ModifierSlot8>? ModifierColumn => _modifierSlots;
+
+    internal bool TryGetModifierKey(string property, out ushort key) =>
+        _modifierKeys.TryGetValue(property, out key);
+
+    internal bool TrySetRowModifier(int row, ushort key, double value, int expiryTick)
+    {
+        EnsureActive();
+        if (_modifierSlots is null || key == RowModifierSlot.EmptyKey || !_modifierSlots.TryReadRow(row, out var block))
+        {
+            return false;
+        }
+
+        var slots = RowModifiers.AsSpan(ref block);
+        var currentTick = World.LogicalTick;
+        var target = -1;
+        var reusable = -1;
+        for (var index = 0; index < slots.Length; index++)
+        {
+            var slot = slots[index];
+            if (slot.Key == key)
+            {
+                target = index;
+                break;
+            }
+
+            if (reusable < 0 && !slot.IsActive(currentTick))
+            {
+                reusable = index;
+            }
+        }
+
+        target = target >= 0 ? target : reusable;
+        if (target < 0)
+        {
+            throw new InvalidOperationException(
+                $"Row {row} of population '{TKind.Id}' already carries {RowModifiers.SlotsPerRow} active modifiers "
+                + "and has no free slot; expire or replace one before adding another.");
+        }
+
+        slots[target] = new RowModifierSlot(key, (float)value, expiryTick);
+        return _modifierSlots.TryWriteRow(row, block);
+    }
+
+    internal bool TryGetEffectiveRowValue(int row, PopulationColumnBase column, ushort modifierKey, out double value)
+    {
+        EnsureActive();
+        if (!column.TryGetRowValue(row, out value))
+        {
+            value = 0;
+            return false;
+        }
+
+        if (_modifierSlots is null || modifierKey == RowModifierSlot.EmptyKey
+            || !_modifierSlots.TryReadRow(row, out var block))
+        {
+            return true;
+        }
+
+        var slots = RowModifiers.AsReadOnlySpan(ref block);
+        var currentTick = World.LogicalTick;
+        for (var index = 0; index < slots.Length; index++)
+        {
+            var slot = slots[index];
+            if (slot.Key == modifierKey && slot.IsActive(currentTick))
+            {
+                value += slot.Value;
+            }
+        }
+
+        return true;
+    }
 
     internal bool TryGetTagBit(string tag, out int bit) => _tagBits.TryGetValue(tag, out bit);
 
@@ -583,6 +745,22 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         }
 
         return _tagMask.TryWriteRow(row, updated);
+    }
+
+    private ushort ResolveModifierKeyOrEmpty(string property) =>
+        _modifierKeys.TryGetValue(property, out var key) ? key : RowModifierSlot.EmptyKey;
+
+    private ushort ResolveModifierKey(string property)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(property);
+        if (_modifierKeys.TryGetValue(property, out var key))
+        {
+            return key;
+        }
+
+        throw new InvalidOperationException(
+            $"Population '{TKind.Id}' does not declare modifier property '{property}'. "
+            + $"Declared properties: '{string.Join("', '", _modifierProperties)}'.");
     }
 
     private int ResolveTagBit(string tag)
@@ -809,6 +987,9 @@ public sealed class Population<TKind> where TKind : IPopulationKind
 
         clone._tagMask = clone._columns.TryGetValue(s_tagMaskKey.Id, out var clonedMask)
             ? (PopulationColumn<ulong>)clonedMask
+            : null;
+        clone._modifierSlots = clone._columns.TryGetValue(s_modifierKey.Id, out var clonedModifiers)
+            ? (PopulationColumn<ModifierSlot8>)clonedModifiers
             : null;
 
         if (_handlesEnabled)
@@ -1222,6 +1403,15 @@ internal abstract class PopulationRegistration
 
     public abstract ReadOnlyMemory<string> TagNames { get; }
 
+    public abstract ReadOnlyMemory<string> ModifierPropertyNames { get; }
+
+    public abstract bool TryGetModifierKey(string property, out ushort key);
+
+    public abstract bool TrySetRowModifier(int row, ushort key, double value, int remainingTicks);
+
+    public abstract bool TryGetEffectiveRowValue(int row, PopulationColumnBase column, ushort modifierKey,
+        out double value);
+
     public abstract bool TryGetTagBit(string tag, out int bit);
 
     public abstract bool TryHasTagBit(int row, int bit);
@@ -1251,6 +1441,17 @@ internal sealed class PopulationRegistration<TKind>(Population<TKind> population
     public override object Value => population;
 
     public override ReadOnlyMemory<string> TagNames => population.Tags;
+
+    public override ReadOnlyMemory<string> ModifierPropertyNames => population.ModifierProperties;
+
+    public override bool TryGetModifierKey(string property, out ushort key) =>
+        population.TryGetModifierKey(property, out key);
+
+    public override bool TrySetRowModifier(int row, ushort key, double value, int remainingTicks) =>
+        population.TrySetRowModifier(row, key, value, population.World.ExpiryFromRemainingTicks(remainingTicks));
+
+    public override bool TryGetEffectiveRowValue(int row, PopulationColumnBase column, ushort modifierKey,
+        out double value) => population.TryGetEffectiveRowValue(row, column, modifierKey, out value);
 
     public override bool TryGetTagBit(string tag, out int bit) => population.TryGetTagBit(tag, out bit);
 
@@ -1293,4 +1494,28 @@ internal readonly struct PopulationTagAccess(PopulationRegistration registration
 
     /// <summary>Sets or clears one row's mask bit.</summary>
     public bool TrySetTagBit(int row, int bit, bool value) => _registration.TrySetTagBit(row, bit, value);
+}
+
+/// <summary>Addresses the inline modifier slots of one population without another lookup per row.</summary>
+/// <remarks>
+/// A rule binds a modifier property to its key once, then writes and reads effective values through
+/// this handle. It is only valid while the population it was resolved from is registered.
+/// </remarks>
+internal readonly struct PopulationModifierAccess(PopulationRegistration registration)
+{
+    private readonly PopulationRegistration _registration = registration;
+
+    /// <summary>Gets the schema's modifier property names, in key order.</summary>
+    public ReadOnlyMemory<string> Properties => _registration.ModifierPropertyNames;
+
+    /// <summary>Resolves a modifier property to its slot key.</summary>
+    public bool TryGetKey(string property, out ushort key) => _registration.TryGetModifierKey(property, out key);
+
+    /// <summary>Writes one row's modifier for a property, converting the authored duration to an expiry tick.</summary>
+    public bool TrySet(int row, ushort key, double value, int remainingTicks) =>
+        _registration.TrySetRowModifier(row, key, value, remainingTicks);
+
+    /// <summary>Reads one row's column value with its active modifiers applied.</summary>
+    public bool TryGetEffectiveValue(int row, PopulationColumnBase column, ushort key, out double value) =>
+        _registration.TryGetEffectiveRowValue(row, column, key, out value);
 }

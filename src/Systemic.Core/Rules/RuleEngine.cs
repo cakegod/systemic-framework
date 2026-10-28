@@ -87,7 +87,7 @@ public sealed class RuleEngine
     private bool _eventHistoryIndexDirty;
     // Rollback netcode clones the world per tick, so bindings are cached per world: rebinding
     // one world's columns would write into the wrong clone. The cap keeps a hot but bounded set.
-    private readonly Dictionary<World, Dictionary<(string Population, string Name, bool IsTag), RowBinding>>
+    private readonly Dictionary<World, Dictionary<(string Population, string Name, RowTargetKind Kind), RowBinding>>
         _rowBindings = [];
     private WorldTransaction? _activeTransaction;
     private WorldTransaction? _batchTransaction;
@@ -173,8 +173,9 @@ public sealed class RuleEngine
     /// implicitly when the caller does not. A rule naming a population, column, or column value type
     /// this world does not provide fails here rather than mid-dispatch. A row rule's property name is
     /// the column's stable key ID, so it is checked against the schema rather than guessed at runtime.
-    /// Row subjects support property comparisons, schema tags, and property adjustments. Modifiers
-    /// and expressions stay on the entity path until the row storage for them exists.
+    /// Row subjects support property comparisons, schema tags, property adjustments, and additive
+    /// modifiers. Expressions stay on the entity path. A row property comparison reads the column's
+    /// effective value, so a row modifier declared for that property is part of the comparison.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="world"/> is null.</exception>
     /// <exception cref="InvalidOperationException">A row rule cannot be compiled against this world.</exception>
@@ -183,7 +184,7 @@ public sealed class RuleEngine
         ArgumentNullException.ThrowIfNull(world);
         // Validate into a local table first: a rejected rule set must not leave a half-bound
         // entry that later dispatches would treat as successfully bound.
-        var rowBindings = new Dictionary<(string Population, string Name, bool IsTag), RowBinding>();
+        var rowBindings = new Dictionary<(string Population, string Name, RowTargetKind Kind), RowBinding>();
         foreach (var rule in _rules.Rules)
         {
             foreach (var condition in rule.Conditions)
@@ -230,10 +231,13 @@ public sealed class RuleEngine
                     case RuleEffectKind.AddTag:
                         BindTag(world, rowBindings, rule, effect.Subject, effect.Name);
                         break;
+                    case RuleEffectKind.SetModifier:
+                        BindModifier(world, rowBindings, rule, effect);
+                        break;
                     default:
                         throw new InvalidOperationException(
                             $"Rule '{rule.Id}' applies {effect.Kind} '{effect.Name}' to {effect.Subject}; "
-                            + "row subjects support property adjustments and schema tags only.");
+                            + "row subjects support property adjustments, schema tags and additive modifiers only.");
                 }
             }
         }
@@ -247,10 +251,30 @@ public sealed class RuleEngine
     }
 
     private static PopulationColumnBase BindColumn(World world,
-        Dictionary<(string Population, string Name, bool IsTag), RowBinding> rowBindings,
+        Dictionary<(string Population, string Name, RowTargetKind Kind), RowBinding> rowBindings,
         CompiledRule rule,
         RuleSubject subject,
         string columnId)
+    {
+        var column = RequireNumericColumn(world, rule, subject, columnId);
+        // A schema that declares this property for modifiers gets the effective value on every read,
+        // so a rule's condition sees the same number its modifier effects write.
+        var modifiers = default(PopulationModifierAccess);
+        var modifierKey = RowModifierSlot.EmptyKey;
+        if (world.TryGetPopulationModifiers(subject.PopulationId, out var access)
+            && access.TryGetKey(columnId, out var key))
+        {
+            modifiers = access;
+            modifierKey = key;
+        }
+
+        rowBindings[(subject.PopulationId, columnId, RowTargetKind.Column)] =
+            RowBinding.ForColumn(column, modifiers, modifierKey);
+        return column;
+    }
+
+    private static PopulationColumnBase RequireNumericColumn(World world, CompiledRule rule,
+        RuleSubject subject, string columnId)
     {
         if (!world.TryGetPopulationColumn(subject.PopulationId, columnId, out var column))
         {
@@ -266,12 +290,58 @@ public sealed class RuleEngine
                 + $"which holds '{column.ValueType.Name}'; row rules need a numeric column.");
         }
 
-        rowBindings[(subject.PopulationId, columnId, false)] = RowBinding.ForColumn(column);
         return column;
     }
 
+    private static void BindModifier(World world,
+        Dictionary<(string Population, string Name, RowTargetKind Kind), RowBinding> rowBindings,
+        CompiledRule rule,
+        RuleEffect effect)
+    {
+        var subject = effect.Subject;
+        if (effect.Operation != ModifierOperation.Add)
+        {
+            throw new InvalidOperationException(
+                $"Rule '{rule.Id}' applies a {effect.Operation} modifier to {subject}; "
+                + "a row modifier slot stores an additive amount, so only Add is supported.");
+        }
+
+        if (effect.Stage != ModifierStage.Standard)
+        {
+            throw new InvalidOperationException(
+                $"Rule '{rule.Id}' applies a {effect.Stage} modifier to {subject}; "
+                + "a row modifier slot has no stage, so only Standard is supported.");
+        }
+
+        if (!double.IsFinite(effect.Value) || !float.IsFinite((float)effect.Value))
+        {
+            throw new InvalidOperationException(
+                $"Rule '{rule.Id}' applies modifier value {effect.Value} to '{effect.Name}' of '{subject.PopulationId}'; "
+                + "a row modifier value must be a finite single-precision number.");
+        }
+
+        if (!world.TryGetPopulationModifiers(subject.PopulationId, out var modifiers))
+        {
+            throw new InvalidOperationException(
+                $"Rule '{rule.Id}' sets a modifier on '{effect.Name}' of population '{subject.PopulationId}', "
+                + "which this world does not define.");
+        }
+
+        if (!modifiers.TryGetKey(effect.Name, out var key))
+        {
+            throw new InvalidOperationException(
+                $"Rule '{rule.Id}' sets a modifier on '{effect.Name}' of population '{subject.PopulationId}', "
+                + $"which does not declare it. Declared modifier properties: '{string.Join("', '", modifiers.Properties.Span)}'. "
+                + "Declare the property on the schema so its slot key is part of the saved state.");
+        }
+
+        var column = RequireNumericColumn(world, rule, subject, effect.Name);
+        rowBindings[(subject.PopulationId, effect.Name, RowTargetKind.Modifier)] =
+            RowBinding.ForModifier(modifiers, key, column);
+    }
+
     private static void BindTag(World world,
-        Dictionary<(string Population, string Name, bool IsTag), RowBinding> rowBindings,
+        Dictionary<(string Population, string Name, RowTargetKind Kind), RowBinding> rowBindings,
         CompiledRule rule,
         RuleSubject subject,
         string tag)
@@ -291,7 +361,7 @@ public sealed class RuleEngine
                 + "Declare the tag on the schema so its mask bit is part of the saved state.");
         }
 
-        rowBindings[(subject.PopulationId, tag, true)] = RowBinding.ForTag(tags, bit);
+        rowBindings[(subject.PopulationId, tag, RowTargetKind.Tag)] = RowBinding.ForTag(tags, bit);
     }
 
     // Populations are usually defined during world initialization, after the game is built, so a row
@@ -306,10 +376,10 @@ public sealed class RuleEngine
     }
 
     private RowBinding ResolveRowBinding(World world, string ruleId, RuleSubject subject, string name,
-        bool isTag, string factType)
+        RowTargetKind kind, string factType)
     {
         if (!_rowBindings.TryGetValue(world, out var rowBindings)
-            || !rowBindings.TryGetValue((subject.PopulationId, name, isTag), out var binding))
+            || !rowBindings.TryGetValue((subject.PopulationId, name, kind), out var binding))
         {
             throw new InvalidOperationException(
                 $"Rule '{ruleId}' addresses '{name}' of population '{subject.PopulationId}' "
@@ -320,16 +390,30 @@ public sealed class RuleEngine
         return binding;
     }
 
-    // One resolved row target: a numeric column, or a schema tag bit. The tag bit is resolved at
-    // bind so dispatch never hashes a string or looks the population up again.
+    // What one resolved row target is: a numeric column (read through its modifier slots when the
+    // schema declares them), a schema tag bit, or a modifier slot key. Everything a dispatch needs
+    // is resolved here, so dispatch never hashes a name or looks the population up again.
+    private enum RowTargetKind
+    {
+        Column,
+        Tag,
+        Modifier,
+    }
+
     private readonly struct RowBinding
     {
-        private RowBinding(PopulationColumnBase? column, PopulationTagAccess tags, int tagBit)
+        private RowBinding(RowTargetKind kind, PopulationColumnBase? column, PopulationTagAccess tags,
+            int tagBit, PopulationModifierAccess modifiers, ushort modifierKey)
         {
+            Kind = kind;
             Column = column;
             Tags = tags;
             TagBit = tagBit;
+            Modifiers = modifiers;
+            ModifierKey = modifierKey;
         }
+
+        public RowTargetKind Kind { get; }
 
         public PopulationColumnBase? Column { get; }
 
@@ -337,13 +421,22 @@ public sealed class RuleEngine
 
         public int TagBit { get; }
 
-        public bool IsTag => Column is null;
+        public PopulationModifierAccess Modifiers { get; }
 
-        public static RowBinding ForColumn(PopulationColumnBase column) =>
-            new(column, default, 0);
+        public ushort ModifierKey { get; }
+
+        public bool HasModifierKey => ModifierKey != RowModifierSlot.EmptyKey;
+
+        public static RowBinding ForColumn(PopulationColumnBase column, PopulationModifierAccess modifiers,
+            ushort modifierKey) =>
+            new(RowTargetKind.Column, column, default, 0, modifiers, modifierKey);
 
         public static RowBinding ForTag(PopulationTagAccess tags, int tagBit) =>
-            new(null, tags, tagBit);
+            new(RowTargetKind.Tag, null, tags, tagBit, default, RowModifierSlot.EmptyKey);
+
+        public static RowBinding ForModifier(PopulationModifierAccess modifiers, ushort modifierKey,
+            PopulationColumnBase column) =>
+            new(RowTargetKind.Modifier, column, default, 0, modifiers, modifierKey);
     }
 
     public RuleDispatchResult Dispatch(
@@ -728,18 +821,26 @@ public sealed class RuleEngine
             if (condition.Subject.IsRow)
             {
                 var binding = ResolveRowBinding(world, rule.Id, condition.Subject, condition.Name,
-                    condition.Kind == RuleConditionKind.HasTag, fact.Type);
-                if (binding.IsTag)
+                    condition.Kind == RuleConditionKind.HasTag ? RowTargetKind.Tag : RowTargetKind.Column,
+                    fact.Type);
+                var slot = condition.Subject.Slot;
+                if (binding.Kind == RowTargetKind.Tag)
                 {
-                    if (!binding.Tags.TryHasTagBit(condition.Subject.Slot, binding.TagBit))
+                    if (!binding.Tags.TryHasTagBit(slot, binding.TagBit))
                     {
                         return false;
                     }
                 }
-                else if (!binding.Column!.TryGetRowValue(condition.Subject.Slot, out var rowValue)
-                    || rowValue < condition.Threshold)
+                else
                 {
-                    return false;
+                    double rowValue;
+                    var read = binding.HasModifierKey
+                        ? binding.Modifiers.TryGetEffectiveValue(slot, binding.Column!, binding.ModifierKey, out rowValue)
+                        : binding.Column!.TryGetRowValue(slot, out rowValue);
+                    if (!read || rowValue < condition.Threshold)
+                    {
+                        return false;
+                    }
                 }
 
                 continue;
@@ -995,17 +1096,27 @@ public sealed class RuleEngine
 
         if (effect.Subject.IsRow)
         {
-            var binding = ResolveRowBinding(world, ruleId, effect.Subject, effect.Name,
-                effect.Kind == RuleEffectKind.AddTag, fact.Type);
+            var kind = effect.Kind switch
+            {
+                RuleEffectKind.AddTag => RowTargetKind.Tag,
+                RuleEffectKind.SetModifier => RowTargetKind.Modifier,
+                _ => RowTargetKind.Column,
+            };
+            var binding = ResolveRowBinding(world, ruleId, effect.Subject, effect.Name, kind, fact.Type);
             // A slot past the live row count is a despawned row: like a missing entity, the effect
             // is accepted by a matched rule and has nowhere to land.
-            if (binding.IsTag)
+            switch (binding.Kind)
             {
-                binding.Tags.TrySetTagBit(effect.Subject.Slot, binding.TagBit, value: true);
-            }
-            else
-            {
-                binding.Column!.TryAddRowValue(effect.Subject.Slot, effect.Value);
+                case RowTargetKind.Tag:
+                    binding.Tags.TrySetTagBit(effect.Subject.Slot, binding.TagBit, value: true);
+                    break;
+                case RowTargetKind.Modifier:
+                    binding.Modifiers.TrySet(effect.Subject.Slot, binding.ModifierKey, effect.Value,
+                        effect.DurationTicks);
+                    break;
+                default:
+                    binding.Column!.TryAddRowValue(effect.Subject.Slot, effect.Value);
+                    break;
             }
 
             return;
