@@ -30,13 +30,44 @@ public sealed class WorldStateTransactionTests
         world.BindRole("test.pruned-role", entity);
         using (var transaction = world.BeginTransaction())
         {
-            entity.ToRemove = true;
+            world.Remove(entity);
             world.PruneRemoved();
             transaction.Rollback();
         }
 
         Assert.Same(entity, world.ById(entity.Id));
         Assert.Same(entity, world.Role("test.pruned-role"));
+    }
+
+    [Fact]
+    public void Rolling_back_a_pending_removal_leaves_the_entity_live()
+    {
+        var world = new World(5, 1);
+        var entity = world.Add(new DataEntity([], []));
+        using (var transaction = world.BeginTransaction())
+        {
+            Assert.True(world.Remove(entity));
+            Assert.False(world.Remove(entity));
+            Assert.True(entity.ToRemove);
+            transaction.Rollback();
+        }
+
+        Assert.False(entity.ToRemove);
+        world.PruneRemoved();
+        Assert.Same(entity, world.ById(entity.Id));
+    }
+
+    [Fact]
+    public void Removing_an_entity_of_another_world_is_rejected()
+    {
+        var world = new World(6, 1);
+        var other = new World(7, 1);
+        var foreign = other.Add(new DataEntity([], []));
+
+        var error = Assert.Throws<InvalidOperationException>(() => world.Remove(foreign));
+
+        Assert.Contains("attached to this world", error.Message, StringComparison.Ordinal);
+        Assert.False(foreign.ToRemove);
     }
 
     [Fact]

@@ -262,7 +262,11 @@ public sealed class RollbackPropertyTests
                 _ = world.Add(new DataEntity(["t"], [], ("c", amount)));
                 break;
             default:
-                entity.ToRemove = amount > 3;
+                if (amount > 3)
+                {
+                    world.Remove(entity);
+                }
+
                 break;
         }
     }

@@ -1519,7 +1519,7 @@ internal sealed class WorldCommandStorage
                     world.Add(command.Entity!);
                     break;
                 case WorldCommandKind.RemoveEntity:
-                    RequireEntity(world, command.EntityId).ToRemove = true;
+                    world.Remove(RequireEntity(world, command.EntityId));
                     break;
                 case WorldCommandKind.SetSpatialBounds:
                     world.SetSpatialBounds(RequireEntity(world, command.EntityId), command.Bounds);

@@ -881,6 +881,34 @@ public sealed class World
     /// <summary>Checks that bounds fit the configured spatial index without changing world state.</summary>
     public void ValidateSpatialBounds(Bounds2 bounds) => _spatialIndex.ValidateBounds(bounds);
 
+    /// <summary>Marks a live entity for removal at the next <see cref="PruneRemoved"/>.</summary>
+    /// <returns><see langword="false"/> when the entity was already marked.</returns>
+    /// <remarks>
+    /// Removal is a World command, not an entity mutation: the World owns the removal set, so the
+    /// pending removal is part of world state, journals with the enclosing transaction and rolls
+    /// back. A scheduled system applies it with <see cref="WorldCommandBuffer.Remove"/> instead.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The entity belongs to another World, or is no
+    /// longer attached to this one.</exception>
+    public bool Remove(Entity entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        EnsureActive();
+        if (!ReferenceEquals(entity.OwnerWorld, this) || !_byId.TryGetValue(entity.Id, out var attached)
+            || !ReferenceEquals(attached, entity))
+        {
+            throw new InvalidOperationException("Removal requires an entity attached to this world.");
+        }
+
+        if (entity.ToRemove)
+        {
+            return false;
+        }
+
+        entity.ToRemove = true;
+        return true;
+    }
+
     public bool RemoveSpatialBounds(Entity entity)
     {
         EnsureSpatialEntity(entity);

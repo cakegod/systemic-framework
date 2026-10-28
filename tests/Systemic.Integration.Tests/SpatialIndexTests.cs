@@ -51,12 +51,12 @@ public sealed class SpatialIndexTests
         world.QuerySpatialNearby(new Point2(0, 0), 2, results);
 
         Assert.Equal([first.Id, second.Id], results);
-        first.ToRemove = true;
+        Assert.True(world.Remove(first));
         world.QuerySpatialNearby(new Point2(0, 0), 2, results);
         Assert.Equal([second.Id], results);
-        first.ToRemove = false;
+        world.PruneRemoved();
         world.QuerySpatialNearby(new Point2(0, 0), 2, results);
-        Assert.Equal([first.Id, second.Id], results);
+        Assert.Equal([second.Id], results);
     }
 
     [Fact]
