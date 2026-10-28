@@ -1,6 +1,6 @@
 # Analyzer reference
 
-`Systemic.Kernel.Generator` supplies the population schema generator and two analyzer families. In this repository, every project under `samples/` receives it through `samples/Directory.Build.targets`. A game project elsewhere should reference `Systemic.Kernel` normally and reference `Systemic.Kernel.Generator` with `OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`.
+`Systemic.Kernel.Generator` supplies the population schema generator and two analyzer families; every shipped library also references `Microsoft.CodeAnalysis.PublicApiAnalyzers` for its public surface, described under [Public API surface](#public-api-surface). In this repository, every project under `samples/` receives it through `samples/Directory.Build.targets`. A game project elsewhere should reference `Systemic.Kernel` normally and reference `Systemic.Kernel.Generator` with `OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`.
 
 ## Strict determinism
 
@@ -87,6 +87,23 @@ Flags direct immediate World operations and direct mutations through `SystemicSy
 `SYSACC001` and `SYSACC002` understand direct access initializers and private static readonly `ImmutableArray<SystemAccess>` values with direct collection or array initializers. They skip access declarations whose value cannot be resolved from those forms. A constant `WriteResource("$world")` is treated as `WriteWorld`; an unrelated constant resource name is known non-World access, while a nonconstant resource name makes the declaration unknown. For per-column checks, use the generated `Read*` and `Write*` declarations.
 
 The preferred pattern is to state the actual column access in `ISystemicSystem.Access` and pass the population to `SystemicSystemContext.ForEachPopulationRange`. The callback receives a scoped capability with its assigned range and column operations; generated `Columns.WriteRange(ref scope)` binds its writer to that range and checks its lifetime token on every write. Keep an explicit population lease only when row identity must span phases or a callback reads another population. Queue World and population structure changes through deferred APIs and let the schedule apply them at a barrier.
+
+## Public API surface
+
+Each shipped library (`Systemic.Kernel`, `Systemic.Core`, `Systemic.Rendering`, `Systemic.Incremental`, `Systemic.Presentation`, `Systemic.Gameplay2D`) references `Microsoft.CodeAnalysis.PublicApiAnalyzers` and carries two files in its project directory:
+
+- `PublicAPI.Shipped.txt` — the surface that has shipped. Treat it as a contract: changing a line is a breaking change for anyone compiling against the library.
+- `PublicAPI.Unshipped.txt` — additions and changes for the next release. It starts with `#nullable enable`, which makes nullability part of the declaration.
+
+The analyzer project and the CLI tool publish no library contract and do not carry the files.
+
+`RS0016` fails the build when a public symbol is not declared in either file, so a new public member cannot land by accident. `RS0017`, `RS0022`, `RS0024`–`RS0027` and `RS0037` cover the reverse direction: a declared symbol that no longer exists, a constructor that changed, a parameter rename, an additional or removed optional parameter, and a nullability change. When the analyzer reports `RS0016`, generate the missing entries instead of typing them:
+
+```sh
+dotnet format analyzers src/Systemic.Core --diagnostics RS0016
+```
+
+That appends the exact declaration text to `PublicAPI.Unshipped.txt`. At release time a maintainer moves those lines into `PublicAPI.Shipped.txt`, which is the diff the [remediation plan](../framework-remediation-plan.md) refers to; additions made during a phase stay in `Unshipped` until then.
 
 ## Analysis boundaries
 

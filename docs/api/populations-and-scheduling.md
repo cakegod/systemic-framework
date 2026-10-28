@@ -87,6 +87,50 @@ For a lower-level Kernel system, use `SystemAccess.ReadColumn<TKind, TValue>` an
 
 The scheduler relies on declarations; it does not infer every memory access at runtime. Declare service state and any other shared resources too. The analyzer checks several direct generated-column and context-access patterns, with limits described in the [analyzer reference](analyzers.md#analysis-boundaries).
 
+## Row-addressed rules and crowd scans
+
+A population schema is an `IPopulationKind`: a stable `Id`, a `Version`, and optionally the tags and modifier properties the schema declares. Generated schemas implement it, and a hand-written schema is how the crowd tier declares its columns:
+
+```csharp
+internal readonly struct CrowdAgent : IPopulationKind
+{
+    public static string Id => "crowd.prey";
+    public static int Version => 1;
+    public static string[] Tags => ["burning"];
+}
+
+var prey = world.DefinePopulation<CrowdAgent>(enableHandles: true);
+var energy = prey.Column(new PopulationColumnKey<int>("crowd.prey.energy", 1, PopulationCodecs.Int32));
+```
+
+Declared tags are one `ulong` mask column whose bit order is the schema's, so a tag test is a bit test and the mask is part of saved state. Declared modifier properties give each row inline `ModifierSlot8` slots; `SetModifier` and `EffectiveValue` address them by property name. `enableHandles` gives every row a generation-checked `PopulationRowReference`, which is what lets a fact name a row and a despawn be detected instead of retargeted.
+
+A rule addresses the row its fact is about with the `factRow` subject in content, and one scope evaluates it against a whole population:
+
+```csharp
+var rules = new RuleEngine(content.Rules);
+rules.Bind(world);
+var result = rules.EvaluateRowEvent(world, "crowd.prey.think", CrowdAgent.Id, new PopulationRange(0, prey.Count));
+```
+
+This is the crowd path: no fact per row, one scope for the range, and only `factRow` subjects are accepted, so an entity subject or an `emitEvent` effect is rejected before the first row instead of acting once per row. The population must be defined with handles, because each row is addressed by a reference. A rule whose first condition is a tag reads one mask bit per row and evaluates the rest of the rule only for rows that carry it; every other condition keeps its authored order. `RuleRowScanResult` reports rows evaluated, rules matched, effects applied, and whether the scan rolled back with its transaction.
+
+To turn many rows crossing a threshold into one fact, use `PopulationSink`. It counts one column against one threshold in a single pass, appends at most one row-addressed fact carrying that count, and appends nothing while the count is unchanged:
+
+```csharp
+var sink = new PopulationSink(world, CrowdAgent.Id, "crowd.prey.energy", threshold: 1,
+    "crowd.prey.standing", prey.ReferenceOf(0));
+var facts = new List<SimulationFact>(1);
+if (sink.Collect(facts) > 0)
+{
+    rules.Dispatch(world, facts[0]);
+}
+```
+
+The anchor row receives the fact, so a rule with a `factRow` subject writes a count on that row. If the anchor despawns, the sink stops emitting rather than reporting against a replaced row. Stagger movement across ticks (the crowd tier moves an eighth of the rows per tick) so the per-tick cost stays inside the simulation budget.
+
+`benchmarks/Systemic.Benchmarks -- --gate --scenario crowd` is the acceptance run for this path: one million rows, one authored rule per row per tick, every tick inside the 10 ms simulation share of a 30 Hz frame, zero allocation. See `samples/crowd-million` for the content and `RowScanTests` for the behaviours the scan pins.
+
 ## Queue population changes
 
 Population rows cannot be added or removed while a lease is active. For direct setup code, use `PopulationCommandBuffer<TKind>` and call `Flush` after the lease ends. Flush resolves removals before additions and initializes each spawned row through the generated schema.

@@ -54,10 +54,13 @@ For host systems, `Order` sorts registration before the schedule is built. It se
 | Read a few rows inside a system | `WithAccess` + `ReadCurrent`/`ReadRange` |
 | Write disjoint rows from parallel partitions | `ForEachPopulationRange` + `Columns.WriteRange(ref access)` |
 | Change World state this tick | `Commands` (deferred, shared wave) then `ApplyDeferredCommands()` in a standalone harness |
+| Remove an entity | `Commands.Remove(entityId)` in a system, or `World.Remove(entity)` outside the schedule |
 | Emit a fact other systems may observe this tick | `Publish` (immediate, needs `WriteWorld`) |
 | Emit a fact only rules and observers need | `DeferFact` (needs `DeferWorldWrites`, shared wave) |
 
 Immediate World operations are the only way to make a change visible to another system in the same tick. They require `WriteWorld`, which excludes every other system from the wave. When the change can wait until the tick ends, queue it through `Commands` and keep a shared wave.
+
+Entity removal is a World command, not an entity mutation. A system queues `Commands.Remove(entityId)`; code outside the schedule calls `World.Remove(entity)`. Both mark the entity and let the world own the pending removal, so it journals with the enclosing transaction and rolls back: an entity marked for removal in a rolled-back tick is live again. `Entity.ToRemove` is readable everywhere and writable only by the world. Removal takes effect at the next `PruneRemoved`, which the host runs at the end of the tick; until then queries that filter live entities already skip the row.
 
 ### Rolling back domain state
 
