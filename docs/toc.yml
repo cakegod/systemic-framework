@@ -8,6 +8,12 @@
       href: api/populations-and-scheduling.md
     - name: Analyzer reference
       href: api/analyzers.md
+- name: Decisions
+  items:
+    - name: Populations as rule subjects
+      href: adr/0001-populations-as-rule-subjects.md
+    - name: Keep the expression language
+      href: adr/0002-keep-the-expression-language.md
 - name: API reference
   href: reference/Systemic.Kernel.yml
 - name: Contributor guidance

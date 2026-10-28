@@ -33,7 +33,8 @@ Fixing findings one at a time produces thirteen fixes and no core. Fix the roots
 | P4.2 | Partial | Save schema is v6, bumped by P2; version 5 migrates and version 4 is rejected with a clear diagnostic, with no v4 migration by decision. The replay fixture was regenerated for the new state format. |
 | P5.2 | Done | `RollbackPropertyTests` uses FsCheck: random command sequences restore world state on rollback and match a parallel world on commit. |
 | P2 | Done | D3 found no user, so P2 took the gate's deletion branch: `EventEngine`, its triggers, `EngineBuilder`, `BatchTrigger`, `EntityQuery`, the `ActionPipeline` effect vocabulary, and both `Execute(KernelEvent)` entry points are gone. One dispatch path remains. Save schema is v6 with a v5 migration that drops `systemic.events`. Numbers and consequences under *Typed dispatch retired*. |
-| P3, P4.1, P4.3, P5.1, P5.3–P5.6 | Open | P3 needs the 6–8 weeks the plan budgets; P4.1 and P5.1/P5.3–P5.6 are separate integrations. |
+| P3 | Started | D1 and D2 are decided: ADR 0001 (populations become rule subjects) and ADR 0002 (the expression language stays, frozen). The crowd target moved to 10M rows and was measured before the bridge was designed; see *Crowd tier at ten million*. P3.1 itself is not written yet. |
+| P4.1, P4.3, P5.1, P5.3–P5.6 | Open | P4.3 no longer retires the expression language; P4.1 and P5.1/P5.3–P5.6 are separate integrations. |
 
 ### Spatial grid storage
 
@@ -105,8 +106,8 @@ is what makes this safe for `BuildChoiceRuntime`.
 
 | ID | Decision | Recommendation | Blocks |
 | --- | --- | --- | --- |
-| D1 | Subject model: A tiered handoff, B populations as rule subjects, C populations only | **B, shipped as A first** | P3.* |
-| D2 | Keep the 898-line expression language or keep only `RuleEffectKind` | **Delete the language, keep the effect list** unless a named content feature needs it | P3.1 |
+| D1 | Subject model: A tiered handoff, B populations as rule subjects, C populations only | **Resolved: B shipped as A first.** Recorded as ADR 0001; the 10M crowd tier is the stop point | P3.* |
+| D2 | Keep the 898-line expression language or keep only `RuleEffectKind` | **Resolved: keep, frozen.** No sample content uses it, but `rate()`/`event_count()` conditions are the only way to author the window comparisons the talent vocabulary needs. ADR 0002 | P3.1 |
 | D3 | Does the typed `EventEngine` path have a user outside the Boids sample? | **Resolved: no.** Nothing in `src/modules` or the samples registers a typed trigger; the Boids sample passed an empty engine only to satisfy the context constructor. P2 shipped as a deletion | P2.1 |
 
 D1 is recorded as an ADR before P3.1 starts. P3.8 is the stop point: if the 100k-crowd demo cannot
@@ -181,11 +182,42 @@ stay in the Kernel, so a system can still charge costs itself.
 | P3.1 | Introduce `RuleSubject` with two addressings (`Entity(id)` and `Row(populationId, handle)`); compile `AdjustProperty`/`SetModifier` property names to column keys per schema, and reject unknown properties at load. Content schema version bump. | A rule naming a property its schema lacks fails at load, not at runtime. |
 | P3.2 | Tags become a `ulong` mask column with a per-schema tag registry (64 tags), replacing `ImmutableHashSet<string>` on the row path. | Tag test and tag effect are O(1) with no hashing and no allocation. |
 | P3.3 | Modifiers become fixed inline slot columns (`ModifierSlot8`: 8 × (ushort key, float value, int expiryTick)) instead of `Dictionary<(int,string), List<PropertyModifier>>`. | `SetModifier` never allocates; 100k rows carry modifiers without heap growth. |
-| P3.4 | Row value journal: extend `PopulationStructureUndoBatch` with dirty-row capture so fact transactions roll back column values, not just structure. | Rollback property test (P5.2) passes for random value and structure edits. |
+| P3.4 | Dirty-row journal capture. Column values already roll back: `PopulationColumn.EditRange` captures whole pages through `PopulationPageUndoBatch`, so correctness landed before P3.1. What remains is cost — a full-buffer edit over 10M rows spends ~10 ms per tick copying pages — so capture the touched rows instead of their pages. | Rollback property test (P5.2) passes for random value and structure edits; a sparse row edit no longer copies a page. |
 | P3.5 | Facts address rows by generation-checked `PopulationHandle<TKind>`; a despawn mid-chain is detected rather than silently retargeting. | Replay test covers despawn during a reaction chain. |
 | P3.6 | Fixed-point (Q16.16) simulation positions for population schemas. Float positions under `MathF`/SIMD are where cross-platform determinism dies and no library fixes it. | State hash is identical across x64 and arm64 for the same seed and inputs. |
 | P3.7 | `PopulationSink`: the per-game aggregation entry point that turns "N rows crossed a threshold" into one fact, so rule churn is bounded by design. Replaces the deleted aggregator. | Crowd rules process a bounded number of facts per tick independent of row count. |
-| P3.8 | **Forcing demo:** 100k agents, one authored rule ("predators tagged X within radius of prey tagged Y deal damage"), one transaction per tick, zero warmed allocations, behaviour emerging from the content vocabulary entities already use. | Passes the crowd gate and builds from content JSON alone. |
+| P3.8 | **Forcing demo:** 10M agents, one authored rule ("predators tagged X within radius of prey tagged Y deal damage"), one transaction per tick, zero warmed allocations, behaviour emerging from the content vocabulary entities already use. | Passes the 10M crowd gate below and builds from content JSON alone. |
+
+### Crowd tier at ten million
+
+The crowd target moved from 100k to 10M rows, so it was measured before the bridge was designed. The
+existing `MillionAgentWorkload` — four `int32` columns, `x += vx`, no AI, no spatial query, one thread —
+now takes a row count (`--agents`). Run on the target class of machine: Intel i5-4430 at 3.0 GHz, four
+visible CPUs, .NET 10 Release, `dotnet run -c Release --project benchmarks/Systemic.Benchmarks --
+--million-agents --mode both --agents N`.
+
+| Rows | Mode | p50 | p95 | Allocated | Peak RSS |
+| --- | --- | --- | --- | --- | --- |
+| 1M | optimized | 2.02 ms | 2.66 ms | 0 B | — |
+| 1M | safe (per-tick transaction) | 2.58 ms | 3.00 ms | 0 B | — |
+| 10M | optimized | 21.02 ms | 23.43 ms | 0 B | 196 MB |
+| 10M | safe (per-tick transaction) | 30.86 ms | 31.99 ms | 0 B | 274 MB |
+
+Three numbers fix the phase's budget:
+
+- A four-column pass over 10M rows costs ~2.1 ns per row. The per-tick transaction adds ~1 ns per row at
+  that size (+9.8 ms) because the journal copies 160 MB that no longer fits in cache; the same
+  transaction costs +0.55 ms at 1M. Ten million rows across six columns is roughly 300 MB resident.
+- 10M is a ~30 Hz tier on this hardware, not 60 Hz: one transaction per tick at 10M is already 31 ms.
+  The crowd gate is therefore 30 Hz with p95 ≤ 35 ms and zero warmed allocations, not the kernel
+  tier's 5 ms.
+- None of that budget includes a rule, a spatial query or rendering. They share the same 31 ms, which
+  is why P3.7's aggregation sink is mandatory rather than an optimisation: a per-row rule over 10M
+  rows cannot run per tick, while a bounded number of aggregated facts can.
+
+A crowd rule that evaluates an expression per row is out of scope by construction; it becomes a sink
+("N rows crossed a threshold") that emits one fact. The gate to demonstrate is that one authored rule
+over 10M rows stays inside the budget with rule churn independent of row count.
 
 ## Phase 4 — API hygiene and migration (1 week)
 
@@ -228,6 +260,10 @@ stay in the Kernel, so a system can still charge costs itself.
   what keeps the cost linear.
 - Phase 3 is the only phase that can fail on design rather than effort. Budget 6–8 weeks for one
   senior engineer and treat P3.8 as the go/no-go.
+- **10M is 100x the original P3.8 target and it moves the go/no-go.** If the 10M demo cannot hold
+  35 ms p95 with rule churn independent of row count, fall back to a 1M demo and report 10M as
+  storage and movement only. That is a defensible result; claiming 10M of systemic agents without
+  it is not.
 
 ## Out of scope
 
