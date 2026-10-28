@@ -21,17 +21,17 @@ public sealed class SystemicSaveExtensionTests
         var original = codec.Save(game);
         var migrations = new ISaveMigration[]
         {
-            new FutureMigration(4, root => root["extensionStates"]!["test.future"] = 23),
-            new FutureMigration(5, root => root["extensionStates"]!["test.future"] = 24),
+            new FutureMigration(5, root => root["extensionStates"]!["test.future"] = 23),
+            new FutureMigration(6, root => root["extensionStates"]!["test.future"] = 24),
         };
         _ = new SystemicSaveCodec(migrations: migrations);
 
-        var upgraded = SystemicSaveMigration.Upgrade(original, 6, migrations);
+        var upgraded = SystemicSaveMigration.Upgrade(original, 7, migrations);
 
-        Assert.Equal(4, JsonNode.Parse(original)!["schemaVersion"]!.GetValue<int>());
-        Assert.Equal(6, JsonNode.Parse(upgraded)!["schemaVersion"]!.GetValue<int>());
+        Assert.Equal(5, JsonNode.Parse(original)!["schemaVersion"]!.GetValue<int>());
+        Assert.Equal(7, JsonNode.Parse(upgraded)!["schemaVersion"]!.GetValue<int>());
         Assert.Equal(24, JsonNode.Parse(upgraded)!["extensionStates"]!["test.future"]!.GetValue<int>());
-        Assert.Equal(upgraded, SystemicSaveMigration.Upgrade(upgraded, 6, []));
+        Assert.Equal(upgraded, SystemicSaveMigration.Upgrade(upgraded, 7, []));
     }
 
     [Fact]
@@ -46,7 +46,8 @@ public sealed class SystemicSaveExtensionTests
         root["world"]!["seed"] = 44;
 
         Assert.Contains("checksum", Assert.Throws<SystemicSaveException>(() =>
-            SystemicSaveMigration.Upgrade(root.ToJsonString(), 5, [new FutureMigration(4, _ => { })])).Message,
+            SystemicSaveMigration.Upgrade(root.ToJsonString(), 6,
+                [new FutureMigration(5, _ => { }), new FutureMigration(6, _ => { })])).Message,
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains("migration", Assert.Throws<SystemicSaveException>(() =>
             SystemicSaveMigration.Upgrade(saved, 6, [new FutureMigration(4, _ => { })])).Message,
@@ -65,7 +66,7 @@ public sealed class SystemicSaveExtensionTests
         var codec = new SystemicSaveCodec();
         var saved = codec.Save(game);
 
-        Assert.Equal(4, JsonNode.Parse(saved)!["schemaVersion"]!.GetValue<int>());
+        Assert.Equal(5, JsonNode.Parse(saved)!["schemaVersion"]!.GetValue<int>());
         Assert.Equal(42, JsonNode.Parse(saved)!["extensionStates"]!["test.counter"]!.GetValue<int>());
 
         var materialized = codec.Load(content, saved);

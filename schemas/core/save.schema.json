@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "contentFingerprint", "checksum", "world", "entityIds", "extensionStates"],
   "properties": {
-    "schemaVersion": { "const": 4 },
+    "schemaVersion": { "const": 5 },
     "contentFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "entityIds": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1 } },

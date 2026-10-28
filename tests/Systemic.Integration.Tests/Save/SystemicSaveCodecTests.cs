@@ -61,7 +61,7 @@ public sealed class SystemicSaveCodecTests
     }
 
     [Fact]
-    public void Version_one_save_is_rejected_with_a_version_4_diagnostic()
+    public void Version_one_save_is_rejected_with_a_current_version_diagnostic()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 3, valueScale: 1)).Build();
@@ -72,7 +72,8 @@ public sealed class SystemicSaveCodecTests
         root.Remove("extensionStates");
 
         var error = Assert.Throws<SystemicSaveException>(() => codec.Load(content, root.ToJsonString()));
-        Assert.Contains("version 4", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"version {SystemicSaveCodec.CurrentSchemaVersion}", error.Message,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

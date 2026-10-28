@@ -29,7 +29,7 @@ public sealed class SystemicSaveException(string message, Exception? innerExcept
 /// <summary>Captures and restores portable engine-neutral world state using explicit entity codecs.</summary>
 public sealed class SystemicSaveCodec
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
     private const string SaveSchemaId = "https://press-the-button.dev/systemic/save.schema.json";
     private static readonly string s_saveSchema = ReadSchema();
 
@@ -307,9 +307,11 @@ public sealed class SystemicSaveCodec
             throw new SystemicSaveException("Save document requires an integer schemaVersion.");
         }
 
-        if (version < 4)
+        // Version 5 renamed the modifier duration field to an absolute expiry tick. There is no
+        // migration: a version 4 document is rejected rather than silently reinterpreted.
+        if (version < CurrentSchemaVersion)
         {
-            throw new SystemicSaveException($"Save schema version {version} is no longer supported. Create a new version 4 save using the current content.");
+            throw new SystemicSaveException($"Save schema version {version} is no longer supported. Create a new version {CurrentSchemaVersion} save using the current content.");
         }
         if (version > CurrentSchemaVersion)
         {

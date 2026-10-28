@@ -30,7 +30,9 @@ Fixing findings one at a time produces thirteen fixes and no core. Fix the roots
 | P1.3 | Done | `PresentationRuntime` uses typed in-memory rollback. `ISaveOnlyStateExtension` marks state the journal already covers, so the four kernel extensions and `BuildChoiceRuntime` no longer capture JSON every tick. Tests: `SaveOnlyStateTests`. |
 | P1.4 | Done | `World.EntitiesWithTag` gives the module an O(tagged) query; `Gameplay2DModule` writes through `Commands`, declares `ReadWorld` + `DeferWorldWrites`, and shares a wave. The scheduler now treats a reader beside a buffered writer as compatible. Every built-in system declares its access explicitly. Tests: `TagQueryTests`, `Module_shares_a_scheduling_wave_with_other_deferred_writers`. |
 | P1.5 | Done | Content tier in `GateTierTests` (2,000 actors, allocation and 5 ms p95). Kernel tier stays with the benchmark gate runner. The 50k/1k test is now a diagnostic under the approved tiers and reports timings without gating. The crowd tier needs P3 before it can be written. |
-| P2–P5 | Open | D1 decided: B staged through A. D2 and D3 still open. |
+| P4.2 | Partial | Save schema is v5 and version 4 is rejected with a clear diagnostic; there is no v4 migration by decision. The replay fixture was regenerated for the new state format. |
+| P5.2 | Done | `RollbackPropertyTests` uses FsCheck: random command sequences restore world state on rollback and match a parallel world on commit. |
+| P2, P3, P4.1, P4.3, P5.1, P5.3–P5.6 | Open | P3 needs the 6–8 weeks the plan budgets; P2 depends on D2/D3; P4.1 and P5.1/P5.3–P5.6 are separate integrations. |
 
 ### Batch rollback semantics
 

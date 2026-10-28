@@ -81,7 +81,8 @@ public sealed class PersistenceContractTests
         var error = Assert.Throws<SystemicSaveException>(() => codec.Load(content, root.ToJsonString()));
 
         Assert.Contains(version.ToString(System.Globalization.CultureInfo.InvariantCulture), error.Message, StringComparison.Ordinal);
-        Assert.Contains("version 4", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"version {SystemicSaveCodec.CurrentSchemaVersion}", error.Message,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
