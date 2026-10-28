@@ -69,27 +69,27 @@
     },
     "modifier": {
       "type": "object", "additionalProperties": false,
-      "required": ["source", "entityId", "property", "operation", "value", "remainingTicks", "priority", "stage"],
+      "required": ["source", "entityId", "property", "operation", "value", "expiryTick", "priority", "stage"],
       "properties": {
         "source": { "type": "string", "minLength": 1 },
         "entityId": { "type": "integer", "minimum": 1 },
         "property": { "type": "string", "minLength": 1 },
         "operation": { "enum": ["Add", "Multiply", "Set"] },
         "value": { "type": "number" },
-        "remainingTicks": { "type": "integer", "minimum": -1 },
+        "expiryTick": { "type": "integer", "minimum": -1 },
         "priority": { "type": "integer" },
         "stage": { "type": "string", "enum": ["Standard", "Foundation", "Additive", "Multiplicative", "Override", "Final"] }
       }
     },
     "grant": {
       "type": "object", "additionalProperties": false,
-      "required": ["source", "entityId", "kind", "name", "remainingTicks"],
+      "required": ["source", "entityId", "kind", "name", "expiryTick"],
       "properties": {
         "source": { "type": "string", "minLength": 1 },
         "entityId": { "type": "integer", "minimum": 1 },
         "kind": { "enum": ["Tag", "Capability"] },
         "name": { "type": "string", "minLength": 1 },
-        "remainingTicks": { "type": "integer", "minimum": -1 }
+        "expiryTick": { "type": "integer", "minimum": -1 }
       }
     },
     "bounds": {

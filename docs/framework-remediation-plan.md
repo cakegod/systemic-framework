@@ -26,11 +26,11 @@ Fixing findings one at a time produces thirteen fixes and no core. Fix the roots
 | P0.2 | Done | `SimulationFactAggregator` and its test removed; nothing else referenced them. |
 | P0.3 | Open | |
 | P1.1 | Done | `RuleEngine.DispatchBatch` shares one transaction and one journal scope; `SystemicGame` dispatches a tick's deferred facts as one batch. Tests: `FactBatchDispatchTests`, `DeferredFactBatchTests`. |
-| P1.2 | Open | |
+| P1.2 | Done | `PropertyModifier`/`PropertyGrant` store an absolute `ExpiryTick`, so the tick loop no longer rewrites or journals live modifiers. Tests: `ModifierExpiryTests` (expiry timing, live entries unchanged, zero allocation). Accepted break: the save payload names the field `expiryTick`, so documents written before this change no longer load. |
 | P1.3 | Done | `PresentationRuntime` uses typed in-memory rollback. `ISaveOnlyStateExtension` marks state the journal already covers, so the four kernel extensions and `BuildChoiceRuntime` no longer capture JSON every tick. Tests: `SaveOnlyStateTests`. |
 | P1.4 | Open | |
-| P1.5 | Open | |
-| P2–P5 | Open | |
+| P1.5 | Partial | Content tier landed in `GateTierTests` (2,000 actors, 32 B/tick against a 4 KiB budget). Kernel tier remains with the benchmark gate runner; the crowd tier needs P3 before it can be written. |
+| P2–P5 | Open | D1 decided: B staged through A. D2 and D3 still open. |
 
 ### Batch rollback semantics
 

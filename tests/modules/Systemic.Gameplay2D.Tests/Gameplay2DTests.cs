@@ -145,8 +145,10 @@ public sealed class Gameplay2DTests
         Assert.True(world.HasTag(target, "focused"));
 
         var system = new Gameplay2DModule();
+        world.LogicalTick = 1;
         system.Step(Context(world, 1));
         world.AdvanceModifiers();
+        world.LogicalTick = 2;
         system.Step(Context(world, 2));
         world.AdvanceModifiers();
 

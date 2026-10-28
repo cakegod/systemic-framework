@@ -225,13 +225,14 @@ public sealed class SystemicSaveCodec
             foreach (var modifier in worldState.Modifiers)
             {
                 world.SetModifier(modifier.Source, world.ById(modifier.EntityId)!, modifier.Property,
-                    modifier.Operation, modifier.Value, modifier.RemainingTicks, modifier.Priority, modifier.Stage);
+                    modifier.Operation, modifier.Value,
+                    RemainingFromExpiry(modifier.ExpiryTick, world.LogicalTick), modifier.Priority, modifier.Stage);
             }
 
             foreach (var grant in worldState.Grants)
             {
                 world.Grant(grant.Source, world.ById(grant.EntityId)!, grant.Kind, grant.Name,
-                    grant.RemainingTicks);
+                    RemainingFromExpiry(grant.ExpiryTick, world.LogicalTick));
             }
 
             foreach (var (role, entityId) in worldState.BoundRoles.OrderBy(pair => pair.Key, StringComparer.Ordinal))
@@ -319,6 +320,11 @@ public sealed class SystemicSaveCodec
             ? SystemicSaveMigration.Upgrade(json, CurrentSchemaVersion, _migrations.Values)
             : json;
     }
+
+    // World stores absolute expiry ticks; saves carry the same absolute tick, and the setter that
+    // accepts a duration turns it back into the equivalent duration at the restored tick.
+    private static int RemainingFromExpiry(int expiryTick, int logicalTick) =>
+        expiryTick < 0 ? -1 : expiryTick - logicalTick + 1;
 
     private static string RequireContentFingerprint(ContentPack content)
     {

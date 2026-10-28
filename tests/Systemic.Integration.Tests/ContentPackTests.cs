@@ -253,9 +253,12 @@ public sealed class ContentPackTests
 
         Assert.Equal(1, result.EffectsApplied);
         Assert.Equal(8, world.EffectiveProperty(actor, "power"));
+        world.LogicalTick = 1;
         world.AdvanceModifiers();
+        world.LogicalTick = 2;
         world.AdvanceModifiers();
         Assert.Equal(8, world.EffectiveProperty(actor, "power"));
+        world.LogicalTick = 3;
         world.AdvanceModifiers();
         Assert.Equal(4, world.EffectiveProperty(actor, "power"));
     }

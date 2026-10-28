@@ -23,9 +23,13 @@ public sealed record PropertyModifier(
     string Property,
     ModifierOperation Operation,
     double Value,
-    int RemainingTicks = -1,
+    int ExpiryTick = -1,
     int Priority = 0,
-    ModifierStage Stage = ModifierStage.Standard);
+    ModifierStage Stage = ModifierStage.Standard)
+{
+    /// <summary>Whether this modifier is permanent or still applies at the supplied tick.</summary>
+    public bool IsActiveAt(int tick) => ExpiryTick < 0 || ExpiryTick >= tick;
+}
 
 public enum GrantKind
 {
@@ -38,7 +42,11 @@ public sealed record PropertyGrant(
     int EntityId,
     GrantKind Kind,
     string Name,
-    int RemainingTicks = -1);
+    int ExpiryTick = -1)
+{
+    /// <summary>Whether this grant is permanent or still applies at the supplied tick.</summary>
+    public bool IsActiveAt(int tick) => ExpiryTick < 0 || ExpiryTick >= tick;
+}
 
 /// <summary>Reports failures in callbacks invoked after a world transaction has committed.</summary>
 /// <remarks>The transaction's world changes are already committed when this exception is thrown.</remarks>
@@ -58,6 +66,8 @@ public sealed class World
     [ThreadStatic]
     private static DataPropertyMutationCacheEntry s_dataPropertyMutationCache;
 
+    private int _logicalTick;
+    private bool _modifierTickInProgress;
     private readonly Dictionary<(int EntityId, string Property), List<PropertyModifier>> _modifiersByKey = [];
     private readonly Dictionary<(int EntityId, string Property), long> _modifierVersions = [];
     private readonly Dictionary<(int EntityId, string Property), CachedModifierApplication> _modifierCache = [];
@@ -302,7 +312,23 @@ public sealed class World
     public double ValueScale { get; }
     public float SpatialCellSize { get; }
     public DrawStream Draws { get; private set; }
-    public int LogicalTick { get; set; }
+    /// <summary>Gets or sets the current logical tick.</summary>
+    /// <remarks>Assigning a new tick marks that tick as in progress until modifiers advance.</remarks>
+    public int LogicalTick
+    {
+        get => _logicalTick;
+        set
+        {
+            if (_logicalTick == value)
+            {
+                return;
+            }
+
+            _logicalTick = value;
+            _modifierTickInProgress = true;
+        }
+    }
+
     public int NextEntityId => checked(_nextId + 1);
     public IReadOnlyList<int> RequiredEntityIds => [.. _required.Order()];
     public IReadOnlyDictionary<string, int> BoundRoles
@@ -1018,7 +1044,7 @@ public sealed class World
         }
 
         grants.RemoveAll(grant => grant.Source == source && grant.Kind == kind && grant.Name == name);
-        grants.Add(new PropertyGrant(source, entityId, kind, name, remainingTicks));
+        grants.Add(new PropertyGrant(source, entityId, kind, name, ExpiryFromRemaining(remainingTicks)));
         if (hadMembership != HasMembership(entity, kind, name))
         {
             UpdateMembershipIndex(entity, kind, name, present: true);
@@ -1544,9 +1570,24 @@ public sealed class World
         }
 
         items.Add(new PropertyModifier(
-            source, entity.Id, property, operation, value, remainingTicks, priority, stage));
+            source, entity.Id, property, operation, value, ExpiryFromRemaining(remainingTicks), priority, stage));
         items.Sort(CompareModifiers);
         InvalidateModifiers(key);
+    }
+
+    // WHY: durations are authored as a tick count, but stored as an absolute tick so the tick loop
+    // never rewrites live state and never journals a decrement. A modifier created during a tick
+    // counts that tick; one created between ticks counts from the next one.
+    private int ExpiryFromRemaining(int remainingTicks)
+    {
+        if (remainingTicks < 0)
+        {
+            return -1;
+        }
+
+        var firstTick = _modifierTickInProgress ? LogicalTick : checked(LogicalTick + 1);
+
+        return checked(firstTick + remainingTicks - 1);
     }
 
     public void RemoveModifier(string source, Entity entity, string property)
@@ -1756,7 +1797,7 @@ public sealed class World
         {
             for (var index = 0; index < items.Count; index++)
             {
-                if (items[index].RemainingTicks >= 0)
+                if (items[index].ExpiryTick >= 0 && items[index].ExpiryTick <= LogicalTick)
                 {
                     _expiringModifierKeys.Add(key);
 
@@ -1776,18 +1817,9 @@ public sealed class World
             for (var index = items.Count - 1; index >= 0; index--)
             {
                 var modifier = items[index];
-                if (modifier.RemainingTicks < 0)
-                {
-                    continue;
-                }
-
-                if (modifier.RemainingTicks <= 1)
+                if (modifier.ExpiryTick >= 0 && modifier.ExpiryTick <= LogicalTick)
                 {
                     items.RemoveAt(index);
-                }
-                else
-                {
-                    items[index] = modifier with { RemainingTicks = modifier.RemainingTicks - 1 };
                 }
             }
 
@@ -1799,12 +1831,13 @@ public sealed class World
             InvalidateModifiers(key);
         }
 
+        _modifierTickInProgress = false;
         _expiringGrantEntities.Clear();
         foreach (var (entityId, grants) in _grantsByEntity)
         {
             for (var index = 0; index < grants.Count; index++)
             {
-                if (grants[index].RemainingTicks >= 0)
+                if (grants[index].ExpiryTick >= 0 && grants[index].ExpiryTick <= LogicalTick)
                 {
                     _expiringGrantEntities.Add(entityId);
 
@@ -1825,19 +1858,10 @@ public sealed class World
             for (var index = grants.Count - 1; index >= 0; index--)
             {
                 var grant = grants[index];
-                if (grant.RemainingTicks < 0)
-                {
-                    continue;
-                }
-
-                if (grant.RemainingTicks <= 1)
+                if (grant.ExpiryTick >= 0 && grant.ExpiryTick <= LogicalTick)
                 {
                     grants.RemoveAt(index);
                     (expiredMemberships ??= []).Add((grant.Kind, grant.Name));
-                }
-                else
-                {
-                    grants[index] = grant with { RemainingTicks = grant.RemainingTicks - 1 };
                 }
             }
 
