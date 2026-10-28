@@ -24,9 +24,10 @@ internal static class PerformanceGate
         var scenarios = scenarioName switch
         {
             "all" => new[] { "producer", "reactive" },
+            "content" => [scenarioName],
             "producer" or "reactive" or "reactive-query" or "reactive-dispatch" => [scenarioName],
             _ => throw new ArgumentException(
-                "Scenario must be 'all', 'producer', 'reactive', 'reactive-query', or 'reactive-dispatch'.",
+                "Scenario must be 'all', 'content', 'producer', 'reactive', 'reactive-query', or 'reactive-dispatch'.",
                 nameof(arguments)),
         };
 
@@ -88,7 +89,8 @@ internal static class PerformanceGate
                     WriteTickLog(runLogPath, timings);
                 }
 
-                var runPassed = overBudget == 0 && allocatedBytes == 0;
+                var maximumAllocatedBytes = workload.MaximumBytesPerTick * measuredTicks;
+                var runPassed = overBudget == 0 && allocatedBytes <= maximumAllocatedBytes;
                 passed &= runPassed;
                 Console.WriteLine($"gate scenario={scenario} run={repetition} warmupTicks={warmupTicks} "
                     + $"measuredTicks={measuredTicks} meanMs={mean:F3} p50Ms={p50:F3} "
@@ -96,6 +98,7 @@ internal static class PerformanceGate
                     + $"overBudgetTicks={overBudget} allocatedBytes={allocatedBytes} "
                     + $"threadAllocatedBytes={threadAllocatedBytes} maxTickAllocatedBytes={maxThreadAllocatedBytes} "
                     + $"bytesPerTick={(double)allocatedBytes / measuredTicks:F2} "
+                    + $"byteBudgetPerTick={workload.MaximumBytesPerTick} "
                     + $"budgetMs={maximumTickMilliseconds:F2} result={(runPassed ? "pass" : "fail")}");
             }
         }
@@ -105,6 +108,8 @@ internal static class PerformanceGate
 
     private static GateWorkload CreateScenario(string scenario, int workerCount) => scenario switch
     {
+        // The content tier owns the whole game step, so it ignores the worker count.
+        "content" => CreateContentTier(),
         "producer" => CreatePopulationProducer(workerCount),
         "reactive" => CreateReactiveScenario(static workload => workload.ExecuteTick()),
         "reactive-query" => CreateReactiveScenario(static workload => workload.ExecuteQueryTick()),
@@ -112,20 +117,32 @@ internal static class PerformanceGate
         _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
     };
 
+    // The content tier owns the whole game step, so it ignores the worker count. Its contract allows
+    // 4 KiB per tick for the entity and rule path; the kernel scenarios must allocate nothing.
+    private static GateWorkload CreateContentTier()
+    {
+        var workload = new ContentTierWorkload();
+        return new GateWorkload(workload.Tick, workload.Validate, ContentTierWorkload.MaximumBytesPerTick, workload);
+    }
+
     private static GateWorkload CreatePopulationProducer(int workerCount)
     {
         var workload = new PopulationProducerWorkload(workerCount);
-        return new GateWorkload(workload.Tick, workload.Validate, workload);
+        return new GateWorkload(workload.Tick, workload.Validate, MaximumBytesPerTick: 0, workload);
     }
 
     private static GateWorkload CreateReactiveScenario(Action<ReactiveWorldBenchmarks> tick)
     {
         var workload = new ReactiveWorldBenchmarks();
         workload.Setup();
-        return new GateWorkload(() => tick(workload), static _ => { });
+        return new GateWorkload(() => tick(workload), static _ => { }, MaximumBytesPerTick: 0);
     }
 
-    private sealed record GateWorkload(Action Tick, Action<int> Validate, IDisposable? Owner = null) : IDisposable
+    private sealed record GateWorkload(
+        Action Tick,
+        Action<int> Validate,
+        long MaximumBytesPerTick,
+        IDisposable? Owner = null) : IDisposable
     {
         public void Dispose() => Owner?.Dispose();
     }

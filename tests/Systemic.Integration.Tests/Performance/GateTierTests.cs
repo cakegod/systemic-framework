@@ -6,12 +6,19 @@ using Xunit.Abstractions;
 
 namespace Systemic.Tests.Performance;
 
-/// <summary>The content tier of the approved three-tier performance contract.</summary>
+/// <summary>The content tier's allocation budget: entities and rules, 2,000 actors, at most 4 KiB per tick.</summary>
 /// <remarks>
-/// The tiers are: kernel (dense populations, 5 ms p95, zero warmed allocations), content (entities
-/// and rules, 2,000 actors, at most 4 KiB per tick), and crowd (100,000 population rows with rule
-/// subjects, which cannot exist before populations can be rule subjects). This file owns the
-/// content tier; the kernel tier stays with the benchmark gate runner.
+/// The tiers are: kernel (dense populations, 5 ms, zero warmed allocations), content (this file),
+/// and crowd (100,000 population rows with rule subjects, which cannot exist before populations can
+/// be rule subjects).
+/// <para>
+/// Only the allocation budget is asserted here. The content tier's frame-time claim is gated by the
+/// benchmark runner as <c>--gate --scenario content</c>, which ticks 500 times in a dedicated
+/// process and fails on any tick at or over 5 ms. A wall-clock assertion in this suite measured the
+/// machine instead of the code: ten test assemblies run in parallel, so a 30-sample p95 was really
+/// the second-slowest tick of whatever else the box was doing. The timings stay as diagnostics, as
+/// they are in the sibling budget tests.
+/// </para>
 /// </remarks>
 public sealed class GateTierTests(ITestOutputHelper output)
 {
@@ -48,10 +55,10 @@ public sealed class GateTierTests(ITestOutputHelper output)
         var perTick = (GC.GetAllocatedBytesForCurrentThread() - allocatedBefore) / TickCount;
         Array.Sort(timings);
         var p95 = timings[(int)Math.Ceiling(timings.Length * 0.95) - 1];
-        _output.WriteLine($"Content tier: {ActorCount} actors, {perTick} B/tick, p95 {p95:F3} ms");
+        _output.WriteLine($"Content tier: {ActorCount} actors, {perTick} B/tick, p95 {p95:F3} ms "
+            + "(timing is diagnostic here; --gate --scenario content is the gate)");
         Assert.True(perTick <= MaximumBytesPerTick,
             $"Content tier allocated {perTick} B per tick for {ActorCount} actors; budget is {MaximumBytesPerTick} B.");
-        Assert.True(p95 < 5, $"Content tier p95 was {p95:F3} ms for {ActorCount} actors; target is <5 ms.");
     }
 
     private static ContentPack Content() => new("", new GameManifest("test", "Test", 30, 4),
