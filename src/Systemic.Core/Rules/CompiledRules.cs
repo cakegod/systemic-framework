@@ -17,6 +17,9 @@ public enum RuleSubjectKind
 
     /// <summary>A row of a named population schema, independent of the fact.</summary>
     Row,
+
+    /// <summary>The population row the fact is about, resolved by generation at dispatch.</summary>
+    FactRow,
 }
 
 /// <summary>Addresses the entity or population row a condition or effect applies to.</summary>
@@ -56,6 +59,20 @@ public readonly record struct RuleSubject
         return new RuleSubject(RuleSubjectKind.Row, populationId, slot);
     }
 
+    /// <summary>Addresses the population row the dispatched fact is about.</summary>
+    /// <param name="populationId">The population schema the fact's row must belong to.</param>
+    /// <exception cref="ArgumentException"><paramref name="populationId"/> is blank.</exception>
+    /// <remarks>
+    /// The row is resolved from the fact's generation-checked reference at dispatch, so a row that
+    /// despawns before the fact is handled no longer matches: the reference does not fall back to
+    /// whichever row now occupies the slot.
+    /// </remarks>
+    public static RuleSubject FactRow(string populationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(populationId);
+        return new RuleSubject(RuleSubjectKind.FactRow, populationId, 0);
+    }
+
     /// <summary>Gets how this subject is addressed.</summary>
     public RuleSubjectKind Kind { get; }
 
@@ -66,12 +83,19 @@ public readonly record struct RuleSubject
     /// <summary>Gets the row slot for a row subject.</summary>
     public int Slot { get; }
 
-    /// <summary>Gets whether this subject addresses a population row.</summary>
+    /// <summary>Gets whether this subject addresses one fixed population row.</summary>
     public bool IsRow => Kind == RuleSubjectKind.Row;
+
+    /// <summary>Gets whether this subject addresses the row the fact is about.</summary>
+    public bool IsFactRow => Kind == RuleSubjectKind.FactRow;
+
+    /// <summary>Gets whether this subject addresses a population row, fixed or fact-carried.</summary>
+    public bool AddressesRow => Kind is RuleSubjectKind.Row or RuleSubjectKind.FactRow;
 
     public override string ToString() => Kind switch
     {
         RuleSubjectKind.Row => $"Row({PopulationId}, {Slot})",
+        RuleSubjectKind.FactRow => $"FactRow({PopulationId})",
         RuleSubjectKind.Entity => $"Entity({Slot})",
         _ => Kind.ToString(),
     };

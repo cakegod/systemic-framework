@@ -780,6 +780,15 @@ public sealed class World
     }
 
     /// <summary>Resolves a population's schema tags for row-addressed rules.</summary>
+    /// <summary>Resolves a generation-checked row reference to a live row of the named population.</summary>
+    internal bool TryResolvePopulationRow(string populationId, int slotIndex, ulong generation, out int row)
+    {
+        EnsureActive();
+        row = -1;
+        return _populationsById.TryGetValue(populationId, out var registration)
+            && registration.TryResolveRow(slotIndex, generation, out row);
+    }
+
     /// <summary>Resolves a population's row modifier slots for row-addressed rules.</summary>
     internal bool TryGetPopulationModifiers(string populationId, out PopulationModifierAccess modifiers)
     {

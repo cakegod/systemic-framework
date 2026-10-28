@@ -31,6 +31,22 @@ public interface IPopulationKind
     static virtual string[] ModifierProperties => [];
 }
 
+/// <summary>
+/// A generation-checked reference to one population row, small enough to travel inside a fact.
+/// </summary>
+/// <param name="PopulationId">The schema ID the row belongs to.</param>
+/// <param name="Slot">The handle slot that identifies the row's lifetime.</param>
+/// <param name="Generation">The generation of that slot when the reference was taken.</param>
+/// <remarks>
+/// A slot is reused after a despawn, so the generation is what makes the reference a statement about
+/// a particular row and not about whatever row occupies the slot later. Resolution fails once the
+/// referenced row is gone, which is how a reaction chain detects a despawn instead of retargeting.
+/// </remarks>
+public readonly record struct PopulationRowReference(string PopulationId, int Slot, ulong Generation)
+{
+    public override string ToString() => $"{PopulationId}[{Slot}:{Generation}]";
+}
+
 /// <summary>Describes a contiguous range of live population rows.</summary>
 /// <param name="Start">Zero-based index of the first row.</param>
 /// <param name="Length">Number of rows in the range.</param>
@@ -573,6 +589,26 @@ public sealed class Population<TKind> where TKind : IPopulationKind
 
         RemoveSwapBack(row);
         return true;
+    }
+
+    /// <summary>Gets a fact-safe, generation-checked reference to a live row.</summary>
+    /// <exception cref="InvalidOperationException">Handles are disabled for this population.</exception>
+    public PopulationRowReference ReferenceOf(int row)
+    {
+        var handle = GetHandle(row);
+        return new PopulationRowReference(TKind.Id, handle.Slot, handle.Generation);
+    }
+
+    /// <summary>Resolves a slot and generation pair to a live row, or reports that the row is gone.</summary>
+    internal bool TryResolveRow(int slotIndex, ulong generation, out int row)
+    {
+        if (!TryGetHandle(slotIndex, generation, out var handle))
+        {
+            row = -1;
+            return false;
+        }
+
+        return TryResolve(handle, out row);
     }
 
     /// <summary>Gets the tag names this schema reserves mask bits for, in bit order.</summary>
@@ -1412,6 +1448,8 @@ internal abstract class PopulationRegistration
     public abstract bool TryGetEffectiveRowValue(int row, PopulationColumnBase column, ushort modifierKey,
         out double value);
 
+    public abstract bool TryResolveRow(int slotIndex, ulong generation, out int row);
+
     public abstract bool TryGetTagBit(string tag, out int bit);
 
     public abstract bool TryHasTagBit(int row, int bit);
@@ -1452,6 +1490,9 @@ internal sealed class PopulationRegistration<TKind>(Population<TKind> population
 
     public override bool TryGetEffectiveRowValue(int row, PopulationColumnBase column, ushort modifierKey,
         out double value) => population.TryGetEffectiveRowValue(row, column, modifierKey, out value);
+
+    public override bool TryResolveRow(int slotIndex, ulong generation, out int row) =>
+        population.TryResolveRow(slotIndex, generation, out row);
 
     public override bool TryGetTagBit(string tag, out int bit) => population.TryGetTagBit(tag, out bit);
 

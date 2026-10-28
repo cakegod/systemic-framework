@@ -10,6 +10,9 @@ public sealed class RowAddressedRuleTests
     private static readonly PopulationColumnKey<int> s_buffHealthKey =
         new("test.buff.health", 1, PopulationCodecs.Int32);
 
+    private static readonly PopulationColumnKey<int> s_handledHealthKey =
+        new("test.handled.health", 1, PopulationCodecs.Int32);
+
     [Fact]
     public void Entity_subject_addresses_one_entity_regardless_of_the_fact()
     {
@@ -297,9 +300,12 @@ public sealed class RowAddressedRuleTests
         Assert.Contains(Prey.Id, error.Message, StringComparison.Ordinal);
     }
 
-    private static RuleEngine Bind(World world, CompiledRule rule)
+    private static RuleEngine Bind(World world, CompiledRule rule) =>
+        Bind(world, [rule]);
+
+    private static RuleEngine Bind(World world, params CompiledRule[] rules)
     {
-        var engine = new RuleEngine(new CompiledRuleSet([rule]));
+        var engine = new RuleEngine(new CompiledRuleSet(rules));
         engine.Bind(world);
         return engine;
     }
@@ -441,6 +447,134 @@ public sealed class RowAddressedRuleTests
         Assert.Equal(99, prey.EffectiveValue(0, "test.buff.health"));
     }
 
+    [Fact]
+    public void Fact_row_rule_writes_the_row_the_fact_names()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateHandledPrey(world, 3);
+        var engine = Bind(world,
+            new CompiledRule("prey.hurt", "prey.hurt", 0, [],
+                [RuleEffect.AdjustProperty(RuleSubject.FactRow(HandledPrey.Id), "test.handled.health", -5)]));
+
+        var result = engine.Dispatch(world, SimulationFact.ForRow("prey.hurt", prey.ReferenceOf(1)));
+
+        Assert.Equal(1, result.EffectsApplied);
+        Assert.Equal([100, 95, 100], ReadHandledHealth(prey));
+    }
+
+    [Fact]
+    public void Fact_row_condition_reads_the_row_the_fact_names()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateHandledPrey(world, 2);
+        var engine = Bind(world,
+            new CompiledRule("prey.hurt", "prey.hurt", 0,
+                [RuleCondition.PropertyAtLeast(RuleSubject.FactRow(HandledPrey.Id), "test.handled.health", 50)],
+                [RuleEffect.AddTag(RuleSubject.FactRow(HandledPrey.Id), "poisoned")]));
+
+        Assert.Equal(1, engine.Dispatch(world, SimulationFact.ForRow("prey.hurt", prey.ReferenceOf(0))).RulesMatched);
+
+        SetHandledHealth(prey, 1, 10);
+        var skipped = engine.Dispatch(world, SimulationFact.ForRow("prey.hurt", prey.ReferenceOf(1)));
+
+        Assert.Equal(0, skipped.RulesMatched);
+        Assert.True(prey.HasTag(0, "poisoned"));
+        Assert.False(prey.HasTag(1, "poisoned"));
+    }
+
+    [Fact]
+    public void Fact_row_on_a_despawned_row_is_skipped_instead_of_retargeting_the_new_occupant()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateHandledPrey(world, 3);
+        var engine = Bind(world,
+            new CompiledRule("prey.hurt", "prey.hurt", 0, [],
+                [RuleEffect.AdjustProperty(RuleSubject.FactRow(HandledPrey.Id), "test.handled.health", -5)]));
+        var reference = prey.ReferenceOf(2);
+
+        prey.RemoveSwapBack(2);
+        prey.AddRange(1);
+        SetHandledHealth(prey, 2, 100);
+
+        var result = engine.Dispatch(world, SimulationFact.ForRow("prey.hurt", reference));
+
+        Assert.Equal(1, result.FactsProcessed);
+        // The effect is accepted by a matched rule and has nowhere to land, exactly like an effect
+        // aimed at a despawned entity; the point is that the new occupant is untouched.
+        Assert.Equal([100, 100, 100], ReadHandledHealth(prey));
+        Assert.False(prey.HasTag(2, "poisoned"));
+    }
+
+    [Fact]
+    public void A_despawn_during_a_reaction_chain_leaves_the_new_occupant_alone()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var prey = CreateHandledPrey(world, 3);
+        var engine = Bind(world,
+            new CompiledRule("prey.hit", "prey.hit", 1, [], [RuleEffect.Emit("prey.hurt")]),
+            new CompiledRule("prey.hurt", "prey.hurt", 0, [],
+                [RuleEffect.AdjustProperty(RuleSubject.FactRow(HandledPrey.Id), "test.handled.health", -5)]));
+
+        var result = engine.Dispatch(world, SimulationFact.ForRow("prey.hit", prey.ReferenceOf(1)),
+            (fact, _) =>
+            {
+                if (fact.Type != "prey.hurt")
+                {
+                    return;
+                }
+
+                // The row the chain is about is gone; the row that moves into its place and the fresh
+                // row that takes the freed handle slot keep their own values.
+                Assert.NotNull(fact.Row);
+                prey.RemoveSwapBack(1);
+                prey.AddRange(1);
+                SetHandledHealth(prey, 1, 50);
+                SetHandledHealth(prey, 2, 100);
+            });
+
+        Assert.Equal(2, result.FactsProcessed);
+        Assert.Equal([100, 50, 100], ReadHandledHealth(prey));
+    }
+
+    private static Population<HandledPrey> CreateHandledPrey(World world, int count)
+    {
+        var population = world.DefinePopulation<HandledPrey>(enableHandles: true);
+        var health = population.Column(s_handledHealthKey);
+        population.Reserve(count);
+        population.AddRange(count);
+        population.WithAccess(new PopulationRange(0, count), health,
+            static (PopulationColumn<int> column, scoped ref PopulationAccessScope<HandledPrey> scope) =>
+            {
+                var values = scope.EditRange(column);
+                for (var row = 0; row < values.Length; row++)
+                {
+                    values[row] = 100;
+                }
+            });
+        return population;
+    }
+
+    private static int[] ReadHandledHealth(Population<HandledPrey> population)
+    {
+        var values = new int[population.Count];
+        population.WithAccess(new PopulationRange(0, values.Length),
+            (Column: population.Column(s_handledHealthKey), Values: values),
+            static ((PopulationColumn<int> Column, int[] Values) state, scoped ref PopulationAccessScope<HandledPrey> scope) =>
+            {
+                var health = scope.ReadAll(state.Column);
+                for (var row = 0; row < state.Values.Length; row++)
+                {
+                    state.Values[row] = health[row];
+                }
+            });
+        return values;
+    }
+
+    private static void SetHandledHealth(Population<HandledPrey> population, int row, int value) =>
+        population.WithAccess(new PopulationRange(row, 1), (Column: population.Column(s_handledHealthKey), Value: value),
+            static ((PopulationColumn<int> Column, int Value) state, scoped ref PopulationAccessScope<HandledPrey> scope) =>
+                scope.EditRange(state.Column)[0] = state.Value);
+
     private static Population<BuffPrey> CreateBuffPrey(World world, int count)
     {
         var population = world.DefinePopulation<BuffPrey>();
@@ -509,6 +643,15 @@ public sealed class RowAddressedRuleTests
         public static string Id => "test.prey";
 
         public static int Version => 1;
+    }
+
+    private readonly struct HandledPrey : IPopulationKind
+    {
+        public static string Id => "test.handled-prey";
+
+        public static int Version => 1;
+
+        public static string[] Tags => ["poisoned"];
     }
 
     private readonly struct BuffPrey : IPopulationKind

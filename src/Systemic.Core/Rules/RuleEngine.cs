@@ -10,11 +10,24 @@ public readonly record struct SimulationFact(
     int Depth = 0,
     double Amount = 0,
     SimulationFactPosition? Position = null,
-    SimulationFactPayload? Payload = null)
+    SimulationFactPayload? Payload = null,
+    PopulationRowReference? Row = null)
 {
     public SimulationFact(FactTypeId Type, int SourceId, int TargetId, int Depth = 0, double Amount = 0,
         SimulationFactPosition? Position = null, SimulationFactPayload? Payload = null)
         : this(Type.Value, SourceId, TargetId, Depth, Amount, Position, Payload) { }
+
+    /// <summary>Creates a fact about one population row rather than about entities.</summary>
+    /// <param name="type">The authored event name.</param>
+    /// <param name="row">A generation-checked reference to the row the fact is about.</param>
+    /// <param name="depth">Reaction depth; zero for a fact dispatched by a system.</param>
+    /// <param name="amount">The authored amount.</param>
+    /// <remarks>The fact carries no entity IDs, so only row-addressed rules can act on it.</remarks>
+    public static SimulationFact ForRow(string type, PopulationRowReference row, int depth = 0, double amount = 0)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(type);
+        return new SimulationFact(type, -1, -1, depth, amount, Row: row);
+    }
 
     /// <summary>A strongly typed view of the authored event name.</summary>
     public FactTypeId TypeId => string.IsNullOrWhiteSpace(Type) ? default : new FactTypeId(Type);
@@ -28,6 +41,16 @@ public readonly record struct SimulationFact(
         Depth = this.Depth;
         Amount = this.Amount;
     }
+
+    /// <summary>Gets whether the fact names exactly one subject: an entity pair or one population row.</summary>
+    /// <remarks>
+    /// A row fact carries no entity IDs, so the two forms cannot be confused: an entity fact needs both
+    /// IDs non-negative, and a row fact needs both at -1 with a generation-checked row reference.
+    /// </remarks>
+    internal bool HasValidAddress => Row is null
+        ? SourceId >= 0 && TargetId >= 0
+        : SourceId == -1 && TargetId == -1 && Row.Value.Slot >= 0 && Row.Value.Generation != 0
+            && !string.IsNullOrWhiteSpace(Row.Value.PopulationId);
 }
 
 public readonly struct SimulationFactEmitter
@@ -189,7 +212,7 @@ public sealed class RuleEngine
         {
             foreach (var condition in rule.Conditions)
             {
-                if (!condition.Subject.IsRow)
+                if (!condition.Subject.AddressesRow)
                 {
                     continue;
                 }
@@ -211,7 +234,7 @@ public sealed class RuleEngine
 
             foreach (var effect in rule.Effects)
             {
-                if (!effect.Subject.IsRow)
+                if (!effect.Subject.AddressesRow)
                 {
                     continue;
                 }
@@ -373,6 +396,22 @@ public sealed class RuleEngine
         {
             Bind(world);
         }
+    }
+
+    // A fixed row subject names its slot directly; a fact row subject resolves the fact's reference,
+    // which fails once the row is gone. Resolution is the only place the slot is decided.
+    private static bool TryResolveRowSlot(World world, SimulationFact fact, RuleSubject subject, out int slot)
+    {
+        if (!subject.IsFactRow)
+        {
+            slot = subject.Slot;
+            return true;
+        }
+
+        slot = -1;
+        return fact.Row is { } row
+            && string.Equals(row.PopulationId, subject.PopulationId, StringComparison.Ordinal)
+            && world.TryResolvePopulationRow(subject.PopulationId, row.Slot, row.Generation, out slot);
     }
 
     private RowBinding ResolveRowBinding(World world, string ruleId, RuleSubject subject, string name,
@@ -585,10 +624,10 @@ public sealed class RuleEngine
                 $"Initial fact depth must be between 0 and the configured maximum of {_maxDepth}.");
         }
 
-        if (initialFact.SourceId < 0 || initialFact.TargetId < 0)
+        if (!initialFact.HasValidAddress)
         {
             throw new ArgumentOutOfRangeException(nameof(initialFact),
-                "Fact source and target IDs must be non-negative.");
+                "A fact must name both a source and a target entity, or exactly one live population row.");
         }
 
         if (!double.IsFinite(initialFact.Amount))
@@ -776,7 +815,7 @@ public sealed class RuleEngine
 
     private bool EnqueueFact(SimulationFact fact)
     {
-        if (string.IsNullOrWhiteSpace(fact.Type) || fact.SourceId < 0 || fact.TargetId < 0
+        if (string.IsNullOrWhiteSpace(fact.Type) || !fact.HasValidAddress
             || fact.Depth < 0 || !double.IsFinite(fact.Amount))
         {
             _invalidFact = true;
@@ -818,12 +857,16 @@ public sealed class RuleEngine
                 continue;
             }
 
-            if (condition.Subject.IsRow)
+            if (condition.Subject.AddressesRow)
             {
+                if (!TryResolveRowSlot(world, fact, condition.Subject, out var slot))
+                {
+                    return false;
+                }
+
                 var binding = ResolveRowBinding(world, rule.Id, condition.Subject, condition.Name,
                     condition.Kind == RuleConditionKind.HasTag ? RowTargetKind.Tag : RowTargetKind.Column,
                     fact.Type);
-                var slot = condition.Subject.Slot;
                 if (binding.Kind == RowTargetKind.Tag)
                 {
                     if (!binding.Tags.TryHasTagBit(slot, binding.TagBit))
@@ -1089,13 +1132,20 @@ public sealed class RuleEngine
                 return;
             }
 
+            // The row reference travels with the reaction, so a later fact still names the same row
+            // and can detect that the row despawned in between.
             EnqueueFact(new SimulationFact(effect.Name, fact.SourceId, fact.TargetId, fact.Depth + 1,
-                fact.Amount, fact.Position, fact.Payload));
+                fact.Amount, fact.Position, fact.Payload, fact.Row));
             return;
         }
 
-        if (effect.Subject.IsRow)
+        if (effect.Subject.AddressesRow)
         {
+            if (!TryResolveRowSlot(world, fact, effect.Subject, out var slot))
+            {
+                return;
+            }
+
             var kind = effect.Kind switch
             {
                 RuleEffectKind.AddTag => RowTargetKind.Tag,
@@ -1108,14 +1158,13 @@ public sealed class RuleEngine
             switch (binding.Kind)
             {
                 case RowTargetKind.Tag:
-                    binding.Tags.TrySetTagBit(effect.Subject.Slot, binding.TagBit, value: true);
+                    binding.Tags.TrySetTagBit(slot, binding.TagBit, value: true);
                     break;
                 case RowTargetKind.Modifier:
-                    binding.Modifiers.TrySet(effect.Subject.Slot, binding.ModifierKey, effect.Value,
-                        effect.DurationTicks);
+                    binding.Modifiers.TrySet(slot, binding.ModifierKey, effect.Value, effect.DurationTicks);
                     break;
                 default:
-                    binding.Column!.TryAddRowValue(effect.Subject.Slot, effect.Value);
+                    binding.Column!.TryAddRowValue(slot, effect.Value);
                     break;
             }
 
