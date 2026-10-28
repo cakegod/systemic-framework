@@ -94,6 +94,10 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     private readonly ObjectPool<PopulationStructureUndoBatch> _structureUndoBatches;
     private int[] _rowToHandleSlot = [];
     private int _capacity;
+    // One packed bitset per schema tag, built on first query and maintained by TrySetTagBit. A scan
+    // that prefilters on a tag then reads one bit per row instead of the eight-byte mask word.
+    private ulong[]?[]? _tagRowBits;
+    private int _tagRowBitsEpoch;
 
     internal Population(World world, bool handlesEnabled, long? ownerToken = null)
     {
@@ -406,6 +410,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
 
             _storage.EnsureNoLeases();
             CaptureStructureUndo();
+            InvalidateTagRowBits();
             var requiredCapacity = start + count;
             if (requiredCapacity > _capacity)
             {
@@ -445,6 +450,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             _storage.EnsureNoLeases();
             CaptureStructureUndo();
             var lastRow = Count - 1;
+            InvalidateTagRowBits();
             foreach (var column in _columns.Values)
             {
                 column.MoveRow(lastRow, row);
@@ -789,8 +795,72 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             return false;
         }
 
-        return _tagMask.TryWriteRow(row, updated);
+        if (!_tagMask.TryWriteRow(row, updated))
+        {
+            return false;
+        }
+
+        UpdateTagRowBit(bit, row, value);
+        return true;
     }
+
+    /// <summary>Tests one tag bit per row from a packed bitset of the live rows.</summary>
+    /// <returns><see langword="false"/> when the schema declares no such tag.</returns>
+    /// <remarks>
+    /// The bitset is derived state: it is built from the mask column on first use and rebuilt after
+    /// any change that does not go through <see cref="TrySetTagBit"/>. A stale bitset would make a
+    /// rule scan match the wrong rows, so every structural change and every rollback drops it rather
+    /// than trying to patch it.
+    /// </remarks>
+    internal bool TryGetTagRowBits(int bit, out ReadOnlySpan<ulong> words)
+    {
+        EnsureActive();
+        ValidateTagBit(bit);
+        var all = _tagRowBits ??= new ulong[]?[_tagNames.Length];
+        var wordCount = (Count + 63) >> 6;
+        var packed = all[bit];
+        if (packed is null || packed.Length < wordCount || _tagRowBitsEpoch != World.RollbackEpoch)
+        {
+            _tagRowBitsEpoch = World.RollbackEpoch;
+            packed = new ulong[wordCount];
+            var masks = _tagMask!.ReadOnlySpan;
+            var tag = 1UL << bit;
+            for (var row = 0; row < masks.Length; row++)
+            {
+                if ((masks[row] & tag) != 0)
+                {
+                    packed[row >> 6] |= 1UL << (row & 63);
+                }
+            }
+
+            all[bit] = packed;
+        }
+
+        words = packed.AsSpan(0, wordCount);
+        return true;
+    }
+
+    private void UpdateTagRowBit(int bit, int row, bool value)
+    {
+        var packed = _tagRowBits?[bit];
+        if (packed is null || (uint)(row >> 6) >= (uint)packed.Length)
+        {
+            return;
+        }
+
+        ref var word = ref packed[row >> 6];
+        if (value)
+        {
+            Interlocked.Or(ref word, 1UL << (row & 63));
+        }
+        else
+        {
+            Interlocked.And(ref word, ~(1UL << (row & 63)));
+        }
+    }
+
+    /// <summary>Drops the derived tag bitsets after a write path the incremental update cannot see.</summary>
+    internal void InvalidateTagRowBits() => _tagRowBits = null;
 
     private ushort ResolveModifierKeyOrEmpty(string property) =>
         _modifierKeys.TryGetValue(property, out var key) ? key : RowModifierSlot.EmptyKey;
@@ -864,6 +934,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             throw new InvalidDataException($"Population '{TKind.Id}' has invalid handle metadata.");
         }
 
+        InvalidateTagRowBits();
         var rowToHandleSlot = (int[])state.RowToHandleSlot.Clone();
         var handleSlots = (PopulationHandleSlotState[])state.HandleSlots.Clone();
         var freeHandleSlots = (int[])state.FreeHandleSlots.Clone();
@@ -1477,6 +1548,10 @@ internal abstract class PopulationRegistration
 
     public abstract bool TrySetTagBit(int row, int bit, bool value);
 
+    public abstract bool TryGetTagRowBits(int bit, out ReadOnlySpan<ulong> words);
+
+    public abstract void InvalidateTagRowBits();
+
     public abstract bool TryGetColumn(string columnId, out PopulationColumnBase column);
 
     public abstract PopulationSaveState CaptureSaveState();
@@ -1527,6 +1602,11 @@ internal sealed class PopulationRegistration<TKind>(Population<TKind> population
 
     public override bool TrySetTagBit(int row, int bit, bool value) => population.TrySetTagBit(row, bit, value);
 
+    public override bool TryGetTagRowBits(int bit, out ReadOnlySpan<ulong> words) =>
+        population.TryGetTagRowBits(bit, out words);
+
+    public override void InvalidateTagRowBits() => population.InvalidateTagRowBits();
+
     public override bool TryGetColumn(string columnId, out PopulationColumnBase column) =>
         population.TryGetColumn(columnId, out column);
 
@@ -1574,6 +1654,10 @@ internal readonly struct PopulationTagAccess(PopulationRegistration registration
 
     /// <summary>Sets or clears one row's mask bit.</summary>
     public bool TrySetTagBit(int row, int bit, bool value) => _registration.TrySetTagBit(row, bit, value);
+
+    /// <summary>Reads one tag bit per live row as a packed bitset.</summary>
+    public bool TryGetRowBits(int bit, out ReadOnlySpan<ulong> words) =>
+        _registration.TryGetTagRowBits(bit, out words);
 }
 
 /// <summary>Addresses the inline modifier slots of one population without another lookup per row.</summary>

@@ -150,6 +150,48 @@ public sealed class RowScanTests
         Assert.Equal([1, 1], ReadEnergy(population));
     }
 
+    // The scan keeps a packed tag bitset instead of the mask column. Undo restores the mask behind
+    // its back, so this pins that a rollback cannot leave the scan believing a live tag is absent.
+    [Fact]
+    public void A_scan_prefilter_sees_a_tag_a_rollback_restored()
+    {
+        var world = new World(seed: 129, valueScale: 1);
+        var population = Create(world, [5, 5]);
+        population.AddTag(0, "burning");
+        var engine = Bind(world, BurnRule());
+        Assert.Equal(1, engine.EvaluateRowEvent(world, "test.think", Crowd.Id, new PopulationRange(0, 2)).RulesMatched);
+
+        using (var transaction = world.BeginTransaction())
+        {
+            Assert.True(population.RemoveTag(0, "burning"));
+            transaction.Rollback();
+        }
+
+        Assert.True(population.HasTag(0, "burning"));
+        Assert.Equal(1, engine.EvaluateRowEvent(world, "test.think", Crowd.Id, new PopulationRange(0, 2)).RulesMatched);
+    }
+
+    // A swap-back removal moves a row's mask word, which the incremental bit update never sees.
+    [Fact]
+    public void A_scan_prefilter_follows_a_tag_when_a_removed_row_is_swapped_back()
+    {
+        var world = new World(seed: 130, valueScale: 1);
+        var population = Create(world, [5, 5, 5]);
+        population.AddTag(2, "burning");
+        var engine = Bind(world, BurnRule());
+        Assert.Equal(1, engine.EvaluateRowEvent(world, "test.think", Crowd.Id, new PopulationRange(0, 3)).RulesMatched);
+
+        population.RemoveSwapBack(0);
+
+        Assert.True(population.HasTag(0, "burning"));
+        Assert.Equal(1, engine.EvaluateRowEvent(world, "test.think", Crowd.Id, new PopulationRange(0, 2)).RulesMatched);
+    }
+
+    private static CompiledRule BurnRule() =>
+        new("test.burn", "test.think", 0,
+            [RuleCondition.HasTag(RuleSubject.FactRow(Crowd.Id), "burning")],
+            [RuleEffect.AdjustProperty(RuleSubject.FactRow(Crowd.Id), "test.scan.energy", -1)]);
+
     private static CompiledRule ThinkRule() =>
         new("test.think", "test.think", 0,
             [RuleCondition.PropertyAtLeast(RuleSubject.FactRow(Crowd.Id), "test.scan.energy", 1)],

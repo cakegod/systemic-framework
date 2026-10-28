@@ -611,19 +611,76 @@ public sealed class RuleEngine
             if (plans.Length == 1 && plans[0].PrefilterMask is { } maskColumn)
             {
                 // One rule per event is the authored crowd shape, and with a single plan the tag
-                // prefilter is a span read: the loop tests one bit per row and only evaluates the
-                // rule for rows that carry it. The mask is only a filter, so the rule still runs in
-                // full for those rows, and no other rule can observe an effect of this one.
-                var masks = maskColumn.ReadOnlySpan;
-                var bit = 1UL << plans[0].PrefilterBit;
+                // prefilter is a packed bitset read: one bit per row instead of the eight-byte mask
+                // word, and the rule still runs in full for rows that carry it. The mask is only a
+                // filter, so no other rule can observe an effect of this one.
                 ref readonly var plan = ref plans[0];
-                var limit = Math.Min(end, masks.Length);
-                for (var row = range.Start; row < limit && !cutOff; row++)
+                var limit = Math.Min(end, rows.RowCount);
+                if (plan.PrefilterTags.TryGetRowBits(plan.PrefilterBit, out var packed))
                 {
-                    evaluated++;
-                    if ((masks[row] & bit) != 0 && MatchesResolvedRow(in plan, row))
+                    // One bit per row instead of one mask word: sixty-four rows per eight-byte load.
+                    // A tag write during the scan lands in this same bitset, so a later row still
+                    // sees it exactly as it would have seen the mask column.
+                    var scanned = range.Start;
+                    var wordIndex = range.Start >> 6;
+                    while (wordIndex < packed.Length && (wordIndex << 6) < limit && !cutOff)
                     {
-                        matched += ApplyRowRule(in plan, row, ref applied);
+                        var wordStart = wordIndex << 6;
+                        var word = packed[wordIndex];
+                        if (wordStart < range.Start)
+                        {
+                            word &= ulong.MaxValue << (range.Start - wordStart);
+                        }
+
+                        while (word != 0)
+                        {
+                            var offset = System.Numerics.BitOperations.TrailingZeroCount(word);
+                            var candidate = wordStart + offset;
+                            if (candidate >= limit)
+                            {
+                                break;
+                            }
+
+                            evaluated += candidate + 1 - scanned;
+                            scanned = candidate + 1;
+                            var appliedHere = MatchesResolvedRow(in plan, candidate);
+                            if (appliedHere)
+                            {
+                                matched += ApplyRowRule(in plan, candidate, ref applied);
+                                if (cutOff)
+                                {
+                                    break;
+                                }
+                            }
+
+                            // Re-reading the word after a rule ran keeps the scan live: a tag write
+                            // for a later row in this word must be seen, exactly as the per-row mask
+                            // read would have seen it. Bits already visited stay masked off.
+                            word = appliedHere
+                                ? packed[wordIndex] & ~(((1UL << offset) << 1) - 1)
+                                : word & ~(1UL << offset);
+                        }
+
+                        wordIndex++;
+                    }
+
+                    if (!cutOff)
+                    {
+                        evaluated += limit - scanned;
+                    }
+                }
+                else
+                {
+                    var masks = maskColumn.ReadOnlySpan;
+                    var bit = 1UL << plan.PrefilterBit;
+                    limit = Math.Min(limit, masks.Length);
+                    for (var row = range.Start; row < limit && !cutOff; row++)
+                    {
+                        evaluated++;
+                        if ((masks[row] & bit) != 0 && MatchesResolvedRow(in plan, row))
+                        {
+                            matched += ApplyRowRule(in plan, row, ref applied);
+                        }
                     }
                 }
             }
@@ -713,7 +770,7 @@ public sealed class RuleEngine
                 ? conditions[0]
                 : default;
             plans[ruleIndex] = new ResolvedRowRule(rule, conditions, effects,
-                prefilter.MaskColumn, prefilter.TagBit);
+                prefilter.MaskColumn, prefilter.TagBit, prefilter.Tags);
         }
 
         _rowScanPlans[key] = plans;
@@ -790,7 +847,7 @@ public sealed class RuleEngine
     }
 
     private readonly record struct ResolvedRowRule(CompiledRule Rule, RowBinding[] Conditions, RowBinding[] Effects,
-        PopulationColumn<ulong>? PrefilterMask, int PrefilterBit);
+        PopulationColumn<ulong>? PrefilterMask, int PrefilterBit, PopulationTagAccess PrefilterTags);
 
     // A row scan walks rows, not the fact queue, so anything that needs an entity or would queue a
     // fact is refused: one fact per row is exactly what the sink exists to prevent. The message is

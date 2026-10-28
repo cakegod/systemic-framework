@@ -198,6 +198,10 @@ public sealed class World
 
     private bool _tagIndexDirty = true;
 
+    /// <summary>Gets how many scopes this world has rolled back.</summary>
+    /// <remarks>Derived indexes that undo restores behind their back compare this to detect a rollback.</remarks>
+    internal int RollbackEpoch { get; private set; }
+
     public World(int seed, double valueScale, float spatialCellSize = DefaultSpatialCellSize)
     {
         if (!double.IsFinite(valueScale) || valueScale <= 0.0)
@@ -2391,6 +2395,9 @@ public sealed class World
                 Draws.Restore(scope.Draws);
                 LogicalTick = scope.LogicalTick;
                 _nextId = scope.NextId;
+                // Undo restores column payloads directly, so derived per-population tag indexes
+                // cannot observe the write and must rebuild on next read.
+                RollbackEpoch++;
 
                 callbacksToRun = scope.RollbackActions;
                 scope.CommitActions?.Clear();
@@ -2427,6 +2434,7 @@ public sealed class World
             scope.CapturedPopulationPages?.Clear();
             scope.CapturedPopulationBuffers?.Clear();
             scope.CapturedPopulationRows?.Clear();
+            scope.ClearRowsBatchCache();
             scope.CapturedPopulationStructures?.Clear();
             scope.CapturedPopulationRoles?.Clear();
             if (_scopes.Count == 0)
@@ -2532,12 +2540,30 @@ public sealed class World
 
         public bool CaptureGrant(int entityId) => (CapturedGrantEntities ??= []).Add(entityId);
 
+        // One rule or column loop writes thousands of rows in a scope, so the batch it keeps asking
+        // for is almost always the one it used a row ago. Remembering it keeps the per-row path to a
+        // reference compare instead of a dictionary probe, and a stale entry is harmless only if it
+        // never outlives the batch: every release and every scope teardown clears it.
+        private PopulationColumnBase? _rowsBatchColumn;
+        private int _rowsBatchBuffer;
+        private PopulationRowsUndoBatch? _rowsBatch;
+
         public bool TryGetRowsBatch(PopulationColumnBase column, int bufferIndex,
             out PopulationRowsUndoBatch batch)
         {
+            if (_rowsBatch is not null && ReferenceEquals(_rowsBatchColumn, column)
+                && _rowsBatchBuffer == bufferIndex)
+            {
+                batch = _rowsBatch;
+                return true;
+            }
+
             if (CapturedPopulationRows is not null
                 && CapturedPopulationRows.TryGetValue(new PopulationRowsKey(column, bufferIndex), out var found))
             {
+                _rowsBatchColumn = column;
+                _rowsBatchBuffer = bufferIndex;
+                _rowsBatch = found;
                 batch = found;
                 return true;
             }
@@ -2547,11 +2573,28 @@ public sealed class World
         }
 
         public void RegisterRowsBatch(PopulationColumnBase column, int bufferIndex,
-            PopulationRowsUndoBatch batch) =>
+            PopulationRowsUndoBatch batch)
+        {
             (CapturedPopulationRows ??= []).Add(new PopulationRowsKey(column, bufferIndex), batch);
+            _rowsBatchColumn = column;
+            _rowsBatchBuffer = bufferIndex;
+            _rowsBatch = batch;
+        }
 
-        public void ReleaseRowsBatch(PopulationColumnBase column, int bufferIndex) =>
+        public void ReleaseRowsBatch(PopulationColumnBase column, int bufferIndex)
+        {
             CapturedPopulationRows?.Remove(new PopulationRowsKey(column, bufferIndex));
+            if (ReferenceEquals(_rowsBatchColumn, column) && _rowsBatchBuffer == bufferIndex)
+            {
+                ClearRowsBatchCache();
+            }
+        }
+
+        public void ClearRowsBatchCache()
+        {
+            _rowsBatchColumn = null;
+            _rowsBatch = null;
+        }
 
         public bool CapturePopulationPage(PopulationColumnBase column, int bufferIndex, int pageIndex)
         {

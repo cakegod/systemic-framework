@@ -39,8 +39,8 @@ dotnet run --project src/tools/Systemic.Cli -- validate samples/crowd-million/co
    `crowd.prey.position` and `crowd.prey.velocity` are `Fixed64`
    columns, so the move is exact and the validation can assert bits rather than a tolerance.
 2. Evaluates `crowd.prey.burn` against every one of the million rows in one scope. The rule's first
-   condition is a tag, so the scan reads one mask bit per row and only evaluates the full rule for
-   rows that carry it.
+   condition is a tag, so the scan reads one packed tag bit per row and only evaluates the full rule
+   for rows that carry it.
 3. Collects the sink over `crowd.prey.energy`. The sink counts the rows that are still standing and
    appends at most one row-addressed fact carrying that count, and nothing while the count is
    unchanged, so the fact volume does not follow the row count.
@@ -55,7 +55,7 @@ dotnet run --project src/tools/Systemic.Cli -- validate samples/crowd-million/co
 ## Measured here
 
 On an i5-4430 at 3.0 GHz running .NET 10 Release, gate parameters `--warmup-ticks 200 --ticks 500`,
-two consecutive runs: p50 4.56 / 4.59 ms, p95 5.29 / 5.49 ms, maximum 7.0 / 8.2 ms, zero bytes
+two consecutive runs: p50 2.87 / 2.81 ms, p95 3.24 / 3.18 ms, maximum 4.3 / 3.9 ms, zero bytes
 allocated, all ticks inside the 10 ms simulation share of a 30 Hz frame. The gate fails on any tick
 at or over budget, so a machine that is busy with something else will fail it: run it as a dedicated
 process, as the other gate tiers are run.
