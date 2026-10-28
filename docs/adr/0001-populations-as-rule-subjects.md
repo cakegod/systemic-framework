@@ -27,11 +27,16 @@ replacement:
 3. Entities keep their current semantics. A rule may address an entity or a row, and both kinds run
    through one `RuleEngine`, one transaction per tick and one depth budget.
 
-The crowd target for this work is 10,000,000 rows, measured at ~31 ms per transactional tick for four
-int32 columns on the target machine class (see *Crowd tier at ten million* in the remediation plan).
-That number is the stop point: if P3.8 cannot demonstrate one authored rule over 10M rows inside that
-budget with zero warmed allocations, the claim narrows to "systemic for dozens, dense for millions"
-and row-addressed rules stay out of the README.
+The target for this work is **1,000,000 agents that evaluate a rule every tick**, not one million rows
+that merely move. Measured on the target machine class, a transactional movement pass over 1M rows
+costs 3.0 ms p95, leaving ~13.7 ms of a 60 Hz tick, or ~13.7 ns per agent, for the rule itself (see
+*Crowd target: one million thinking agents* in the remediation plan).
+
+Ten million rows was also measured — 31 ms per transactional tick, 274 MB — and stands as the storage
+and movement ceiling. It is not the rule target: at 10M a full-column pass alone consumes the tick, so
+rules there would have to be aggregate-only. The stop point is the 1M thinking tier: if P3.8 cannot
+show one authored rule evaluated per agent inside 16.7 ms with zero warmed allocations, the claim
+narrows to "systemic for dozens, dense for millions" and row-addressed rules stay out of the README.
 
 ## Consequences
 
@@ -44,5 +49,5 @@ and row-addressed rules stay out of the README.
   spends ~10 ms per tick copying pages, which dirty-row capture removes.
 - Determinism: column values are unmanaged and can be integral, but `double` properties cannot enter
   the row path if cross-platform state hashes are required. P3.6 gates that claim.
-- Rendering, input and audio stay outside the framework; a 10M crowd is a simulation number, not a
-  frame-rate promise.
+- Rendering, input and audio stay outside the framework; a million-agent crowd is a simulation
+  number, not a frame-rate promise.

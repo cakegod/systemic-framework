@@ -13,13 +13,18 @@ dotnet run -c Release --project benchmarks/Systemic.Benchmarks -- \
 ```
 
 `--agents N` sets the row count (default 1,000,000, useful up to 100,000,000) and `--target-ms N`
-sets the p95 target the report compares against (default 8.0). The crowd tier is measured at ten
-million rows:
+sets the p95 target the report compares against (default 8.0). Ten million rows is the storage and
+movement ceiling, measured with:
 
 ```sh
 dotnet run -c Release --project benchmarks/Systemic.Benchmarks -- \
   --million-agents --mode both --agents 10000000 --warmup-ticks 5 --ticks 20 --target-ms 35
 ```
+
+This workload is movement only. The plan's crowd target is 1M agents that each evaluate a rule per
+tick (`docs/framework-remediation-plan.md`, *Crowd target: one million thinking agents*); it uses this
+workload's measured movement cost as the baseline that the rule budget is drawn from, and does not
+model the rule itself.
 
 `--mode safe` is the default. It wraps each complete movement tick in a `World`
 transaction, including the cost of capturing rollback state and committing. The
