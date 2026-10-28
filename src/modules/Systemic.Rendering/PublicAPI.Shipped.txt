@@ -1,0 +1,28 @@
+#nullable enable
+static Systemic.Rendering.SwarmColor.Pack(byte red, byte green, byte blue, byte alpha = 255) -> uint
+static Systemic.Rendering.SwarmColor.Unpack(uint rgba) -> (byte Red, byte Green, byte Blue, byte Alpha)
+Systemic.Rendering.ISwarmSource
+Systemic.Rendering.ISwarmSource.Id.get -> string!
+Systemic.Rendering.ISwarmSource.Instances.get -> System.ReadOnlySpan<Systemic.Rendering.SwarmInstance>
+Systemic.Rendering.ISwarmSource.Revision.get -> int
+Systemic.Rendering.SwarmColor
+Systemic.Rendering.SwarmInstance
+Systemic.Rendering.SwarmInstance.Position.get -> System.Numerics.Vector2
+Systemic.Rendering.SwarmInstance.Rgba.get -> uint
+Systemic.Rendering.SwarmInstance.Rotation.get -> float
+Systemic.Rendering.SwarmInstance.Size.get -> float
+Systemic.Rendering.SwarmInstance.SwarmInstance() -> void
+Systemic.Rendering.SwarmInstance.SwarmInstance(System.Numerics.Vector2 position, float size, float rotation, uint rgba) -> void
+Systemic.Rendering.SwarmScene
+Systemic.Rendering.SwarmScene.Add(Systemic.Rendering.ISwarmSource! source) -> void
+Systemic.Rendering.SwarmScene.InstanceCount.get -> int
+Systemic.Rendering.SwarmScene.Remove(Systemic.Rendering.ISwarmSource! source) -> bool
+Systemic.Rendering.SwarmScene.Sources.get -> System.Collections.Generic.IReadOnlyList<Systemic.Rendering.ISwarmSource!>!
+Systemic.Rendering.SwarmScene.SwarmScene() -> void
+Systemic.Rendering.SwarmSource
+Systemic.Rendering.SwarmSource.BeginWrite(int count) -> System.Memory<Systemic.Rendering.SwarmInstance>
+Systemic.Rendering.SwarmSource.EndWrite() -> void
+Systemic.Rendering.SwarmSource.Id.get -> string!
+Systemic.Rendering.SwarmSource.Instances.get -> System.ReadOnlySpan<Systemic.Rendering.SwarmInstance>
+Systemic.Rendering.SwarmSource.Revision.get -> int
+Systemic.Rendering.SwarmSource.SwarmSource(string! id, int capacity = 0) -> void

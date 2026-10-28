@@ -1,0 +1,881 @@
+#nullable enable
+abstract Systemic.Kernel.Entity.Clone() -> Systemic.Kernel.Entity!
+abstract Systemic.Kernel.Entity.RestoreFrom(Systemic.Kernel.Entity! snapshot) -> void
+abstract Systemic.Kernel.ResourceEntity.Identity.get -> string!
+const Systemic.Kernel.DeterministicRandom.AlgorithmVersion = 1 -> int
+const Systemic.Kernel.Entity.ToRemoveProperty = "to_remove" -> string!
+const Systemic.Kernel.EntityCapabilities.BeProduced = "be_produced" -> string!
+const Systemic.Kernel.EntityCapabilities.BeSpent = "be_spent" -> string!
+const Systemic.Kernel.EntityProperties.Amount = "amount" -> string!
+const Systemic.Kernel.EntityTags.Resource = "resource" -> string!
+const Systemic.Kernel.Population<TKind>.MaximumTags = 64 -> int
+const Systemic.Kernel.PopulationWorldState.CurrentVersion = 1 -> int
+const Systemic.Kernel.RowModifiers.SlotsPerRow = 8 -> int
+const Systemic.Kernel.RowModifierSlot.EmptyKey = 0 -> ushort
+const Systemic.Kernel.World.DefaultSpatialCellSize = 32 -> float
+override abstract Systemic.Kernel.ResourceEntity.RestoreFrom(Systemic.Kernel.Entity! snapshot) -> void
+override Systemic.Kernel.Bounds2.GetHashCode() -> int
+override Systemic.Kernel.DataEntity.Clone() -> Systemic.Kernel.Entity!
+override Systemic.Kernel.DataEntity.RestoreFrom(Systemic.Kernel.Entity! snapshot) -> void
+override Systemic.Kernel.DataEntity.TryGetProperty(Systemic.Kernel.World! world, string! name, out double value) -> bool
+override Systemic.Kernel.DataEntity.TrySetProperty(Systemic.Kernel.World! world, string! name, double value) -> bool
+override Systemic.Kernel.DrawStreamSnapshot.GetHashCode() -> int
+override Systemic.Kernel.Fixed64.Equals(object? obj) -> bool
+override Systemic.Kernel.Fixed64.GetHashCode() -> int
+override Systemic.Kernel.Fixed64.ToString() -> string!
+override Systemic.Kernel.FixedVector2.Equals(object? obj) -> bool
+override Systemic.Kernel.FixedVector2.GetHashCode() -> int
+override Systemic.Kernel.FixedVector2.ToString() -> string!
+override Systemic.Kernel.GridCell2D.GetHashCode() -> int
+override Systemic.Kernel.Point2.GetHashCode() -> int
+override Systemic.Kernel.PopulationColumnSaveState.Equals(object? obj) -> bool
+override Systemic.Kernel.PopulationColumnSaveState.GetHashCode() -> int
+override Systemic.Kernel.PopulationColumnSaveState.ToString() -> string!
+override Systemic.Kernel.PopulationCommandResult.GetHashCode() -> int
+override Systemic.Kernel.PopulationComputeAgent.GetHashCode() -> int
+override Systemic.Kernel.PopulationComputeResult.GetHashCode() -> int
+override Systemic.Kernel.PopulationHandle<TKind>.GetHashCode() -> int
+override Systemic.Kernel.PopulationHandleSlotState.GetHashCode() -> int
+override Systemic.Kernel.PopulationRange.GetHashCode() -> int
+override Systemic.Kernel.PopulationRowReference.GetHashCode() -> int
+override Systemic.Kernel.PopulationRowReference.ToString() -> string!
+override Systemic.Kernel.PopulationSaveState.Equals(object? obj) -> bool
+override Systemic.Kernel.PopulationSaveState.GetHashCode() -> int
+override Systemic.Kernel.PopulationSaveState.ToString() -> string!
+override Systemic.Kernel.PopulationWorldState.Equals(object? obj) -> bool
+override Systemic.Kernel.PopulationWorldState.GetHashCode() -> int
+override Systemic.Kernel.PopulationWorldState.ToString() -> string!
+override Systemic.Kernel.PropertyGrant.Equals(object? obj) -> bool
+override Systemic.Kernel.PropertyGrant.GetHashCode() -> int
+override Systemic.Kernel.PropertyGrant.ToString() -> string!
+override Systemic.Kernel.PropertyModifier.Equals(object? obj) -> bool
+override Systemic.Kernel.PropertyModifier.GetHashCode() -> int
+override Systemic.Kernel.PropertyModifier.ToString() -> string!
+override Systemic.Kernel.ResourceEntity.TryGetProperty(Systemic.Kernel.World! world, string! name, out double value) -> bool
+override Systemic.Kernel.ResourceEntity.TryProduce(Systemic.Kernel.World! world, double amount, int activations = 1) -> double
+override Systemic.Kernel.RowModifierSlot.ToString() -> string!
+override Systemic.Kernel.SimpleResourceEntity.Clone() -> Systemic.Kernel.Entity!
+override Systemic.Kernel.SimpleResourceEntity.Identity.get -> string!
+override Systemic.Kernel.SimpleResourceEntity.RestoreFrom(Systemic.Kernel.Entity! snapshot) -> void
+override Systemic.Kernel.SystemAccess.GetHashCode() -> int
+static Systemic.Kernel.Bounds2.operator !=(Systemic.Kernel.Bounds2 left, Systemic.Kernel.Bounds2 right) -> bool
+static Systemic.Kernel.Bounds2.operator ==(Systemic.Kernel.Bounds2 left, Systemic.Kernel.Bounds2 right) -> bool
+static Systemic.Kernel.DeterministicColumnKernels.Add(System.ReadOnlySpan<int> left, System.ReadOnlySpan<int> right, System.Span<int> destination) -> void
+static Systemic.Kernel.DeterministicColumnKernels.Add(System.ReadOnlySpan<long> left, System.ReadOnlySpan<long> right, System.Span<long> destination) -> void
+static Systemic.Kernel.DeterministicColumnKernels.Multiply(System.ReadOnlySpan<int> values, int factor, System.Span<int> destination) -> void
+static Systemic.Kernel.DeterministicColumnKernels.Subtract(System.ReadOnlySpan<int> left, System.ReadOnlySpan<int> right, System.Span<int> destination) -> void
+static Systemic.Kernel.DeterministicColumnKernels.Subtract(System.ReadOnlySpan<long> left, System.ReadOnlySpan<long> right, System.Span<long> destination) -> void
+static Systemic.Kernel.DeterministicColumnKernels.Sum(System.ReadOnlySpan<int> values) -> long
+static Systemic.Kernel.DeterministicDecimal.Add(decimal left, decimal right, int scale) -> decimal
+static Systemic.Kernel.DeterministicDecimal.Divide(decimal left, decimal right, int scale) -> decimal
+static Systemic.Kernel.DeterministicDecimal.Multiply(decimal left, decimal right, int scale) -> decimal
+static Systemic.Kernel.DeterministicDecimal.Round(decimal value, int scale) -> decimal
+static Systemic.Kernel.DeterministicDecimal.Subtract(decimal left, decimal right, int scale) -> decimal
+static Systemic.Kernel.DeterministicRandom.HashSystemId(string! systemId) -> ulong
+static Systemic.Kernel.DeterministicTrig.SinCos(Systemic.Kernel.Fixed64 turns) -> (Systemic.Kernel.Fixed64 Sin, Systemic.Kernel.Fixed64 Cos)
+static Systemic.Kernel.DrawStreamSnapshot.operator !=(Systemic.Kernel.DrawStreamSnapshot left, Systemic.Kernel.DrawStreamSnapshot right) -> bool
+static Systemic.Kernel.DrawStreamSnapshot.operator ==(Systemic.Kernel.DrawStreamSnapshot left, Systemic.Kernel.DrawStreamSnapshot right) -> bool
+static Systemic.Kernel.Entity.RestoreArray<T>(ref T[]! live, T[]! snapshot) -> void
+static Systemic.Kernel.Fixed64.explicit operator decimal(Systemic.Kernel.Fixed64 value) -> decimal
+static Systemic.Kernel.Fixed64.explicit operator int(Systemic.Kernel.Fixed64 value) -> int
+static Systemic.Kernel.Fixed64.explicit operator long(Systemic.Kernel.Fixed64 value) -> long
+static Systemic.Kernel.Fixed64.explicit operator Systemic.Kernel.Fixed64(decimal value) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.explicit operator Systemic.Kernel.Fixed64(int value) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.explicit operator Systemic.Kernel.Fixed64(long value) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.FromRaw(long raw) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.One.get -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.operator !=(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> bool
+static Systemic.Kernel.Fixed64.operator *(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.operator +(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.operator -(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.operator -(Systemic.Kernel.Fixed64 value) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.operator /(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64.operator <(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> bool
+static Systemic.Kernel.Fixed64.operator <=(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> bool
+static Systemic.Kernel.Fixed64.operator ==(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> bool
+static Systemic.Kernel.Fixed64.operator >(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> bool
+static Systemic.Kernel.Fixed64.operator >=(Systemic.Kernel.Fixed64 left, Systemic.Kernel.Fixed64 right) -> bool
+static Systemic.Kernel.Fixed64.Zero.get -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.Fixed64Codec.Instance.get -> Systemic.Kernel.Fixed64Codec!
+static Systemic.Kernel.FixedUpdateLod.ShouldUpdate(ulong stableId, long tick, int period) -> bool
+static Systemic.Kernel.FixedVector2.Dot(Systemic.Kernel.FixedVector2 left, Systemic.Kernel.FixedVector2 right) -> Systemic.Kernel.Fixed64
+static Systemic.Kernel.FixedVector2.operator !=(Systemic.Kernel.FixedVector2 left, Systemic.Kernel.FixedVector2 right) -> bool
+static Systemic.Kernel.FixedVector2.operator *(Systemic.Kernel.Fixed64 scalar, Systemic.Kernel.FixedVector2 value) -> Systemic.Kernel.FixedVector2
+static Systemic.Kernel.FixedVector2.operator *(Systemic.Kernel.FixedVector2 value, Systemic.Kernel.Fixed64 scalar) -> Systemic.Kernel.FixedVector2
+static Systemic.Kernel.FixedVector2.operator +(Systemic.Kernel.FixedVector2 left, Systemic.Kernel.FixedVector2 right) -> Systemic.Kernel.FixedVector2
+static Systemic.Kernel.FixedVector2.operator -(Systemic.Kernel.FixedVector2 left, Systemic.Kernel.FixedVector2 right) -> Systemic.Kernel.FixedVector2
+static Systemic.Kernel.FixedVector2.operator -(Systemic.Kernel.FixedVector2 value) -> Systemic.Kernel.FixedVector2
+static Systemic.Kernel.FixedVector2.operator /(Systemic.Kernel.FixedVector2 value, Systemic.Kernel.Fixed64 scalar) -> Systemic.Kernel.FixedVector2
+static Systemic.Kernel.FixedVector2.operator ==(Systemic.Kernel.FixedVector2 left, Systemic.Kernel.FixedVector2 right) -> bool
+static Systemic.Kernel.FixedVector2.Zero.get -> Systemic.Kernel.FixedVector2
+static Systemic.Kernel.FixedVector2Codec.Instance.get -> Systemic.Kernel.FixedVector2Codec!
+static Systemic.Kernel.GridCell2D.operator !=(Systemic.Kernel.GridCell2D left, Systemic.Kernel.GridCell2D right) -> bool
+static Systemic.Kernel.GridCell2D.operator ==(Systemic.Kernel.GridCell2D left, Systemic.Kernel.GridCell2D right) -> bool
+static Systemic.Kernel.Point2.operator !=(Systemic.Kernel.Point2 left, Systemic.Kernel.Point2 right) -> bool
+static Systemic.Kernel.Point2.operator ==(Systemic.Kernel.Point2 left, Systemic.Kernel.Point2 right) -> bool
+static Systemic.Kernel.Population<TKind>.MaximumRowModifiers.get -> int
+static Systemic.Kernel.PopulationCodecs.Boolean.get -> Systemic.Kernel.IPopulationCodec<bool>!
+static Systemic.Kernel.PopulationCodecs.Byte.get -> Systemic.Kernel.IPopulationCodec<byte>!
+static Systemic.Kernel.PopulationCodecs.Char.get -> Systemic.Kernel.IPopulationCodec<char>!
+static Systemic.Kernel.PopulationCodecs.Decimal.get -> Systemic.Kernel.IPopulationCodec<decimal>!
+static Systemic.Kernel.PopulationCodecs.Double.get -> Systemic.Kernel.IPopulationCodec<double>!
+static Systemic.Kernel.PopulationCodecs.Int16.get -> Systemic.Kernel.IPopulationCodec<short>!
+static Systemic.Kernel.PopulationCodecs.Int32.get -> Systemic.Kernel.IPopulationCodec<int>!
+static Systemic.Kernel.PopulationCodecs.Int64.get -> Systemic.Kernel.IPopulationCodec<long>!
+static Systemic.Kernel.PopulationCodecs.SByte.get -> Systemic.Kernel.IPopulationCodec<sbyte>!
+static Systemic.Kernel.PopulationCodecs.Single.get -> Systemic.Kernel.IPopulationCodec<float>!
+static Systemic.Kernel.PopulationCodecs.UInt16.get -> Systemic.Kernel.IPopulationCodec<ushort>!
+static Systemic.Kernel.PopulationCodecs.UInt32.get -> Systemic.Kernel.IPopulationCodec<uint>!
+static Systemic.Kernel.PopulationCodecs.UInt64.get -> Systemic.Kernel.IPopulationCodec<ulong>!
+static Systemic.Kernel.PopulationCodecs.Vector2.get -> Systemic.Kernel.IPopulationCodec<System.Numerics.Vector2>!
+static Systemic.Kernel.PopulationCodecs.Vector3.get -> Systemic.Kernel.IPopulationCodec<System.Numerics.Vector3>!
+static Systemic.Kernel.PopulationCodecs.Vector4.get -> Systemic.Kernel.IPopulationCodec<System.Numerics.Vector4>!
+static Systemic.Kernel.PopulationColumnSaveState.operator !=(Systemic.Kernel.PopulationColumnSaveState? left, Systemic.Kernel.PopulationColumnSaveState? right) -> bool
+static Systemic.Kernel.PopulationColumnSaveState.operator ==(Systemic.Kernel.PopulationColumnSaveState? left, Systemic.Kernel.PopulationColumnSaveState? right) -> bool
+static Systemic.Kernel.PopulationCommandResult.operator !=(Systemic.Kernel.PopulationCommandResult left, Systemic.Kernel.PopulationCommandResult right) -> bool
+static Systemic.Kernel.PopulationCommandResult.operator ==(Systemic.Kernel.PopulationCommandResult left, Systemic.Kernel.PopulationCommandResult right) -> bool
+static Systemic.Kernel.PopulationComputeAgent.operator !=(Systemic.Kernel.PopulationComputeAgent left, Systemic.Kernel.PopulationComputeAgent right) -> bool
+static Systemic.Kernel.PopulationComputeAgent.operator ==(Systemic.Kernel.PopulationComputeAgent left, Systemic.Kernel.PopulationComputeAgent right) -> bool
+static Systemic.Kernel.PopulationComputeResult.operator !=(Systemic.Kernel.PopulationComputeResult left, Systemic.Kernel.PopulationComputeResult right) -> bool
+static Systemic.Kernel.PopulationComputeResult.operator ==(Systemic.Kernel.PopulationComputeResult left, Systemic.Kernel.PopulationComputeResult right) -> bool
+static Systemic.Kernel.PopulationHandle<TKind>.operator !=(Systemic.Kernel.PopulationHandle<TKind> left, Systemic.Kernel.PopulationHandle<TKind> right) -> bool
+static Systemic.Kernel.PopulationHandle<TKind>.operator ==(Systemic.Kernel.PopulationHandle<TKind> left, Systemic.Kernel.PopulationHandle<TKind> right) -> bool
+static Systemic.Kernel.PopulationHandleSlotState.operator !=(Systemic.Kernel.PopulationHandleSlotState left, Systemic.Kernel.PopulationHandleSlotState right) -> bool
+static Systemic.Kernel.PopulationHandleSlotState.operator ==(Systemic.Kernel.PopulationHandleSlotState left, Systemic.Kernel.PopulationHandleSlotState right) -> bool
+static Systemic.Kernel.PopulationModifierCodec.Instance.get -> Systemic.Kernel.PopulationModifierCodec!
+static Systemic.Kernel.PopulationRange.operator !=(Systemic.Kernel.PopulationRange left, Systemic.Kernel.PopulationRange right) -> bool
+static Systemic.Kernel.PopulationRange.operator ==(Systemic.Kernel.PopulationRange left, Systemic.Kernel.PopulationRange right) -> bool
+static Systemic.Kernel.PopulationRowReference.operator !=(Systemic.Kernel.PopulationRowReference left, Systemic.Kernel.PopulationRowReference right) -> bool
+static Systemic.Kernel.PopulationRowReference.operator ==(Systemic.Kernel.PopulationRowReference left, Systemic.Kernel.PopulationRowReference right) -> bool
+static Systemic.Kernel.PopulationSaveState.operator !=(Systemic.Kernel.PopulationSaveState? left, Systemic.Kernel.PopulationSaveState? right) -> bool
+static Systemic.Kernel.PopulationSaveState.operator ==(Systemic.Kernel.PopulationSaveState? left, Systemic.Kernel.PopulationSaveState? right) -> bool
+static Systemic.Kernel.PopulationWorldState.operator !=(Systemic.Kernel.PopulationWorldState? left, Systemic.Kernel.PopulationWorldState? right) -> bool
+static Systemic.Kernel.PopulationWorldState.operator ==(Systemic.Kernel.PopulationWorldState? left, Systemic.Kernel.PopulationWorldState? right) -> bool
+static Systemic.Kernel.PropertyGrant.operator !=(Systemic.Kernel.PropertyGrant? left, Systemic.Kernel.PropertyGrant? right) -> bool
+static Systemic.Kernel.PropertyGrant.operator ==(Systemic.Kernel.PropertyGrant? left, Systemic.Kernel.PropertyGrant? right) -> bool
+static Systemic.Kernel.PropertyModifier.operator !=(Systemic.Kernel.PropertyModifier? left, Systemic.Kernel.PropertyModifier? right) -> bool
+static Systemic.Kernel.PropertyModifier.operator ==(Systemic.Kernel.PropertyModifier? left, Systemic.Kernel.PropertyModifier? right) -> bool
+static Systemic.Kernel.RowModifiers.AsReadOnlySpan(ref Systemic.Kernel.ModifierSlot8 block) -> System.ReadOnlySpan<Systemic.Kernel.RowModifierSlot>
+static Systemic.Kernel.RowModifiers.AsSpan(ref Systemic.Kernel.ModifierSlot8 block) -> System.Span<Systemic.Kernel.RowModifierSlot>
+static Systemic.Kernel.SystemAccess.DeferWorldWrites.get -> Systemic.Kernel.SystemAccess
+static Systemic.Kernel.SystemAccess.operator !=(Systemic.Kernel.SystemAccess left, Systemic.Kernel.SystemAccess right) -> bool
+static Systemic.Kernel.SystemAccess.operator ==(Systemic.Kernel.SystemAccess left, Systemic.Kernel.SystemAccess right) -> bool
+static Systemic.Kernel.SystemAccess.ReadColumn<TKind, TValue>(Systemic.Kernel.PopulationColumnKey<TValue>! column) -> Systemic.Kernel.SystemAccess
+static Systemic.Kernel.SystemAccess.ReadResource(string! resource) -> Systemic.Kernel.SystemAccess
+static Systemic.Kernel.SystemAccess.ReadWorld.get -> Systemic.Kernel.SystemAccess
+static Systemic.Kernel.SystemAccess.WriteColumn<TKind, TValue>(Systemic.Kernel.PopulationColumnKey<TValue>! column) -> Systemic.Kernel.SystemAccess
+static Systemic.Kernel.SystemAccess.WriteResource(string! resource) -> Systemic.Kernel.SystemAccess
+static Systemic.Kernel.SystemAccess.WriteWorld.get -> Systemic.Kernel.SystemAccess
+static Systemic.Kernel.World.RegisterRole(string! name) -> int
+Systemic.ActionAuthoring.ActionHandlerAttribute
+Systemic.ActionAuthoring.ActionHandlerAttribute.ActionHandlerAttribute(System.Type! eventType, string! id, int priority = 0, bool optional = false, string? actionId = null) -> void
+Systemic.ActionAuthoring.ActionHandlerAttribute.ActionId.get -> string?
+Systemic.ActionAuthoring.ActionHandlerAttribute.EventType.get -> System.Type!
+Systemic.ActionAuthoring.ActionHandlerAttribute.Id.get -> string!
+Systemic.ActionAuthoring.ActionHandlerAttribute.Optional.get -> bool
+Systemic.ActionAuthoring.ActionHandlerAttribute.Priority.get -> int
+Systemic.Kernel.Bounds2
+Systemic.Kernel.Bounds2.Bottom.get -> float
+Systemic.Kernel.Bounds2.Bounds2() -> void
+Systemic.Kernel.Bounds2.Bounds2(float X, float Y, float HalfWidth, float HalfHeight) -> void
+Systemic.Kernel.Bounds2.Deconstruct(out float X, out float Y, out float HalfWidth, out float HalfHeight) -> void
+Systemic.Kernel.Bounds2.Equals(Systemic.Kernel.Bounds2 other) -> bool
+Systemic.Kernel.Bounds2.HalfHeight.get -> float
+Systemic.Kernel.Bounds2.HalfHeight.init -> void
+Systemic.Kernel.Bounds2.HalfWidth.get -> float
+Systemic.Kernel.Bounds2.HalfWidth.init -> void
+Systemic.Kernel.Bounds2.IsValid.get -> bool
+Systemic.Kernel.Bounds2.Left.get -> float
+Systemic.Kernel.Bounds2.Overlaps(Systemic.Kernel.Bounds2 other) -> bool
+Systemic.Kernel.Bounds2.Right.get -> float
+Systemic.Kernel.Bounds2.Top.get -> float
+Systemic.Kernel.Bounds2.X.get -> float
+Systemic.Kernel.Bounds2.X.init -> void
+Systemic.Kernel.Bounds2.Y.get -> float
+Systemic.Kernel.Bounds2.Y.init -> void
+Systemic.Kernel.CpuPopulationComputeBackend
+Systemic.Kernel.CpuPopulationComputeBackend.CpuPopulationComputeBackend() -> void
+Systemic.Kernel.CpuPopulationComputeBackend.IntegrateAsync(System.ReadOnlyMemory<Systemic.Kernel.PopulationComputeAgent> input, System.Memory<Systemic.Kernel.PopulationComputeAgent> output, Systemic.Kernel.Fixed64 elapsed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Systemic.Kernel.PopulationComputeResult>
+Systemic.Kernel.DataEntity
+Systemic.Kernel.DataEntity.DataEntity(System.Collections.Generic.IEnumerable<string!>! tags, System.Collections.Generic.IEnumerable<string!>! capabilities, params (string! Name, double Value)[]! properties) -> void
+Systemic.Kernel.DataEntity.Properties.get -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+Systemic.Kernel.DeterministicColumnKernels
+Systemic.Kernel.DeterministicDecimal
+Systemic.Kernel.DeterministicRandom
+Systemic.Kernel.DeterministicRandom.At(ulong drawIndex) -> ulong
+Systemic.Kernel.DeterministicRandom.DeterministicRandom() -> void
+Systemic.Kernel.DeterministicRandom.DeterministicRandom(ulong seed, string! systemId, ulong entityId, ulong tick) -> void
+Systemic.Kernel.DeterministicRandom.UnitFixed(ulong drawIndex) -> Systemic.Kernel.Fixed64
+Systemic.Kernel.DeterministicRandomFactory
+Systemic.Kernel.DeterministicRandomFactory.DeterministicRandomFactory() -> void
+Systemic.Kernel.DeterministicRandomFactory.DeterministicRandomFactory(ulong seed, string! systemId) -> void
+Systemic.Kernel.DeterministicRandomFactory.ForEntity(ulong entityId, ulong tick) -> Systemic.Kernel.DeterministicRandom
+Systemic.Kernel.DeterministicSystemSchedule
+Systemic.Kernel.DeterministicSystemSchedule.Dispose() -> void
+Systemic.Kernel.DeterministicSystemSchedule.Execute(Systemic.Kernel.World! world, int tick) -> void
+Systemic.Kernel.DeterministicSystemSchedule.SystemCount.get -> int
+Systemic.Kernel.DeterministicSystemSchedule.Waves.get -> System.Collections.Immutable.ImmutableArray<System.Collections.Immutable.ImmutableArray<string!>>
+Systemic.Kernel.DeterministicSystemSchedule.WorkerCount.get -> int
+Systemic.Kernel.DeterministicSystemScheduleBuilder
+Systemic.Kernel.DeterministicSystemScheduleBuilder.Add(Systemic.Kernel.IScheduledKernelSystem! system) -> Systemic.Kernel.DeterministicSystemScheduleBuilder!
+Systemic.Kernel.DeterministicSystemScheduleBuilder.Build() -> Systemic.Kernel.DeterministicSystemSchedule!
+Systemic.Kernel.DeterministicSystemScheduleBuilder.DeterministicSystemScheduleBuilder(int workerCount = 0) -> void
+Systemic.Kernel.DeterministicTrig
+Systemic.Kernel.DoubleBufferedPopulationColumn<T>
+Systemic.Kernel.DoubleBufferedPopulationColumn<T>.Count.get -> int
+Systemic.Kernel.DoubleBufferedPopulationColumn<T>.Swap() -> void
+Systemic.Kernel.DoubleBufferedPopulationEdit<T>
+Systemic.Kernel.DoubleBufferedPopulationEdit<T>.Current.get -> System.Span<T>
+Systemic.Kernel.DoubleBufferedPopulationEdit<T>.DoubleBufferedPopulationEdit() -> void
+Systemic.Kernel.DoubleBufferedPopulationEdit<T>.DoubleBufferedPopulationEdit(System.Span<T> current, System.Span<T> next) -> void
+Systemic.Kernel.DoubleBufferedPopulationEdit<T>.Next.get -> System.Span<T>
+Systemic.Kernel.DrawStream
+Systemic.Kernel.DrawStream.CaptureState() -> Systemic.Kernel.DrawStreamSnapshot
+Systemic.Kernel.DrawStream.Clone() -> Systemic.Kernel.DrawStream!
+Systemic.Kernel.DrawStream.Draws.get -> int
+Systemic.Kernel.DrawStream.DrawStream(int seed) -> void
+Systemic.Kernel.DrawStream.NextFloat() -> float
+Systemic.Kernel.DrawStream.RestoreState(Systemic.Kernel.DrawStreamSnapshot state) -> void
+Systemic.Kernel.DrawStream.Seed(int seed) -> void
+Systemic.Kernel.DrawStreamSnapshot
+Systemic.Kernel.DrawStreamSnapshot.Deconstruct(out ulong State, out ulong Increment, out int Draws) -> void
+Systemic.Kernel.DrawStreamSnapshot.Draws.get -> int
+Systemic.Kernel.DrawStreamSnapshot.Draws.init -> void
+Systemic.Kernel.DrawStreamSnapshot.DrawStreamSnapshot() -> void
+Systemic.Kernel.DrawStreamSnapshot.DrawStreamSnapshot(ulong State, ulong Increment, int Draws) -> void
+Systemic.Kernel.DrawStreamSnapshot.Equals(Systemic.Kernel.DrawStreamSnapshot other) -> bool
+Systemic.Kernel.DrawStreamSnapshot.Increment.get -> ulong
+Systemic.Kernel.DrawStreamSnapshot.Increment.init -> void
+Systemic.Kernel.DrawStreamSnapshot.State.get -> ulong
+Systemic.Kernel.DrawStreamSnapshot.State.init -> void
+Systemic.Kernel.Entity
+Systemic.Kernel.Entity.AddCapability(string! capability) -> void
+Systemic.Kernel.Entity.AddTag(string! tag) -> void
+Systemic.Kernel.Entity.Capabilities.get -> System.Collections.Generic.IReadOnlySet<string!>!
+Systemic.Kernel.Entity.CopyBaseTo(Systemic.Kernel.Entity! clone) -> void
+Systemic.Kernel.Entity.Entity(params string![]! tags) -> void
+Systemic.Kernel.Entity.HasCapability(string! capability) -> bool
+Systemic.Kernel.Entity.HasTag(string! tag) -> bool
+Systemic.Kernel.Entity.Id.get -> int
+Systemic.Kernel.Entity.Links.get -> System.Collections.Generic.IReadOnlyDictionary<string!, int>!
+Systemic.Kernel.Entity.MarkMutated() -> void
+Systemic.Kernel.Entity.OwnerWorld.get -> Systemic.Kernel.World?
+Systemic.Kernel.Entity.RecordCompactPropertyUndo<T>(string! propertyName, T previousValue) -> void
+Systemic.Kernel.Entity.RemoveCapability(string! capability) -> void
+Systemic.Kernel.Entity.RemoveLink(string! link) -> void
+Systemic.Kernel.Entity.RemoveTag(string! tag) -> void
+Systemic.Kernel.Entity.RestoreBaseFrom(Systemic.Kernel.Entity! snapshot) -> void
+Systemic.Kernel.Entity.RestoreBaseState(System.Collections.Generic.IEnumerable<string!>! tags, System.Collections.Generic.IEnumerable<string!>! capabilities, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, int>>! links, bool toRemove) -> void
+Systemic.Kernel.Entity.Set<T>(ref T field, T value, string! propertyName = "") -> void
+Systemic.Kernel.Entity.SetElement<T>(T[]! array, int index, T value) -> void
+Systemic.Kernel.Entity.SetLink(string! link, int targetId) -> void
+Systemic.Kernel.Entity.Tags.get -> System.Collections.Generic.IReadOnlySet<string!>!
+Systemic.Kernel.Entity.ToRemove.get -> bool
+Systemic.Kernel.EntityAttribute
+Systemic.Kernel.EntityAttribute.EntityAttribute(System.Type? properties = null) -> void
+Systemic.Kernel.EntityAttribute.Properties.get -> System.Type?
+Systemic.Kernel.EntityCapabilities
+Systemic.Kernel.EntityProperties
+Systemic.Kernel.EntityTags
+Systemic.Kernel.Fixed64
+Systemic.Kernel.Fixed64.CompareTo(Systemic.Kernel.Fixed64 other) -> int
+Systemic.Kernel.Fixed64.Equals(Systemic.Kernel.Fixed64 other) -> bool
+Systemic.Kernel.Fixed64.Fixed64() -> void
+Systemic.Kernel.Fixed64.RawValue.get -> long
+Systemic.Kernel.Fixed64Codec
+Systemic.Kernel.Fixed64Codec.Decode(System.ReadOnlySpan<byte> source, System.Span<Systemic.Kernel.Fixed64> values) -> void
+Systemic.Kernel.Fixed64Codec.ElementSize.get -> int
+Systemic.Kernel.Fixed64Codec.Encode(System.ReadOnlySpan<Systemic.Kernel.Fixed64> values, System.Span<byte> destination) -> void
+Systemic.Kernel.Fixed64Codec.GetEncodedLength(int valueCount) -> int
+Systemic.Kernel.Fixed64Codec.Id.get -> string!
+Systemic.Kernel.Fixed64Codec.Version.get -> int
+Systemic.Kernel.FixedPopulationSpatialIndex2D
+Systemic.Kernel.FixedPopulationSpatialIndex2D.Count.get -> int
+Systemic.Kernel.FixedPopulationSpatialIndex2D.FixedPopulationSpatialIndex2D(Systemic.Kernel.FixedVector2 minimum, Systemic.Kernel.FixedVector2 maximum, bool wrapX = false, bool wrapY = false) -> void
+Systemic.Kernel.FixedPopulationSpatialIndex2D.Maximum.get -> Systemic.Kernel.FixedVector2
+Systemic.Kernel.FixedPopulationSpatialIndex2D.Minimum.get -> Systemic.Kernel.FixedVector2
+Systemic.Kernel.FixedPopulationSpatialIndex2D.QueryKNearest(Systemic.Kernel.FixedVector2 center, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.FixedPopulationSpatialIndex2D.QueryKNearest(Systemic.Kernel.FixedVector2 center, Systemic.Kernel.Fixed64 radius, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.FixedPopulationSpatialIndex2D.QueryRadius(Systemic.Kernel.FixedVector2 center, Systemic.Kernel.Fixed64 radius, System.Collections.Generic.List<int>! results, int maximumResults = 2147483647) -> void
+Systemic.Kernel.FixedPopulationSpatialIndex2D.Rebuild(System.ReadOnlySpan<Systemic.Kernel.FixedVector2> positions) -> Systemic.Kernel.FixedPopulationSpatialIndex2DSnapshot
+Systemic.Kernel.FixedPopulationSpatialIndex2D.Reserve(int rowCapacity) -> void
+Systemic.Kernel.FixedPopulationSpatialIndex2D.TryQueryNearest(Systemic.Kernel.FixedVector2 center, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.FixedPopulationSpatialIndex2D.TryQueryNearest(Systemic.Kernel.FixedVector2 center, Systemic.Kernel.Fixed64 radius, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.FixedPopulationSpatialIndex2DSnapshot
+Systemic.Kernel.FixedPopulationSpatialIndex2DSnapshot.FixedPopulationSpatialIndex2DSnapshot() -> void
+Systemic.Kernel.FixedPopulationSpatialIndex2DSnapshot.FixedPopulationSpatialIndex2DSnapshot(Systemic.Kernel.FixedPopulationSpatialIndex2D! index, int version) -> void
+Systemic.Kernel.FixedPopulationSpatialIndex2DSnapshot.QueryKNearest(Systemic.Kernel.FixedVector2 center, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.FixedPopulationSpatialIndex2DSnapshot.QueryKNearest(Systemic.Kernel.FixedVector2 center, Systemic.Kernel.Fixed64 radius, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.FixedPopulationSpatialIndex2DSnapshot.QueryRadius(Systemic.Kernel.FixedVector2 center, Systemic.Kernel.Fixed64 radius, System.Collections.Generic.List<int>! results, int maximumResults = 2147483647) -> void
+Systemic.Kernel.FixedPopulationSpatialIndex2DSnapshot.TryQueryNearest(Systemic.Kernel.FixedVector2 center, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.FixedPopulationSpatialIndex2DSnapshot.TryQueryNearest(Systemic.Kernel.FixedVector2 center, Systemic.Kernel.Fixed64 radius, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.FixedUpdateLod
+Systemic.Kernel.FixedVector2
+Systemic.Kernel.FixedVector2.Equals(Systemic.Kernel.FixedVector2 other) -> bool
+Systemic.Kernel.FixedVector2.FixedVector2() -> void
+Systemic.Kernel.FixedVector2.FixedVector2(Systemic.Kernel.Fixed64 x, Systemic.Kernel.Fixed64 y) -> void
+Systemic.Kernel.FixedVector2.LengthSquared() -> Systemic.Kernel.Fixed64
+Systemic.Kernel.FixedVector2.X.get -> Systemic.Kernel.Fixed64
+Systemic.Kernel.FixedVector2.Y.get -> Systemic.Kernel.Fixed64
+Systemic.Kernel.FixedVector2Codec
+Systemic.Kernel.FixedVector2Codec.Decode(System.ReadOnlySpan<byte> source, System.Span<Systemic.Kernel.FixedVector2> values) -> void
+Systemic.Kernel.FixedVector2Codec.ElementSize.get -> int
+Systemic.Kernel.FixedVector2Codec.Encode(System.ReadOnlySpan<Systemic.Kernel.FixedVector2> values, System.Span<byte> destination) -> void
+Systemic.Kernel.FixedVector2Codec.GetEncodedLength(int valueCount) -> int
+Systemic.Kernel.FixedVector2Codec.Id.get -> string!
+Systemic.Kernel.FixedVector2Codec.Version.get -> int
+Systemic.Kernel.GrantKind
+Systemic.Kernel.GrantKind.Capability = 1 -> Systemic.Kernel.GrantKind
+Systemic.Kernel.GrantKind.Tag = 0 -> Systemic.Kernel.GrantKind
+Systemic.Kernel.GridCell2D
+Systemic.Kernel.GridCell2D.Deconstruct(out int X, out int Y) -> void
+Systemic.Kernel.GridCell2D.Equals(Systemic.Kernel.GridCell2D other) -> bool
+Systemic.Kernel.GridCell2D.GridCell2D() -> void
+Systemic.Kernel.GridCell2D.GridCell2D(int X, int Y) -> void
+Systemic.Kernel.GridCell2D.X.get -> int
+Systemic.Kernel.GridCell2D.X.init -> void
+Systemic.Kernel.GridCell2D.Y.get -> int
+Systemic.Kernel.GridCell2D.Y.init -> void
+Systemic.Kernel.GridOutOfBoundsPolicy
+Systemic.Kernel.GridOutOfBoundsPolicy.Blocked = 0 -> Systemic.Kernel.GridOutOfBoundsPolicy
+Systemic.Kernel.GridOutOfBoundsPolicy.Free = 1 -> Systemic.Kernel.GridOutOfBoundsPolicy
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.Add(int row, System.Numerics.Vector2 position) -> void
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.Bounds.get -> Systemic.Kernel.Bounds2
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.CellSize.get -> float
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.Count.get -> int
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.IncrementalPopulationSpatialGrid2D(Systemic.Kernel.Bounds2 bounds, float cellSize, bool wrapX = false, bool wrapY = false) -> void
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.QueryBounds(Systemic.Kernel.Bounds2 area, System.Collections.Generic.List<int>! results) -> void
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.QueryKNearest(System.Numerics.Vector2 center, float radius, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.QueryKNearest(System.Numerics.Vector2 center, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.QueryRadius(System.Numerics.Vector2 center, float radius, System.Collections.Generic.List<int>! results, int maximumResults = 2147483647) -> void
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.Remove(int row) -> bool
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.TryQueryNearest(System.Numerics.Vector2 center, float radius, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.TryQueryNearest(System.Numerics.Vector2 center, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.IncrementalPopulationSpatialGrid2D.Update(int row, System.Numerics.Vector2 position) -> void
+Systemic.Kernel.InvalidPositionPolicy
+Systemic.Kernel.InvalidPositionPolicy.Skip = 1 -> Systemic.Kernel.InvalidPositionPolicy
+Systemic.Kernel.InvalidPositionPolicy.Throw = 0 -> Systemic.Kernel.InvalidPositionPolicy
+Systemic.Kernel.IPopulationCodec<T>
+Systemic.Kernel.IPopulationCodec<T>.Decode(System.ReadOnlySpan<byte> source, System.Span<T> values) -> void
+Systemic.Kernel.IPopulationCodec<T>.ElementSize.get -> int
+Systemic.Kernel.IPopulationCodec<T>.Encode(System.ReadOnlySpan<T> values, System.Span<byte> destination) -> void
+Systemic.Kernel.IPopulationCodec<T>.GetEncodedLength(int valueCount) -> int
+Systemic.Kernel.IPopulationCodec<T>.Id.get -> string!
+Systemic.Kernel.IPopulationCodec<T>.Version.get -> int
+Systemic.Kernel.IPopulationComputeBackend
+Systemic.Kernel.IPopulationComputeBackend.IntegrateAsync(System.ReadOnlyMemory<Systemic.Kernel.PopulationComputeAgent> input, System.Memory<Systemic.Kernel.PopulationComputeAgent> output, Systemic.Kernel.Fixed64 elapsed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Systemic.Kernel.PopulationComputeResult>
+Systemic.Kernel.IPopulationKind
+Systemic.Kernel.IPopulationKind.Id.get -> string!
+Systemic.Kernel.IPopulationKind.ModifierProperties.get -> string![]!
+Systemic.Kernel.IPopulationKind.Tags.get -> string![]!
+Systemic.Kernel.IPopulationKind.Version.get -> int
+Systemic.Kernel.IPopulationSchema<TSelf>
+Systemic.Kernel.IPopulationSchema<TSelf>.InitializeRange(Systemic.Kernel.Population<TSelf>! population, Systemic.Kernel.PopulationRange range, System.ReadOnlySpan<TSelf> values) -> void
+Systemic.Kernel.IScheduledKernelSystem
+Systemic.Kernel.IScheduledKernelSystem.Access.get -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.SystemAccess>!
+Systemic.Kernel.IScheduledKernelSystem.Execute(Systemic.Kernel.ScheduledSystemContext! context) -> void
+Systemic.Kernel.IScheduledKernelSystem.Id.get -> string!
+Systemic.Kernel.ModifierOperation
+Systemic.Kernel.ModifierOperation.Add = 0 -> Systemic.Kernel.ModifierOperation
+Systemic.Kernel.ModifierOperation.Multiply = 1 -> Systemic.Kernel.ModifierOperation
+Systemic.Kernel.ModifierOperation.Set = 2 -> Systemic.Kernel.ModifierOperation
+Systemic.Kernel.ModifierSlot8
+Systemic.Kernel.ModifierSlot8.ModifierSlot8() -> void
+Systemic.Kernel.ModifierStage
+Systemic.Kernel.ModifierStage.Additive = 2 -> Systemic.Kernel.ModifierStage
+Systemic.Kernel.ModifierStage.Final = 5 -> Systemic.Kernel.ModifierStage
+Systemic.Kernel.ModifierStage.Foundation = 1 -> Systemic.Kernel.ModifierStage
+Systemic.Kernel.ModifierStage.Multiplicative = 3 -> Systemic.Kernel.ModifierStage
+Systemic.Kernel.ModifierStage.Override = 4 -> Systemic.Kernel.ModifierStage
+Systemic.Kernel.ModifierStage.Standard = 0 -> Systemic.Kernel.ModifierStage
+Systemic.Kernel.Point2
+Systemic.Kernel.Point2.Deconstruct(out float X, out float Y) -> void
+Systemic.Kernel.Point2.Equals(Systemic.Kernel.Point2 other) -> bool
+Systemic.Kernel.Point2.Point2() -> void
+Systemic.Kernel.Point2.Point2(float X, float Y) -> void
+Systemic.Kernel.Point2.X.get -> float
+Systemic.Kernel.Point2.X.init -> void
+Systemic.Kernel.Point2.Y.get -> float
+Systemic.Kernel.Point2.Y.init -> void
+Systemic.Kernel.Population<TKind>
+Systemic.Kernel.Population<TKind>.AddRange(int count) -> Systemic.Kernel.PopulationRange
+Systemic.Kernel.Population<TKind>.AddTag(int row, string! tag) -> bool
+Systemic.Kernel.Population<TKind>.Borrow() -> Systemic.Kernel.PopulationLease<TKind>!
+Systemic.Kernel.Population<TKind>.Capacity.get -> int
+Systemic.Kernel.Population<TKind>.Column<T>(Systemic.Kernel.PopulationColumnKey<T>! key) -> Systemic.Kernel.PopulationColumn<T>!
+Systemic.Kernel.Population<TKind>.Count.get -> int
+Systemic.Kernel.Population<TKind>.DoubleBufferedColumn<T>(Systemic.Kernel.PopulationColumnKey<T>! key) -> Systemic.Kernel.DoubleBufferedPopulationColumn<T>!
+Systemic.Kernel.Population<TKind>.EffectiveValue(int row, string! property) -> double
+Systemic.Kernel.Population<TKind>.GetHandle(int row) -> Systemic.Kernel.PopulationHandle<TKind>
+Systemic.Kernel.Population<TKind>.HandlesEnabled.get -> bool
+Systemic.Kernel.Population<TKind>.HasTag(int row, string! tag) -> bool
+Systemic.Kernel.Population<TKind>.ModifierProperties.get -> System.ReadOnlyMemory<string!>
+Systemic.Kernel.Population<TKind>.ReferenceOf(int row) -> Systemic.Kernel.PopulationRowReference
+Systemic.Kernel.Population<TKind>.RemoveSwapBack(int row) -> void
+Systemic.Kernel.Population<TKind>.RemoveTag(int row, string! tag) -> bool
+Systemic.Kernel.Population<TKind>.Reserve(int capacity) -> void
+Systemic.Kernel.Population<TKind>.SetModifier(int row, string! property, double value, int remainingTicks = -1) -> bool
+Systemic.Kernel.Population<TKind>.Tags.get -> System.ReadOnlyMemory<string!>
+Systemic.Kernel.Population<TKind>.TryGetHandle(int slotIndex, ulong generation, out Systemic.Kernel.PopulationHandle<TKind> handle) -> bool
+Systemic.Kernel.Population<TKind>.TryRemove(Systemic.Kernel.PopulationHandle<TKind> handle) -> bool
+Systemic.Kernel.Population<TKind>.TryResolve(Systemic.Kernel.PopulationHandle<TKind> handle, out int row) -> bool
+Systemic.Kernel.Population<TKind>.WithAccess<TInput, TState>(Systemic.Kernel.PopulationRange range, scoped System.ReadOnlySpan<TInput> input, TState state, Systemic.Kernel.PopulationInputAccessAction<TKind, TInput, TState>! callback) -> void
+Systemic.Kernel.Population<TKind>.WithAccess<TState>(Systemic.Kernel.PopulationRange range, TState state, Systemic.Kernel.PopulationAccessAction<TKind, TState>! callback) -> void
+Systemic.Kernel.PopulationAccessAction<TKind, TState>
+Systemic.Kernel.PopulationAccessGuard
+Systemic.Kernel.PopulationAccessGuard.PopulationAccessGuard() -> void
+Systemic.Kernel.PopulationAccessGuard.Validate() -> void
+Systemic.Kernel.PopulationAccessScope<TKind>
+Systemic.Kernel.PopulationAccessScope<TKind>.EditBoth<T>(Systemic.Kernel.DoubleBufferedPopulationColumn<T>! column) -> Systemic.Kernel.DoubleBufferedPopulationEdit<T>
+Systemic.Kernel.PopulationAccessScope<TKind>.EditNext<T>(Systemic.Kernel.DoubleBufferedPopulationColumn<T>! column) -> System.Span<T>
+Systemic.Kernel.PopulationAccessScope<TKind>.EditRange<T>(Systemic.Kernel.PopulationColumn<T>! column) -> System.Span<T>
+Systemic.Kernel.PopulationAccessScope<TKind>.Guard.get -> Systemic.Kernel.PopulationAccessGuard
+Systemic.Kernel.PopulationAccessScope<TKind>.PopulationAccessScope() -> void
+Systemic.Kernel.PopulationAccessScope<TKind>.Range.get -> Systemic.Kernel.PopulationRange
+Systemic.Kernel.PopulationAccessScope<TKind>.ReadAll<T>(Systemic.Kernel.PopulationColumn<T>! column) -> System.ReadOnlySpan<T>
+Systemic.Kernel.PopulationAccessScope<TKind>.ReadAll<TOtherKind, T>(Systemic.Kernel.PopulationLease<TOtherKind>! lease, Systemic.Kernel.PopulationColumn<T>! column) -> System.ReadOnlySpan<T>
+Systemic.Kernel.PopulationAccessScope<TKind>.ReadCurrent<T>(Systemic.Kernel.DoubleBufferedPopulationColumn<T>! column) -> System.ReadOnlySpan<T>
+Systemic.Kernel.PopulationAccessScope<TKind>.ReadCurrent<TOtherKind, T>(Systemic.Kernel.PopulationLease<TOtherKind>! lease, Systemic.Kernel.DoubleBufferedPopulationColumn<T>! column) -> System.ReadOnlySpan<T>
+Systemic.Kernel.PopulationAccessScope<TKind>.ReadCurrentRange<T>(Systemic.Kernel.DoubleBufferedPopulationColumn<T>! column) -> System.ReadOnlySpan<T>
+Systemic.Kernel.PopulationAccessScope<TKind>.ReadRange<T>(Systemic.Kernel.PopulationColumn<T>! column) -> System.ReadOnlySpan<T>
+Systemic.Kernel.PopulationCodecs
+Systemic.Kernel.PopulationColumn<T>
+Systemic.Kernel.PopulationColumn<T>.Count.get -> int
+Systemic.Kernel.PopulationColumnAttribute
+Systemic.Kernel.PopulationColumnAttribute.CodecType.get -> System.Type?
+Systemic.Kernel.PopulationColumnAttribute.CodecType.init -> void
+Systemic.Kernel.PopulationColumnAttribute.DoubleBuffered.get -> bool
+Systemic.Kernel.PopulationColumnAttribute.DoubleBuffered.init -> void
+Systemic.Kernel.PopulationColumnAttribute.Id.get -> string!
+Systemic.Kernel.PopulationColumnAttribute.PopulationColumnAttribute(string! id) -> void
+Systemic.Kernel.PopulationColumnBase
+Systemic.Kernel.PopulationColumnBase.CodecId.get -> string!
+Systemic.Kernel.PopulationColumnBase.CodecVersion.get -> int
+Systemic.Kernel.PopulationColumnBase.ElementSize.get -> int
+Systemic.Kernel.PopulationColumnBase.Id.get -> string!
+Systemic.Kernel.PopulationColumnBase.IsDoubleBuffered.get -> bool
+Systemic.Kernel.PopulationColumnBase.PopulationColumnBase(string! id, int version, System.Type! valueType, string! codecId, int codecVersion, int elementSize, bool isDoubleBuffered) -> void
+Systemic.Kernel.PopulationColumnBase.ValidateSaveState(Systemic.Kernel.PopulationColumnSaveState! state, bool isDoubleBuffered, int expectedDataLength) -> void
+Systemic.Kernel.PopulationColumnBase.ValueType.get -> System.Type!
+Systemic.Kernel.PopulationColumnBase.Version.get -> int
+Systemic.Kernel.PopulationColumnKey<T>
+Systemic.Kernel.PopulationColumnKey<T>.Codec.get -> Systemic.Kernel.IPopulationCodec<T>!
+Systemic.Kernel.PopulationColumnKey<T>.Id.get -> string!
+Systemic.Kernel.PopulationColumnKey<T>.PopulationColumnKey(string! id, int version, Systemic.Kernel.IPopulationCodec<T>! codec) -> void
+Systemic.Kernel.PopulationColumnKey<T>.Version.get -> int
+Systemic.Kernel.PopulationColumnSaveState
+Systemic.Kernel.PopulationColumnSaveState.<Clone>$() -> Systemic.Kernel.PopulationColumnSaveState!
+Systemic.Kernel.PopulationColumnSaveState.CodecId.get -> string!
+Systemic.Kernel.PopulationColumnSaveState.CodecId.init -> void
+Systemic.Kernel.PopulationColumnSaveState.CodecVersion.get -> int
+Systemic.Kernel.PopulationColumnSaveState.CodecVersion.init -> void
+Systemic.Kernel.PopulationColumnSaveState.Data.get -> byte[]!
+Systemic.Kernel.PopulationColumnSaveState.Data.init -> void
+Systemic.Kernel.PopulationColumnSaveState.Deconstruct(out string! Id, out int Version, out string! CodecId, out int CodecVersion, out int ElementSize, out bool IsDoubleBuffered, out byte[]! Data) -> void
+Systemic.Kernel.PopulationColumnSaveState.ElementSize.get -> int
+Systemic.Kernel.PopulationColumnSaveState.ElementSize.init -> void
+Systemic.Kernel.PopulationColumnSaveState.Equals(Systemic.Kernel.PopulationColumnSaveState? other) -> bool
+Systemic.Kernel.PopulationColumnSaveState.Id.get -> string!
+Systemic.Kernel.PopulationColumnSaveState.Id.init -> void
+Systemic.Kernel.PopulationColumnSaveState.IsDoubleBuffered.get -> bool
+Systemic.Kernel.PopulationColumnSaveState.IsDoubleBuffered.init -> void
+Systemic.Kernel.PopulationColumnSaveState.PopulationColumnSaveState(string! Id, int Version, string! CodecId, int CodecVersion, int ElementSize, bool IsDoubleBuffered, byte[]! Data) -> void
+Systemic.Kernel.PopulationColumnSaveState.Version.get -> int
+Systemic.Kernel.PopulationColumnSaveState.Version.init -> void
+Systemic.Kernel.PopulationCommandBuffer<TKind>
+Systemic.Kernel.PopulationCommandBuffer<TKind>.Clear() -> void
+Systemic.Kernel.PopulationCommandBuffer<TKind>.Flush() -> Systemic.Kernel.PopulationCommandResult
+Systemic.Kernel.PopulationCommandBuffer<TKind>.PopulationCommandBuffer(Systemic.Kernel.Population<TKind>! population) -> void
+Systemic.Kernel.PopulationCommandBuffer<TKind>.Remove(Systemic.Kernel.PopulationHandle<TKind> handle) -> void
+Systemic.Kernel.PopulationCommandBuffer<TKind>.RemoveRow(int row) -> void
+Systemic.Kernel.PopulationCommandBuffer<TKind>.Reserve(int spawnCapacity, int removalCapacity) -> void
+Systemic.Kernel.PopulationCommandBuffer<TKind>.Spawn(System.ReadOnlySpan<TKind> values) -> void
+Systemic.Kernel.PopulationCommandResult
+Systemic.Kernel.PopulationCommandResult.Deconstruct(out Systemic.Kernel.PopulationRange SpawnedRows, out int RemovedCount) -> void
+Systemic.Kernel.PopulationCommandResult.Equals(Systemic.Kernel.PopulationCommandResult other) -> bool
+Systemic.Kernel.PopulationCommandResult.PopulationCommandResult() -> void
+Systemic.Kernel.PopulationCommandResult.PopulationCommandResult(Systemic.Kernel.PopulationRange SpawnedRows, int RemovedCount) -> void
+Systemic.Kernel.PopulationCommandResult.RemovedCount.get -> int
+Systemic.Kernel.PopulationCommandResult.RemovedCount.init -> void
+Systemic.Kernel.PopulationCommandResult.SpawnedRows.get -> Systemic.Kernel.PopulationRange
+Systemic.Kernel.PopulationCommandResult.SpawnedRows.init -> void
+Systemic.Kernel.PopulationComputeAgent
+Systemic.Kernel.PopulationComputeAgent.Deconstruct(out Systemic.Kernel.FixedVector2 Position, out Systemic.Kernel.FixedVector2 Velocity) -> void
+Systemic.Kernel.PopulationComputeAgent.Equals(Systemic.Kernel.PopulationComputeAgent other) -> bool
+Systemic.Kernel.PopulationComputeAgent.PopulationComputeAgent() -> void
+Systemic.Kernel.PopulationComputeAgent.PopulationComputeAgent(Systemic.Kernel.FixedVector2 Position, Systemic.Kernel.FixedVector2 Velocity) -> void
+Systemic.Kernel.PopulationComputeAgent.Position.get -> Systemic.Kernel.FixedVector2
+Systemic.Kernel.PopulationComputeAgent.Position.init -> void
+Systemic.Kernel.PopulationComputeAgent.Velocity.get -> Systemic.Kernel.FixedVector2
+Systemic.Kernel.PopulationComputeAgent.Velocity.init -> void
+Systemic.Kernel.PopulationComputeResult
+Systemic.Kernel.PopulationComputeResult.Count.get -> int
+Systemic.Kernel.PopulationComputeResult.Count.init -> void
+Systemic.Kernel.PopulationComputeResult.Deconstruct(out int Count, out System.Int128 SumXRaw, out System.Int128 SumYRaw) -> void
+Systemic.Kernel.PopulationComputeResult.Equals(Systemic.Kernel.PopulationComputeResult other) -> bool
+Systemic.Kernel.PopulationComputeResult.PopulationComputeResult() -> void
+Systemic.Kernel.PopulationComputeResult.PopulationComputeResult(int Count, System.Int128 SumXRaw, System.Int128 SumYRaw) -> void
+Systemic.Kernel.PopulationComputeResult.SumXRaw.get -> System.Int128
+Systemic.Kernel.PopulationComputeResult.SumXRaw.init -> void
+Systemic.Kernel.PopulationComputeResult.SumYRaw.get -> System.Int128
+Systemic.Kernel.PopulationComputeResult.SumYRaw.init -> void
+Systemic.Kernel.PopulationHandle<TKind>
+Systemic.Kernel.PopulationHandle<TKind>.Equals(Systemic.Kernel.PopulationHandle<TKind> other) -> bool
+Systemic.Kernel.PopulationHandle<TKind>.Generation.get -> ulong
+Systemic.Kernel.PopulationHandle<TKind>.PopulationHandle() -> void
+Systemic.Kernel.PopulationHandle<TKind>.Slot.get -> int
+Systemic.Kernel.PopulationHandleSlotState
+Systemic.Kernel.PopulationHandleSlotState.Deconstruct(out int Row, out ulong Generation) -> void
+Systemic.Kernel.PopulationHandleSlotState.Equals(Systemic.Kernel.PopulationHandleSlotState other) -> bool
+Systemic.Kernel.PopulationHandleSlotState.Generation.get -> ulong
+Systemic.Kernel.PopulationHandleSlotState.Generation.init -> void
+Systemic.Kernel.PopulationHandleSlotState.PopulationHandleSlotState() -> void
+Systemic.Kernel.PopulationHandleSlotState.PopulationHandleSlotState(int Row, ulong Generation) -> void
+Systemic.Kernel.PopulationHandleSlotState.Row.get -> int
+Systemic.Kernel.PopulationHandleSlotState.Row.init -> void
+Systemic.Kernel.PopulationInputAccessAction<TKind, TInput, TState>
+Systemic.Kernel.PopulationLease<TKind>
+Systemic.Kernel.PopulationLease<TKind>.Count.get -> int
+Systemic.Kernel.PopulationLease<TKind>.Dispose() -> void
+Systemic.Kernel.PopulationLease<TKind>.WithAccess<TInput, TState>(Systemic.Kernel.PopulationRange range, scoped System.ReadOnlySpan<TInput> input, TState state, Systemic.Kernel.PopulationInputAccessAction<TKind, TInput, TState>! callback) -> void
+Systemic.Kernel.PopulationLease<TKind>.WithAccess<TState>(Systemic.Kernel.PopulationRange range, TState state, Systemic.Kernel.PopulationAccessAction<TKind, TState>! callback) -> void
+Systemic.Kernel.PopulationModifierCodec
+Systemic.Kernel.PopulationModifierCodec.Decode(System.ReadOnlySpan<byte> source, System.Span<Systemic.Kernel.ModifierSlot8> values) -> void
+Systemic.Kernel.PopulationModifierCodec.ElementSize.get -> int
+Systemic.Kernel.PopulationModifierCodec.Encode(System.ReadOnlySpan<Systemic.Kernel.ModifierSlot8> values, System.Span<byte> destination) -> void
+Systemic.Kernel.PopulationModifierCodec.GetEncodedLength(int valueCount) -> int
+Systemic.Kernel.PopulationModifierCodec.Id.get -> string!
+Systemic.Kernel.PopulationModifierCodec.Version.get -> int
+Systemic.Kernel.PopulationRange
+Systemic.Kernel.PopulationRange.Deconstruct(out int Start, out int Length) -> void
+Systemic.Kernel.PopulationRange.End.get -> int
+Systemic.Kernel.PopulationRange.Equals(Systemic.Kernel.PopulationRange other) -> bool
+Systemic.Kernel.PopulationRange.Length.get -> int
+Systemic.Kernel.PopulationRange.Length.init -> void
+Systemic.Kernel.PopulationRange.PopulationRange() -> void
+Systemic.Kernel.PopulationRange.PopulationRange(int Start, int Length) -> void
+Systemic.Kernel.PopulationRange.Start.get -> int
+Systemic.Kernel.PopulationRange.Start.init -> void
+Systemic.Kernel.PopulationRangeAction<TKind, TState>
+Systemic.Kernel.PopulationRowReference
+Systemic.Kernel.PopulationRowReference.Deconstruct(out string! PopulationId, out int Slot, out ulong Generation) -> void
+Systemic.Kernel.PopulationRowReference.Equals(Systemic.Kernel.PopulationRowReference other) -> bool
+Systemic.Kernel.PopulationRowReference.Generation.get -> ulong
+Systemic.Kernel.PopulationRowReference.Generation.init -> void
+Systemic.Kernel.PopulationRowReference.PopulationId.get -> string!
+Systemic.Kernel.PopulationRowReference.PopulationId.init -> void
+Systemic.Kernel.PopulationRowReference.PopulationRowReference() -> void
+Systemic.Kernel.PopulationRowReference.PopulationRowReference(string! PopulationId, int Slot, ulong Generation) -> void
+Systemic.Kernel.PopulationRowReference.Slot.get -> int
+Systemic.Kernel.PopulationRowReference.Slot.init -> void
+Systemic.Kernel.PopulationSaveState
+Systemic.Kernel.PopulationSaveState.<Clone>$() -> Systemic.Kernel.PopulationSaveState!
+Systemic.Kernel.PopulationSaveState.Columns.get -> Systemic.Kernel.PopulationColumnSaveState![]!
+Systemic.Kernel.PopulationSaveState.Columns.init -> void
+Systemic.Kernel.PopulationSaveState.Deconstruct(out string! Id, out int Version, out int RowCount, out bool HandlesEnabled, out int[]! RowToHandleSlot, out Systemic.Kernel.PopulationHandleSlotState[]! HandleSlots, out int[]! FreeHandleSlots, out Systemic.Kernel.PopulationColumnSaveState![]! Columns) -> void
+Systemic.Kernel.PopulationSaveState.Equals(Systemic.Kernel.PopulationSaveState? other) -> bool
+Systemic.Kernel.PopulationSaveState.FreeHandleSlots.get -> int[]!
+Systemic.Kernel.PopulationSaveState.FreeHandleSlots.init -> void
+Systemic.Kernel.PopulationSaveState.HandlesEnabled.get -> bool
+Systemic.Kernel.PopulationSaveState.HandlesEnabled.init -> void
+Systemic.Kernel.PopulationSaveState.HandleSlots.get -> Systemic.Kernel.PopulationHandleSlotState[]!
+Systemic.Kernel.PopulationSaveState.HandleSlots.init -> void
+Systemic.Kernel.PopulationSaveState.Id.get -> string!
+Systemic.Kernel.PopulationSaveState.Id.init -> void
+Systemic.Kernel.PopulationSaveState.PopulationSaveState(string! Id, int Version, int RowCount, bool HandlesEnabled, int[]! RowToHandleSlot, Systemic.Kernel.PopulationHandleSlotState[]! HandleSlots, int[]! FreeHandleSlots, Systemic.Kernel.PopulationColumnSaveState![]! Columns) -> void
+Systemic.Kernel.PopulationSaveState.RowCount.get -> int
+Systemic.Kernel.PopulationSaveState.RowCount.init -> void
+Systemic.Kernel.PopulationSaveState.RowToHandleSlot.get -> int[]!
+Systemic.Kernel.PopulationSaveState.RowToHandleSlot.init -> void
+Systemic.Kernel.PopulationSaveState.Version.get -> int
+Systemic.Kernel.PopulationSaveState.Version.init -> void
+Systemic.Kernel.PopulationSchemaAttribute
+Systemic.Kernel.PopulationSchemaAttribute.EnableHandles.get -> bool
+Systemic.Kernel.PopulationSchemaAttribute.EnableHandles.init -> void
+Systemic.Kernel.PopulationSchemaAttribute.Id.get -> string!
+Systemic.Kernel.PopulationSchemaAttribute.PopulationSchemaAttribute(string! id, int version) -> void
+Systemic.Kernel.PopulationSchemaAttribute.Version.get -> int
+Systemic.Kernel.PopulationSpatialGrid2D
+Systemic.Kernel.PopulationSpatialGrid2D.Bounds.get -> Systemic.Kernel.Bounds2
+Systemic.Kernel.PopulationSpatialGrid2D.CandidateEnumerator
+Systemic.Kernel.PopulationSpatialGrid2D.CandidateEnumerator.CandidateEnumerator() -> void
+Systemic.Kernel.PopulationSpatialGrid2D.CandidateEnumerator.Current.get -> int
+Systemic.Kernel.PopulationSpatialGrid2D.CandidateEnumerator.GetEnumerator() -> Systemic.Kernel.PopulationSpatialGrid2D.CandidateEnumerator
+Systemic.Kernel.PopulationSpatialGrid2D.CandidateEnumerator.MoveNext() -> bool
+Systemic.Kernel.PopulationSpatialGrid2D.CellSize.get -> float
+Systemic.Kernel.PopulationSpatialGrid2D.Count.get -> int
+Systemic.Kernel.PopulationSpatialGrid2D.InvalidPositionCount.get -> int
+Systemic.Kernel.PopulationSpatialGrid2D.PopulationSpatialGrid2D(Systemic.Kernel.Bounds2 bounds, float cellSize, bool wrapX = false, bool wrapY = false) -> void
+Systemic.Kernel.PopulationSpatialGrid2D.QueryCellNeighborhoodCandidates(int centerRow, int cellTraversalOffset = 0) -> Systemic.Kernel.PopulationSpatialGrid2D.CandidateEnumerator
+Systemic.Kernel.PopulationSpatialGrid2D.QueryCellNeighborhoodCandidates(int centerRow, System.Span<int> results, int cellTraversalOffset = 0) -> int
+Systemic.Kernel.PopulationSpatialGrid2D.QueryKNearest(System.Numerics.Vector2 center, float radius, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.PopulationSpatialGrid2D.QueryKNearest(System.Numerics.Vector2 center, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.PopulationSpatialGrid2D.QueryRadius(System.Numerics.Vector2 center, float radius, System.Collections.Generic.List<int>! results) -> void
+Systemic.Kernel.PopulationSpatialGrid2D.QueryRadius(System.Numerics.Vector2 center, float radius, System.Collections.Generic.List<int>! results, int maximumResults) -> void
+Systemic.Kernel.PopulationSpatialGrid2D.QueryRadiusCandidates(System.Numerics.Vector2 center, float radius, System.Collections.Generic.List<int>! results, int maximumResults) -> void
+Systemic.Kernel.PopulationSpatialGrid2D.QueryRadiusCandidates(System.Numerics.Vector2 center, float radius, System.Span<int> results) -> int
+Systemic.Kernel.PopulationSpatialGrid2D.Rebuild(System.ReadOnlySpan<System.Numerics.Vector2> positions) -> Systemic.Kernel.PopulationSpatialGrid2DSnapshot
+Systemic.Kernel.PopulationSpatialGrid2D.Rebuild(System.ReadOnlySpan<System.Numerics.Vector2> positions, string! populationId, Systemic.Kernel.InvalidPositionPolicy invalidPositionPolicy = Systemic.Kernel.InvalidPositionPolicy.Throw) -> Systemic.Kernel.PopulationSpatialGrid2DSnapshot
+Systemic.Kernel.PopulationSpatialGrid2D.Reserve(int rowCapacity) -> void
+Systemic.Kernel.PopulationSpatialGrid2D.TryQueryNearest(System.Numerics.Vector2 center, float radius, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.PopulationSpatialGrid2D.TryQueryNearest(System.Numerics.Vector2 center, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.PopulationSpatialGrid2DSnapshot() -> void
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.PopulationSpatialGrid2DSnapshot(Systemic.Kernel.PopulationSpatialGrid2D! grid, int version) -> void
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.QueryBounds(Systemic.Kernel.Bounds2 area, System.Collections.Generic.List<int>! results) -> void
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.QueryCellNeighborhoodCandidates(int centerRow, int cellTraversalOffset = 0) -> Systemic.Kernel.PopulationSpatialGrid2D.CandidateEnumerator
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.QueryCellNeighborhoodCandidates(int centerRow, System.Span<int> results, int cellTraversalOffset = 0) -> int
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.QueryKNearest(System.Numerics.Vector2 center, float radius, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.QueryKNearest(System.Numerics.Vector2 center, int k, System.Span<int> results, System.Predicate<int>? filter = null) -> int
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.QueryRadius(System.Numerics.Vector2 center, float radius, System.Collections.Generic.List<int>! results) -> void
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.QueryRadius(System.Numerics.Vector2 center, float radius, System.Collections.Generic.List<int>! results, int maximumResults) -> void
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.QueryRadiusCandidates(System.Numerics.Vector2 center, float radius, System.Collections.Generic.List<int>! results, int maximumResults) -> void
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.QueryRadiusCandidates(System.Numerics.Vector2 center, float radius, System.Span<int> results) -> int
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.TryQueryNearest(System.Numerics.Vector2 center, float radius, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.PopulationSpatialGrid2DSnapshot.TryQueryNearest(System.Numerics.Vector2 center, out int row, System.Predicate<int>? filter = null) -> bool
+Systemic.Kernel.PopulationWorldState
+Systemic.Kernel.PopulationWorldState.<Clone>$() -> Systemic.Kernel.PopulationWorldState!
+Systemic.Kernel.PopulationWorldState.Deconstruct(out int Version, out Systemic.Kernel.PopulationSaveState![]! Populations) -> void
+Systemic.Kernel.PopulationWorldState.Equals(Systemic.Kernel.PopulationWorldState? other) -> bool
+Systemic.Kernel.PopulationWorldState.Populations.get -> Systemic.Kernel.PopulationSaveState![]!
+Systemic.Kernel.PopulationWorldState.Populations.init -> void
+Systemic.Kernel.PopulationWorldState.PopulationWorldState(int Version, Systemic.Kernel.PopulationSaveState![]! Populations) -> void
+Systemic.Kernel.PopulationWorldState.Version.get -> int
+Systemic.Kernel.PopulationWorldState.Version.init -> void
+Systemic.Kernel.PropertyGrant
+Systemic.Kernel.PropertyGrant.<Clone>$() -> Systemic.Kernel.PropertyGrant!
+Systemic.Kernel.PropertyGrant.Deconstruct(out string! Source, out int EntityId, out Systemic.Kernel.GrantKind Kind, out string! Name, out int ExpiryTick) -> void
+Systemic.Kernel.PropertyGrant.EntityId.get -> int
+Systemic.Kernel.PropertyGrant.EntityId.init -> void
+Systemic.Kernel.PropertyGrant.Equals(Systemic.Kernel.PropertyGrant? other) -> bool
+Systemic.Kernel.PropertyGrant.ExpiryTick.get -> int
+Systemic.Kernel.PropertyGrant.ExpiryTick.init -> void
+Systemic.Kernel.PropertyGrant.IsActiveAt(int tick) -> bool
+Systemic.Kernel.PropertyGrant.Kind.get -> Systemic.Kernel.GrantKind
+Systemic.Kernel.PropertyGrant.Kind.init -> void
+Systemic.Kernel.PropertyGrant.Name.get -> string!
+Systemic.Kernel.PropertyGrant.Name.init -> void
+Systemic.Kernel.PropertyGrant.PropertyGrant(string! Source, int EntityId, Systemic.Kernel.GrantKind Kind, string! Name, int ExpiryTick = -1) -> void
+Systemic.Kernel.PropertyGrant.Source.get -> string!
+Systemic.Kernel.PropertyGrant.Source.init -> void
+Systemic.Kernel.PropertyModifier
+Systemic.Kernel.PropertyModifier.<Clone>$() -> Systemic.Kernel.PropertyModifier!
+Systemic.Kernel.PropertyModifier.Deconstruct(out string! Source, out int EntityId, out string! Property, out Systemic.Kernel.ModifierOperation Operation, out double Value, out int ExpiryTick, out int Priority, out Systemic.Kernel.ModifierStage Stage) -> void
+Systemic.Kernel.PropertyModifier.EntityId.get -> int
+Systemic.Kernel.PropertyModifier.EntityId.init -> void
+Systemic.Kernel.PropertyModifier.Equals(Systemic.Kernel.PropertyModifier? other) -> bool
+Systemic.Kernel.PropertyModifier.ExpiryTick.get -> int
+Systemic.Kernel.PropertyModifier.ExpiryTick.init -> void
+Systemic.Kernel.PropertyModifier.IsActiveAt(int tick) -> bool
+Systemic.Kernel.PropertyModifier.Operation.get -> Systemic.Kernel.ModifierOperation
+Systemic.Kernel.PropertyModifier.Operation.init -> void
+Systemic.Kernel.PropertyModifier.Priority.get -> int
+Systemic.Kernel.PropertyModifier.Priority.init -> void
+Systemic.Kernel.PropertyModifier.Property.get -> string!
+Systemic.Kernel.PropertyModifier.Property.init -> void
+Systemic.Kernel.PropertyModifier.PropertyModifier(string! Source, int EntityId, string! Property, Systemic.Kernel.ModifierOperation Operation, double Value, int ExpiryTick = -1, int Priority = 0, Systemic.Kernel.ModifierStage Stage = Systemic.Kernel.ModifierStage.Standard) -> void
+Systemic.Kernel.PropertyModifier.Source.get -> string!
+Systemic.Kernel.PropertyModifier.Source.init -> void
+Systemic.Kernel.PropertyModifier.Stage.get -> Systemic.Kernel.ModifierStage
+Systemic.Kernel.PropertyModifier.Stage.init -> void
+Systemic.Kernel.PropertyModifier.Value.get -> double
+Systemic.Kernel.PropertyModifier.Value.init -> void
+Systemic.Kernel.ReadOnlyWorldView
+Systemic.Kernel.ReadOnlyWorldView.ContainsEntity(int entityId) -> bool
+Systemic.Kernel.ReadOnlyWorldView.EntitiesWithTag(string! tag) -> System.ReadOnlyMemory<int>
+Systemic.Kernel.ReadOnlyWorldView.HasTag(int entityId, string! tag) -> bool
+Systemic.Kernel.ReadOnlyWorldView.ReadOnlyWorldView() -> void
+Systemic.Kernel.ReadOnlyWorldView.ReadOnlyWorldView(Systemic.Kernel.World! world) -> void
+Systemic.Kernel.ReadOnlyWorldView.TryGetBaseProperty(int entityId, string! property, out double value) -> bool
+Systemic.Kernel.ReadOnlyWorldView.TryGetProperty(int entityId, string! property, out double value) -> bool
+Systemic.Kernel.ReadOnlyWorldView.TryGetSpatialBounds(int entityId, out Systemic.Kernel.Bounds2 bounds) -> bool
+Systemic.Kernel.ReadOnlyWorldView.ValidateSpatialBounds(Systemic.Kernel.Bounds2 bounds) -> void
+Systemic.Kernel.ResourceEntity
+Systemic.Kernel.ResourceEntity.Amount.get -> double
+Systemic.Kernel.ResourceEntity.Amount.set -> void
+Systemic.Kernel.ResourceEntity.CanProduce(Systemic.Kernel.World! world, double amount, out double accepted) -> bool
+Systemic.Kernel.ResourceEntity.Capacity.get -> double
+Systemic.Kernel.ResourceEntity.ResourceEntity(double capacity, params string![]! tags) -> void
+Systemic.Kernel.ResourceEntity.RestoreResourceFrom(Systemic.Kernel.Entity! snapshot) -> void
+Systemic.Kernel.ResourceEntity.TryAdd(double amount) -> double
+Systemic.Kernel.ResourceEntity.TrySpend(Systemic.Kernel.World! world, double amount) -> bool
+Systemic.Kernel.ResourceEntity.TrySpendAll(Systemic.Kernel.World! world) -> bool
+Systemic.Kernel.ResourceEntity.TrySpendUpTo(Systemic.Kernel.World! world, double amount) -> double
+Systemic.Kernel.RowModifiers
+Systemic.Kernel.RowModifierSlot
+Systemic.Kernel.RowModifierSlot.ExpiryTick -> int
+Systemic.Kernel.RowModifierSlot.IsActive(int currentTick) -> bool
+Systemic.Kernel.RowModifierSlot.Key -> ushort
+Systemic.Kernel.RowModifierSlot.RowModifierSlot() -> void
+Systemic.Kernel.RowModifierSlot.RowModifierSlot(ushort key, float value, int expiryTick) -> void
+Systemic.Kernel.RowModifierSlot.Value -> float
+Systemic.Kernel.ScheduledSystemContext
+Systemic.Kernel.ScheduledSystemContext.BorrowPopulation<TKind>(Systemic.Kernel.Population<TKind>! population) -> Systemic.Kernel.PopulationLease<TKind>!
+Systemic.Kernel.ScheduledSystemContext.Commands.get -> Systemic.Kernel.WorldCommandBuffer
+Systemic.Kernel.ScheduledSystemContext.DeferPopulationCommands<TKind>(Systemic.Kernel.Population<TKind>! population, int partitionCount) -> Systemic.Kernel.PopulationCommandBuffer<TKind>![]!
+Systemic.Kernel.ScheduledSystemContext.ForEachPopulationRange<TKind, TState>(Systemic.Kernel.Population<TKind>! population, TState state, Systemic.Kernel.PopulationRangeAction<TKind, TState>! executeRange) -> void
+Systemic.Kernel.ScheduledSystemContext.ForEachPopulationRange<TKind, TState>(Systemic.Kernel.PopulationLease<TKind>! lease, TState state, Systemic.Kernel.PopulationRangeAction<TKind, TState>! executeRange) -> void
+Systemic.Kernel.ScheduledSystemContext.ForEachRange<TState>(TState state, int rowCount, System.Action<TState, int, Systemic.Kernel.PopulationRange>! executeRange) -> void
+Systemic.Kernel.ScheduledSystemContext.OnRollback(System.Action! action) -> void
+Systemic.Kernel.ScheduledSystemContext.ReduceRanges<TState, TResult>(TState state, int rowCount, int partitionCount, TResult identity, System.Func<TState, int, Systemic.Kernel.PopulationRange, TResult>! map, System.Func<TResult, TResult, TResult>! merge) -> TResult
+Systemic.Kernel.ScheduledSystemContext.Tick.get -> int
+Systemic.Kernel.ScheduledSystemContext.WorkerCount.get -> int
+Systemic.Kernel.ScheduledSystemContext.World.get -> Systemic.Kernel.ReadOnlyWorldView
+Systemic.Kernel.SimpleResourceEntity
+Systemic.Kernel.SimpleResourceEntity.SimpleResourceEntity(string! identity, double capacity, params string![]! tags) -> void
+Systemic.Kernel.SpatialIndex
+Systemic.Kernel.SpatialIndex.Count.get -> int
+Systemic.Kernel.SpatialIndex.QueryNearby(Systemic.Kernel.Point2 point, float radius, System.Collections.Generic.List<int>! results) -> void
+Systemic.Kernel.SpatialIndex.QueryOverlaps(Systemic.Kernel.Bounds2 area, System.Collections.Generic.List<int>! results) -> void
+Systemic.Kernel.SpatialIndex.Remove(int entityId) -> bool
+Systemic.Kernel.SpatialIndex.SpatialIndex(float cellSize, long maximumCellMemberships = 1000000) -> void
+Systemic.Kernel.SpatialIndex.TryGetBounds(int entityId, out Systemic.Kernel.Bounds2 bounds) -> bool
+Systemic.Kernel.SpatialIndex.Upsert(int entityId, Systemic.Kernel.Bounds2 bounds) -> void
+Systemic.Kernel.StaticBlockingField2D
+Systemic.Kernel.StaticBlockingField2D.AreConnected(Systemic.Kernel.GridCell2D start, Systemic.Kernel.GridCell2D end) -> bool
+Systemic.Kernel.StaticBlockingField2D.BlockedMask.get -> System.Collections.Generic.IReadOnlyList<bool>!
+Systemic.Kernel.StaticBlockingField2D.GetConnectedCells(Systemic.Kernel.GridCell2D start) -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.GridCell2D>!
+Systemic.Kernel.StaticBlockingField2D.HasLineOfSight(Systemic.Kernel.GridCell2D start, Systemic.Kernel.GridCell2D end) -> bool
+Systemic.Kernel.StaticBlockingField2D.Height.get -> int
+Systemic.Kernel.StaticBlockingField2D.IsBlocked(Systemic.Kernel.GridCell2D cell) -> bool
+Systemic.Kernel.StaticBlockingField2D.IsInBounds(Systemic.Kernel.GridCell2D cell) -> bool
+Systemic.Kernel.StaticBlockingField2D.OutOfBoundsPolicy.get -> Systemic.Kernel.GridOutOfBoundsPolicy
+Systemic.Kernel.StaticBlockingField2D.StaticBlockingField2D(int width, int height, System.Collections.Generic.IEnumerable<Systemic.Kernel.GridCell2D>! blockedCells, Systemic.Kernel.GridOutOfBoundsPolicy outOfBoundsPolicy) -> void
+Systemic.Kernel.StaticBlockingField2D.TryFindNearestFree(Systemic.Kernel.GridCell2D desired, out Systemic.Kernel.GridCell2D nearest) -> bool
+Systemic.Kernel.StaticBlockingField2D.Width.get -> int
+Systemic.Kernel.SystemAccess
+Systemic.Kernel.SystemAccess.Deconstruct(out string! Resource, out Systemic.Kernel.SystemAccessMode Mode) -> void
+Systemic.Kernel.SystemAccess.Equals(Systemic.Kernel.SystemAccess other) -> bool
+Systemic.Kernel.SystemAccess.Mode.get -> Systemic.Kernel.SystemAccessMode
+Systemic.Kernel.SystemAccess.Mode.init -> void
+Systemic.Kernel.SystemAccess.Resource.get -> string!
+Systemic.Kernel.SystemAccess.Resource.init -> void
+Systemic.Kernel.SystemAccess.SystemAccess() -> void
+Systemic.Kernel.SystemAccess.SystemAccess(string! Resource, Systemic.Kernel.SystemAccessMode Mode) -> void
+Systemic.Kernel.SystemAccessMode
+Systemic.Kernel.SystemAccessMode.DeferredWorldWrite = 2 -> Systemic.Kernel.SystemAccessMode
+Systemic.Kernel.SystemAccessMode.Read = 0 -> Systemic.Kernel.SystemAccessMode
+Systemic.Kernel.SystemAccessMode.Write = 1 -> Systemic.Kernel.SystemAccessMode
+Systemic.Kernel.World
+Systemic.Kernel.World.Add<T>(T! entity) -> T!
+Systemic.Kernel.World.AddRestored<T>(T! entity, int id) -> T!
+Systemic.Kernel.World.AdvanceModifiers() -> void
+Systemic.Kernel.World.BeginTransaction() -> Systemic.Kernel.WorldTransaction
+Systemic.Kernel.World.BindRole(int role, Systemic.Kernel.Entity! entity) -> void
+Systemic.Kernel.World.BindRole(string! role, Systemic.Kernel.Entity! entity) -> void
+Systemic.Kernel.World.BoundRoles.get -> System.Collections.Generic.IReadOnlyDictionary<string!, int>!
+Systemic.Kernel.World.ById(int id) -> Systemic.Kernel.Entity?
+Systemic.Kernel.World.CapturePopulationState() -> Systemic.Kernel.PopulationWorldState!
+Systemic.Kernel.World.Clone() -> Systemic.Kernel.World!
+Systemic.Kernel.World.DefinePopulation<TKind>(bool enableHandles = false) -> Systemic.Kernel.Population<TKind>!
+Systemic.Kernel.World.Draws.get -> Systemic.Kernel.DrawStream!
+Systemic.Kernel.World.Edit<T>(T! entity) -> T!
+Systemic.Kernel.World.EffectiveProperty(Systemic.Kernel.Entity! entity, string! property) -> double
+Systemic.Kernel.World.Entities.get -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.Entity!>!
+Systemic.Kernel.World.EntitiesWithTag(string! tag) -> System.ReadOnlyMemory<int>
+Systemic.Kernel.World.FirstTagged(string! tag, string! capability) -> int
+Systemic.Kernel.World.GetPopulation<TKind>() -> Systemic.Kernel.Population<TKind>!
+Systemic.Kernel.World.Grant(string! source, Systemic.Kernel.Entity! entity, Systemic.Kernel.GrantKind kind, string! name, int remainingTicks = -1) -> void
+Systemic.Kernel.World.Grants.get -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.PropertyGrant!>!
+Systemic.Kernel.World.HasCapability(Systemic.Kernel.Entity! entity, string! capability) -> bool
+Systemic.Kernel.World.HasPopulations.get -> bool
+Systemic.Kernel.World.HasTag(Systemic.Kernel.Entity! entity, string! tag) -> bool
+Systemic.Kernel.World.LiveCount(string! tag) -> int
+Systemic.Kernel.World.LiveRank(string! tag, int entityId) -> int
+Systemic.Kernel.World.LogicalTick.get -> int
+Systemic.Kernel.World.LogicalTick.set -> void
+Systemic.Kernel.World.MarkPopulationDirty() -> void
+Systemic.Kernel.World.MarkRequired(Systemic.Kernel.Entity! entity) -> void
+Systemic.Kernel.World.Modifiers.get -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.PropertyModifier!>!
+Systemic.Kernel.World.NextEntityId.get -> int
+Systemic.Kernel.World.OfType<TEntity>() -> System.Collections.Generic.IEnumerable<TEntity!>!
+Systemic.Kernel.World.PruneRemoved() -> void
+Systemic.Kernel.World.QuerySpatialNearby(Systemic.Kernel.Point2 point, float radius, System.Collections.Generic.List<int>! results) -> void
+Systemic.Kernel.World.QuerySpatialOverlaps(Systemic.Kernel.Bounds2 area, System.Collections.Generic.List<int>! results) -> void
+Systemic.Kernel.World.Remove(Systemic.Kernel.Entity! entity) -> bool
+Systemic.Kernel.World.RemoveEffectsBySource(string! source) -> void
+Systemic.Kernel.World.RemoveModifier(string! source, Systemic.Kernel.Entity! entity, string! property) -> void
+Systemic.Kernel.World.RemoveSpatialBounds(Systemic.Kernel.Entity! entity) -> bool
+Systemic.Kernel.World.RequiredEntityIds.get -> System.Collections.Generic.IReadOnlyList<int>!
+Systemic.Kernel.World.RestoreEntityIdSequence(int nextEntityId) -> void
+Systemic.Kernel.World.RestorePopulationState(Systemic.Kernel.PopulationWorldState! state) -> void
+Systemic.Kernel.World.Revoke(string! source, Systemic.Kernel.Entity! entity, Systemic.Kernel.GrantKind kind, string! name) -> void
+Systemic.Kernel.World.Role(int role) -> Systemic.Kernel.Entity?
+Systemic.Kernel.World.Role(string! role) -> Systemic.Kernel.Entity?
+Systemic.Kernel.World.Role<T>(int role) -> T!
+Systemic.Kernel.World.Role<T>(string! role) -> T!
+Systemic.Kernel.World.Seed.get -> int
+Systemic.Kernel.World.SetModifier(string! source, Systemic.Kernel.Entity! entity, string! property, Systemic.Kernel.ModifierOperation operation, double value, int remainingTicks = -1, int priority = 0, Systemic.Kernel.ModifierStage stage = Systemic.Kernel.ModifierStage.Standard) -> void
+Systemic.Kernel.World.SetSpatialBounds(Systemic.Kernel.Entity! entity, Systemic.Kernel.Bounds2 bounds) -> void
+Systemic.Kernel.World.SpatialCellSize.get -> float
+Systemic.Kernel.World.SpatialEntityCount.get -> int
+Systemic.Kernel.World.TryGetEffectiveProperty(Systemic.Kernel.Entity! entity, string! property, out double value) -> bool
+Systemic.Kernel.World.TryGetSpatialBounds(int entityId, out Systemic.Kernel.Bounds2 bounds) -> bool
+Systemic.Kernel.World.TryRegisterRollbackAction(System.Action! action) -> bool
+Systemic.Kernel.World.ValidateSpatialBounds(Systemic.Kernel.Bounds2 bounds) -> void
+Systemic.Kernel.World.ValueScale.get -> double
+Systemic.Kernel.World.World(int seed, double valueScale, float spatialCellSize = 32) -> void
+Systemic.Kernel.WorldCommandBuffer
+Systemic.Kernel.WorldCommandBuffer.Add(Systemic.Kernel.Entity! entity) -> void
+Systemic.Kernel.WorldCommandBuffer.AddCapability(int entityId, string! capability) -> void
+Systemic.Kernel.WorldCommandBuffer.AddTag(int entityId, string! tag) -> void
+Systemic.Kernel.WorldCommandBuffer.Clear() -> void
+Systemic.Kernel.WorldCommandBuffer.Count.get -> int
+Systemic.Kernel.WorldCommandBuffer.Flush(Systemic.Kernel.World! world) -> void
+Systemic.Kernel.WorldCommandBuffer.Grant(string! source, int entityId, Systemic.Kernel.GrantKind kind, string! name, int remainingTicks = -1) -> void
+Systemic.Kernel.WorldCommandBuffer.Remove(int entityId) -> void
+Systemic.Kernel.WorldCommandBuffer.RemoveCapability(int entityId, string! capability) -> void
+Systemic.Kernel.WorldCommandBuffer.RemoveLink(int entityId, string! link) -> void
+Systemic.Kernel.WorldCommandBuffer.RemoveModifier(string! source, int entityId, string! property) -> void
+Systemic.Kernel.WorldCommandBuffer.RemoveSpatialBounds(int entityId) -> void
+Systemic.Kernel.WorldCommandBuffer.RemoveTag(int entityId, string! tag) -> void
+Systemic.Kernel.WorldCommandBuffer.Reserve(int commandCapacity) -> void
+Systemic.Kernel.WorldCommandBuffer.Revoke(string! source, int entityId, Systemic.Kernel.GrantKind kind, string! name) -> void
+Systemic.Kernel.WorldCommandBuffer.SetLink(int entityId, string! link, int targetEntityId) -> void
+Systemic.Kernel.WorldCommandBuffer.SetModifier(string! source, int entityId, string! property, Systemic.Kernel.ModifierOperation operation, double value, int remainingTicks = -1, int priority = 0, Systemic.Kernel.ModifierStage stage = Systemic.Kernel.ModifierStage.Standard) -> void
+Systemic.Kernel.WorldCommandBuffer.SetProperty(int entityId, string! property, double value) -> void
+Systemic.Kernel.WorldCommandBuffer.SetSpatialBounds(int entityId, Systemic.Kernel.Bounds2 bounds) -> void
+Systemic.Kernel.WorldCommandBuffer.WorldCommandBuffer() -> void
+Systemic.Kernel.WorldCommitCallbackException
+Systemic.Kernel.WorldCommitCallbackException.WorldCommitCallbackException(System.Collections.Generic.IEnumerable<System.Exception!>! failures) -> void
+Systemic.Kernel.WorldTransaction
+Systemic.Kernel.WorldTransaction.Commit() -> void
+Systemic.Kernel.WorldTransaction.Dispose() -> void
+Systemic.Kernel.WorldTransaction.HasChanges.get -> bool
+Systemic.Kernel.WorldTransaction.OnCommit(System.Action! action) -> void
+Systemic.Kernel.WorldTransaction.OnRollback(System.Action! action) -> void
+Systemic.Kernel.WorldTransaction.Rollback() -> void
+Systemic.Kernel.WorldTransaction.WorldTransaction() -> void
+virtual Systemic.Kernel.Entity.SupportsCompactPropertyUndo.get -> bool
+virtual Systemic.Kernel.Entity.TryGetProperty(Systemic.Kernel.World! world, string! name, out double value) -> bool
+virtual Systemic.Kernel.Entity.TryProduce(Systemic.Kernel.World! world, double amount, int activations = 1) -> double
+virtual Systemic.Kernel.Entity.TrySetProperty(Systemic.Kernel.World! world, string! name, double value) -> bool
+virtual Systemic.Kernel.PopulationAccessAction<TKind, TState>.Invoke(TState state, scoped ref Systemic.Kernel.PopulationAccessScope<TKind> scope) -> void
+virtual Systemic.Kernel.PopulationInputAccessAction<TKind, TInput, TState>.Invoke(scoped System.ReadOnlySpan<TInput> input, TState state, scoped ref Systemic.Kernel.PopulationAccessScope<TKind> scope) -> void
+virtual Systemic.Kernel.PopulationRangeAction<TKind, TState>.Invoke(TState state, int partition, scoped ref Systemic.Kernel.PopulationAccessScope<TKind> scope) -> void
+virtual Systemic.Kernel.ResourceEntity.CanAcceptProduction(double amount) -> bool
+virtual Systemic.Kernel.ResourceEntity.OnProduced(Systemic.Kernel.World! world, double amount, int activations) -> void
+~override Systemic.Kernel.Bounds2.Equals(object obj) -> bool
+~override Systemic.Kernel.Bounds2.ToString() -> string
+~override Systemic.Kernel.DrawStreamSnapshot.Equals(object obj) -> bool
+~override Systemic.Kernel.DrawStreamSnapshot.ToString() -> string
+~override Systemic.Kernel.GridCell2D.Equals(object obj) -> bool
+~override Systemic.Kernel.GridCell2D.ToString() -> string
+~override Systemic.Kernel.Point2.Equals(object obj) -> bool
+~override Systemic.Kernel.Point2.ToString() -> string
+~override Systemic.Kernel.PopulationCommandResult.Equals(object obj) -> bool
+~override Systemic.Kernel.PopulationCommandResult.ToString() -> string
+~override Systemic.Kernel.PopulationComputeAgent.Equals(object obj) -> bool
+~override Systemic.Kernel.PopulationComputeAgent.ToString() -> string
+~override Systemic.Kernel.PopulationComputeResult.Equals(object obj) -> bool
+~override Systemic.Kernel.PopulationComputeResult.ToString() -> string
+~override Systemic.Kernel.PopulationHandle<TKind>.Equals(object obj) -> bool
+~override Systemic.Kernel.PopulationHandle<TKind>.ToString() -> string
+~override Systemic.Kernel.PopulationHandleSlotState.Equals(object obj) -> bool
+~override Systemic.Kernel.PopulationHandleSlotState.ToString() -> string
+~override Systemic.Kernel.PopulationRange.Equals(object obj) -> bool
+~override Systemic.Kernel.PopulationRange.ToString() -> string
+~override Systemic.Kernel.PopulationRowReference.Equals(object obj) -> bool
+~override Systemic.Kernel.SystemAccess.Equals(object obj) -> bool
+~override Systemic.Kernel.SystemAccess.ToString() -> string
