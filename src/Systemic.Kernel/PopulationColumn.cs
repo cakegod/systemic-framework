@@ -335,7 +335,12 @@ public abstract class PopulationColumnBase(
     int elementSize,
     bool isDoubleBuffered)
 {
+    // Row batches are pooled per column, but not without limit: a transaction that writes a million
+    // distinct rows would otherwise pin a million batches for the lifetime of the column.
+    private const int MaximumPooledRowUndoBatches = 4_096;
+
     private readonly Stack<PopulationPageUndoBatch> _freePageUndoBatches = new();
+    private readonly Stack<PopulationRowUndoBatch> _freeRowUndoBatches = new();
 
     public string Id { get; } = id;
 
@@ -418,6 +423,50 @@ public abstract class PopulationColumnBase(
         }
     }
 
+    /// <summary>Captures one row's bytes for transaction undo.</summary>
+    /// <remarks>
+    /// A sparse write pays for the row it touches instead of the page that holds it. Undo records
+    /// are replayed in reverse order, and every capture holds the value as of its first touch, so a
+    /// row capture and a page capture of the same region compose to the pre-transaction state.
+    /// </remarks>
+    internal IColumnUndoBatch CaptureRowUndo(int bufferIndex, int row)
+    {
+        var batch = _freeRowUndoBatches.Count > 0
+            ? _freeRowUndoBatches.Pop()
+            : new PopulationRowUndoBatch(this);
+        try
+        {
+            batch.Capture(bufferIndex, row);
+            return batch;
+        }
+        catch
+        {
+            try
+            {
+                batch.Reset();
+                if (_freeRowUndoBatches.Count < MaximumPooledRowUndoBatches)
+                {
+                    _freeRowUndoBatches.Push(batch);
+                }
+            }
+            catch
+            {
+                // Do not return an unusable batch to the pool.
+            }
+
+            throw;
+        }
+    }
+
+    internal void ReleaseRowUndo(PopulationRowUndoBatch batch)
+    {
+        batch.Reset();
+        if (_freeRowUndoBatches.Count < MaximumPooledRowUndoBatches)
+        {
+            _freeRowUndoBatches.Push(batch);
+        }
+    }
+
     internal abstract int GetPageSnapshotByteLength(int rowCount);
 
     internal abstract void CopyPageToSnapshot(int bufferIndex, int start, Span<byte> destination);
@@ -428,6 +477,39 @@ public abstract class PopulationColumnBase(
     {
         batch.Reset();
         _freePageUndoBatches.Push(batch);
+    }
+}
+
+internal sealed class PopulationRowUndoBatch(PopulationColumnBase column) : IColumnUndoBatch
+{
+    private byte[] _snapshot = [];
+    private int _bufferIndex;
+    private int _row = -1;
+    private int _byteLength;
+
+    public void Capture(int bufferIndex, int row)
+    {
+        _bufferIndex = bufferIndex;
+        _row = row;
+        _byteLength = column.GetPageSnapshotByteLength(1);
+        if (_snapshot.Length < _byteLength)
+        {
+            Array.Resize(ref _snapshot, _byteLength);
+        }
+
+        column.CopyPageToSnapshot(bufferIndex, row, _snapshot.AsSpan(0, _byteLength));
+    }
+
+    public void Undo() => column.RestorePageFromSnapshot(
+        _bufferIndex, _row, _snapshot.AsSpan(0, _byteLength));
+
+    public void Release() => column.ReleaseRowUndo(this);
+
+    public void Reset()
+    {
+        _bufferIndex = 0;
+        _row = -1;
+        _byteLength = 0;
     }
 }
 
@@ -580,8 +662,7 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
         lock (_population.World.TransactionGate)
         {
             _buffer = _buffer.EnsureWritable();
-            // Page granularity keeps undo correct today; P3.4 narrows capture to the touched rows.
-            CapturePages(0, row, 1, _buffer.Values.Length);
+            CaptureRow(0, row);
             ref var cell = ref _buffer.Values[row];
             PopulationNumeric.Add(ref cell, amount);
             if (!double.IsFinite(PopulationNumeric.ToDouble(in cell)))
@@ -622,7 +703,7 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
         lock (_population.World.TransactionGate)
         {
             _buffer = _buffer.EnsureWritable();
-            CapturePages(0, row, 1, _buffer.Values.Length);
+            CaptureRow(0, row);
             _buffer.Values[row] = value;
         }
 
@@ -665,7 +746,7 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
     internal override void MoveRow(int source, int destination)
     {
         _buffer = _buffer.EnsureWritable();
-        CapturePages(0, destination, 1, _buffer.Values.Length);
+        CaptureRow(0, destination);
         _buffer.Values[destination] = _buffer.Values[source];
     }
 
@@ -681,6 +762,14 @@ public sealed class PopulationColumn<T> : PopulationColumnBase where T : unmanag
     {
         _buffer = _buffer.EnsureWritable();
         MemoryMarshal.Cast<byte, T>(source).CopyTo(_buffer.Values.AsSpan(start, source.Length / Unsafe.SizeOf<T>()));
+    }
+
+    private void CaptureRow(int bufferIndex, int row)
+    {
+        if (_population.HasActiveTransaction)
+        {
+            _population.World.RecordPopulationRow(this, bufferIndex, row);
+        }
     }
 
     private void CapturePages(int bufferIndex, int start, int length, int capacity)

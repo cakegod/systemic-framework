@@ -22,6 +22,169 @@ public sealed class RollbackPropertyTests
         Check.One(Config.QuickThrowOnFailure, Prop.ForAll<int[]>(KeepsCommittedState));
     }
 
+    [Fact]
+    public void Rollback_restores_population_state_after_any_row_sequence()
+    {
+        Check.One(Config.QuickThrowOnFailure, Prop.ForAll<int[]>(RestoresPopulationState));
+    }
+
+    [Fact]
+    public void Commit_keeps_population_state_for_a_committed_tick()
+    {
+        Check.One(Config.QuickThrowOnFailure, Prop.ForAll<int[]>(KeepsCommittedPopulationState));
+    }
+
+    private static bool RestoresPopulationState(int[] values)
+    {
+        var world = CreatePopulationWorld(out var population);
+        var before = DescribePopulation(world, population);
+
+        using (var transaction = world.BeginTransaction())
+        {
+            foreach (var value in values)
+            {
+                ApplyPopulation(world, population, value);
+            }
+
+            transaction.Rollback();
+        }
+
+        return before == DescribePopulation(world, population);
+    }
+
+    private static bool KeepsCommittedPopulationState(int[] values)
+    {
+        var world = CreatePopulationWorld(out var population);
+        var expected = CreatePopulationWorld(out var expectedPopulation);
+
+        using (var transaction = world.BeginTransaction())
+        {
+            foreach (var value in values)
+            {
+                ApplyPopulation(world, population, value);
+                ApplyPopulation(expected, expectedPopulation, value);
+            }
+
+            transaction.Commit();
+        }
+
+        return DescribePopulation(world, population) == DescribePopulation(expected, expectedPopulation);
+    }
+
+    private static World CreatePopulationWorld(out Population<RollbackCrowdKind> population)
+    {
+        var world = new World(seed: 11, valueScale: 1);
+        population = world.DefinePopulation<RollbackCrowdKind>(enableHandles: true);
+        var health = population.Column(s_crowdHealthKey);
+        population.Reserve(8);
+        population.AddRange(2);
+        population.WithAccess(new PopulationRange(0, 2), health,
+            static (PopulationColumn<int> column, scoped ref PopulationAccessScope<RollbackCrowdKind> scope) =>
+            {
+                var values = scope.EditRange(column);
+                values[0] = 100;
+                values[1] = 50;
+            });
+        return world;
+    }
+
+    // One random command per value: value edits, sparse writes, tag bits, modifier slots, and the
+    // structural edits (grow, remove-swap-back) that move rows under the journal.
+    private static void ApplyPopulation(World world, Population<RollbackCrowdKind> population, int value)
+    {
+        var amount = Math.Abs(value % 9);
+        var row = population.Count == 0 ? 0 : Math.Abs(value % population.Count);
+        var health = population.Column(s_crowdHealthKey);
+        switch ((value % 13 + 13) % 13)
+        {
+            case 0:
+                if (population.Count > 0)
+                {
+                    population.WithAccess(new PopulationRange(row, 1), (Column: health, Amount: amount),
+                        static ((PopulationColumn<int> Column, int Amount) state,
+                            scoped ref PopulationAccessScope<RollbackCrowdKind> scope) =>
+                            scope.EditRange(state.Column)[0] = state.Amount);
+                }
+
+                break;
+            case 1:
+                if (population.Count > 0)
+                {
+                    population.AddTag(row, "poisoned");
+                }
+
+                break;
+            case 2:
+                if (population.Count > 0)
+                {
+                    population.RemoveTag(row, "poisoned");
+                }
+
+                break;
+            case 3:
+                if (population.Count > 0)
+                {
+                    population.SetModifier(row, "test.crowd.health", amount, remainingTicks: value % 4);
+                }
+
+                break;
+            case 4:
+                population.AddRange(1);
+                break;
+            case 5:
+                if (population.Count > 1)
+                {
+                    population.RemoveSwapBack(row);
+                }
+
+                break;
+            case 6:
+                if (population.Count > 0)
+                {
+                    population.AddTag(row, "blessed");
+                }
+
+                break;
+            default:
+                if (population.Count > 0)
+                {
+                    _ = population.EffectiveValue(row, "test.crowd.health");
+                }
+
+                break;
+        }
+    }
+
+    private static string DescribePopulation(World world, Population<RollbackCrowdKind> population)
+    {
+        var text = new StringBuilder();
+        text.Append("count:").Append(population.Count).Append(";");
+        for (var row = 0; row < population.Count; row++)
+        {
+            text.Append("row:").Append(row)
+                .Append(',').Append(population.EffectiveValue(row, "test.crowd.health"))
+                .Append(',').Append(population.HasTag(row, "poisoned"))
+                .Append(',').Append(population.HasTag(row, "blessed"))
+                .Append(';');
+        }
+
+        return text.ToString();
+    }
+
+    private static readonly PopulationColumnKey<int> s_crowdHealthKey =
+        new("test.crowd.health", 1, PopulationCodecs.Int32);
+
+    private readonly struct RollbackCrowdKind : IPopulationKind
+    {
+        public static string Id => "test.rollback-crowd";
+
+        public static int Version => 1;
+
+        public static string[] Tags => ["poisoned", "blessed"];
+
+        public static string[] ModifierProperties => ["test.crowd.health"];
+    }
+
     private static bool RestoresState(int[] values)
     {
         var world = new World(seed: 5, valueScale: 1);

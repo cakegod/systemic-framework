@@ -411,6 +411,41 @@ public sealed class World
 
     public void MarkPopulationDirty() => _populationDirty = true;
 
+    /// <summary>Gets the number of population bytes copied into undo batches since the process started.</summary>
+    /// <remarks>Diagnostic: it separates the cost of a sparse row write from a page or buffer capture.</remarks>
+    internal long PopulationJournalBytes { get; private set; }
+
+    /// <summary>Captures one population row for transaction undo instead of the page that holds it.</summary>
+    /// <remarks>
+    /// A rule that adjusts one row per fact pays for that row, not for the 4 KiB page around it. The
+    /// batch holds the row as of its first touch, and undo replays in reverse, so a later page capture
+    /// of the same region still restores the pre-transaction page.
+    /// </remarks>
+    internal void RecordPopulationRow(PopulationColumnBase column, int bufferIndex, int row)
+    {
+        lock (TransactionGate)
+        {
+            if (_undoing || _scopes.Count == 0)
+            {
+                return;
+            }
+
+            IColumnUndoBatch? batch = null;
+            try
+            {
+                batch = column.CaptureRowUndo(bufferIndex, row);
+                _journal.Add(UndoRecord.ForColumnUndo(batch));
+                PopulationJournalBytes += column.GetPageSnapshotByteLength(1);
+                batch = null;
+            }
+            catch
+            {
+                try { batch?.Release(); } catch { /* Preserve the original failure. */ }
+                throw;
+            }
+        }
+    }
+
     internal void RecordPopulationPage(
         PopulationColumnBase column,
         int bufferIndex,
@@ -436,6 +471,7 @@ public sealed class World
             {
                 batch = column.CapturePageUndo(bufferIndex, start, length);
                 _journal.Add(UndoRecord.ForColumnUndo(batch));
+                PopulationJournalBytes += column.GetPageSnapshotByteLength(length);
                 batch = null;
             }
             catch
@@ -477,6 +513,7 @@ public sealed class World
             {
                 batch = column.CapturePageUndo(bufferIndex, 0, capacity);
                 _journal.Add(UndoRecord.ForColumnUndo(batch));
+                PopulationJournalBytes += column.GetPageSnapshotByteLength(capacity);
                 batch = null;
                 return true;
             }
