@@ -36,6 +36,10 @@ Use `--ticks N` to change the measured duration, `--stress-balls` accepts 10,000
 
 Choose START or SETTINGS with the mouse or the up/down arrows and Enter. In SETTINGS, use left/right or click to change VSync and the FPS limit (30, 60, 120, or unlimited); Esc returns to the title. VSync may cap the FPS at the display refresh rate. Settings apply for the current session.
 
+The HUD seats full-color pixel relics in brass-edged upgrade sockets. Each socket shows its buy key, name, and a segmented savings bar; a `+` means affordable and a check means fully upgraded. Hover an icon or press its buy key to unfold its effect, level, price, and any missing resources. A brief forge flash confirms a successful purchase. Hover the ball counter or press `Tab` to inspect the selected ball and shot cost. Details retract after two seconds away. Pause to see the full control reference.
+
+The eleven 24x24 HUD icons live in `content/hud-relics.png`, with the editable source in `art/hud-relics.aseprite`. They render at integer pixel scales with nearest-neighbor sampling.
+
 | Input | Action |
 | --- | --- |
 | Mouse click | Fire the selected ball toward the click |

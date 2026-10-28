@@ -11,7 +11,7 @@ namespace Systemic.Kernel.Generator.Tests;
 public sealed class SystemAccessAnalyzerTests
 {
     [Fact]
-    public void Diagnostics_are_errors_in_the_system_access_category_and_link_to_the_guide()
+    public void Diagnostics_sit_in_the_system_access_category_and_link_to_the_guide()
     {
         var analyzerType = typeof(StrictDeterminismAnalyzer).Assembly
             .GetType("Systemic.Kernel.Generator.SystemAccessAnalyzer");
@@ -19,11 +19,13 @@ public sealed class SystemAccessAnalyzerTests
         var analyzer = (DiagnosticAnalyzer)Activator.CreateInstance(analyzerType)!;
         var diagnostics = analyzer.SupportedDiagnostics;
 
-        Assert.Equal(6, diagnostics.Length);
+        Assert.Equal(8, diagnostics.Length);
+        Assert.Equal(7, diagnostics.Count(descriptor => descriptor.DefaultSeverity == DiagnosticSeverity.Error));
+        var exclusive = Assert.Single(diagnostics.Where(descriptor => descriptor.DefaultSeverity == DiagnosticSeverity.Info));
+        Assert.Equal("SYSACC007", exclusive.Id);
         foreach (var descriptor in diagnostics)
         {
             Assert.Equal("SystemAccess", descriptor.Category);
-            Assert.Equal(DiagnosticSeverity.Error, descriptor.DefaultSeverity);
             Assert.True(descriptor.IsEnabledByDefault);
             Assert.False(string.IsNullOrWhiteSpace(descriptor.Description.ToString()));
             Assert.Equal(
@@ -48,6 +50,26 @@ public sealed class SystemAccessAnalyzerTests
                     context.Publish(default);
                     context.Execute(default);
                 }
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.Equal("SYSACC007", Assert.Single(diagnostics).Id);
+    }
+
+    [Fact]
+    public async Task Systems_declaring_access_do_not_report_default_exclusivity()
+    {
+        const string source = """
+            using System.Collections.Generic;
+            using Systemic.Host;
+            using Systemic.Kernel;
+            internal sealed class DeclaredSystem : ISystemicSystem
+            {
+                public string Id => "declared";
+                public IReadOnlyList<SystemAccess> Access => [SystemAccess.WriteWorld];
+                public void Step(SystemicSystemContext context) { }
             }
             """;
 
@@ -307,7 +329,41 @@ public sealed class SystemAccessAnalyzerTests
             }
             """;
 
-        Assert.Empty(await Analyze(source));
+        var diagnostics = await Analyze(source);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        Assert.Equal("SYSACC007", Assert.Single(diagnostics).Id);
+    }
+
+    [Fact]
+    public async Task Deferred_facts_require_a_world_write_access_mode()
+    {
+        const string source = """
+            using System.Collections.Generic;
+            using Systemic.Host;
+            using Systemic.Kernel;
+            internal sealed class RestrictedSystem : ISystemicSystem
+            {
+                public string Id => "restricted";
+                public IReadOnlyList<SystemAccess> Access => [SystemAccess.ReadWorld];
+                public void Step(SystemicSystemContext context) => context.DeferFact(default);
+            }
+            internal sealed class DeferredSystem : ISystemicSystem
+            {
+                public string Id => "deferred";
+                public IReadOnlyList<SystemAccess> Access => [SystemAccess.DeferWorldWrites];
+                public void Step(SystemicSystemContext context) => context.DeferFact(default);
+            }
+            internal sealed class ExclusiveSystem : ISystemicSystem
+            {
+                public string Id => "exclusive";
+                public IReadOnlyList<SystemAccess> Access => new SystemAccess[] { SystemAccess.WriteWorld };
+                public void Step(SystemicSystemContext context) => context.DeferFact(default);
+            }
+            """;
+
+        var diagnostics = await Analyze(source);
+        Assert.Single(diagnostics.Where(diagnostic => diagnostic.Id == "SYSACC008"));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Id == "SYSACC007");
     }
 
     [Fact]

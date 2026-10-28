@@ -24,13 +24,11 @@ public enum UpgradeKind
 }
 
 public readonly record struct UpgradeInfo(
-    UpgradeKind Kind,
     string Name,
     bool UsesPrisms,
     int Level,
     int MaxLevel,
-    long Cost,
-    string Effect);
+    long Cost);
 
 public readonly record struct MineHitEvent(int X, int Y);
 
@@ -50,7 +48,7 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
 
     private static readonly ImmutableArray<SystemAccess> s_access =
     [
-        SystemAccess.WriteWorld,
+        SystemAccess.DeferWorldWrites,
         MineBallPopulation.WriteX,
         MineBallPopulation.WriteY,
         MineBallPopulation.WriteDirectionX,
@@ -76,9 +74,7 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
     private readonly ShotRequest[] _pendingShots = new ShotRequest[MaximumPendingShots];
     private readonly MineHitEvent[] _hitEvents = new MineHitEvent[MaximumHitEventsPerTick];
     private readonly int[] _freeSlots;
-    private readonly int[] _ballXSnapshot;
-    private readonly int[] _ballYSnapshot;
-    private readonly int[] _ballKindsSnapshot;
+    private readonly MineBall[] _ballSnapshot;
     private int _pendingShotCount;
     private int _hitEventCount;
     private int _freeSlotCount;
@@ -118,9 +114,7 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
         _populationCapacity = Math.Max(MaximumBalls, stressBallCount);
         _speedMultiplier = stressBallCount == 0 ? 1 : speedMultiplier;
         _freeSlots = new int[_populationCapacity];
-        _ballXSnapshot = new int[_populationCapacity];
-        _ballYSnapshot = new int[_populationCapacity];
-        _ballKindsSnapshot = new int[_populationCapacity];
+        _ballSnapshot = new MineBall[_populationCapacity];
 
         Dust = StartingDust;
         DefineUpgrades();
@@ -143,7 +137,6 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
         for (var row = 0; row < _populationCapacity; row++)
         {
             values[row] = new MineBall { Kind = -1 };
-            _ballKindsSnapshot[row] = -1;
         }
 
         var initialBalls = stressBallCount == 0 ? StartingBalls : stressBallCount;
@@ -160,12 +153,10 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
                 DirectionY = directionY,
                 Kind = (int)BallKind.Basic
             };
-            _ballXSnapshot[row] = values[row].X;
-            _ballYSnapshot[row] = values[row].Y;
-            _ballKindsSnapshot[row] = values[row].Kind;
         }
 
         MineBall.InitializeRange(_balls, new PopulationRange(0, _populationCapacity), values);
+        MineBallPopulation.Snapshot(_balls, new PopulationRange(0, _populationCapacity), _ballSnapshot);
         BallCount = initialBalls;
     }
 
@@ -199,11 +190,7 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
 
     public IReadOnlyList<UpgradeInfo> Upgrades => _upgrades;
 
-    public ReadOnlySpan<int> BallX => _ballXSnapshot;
-
-    public ReadOnlySpan<int> BallY => _ballYSnapshot;
-
-    public ReadOnlySpan<int> BallKinds => _ballKindsSnapshot;
+    internal ReadOnlySpan<MineBall> Balls => _ballSnapshot;
 
     public ReadOnlySpan<MineHitEvent> HitEvents => _hitEvents.AsSpan(0, _hitEventCount);
 
@@ -273,12 +260,12 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
         MaybeAutoFire();
         AdvanceBalls();
 
-        context.SetProperty(_dustEntity, "balance", Dust);
-        context.SetProperty(_prismEntity, "balance", Prisms);
+        context.Commands.SetProperty(_dustEntity.Id, "balance", Dust);
+        context.Commands.SetProperty(_prismEntity.Id, "balance", Prisms);
         if (_goldFound)
         {
             _goldFound = false;
-            context.Publish(MineFacts.GoldenPixelFound(_mineId));
+            context.DeferFact(MineFacts.GoldenPixelFound(_mineId));
         }
     }
 
@@ -341,7 +328,7 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
         _balls.WithAccess(
             new PopulationRange(0, _populationCapacity),
             this,
-            static (PixelMineSimulation simulation, scoped ref PopulationAccessScope<MineBall> access) =>
+            static (simulation, scoped ref access) =>
                 simulation.AdvanceBalls(ref access));
 
         _x.Swap();
@@ -349,6 +336,7 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
         _directionX.Swap();
         _directionY.Swap();
         _kinds.Swap();
+        MineBallPopulation.Snapshot(_balls, new PopulationRange(0, _populationCapacity), _ballSnapshot);
     }
 
     private void AdvanceBalls(scoped ref PopulationAccessScope<MineBall> access)
@@ -454,9 +442,6 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
 
         alive = SpawnShots(alive, random, nextX, nextY, nextDirectionX, nextDirectionY, nextKinds);
 
-        nextX.CopyTo(_ballXSnapshot);
-        nextY.CopyTo(_ballYSnapshot);
-        nextKinds.CopyTo(_ballKindsSnapshot);
         BallCount = alive;
         _pendingShotCount = 0;
     }
@@ -651,13 +636,13 @@ public sealed class PixelMineSimulation : ISystemicSystem, IDisposable
 
     private void DefineUpgrades()
     {
-        _upgrades[(int)UpgradeKind.Power] = new(UpgradeKind.Power, "POWER", false, 0, 20, NextCost(UpgradeKind.Power, 0), "DEEPER BITE");
-        _upgrades[(int)UpgradeKind.Speed] = new(UpgradeKind.Speed, "SPEED", false, 0, 20, NextCost(UpgradeKind.Speed, 0), "FASTER BALLS");
-        _upgrades[(int)UpgradeKind.Capacity] = new(UpgradeKind.Capacity, "BALLS", false, 0, 16, NextCost(UpgradeKind.Capacity, 0), "+60 BALL SLOTS");
-        _upgrades[(int)UpgradeKind.AutoFire] = new(UpgradeKind.AutoFire, "AUTO", false, 0, 12, NextCost(UpgradeKind.AutoFire, 0), "AUTO SHOTS");
-        _upgrades[(int)UpgradeKind.Rod] = new(UpgradeKind.Rod, "ROD", false, 0, 1, NextCost(UpgradeKind.Rod, 0), "GOLD DIRECTION");
-        _upgrades[(int)UpgradeKind.Smash] = new(UpgradeKind.Smash, "SMASH", true, 0, 1, SmashPrismCost, "RADIUS BALL (8 DUST)");
-        _upgrades[(int)UpgradeKind.Directional] = new(UpgradeKind.Directional, "DRILL", true, 0, 1, DirectionalPrismCost, "TUNNEL BALL (5 DUST)");
+        _upgrades[(int)UpgradeKind.Power] = new("POWER", false, 0, 20, NextCost(UpgradeKind.Power, 0));
+        _upgrades[(int)UpgradeKind.Speed] = new("SPEED", false, 0, 20, NextCost(UpgradeKind.Speed, 0));
+        _upgrades[(int)UpgradeKind.Capacity] = new("BALLS", false, 0, 16, NextCost(UpgradeKind.Capacity, 0));
+        _upgrades[(int)UpgradeKind.AutoFire] = new("AUTO", false, 0, 12, NextCost(UpgradeKind.AutoFire, 0));
+        _upgrades[(int)UpgradeKind.Rod] = new("ROD", false, 0, 1, NextCost(UpgradeKind.Rod, 0));
+        _upgrades[(int)UpgradeKind.Smash] = new("SMASH", true, 0, 1, SmashPrismCost);
+        _upgrades[(int)UpgradeKind.Directional] = new("DRILL", true, 0, 1, DirectionalPrismCost);
     }
 
     private static long NextCost(UpgradeKind kind, int level) => kind switch

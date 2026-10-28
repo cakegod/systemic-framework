@@ -34,6 +34,7 @@ The [compile-checked example](https://github.com/cakegod/systemic-framework/blob
 - `GetService<T>()` retrieves a service registered with `SystemicGameBuilder.AddService`. Systems share the registered service instance, so declare the resources that protect any shared mutable service state.
 - `Commands` records deferred World changes. A system's private commands flush at the end of its scheduling wave in stable registration order.
 - `GetWritableWorld`, `SetProperty`, `Publish`, and `Execute` perform immediate World work. The system must declare `SystemAccess.WriteWorld`; this places it in a wave by itself.
+- `DeferFact` queues a fact for serial dispatch after the whole schedule, so a system that only emits facts can declare `SystemAccess.DeferWorldWrites` and share a wave. Effects of a deferred fact are not visible to other systems until the next tick. Call it from the system body, not from a range callback.
 - `ForEachPopulationRange` can take a `Population<TKind>` directly, lease its storage for the scheduled callback, and release it when the range call returns. `BorrowPopulation` is available when a system needs a lease outside one range call, such as to read another population. Structural changes must wait until all relevant access callbacks and leases end.
 - `ForEachRange` partitions contiguous row ranges. Each row belongs to at most one callback, and each callback receives its partition index and range. Worker callbacks should write only that range and should not make immediate World changes or mutate a shared command buffer.
 - `ReduceRanges` maps logical partitions and merges partial results in partition order. Keep the partition count fixed when results must use the same merge order across worker counts; the arithmetic itself must also be deterministic.
@@ -42,6 +43,31 @@ The [compile-checked example](https://github.com/cakegod/systemic-framework/blob
 `ISystemicSystem.Access` defaults to `SystemAccess.WriteWorld`, preserving an exclusive wave for systems that do not declare their data dependencies. To let systems share a wave, declare reads and writes for the resources and columns they actually use. The scheduler orders conflicting declarations in registration order; an incorrect declaration can still permit races, so declarations and range ownership remain the system author's responsibility.
 
 For host systems, `Order` sorts registration before the schedule is built. It sets priority for conflicting systems and the stable order used at barriers; systems with compatible access may still share a concurrent wave, so `Order` does not sequence independent systems.
+
+## Pick the smallest API that fits
+
+| You need to | Use |
+| --- | --- |
+| Run a tick system in a Core host | `ISystemicSystem` + `SystemicGameBuilder.AddSystem`; declare `Access` so compatible systems share a wave |
+| Drive Kernel without content, rules or the host | `IScheduledKernelSystem` + `DeterministicSystemScheduleBuilder` |
+| Read population rows outside an access callback (rendering, UI, tests) | the generated `<Schema>Population.Snapshot(population, range, buffer)` |
+| Read a few rows inside a system | `WithAccess` + `ReadCurrent`/`ReadRange` |
+| Write disjoint rows from parallel partitions | `ForEachPopulationRange` + `Columns.WriteRange(ref access)` |
+| Change World state this tick | `Commands` (deferred, shared wave) or `Publish`/`SetProperty` (immediate, needs `WriteWorld`) |
+| Emit a fact other systems may observe this tick | `Publish` (immediate, needs `WriteWorld`) |
+| Emit a fact only rules and observers need | `DeferFact` (needs `DeferWorldWrites`, shared wave) |
+
+Immediate World operations are the only way to make a change visible to another system in the same tick. They require `WriteWorld`, which excludes every other system from the wave. When the change can wait until the tick ends, queue it through `Commands` and keep a shared wave.
+
+### Rolling back domain state
+
+| State you need restored on a failed tick | Implement |
+| --- | --- |
+| Plain fields with an in-memory snapshot | `ISystemicTransactionalState` |
+| Allocation-sensitive state with a pooled snapshot | `ISystemicReusableTransactionalState` |
+| Save/load only, no per-tick rollback | `ISystemicStatefulExtension` |
+
+Systems and services that implement one of these are registered automatically. `RegisterStatefulExtension` is for standalone state objects only. The host snapshots registered state before the systems run and restores it when the tick rolls back.
 
 ## Direct tests and standalone harnesses
 

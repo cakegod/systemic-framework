@@ -15,6 +15,18 @@ public sealed class MineSimulationTests
     }
 
     [Fact]
+    public void ContentIdsMatchTheCodeConstants()
+    {
+        var content = PixelMineHost.LoadContent(PixelMineHost.ContentDirectory);
+
+        Assert.Contains(content.Rules.Rules, rule => rule.EventType == MineContent.GoldenFound);
+        foreach (var id in new[] { MineContent.MineEntity, MineContent.DustEntity, MineContent.PrismEntity })
+        {
+            Assert.Contains(content.Entities.Definitions, definition => definition.Id == id);
+        }
+    }
+
+    [Fact]
     public void MineHoldsExactlyTenMillionPixels()
     {
         Assert.Equal(10_000_000, PixelMineWorld.CellCount);
@@ -75,8 +87,8 @@ public sealed class MineSimulationTests
 
         for (var ball = 0; ball < PixelMineSimulation.StartingBalls; ball++)
         {
-            Assert.Equal(simulation.World.SpawnX, simulation.BallX[ball] >> 16);
-            Assert.Equal(simulation.World.SpawnY, simulation.BallY[ball] >> 16);
+            Assert.Equal(simulation.World.SpawnX, simulation.Balls[ball].X >> 16);
+            Assert.Equal(simulation.World.SpawnY, simulation.Balls[ball].Y >> 16);
         }
     }
 
@@ -85,12 +97,12 @@ public sealed class MineSimulationTests
     {
         using var host = PixelMineHost.Create(17);
         var simulation = host.Simulation;
-        var initialX = simulation.BallX[0];
-        var initialY = simulation.BallY[0];
+        var initialX = simulation.Balls[0].X;
+        var initialY = simulation.Balls[0].Y;
 
         host.Step(1);
 
-        Assert.True(initialX != simulation.BallX[0] || initialY != simulation.BallY[0]);
+        Assert.True(initialX != simulation.Balls[0].X || initialY != simulation.Balls[0].Y);
     }
 
     [Fact]

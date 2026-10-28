@@ -31,7 +31,7 @@ Choose deterministic numeric primitives and explicit inputs for authoritative si
 
 ## System access and range callbacks
 
-The current unshipped `SYSACC` rules are enabled errors for recognized `ISystemicSystem` code:
+`SYSACC001`–`SYSACC006` and `SYSACC008` are enabled errors for recognized `ISystemicSystem` code; `SYSACC007` is informational:
 
 | Rule | Diagnostic |
 | --- | --- |
@@ -41,6 +41,8 @@ The current unshipped `SYSACC` rules are enabled errors for recognized `ISystemi
 | [`SYSACC004`](#sysacc004) | Scoped population column reads and writes need matching per-column access declarations. |
 | [`SYSACC005`](#sysacc005) | Immediate World operations and mutations through `SystemicSystemContext.Commands` are unsafe inside a range callback. |
 | [`SYSACC006`](#sysacc006) | A parallel range callback cannot read all rows of a single-buffered column that it writes. |
+| [`SYSACC007`](#sysacc007) | A system that does not declare `Access` runs with the default exclusive `WriteWorld` declaration. |
+| [`SYSACC008`](#sysacc008) | `DeferFact` needs `SystemAccess.DeferWorldWrites` or `SystemAccess.WriteWorld`. |
 
 <a id="sysacc001"></a>
 ### SYSACC001
@@ -66,6 +68,16 @@ Flags recognized `PopulationAccessScope` reads and writes when the corresponding
 ### SYSACC006
 
 Flags `PopulationAccessScope.ReadAll` for a single-buffered column inside `ForEachPopulationRange` when the system also declares writes to that column. Other partitions can mutate those rows at the same time. Use `ReadRange` for the callback's assigned rows, or move cross-partition reads to a separate immutable/double-buffered column. The runtime enforces the same restriction even when the analyzer cannot recognize the access declaration or call site.
+
+<a id="sysacc007"></a>
+### SYSACC007
+
+Reports an informational diagnostic at a system type that omits `ISystemicSystem.Access`. The default is `SystemAccess.WriteWorld`, so the system runs in a wave by itself even when it only touches one population. Declare the generated `Read*`/`Write*` column access, or `DeferWorldWrites`, to let compatible systems share a wave. The diagnostic is informational because exclusive execution is correct, just slower.
+
+<a id="sysacc008"></a>
+### SYSACC008
+
+Declares missing deferred World access for a direct call to `DeferFact`. Add `SystemAccess.DeferWorldWrites` (shared wave) or `SystemAccess.WriteWorld` (exclusive) before queueing facts, and call it from the system body rather than a range callback, where the queue would be shared across workers.
 
 <a id="sysacc005"></a>
 ### SYSACC005

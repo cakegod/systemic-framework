@@ -231,7 +231,8 @@ public static class Program
 
         Console.WriteLine(
             $"seed={options.Seed} ticks={simulation.Tick} mined={simulation.MinedPixels} dust={simulation.Dust} "
-            + $"prisms={simulation.Prisms} balls={simulation.BallCount} shots={simulation.BallsFired} won={simulation.Won}");
+            + $"prisms={simulation.Prisms} balls={simulation.BallCount} shots={simulation.BallsFired} won={simulation.Won} "
+            + $"waves={host.Game.SchedulerWaves.Length} workers={host.Game.SchedulerWorkerCount}");
         if (simulation.MinedPixels == 0)
         {
             throw new InvalidOperationException("Autoplay mined nothing; use more ticks (e.g. 12,000).");
@@ -265,7 +266,8 @@ public static class Program
         Console.WriteLine(
             $"stress seed={options.Seed} ticks={options.Ticks} balls={simulation.BallCount} "
             + $"speed={options.StressSpeed}x mean_ms={total / milliseconds.Length:F2} "
-            + $"p95_ms={p95:F2} max_ms={milliseconds[^1]:F2}");
+            + $"p95_ms={p95:F2} max_ms={milliseconds[^1]:F2} "
+            + $"waves={host.Game.SchedulerWaves.Length} workers={host.Game.SchedulerWorkerCount}");
         if (simulation.BallCount == 0)
         {
             throw new InvalidOperationException("Stress run lost every ball.");

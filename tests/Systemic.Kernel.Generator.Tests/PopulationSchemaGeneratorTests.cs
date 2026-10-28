@@ -69,6 +69,51 @@ public sealed class PopulationSchemaGeneratorTests
     }
 
     [Fact]
+    public void Snapshot_copies_a_range_into_a_caller_buffer()
+    {
+        const string source = """
+            using Systemic.Kernel;
+
+            namespace SnapshotProof;
+
+            [PopulationSchema("proof.snapshot", 1)]
+            public partial struct Particle
+            {
+                [PopulationColumn("x", DoubleBuffered = true)] public int X;
+                [PopulationColumn("health")] public int Health;
+            }
+
+            public static class Consumer
+            {
+                public static int Run(World world)
+                {
+                    var population = ParticlePopulation.Define(world);
+                    var range = population.AddRange(3);
+                    Particle.InitializeRange(population, range, new Particle[]
+                    {
+                        new() { X = 10, Health = 1 },
+                        new() { X = 20, Health = 2 },
+                        new() { X = 30, Health = 3 }
+                    });
+                    var snapshot = new Particle[2];
+                    ParticlePopulation.Snapshot(population, new PopulationRange(1, 2), snapshot);
+                    return (snapshot[0].X * 100) + snapshot[1].Health;
+                }
+            }
+            """;
+
+        var (driver, output) = Generate(source);
+
+        Assert.Empty(driver.GetRunResult().Diagnostics);
+        Assert.Empty(output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        using var assembly = new MemoryStream();
+        var emit = output.Emit(assembly);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var consumer = System.Reflection.Assembly.Load(assembly.ToArray()).GetType("SnapshotProof.Consumer")!;
+        Assert.Equal(2003, consumer.GetMethod("Run")!.Invoke(null, [new World(seed: 1, valueScale: 1)]));
+    }
+
+    [Fact]
     public void Generated_row_and_range_writes_use_checked_columns_and_restore_transaction_state()
     {
         const string source = """

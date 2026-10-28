@@ -76,6 +76,8 @@ public sealed class SystemicSystemContext
     private readonly int _standaloneTick;
     private readonly bool _standalone;
     private bool _canWriteWorld;
+    private bool _canDeferWorldWrites;
+    private DeferredFactQueue? _deferredFacts;
 
     /// <summary>Creates a single-use context for a direct system test or standalone harness.</summary>
     public SystemicSystemContext(World world, RuleEngine contentRules, EventEngine extensionEngine, int tick)
@@ -160,6 +162,33 @@ public sealed class SystemicSystemContext
         }
     }
 
+    /// <summary>Queues a fact for dispatch after every system has run this tick.</summary>
+    /// <remarks>Requires <see cref="SystemAccess.DeferWorldWrites"/> or <see cref="SystemAccess.WriteWorld"/>. Queued facts dispatch serially in system registration order after the schedule, so no other system observes their effects during the same tick. A standalone context dispatches immediately.</remarks>
+    /// <exception cref="InvalidOperationException">The system lacks deferred World write access.</exception>
+    public void DeferFact(SimulationFact fact)
+    {
+        if (_kernelContext is not null)
+        {
+            if (!_canWriteWorld && !_canDeferWorldWrites)
+            {
+                throw new InvalidOperationException(
+                    "Deferred facts require SystemAccess.DeferWorldWrites or SystemAccess.WriteWorld; deferred World commands remain available without them.");
+            }
+
+            (_deferredFacts ?? throw new InvalidOperationException("The deferred fact queue is unavailable during this execution."))
+                .Facts.Add(fact);
+            return;
+        }
+
+        if (_standalone)
+        {
+            _contentRules.Dispatch(_world, fact, _observeFact);
+            return;
+        }
+
+        throw new InvalidOperationException("System context operations are available only while the system executes.");
+    }
+
     /// <summary>Dispatches a simulation fact against the current World.</summary>
     /// <exception cref="InvalidOperationException">The system did not declare immediate World write access.</exception>
     public RuleDispatchResult Publish(SimulationFact fact)
@@ -241,8 +270,8 @@ public sealed class SystemicSystemContext
             return;
 
         lease.WithAccess(range, new StandalonePopulationRangeState<TKind, TState>(state, executeRange),
-            static (StandalonePopulationRangeState<TKind, TState> callbackState,
-                scoped ref PopulationAccessScope<TKind> scope) =>
+            static (callbackState,
+                scoped ref scope) =>
                 callbackState.Callback(callbackState.State, 0, ref scope));
     }
 
@@ -276,8 +305,8 @@ public sealed class SystemicSystemContext
             return;
 
         population.WithAccess(range, new StandalonePopulationRangeState<TKind, TState>(state, executeRange),
-            static (StandalonePopulationRangeState<TKind, TState> callbackState,
-                scoped ref PopulationAccessScope<TKind> scope) =>
+            static (callbackState,
+                scoped ref scope) =>
                 callbackState.Callback(callbackState.State, 0, ref scope));
     }
 
@@ -345,16 +374,24 @@ public sealed class SystemicSystemContext
         return buffers;
     }
 
-    internal void Prepare(ScheduledSystemContext kernelContext, bool canWriteWorld)
+    internal void Prepare(
+        ScheduledSystemContext kernelContext,
+        bool canWriteWorld,
+        bool canDeferWorldWrites,
+        DeferredFactQueue deferredFacts)
     {
         _kernelContext = kernelContext;
         _canWriteWorld = canWriteWorld;
+        _canDeferWorldWrites = canDeferWorldWrites;
+        _deferredFacts = deferredFacts;
     }
 
     internal void Finish()
     {
         _kernelContext = null;
         _canWriteWorld = false;
+        _canDeferWorldWrites = false;
+        _deferredFacts = null;
     }
 
     private void FlushWorldCommands()
@@ -457,6 +494,8 @@ public sealed class SystemicGameBuilder
     public ImmutableDictionary<string, int> EntityIds { get; }
     public bool IsRestoringWorld => _extensionStates is not null;
 
+    /// <summary>Registers a shared service for the host and every system.</summary>
+    /// <remarks>A service that implements <see cref="ISystemicStatefulExtension"/> is also registered for save and rollback snapshots; that is intentional, so state carried by a service survives a rolled-back tick.</remarks>
     public SystemicGameBuilder AddService<TService>(TService service)
         where TService : notnull
     {
@@ -506,6 +545,8 @@ public sealed class SystemicGameBuilder
         return this;
     }
 
+    /// <summary>Adds state that the host snapshots before each tick and restores when it rolls back.</summary>
+    /// <remarks>Systems and services implementing <see cref="ISystemicStatefulExtension"/> are registered automatically; call this only for standalone state objects.</remarks>
     public SystemicGameBuilder RegisterStatefulExtension(ISystemicStatefulExtension extension)
     {
         EnsureNotBuilt();
@@ -539,6 +580,8 @@ public sealed class SystemicGameBuilder
         return this;
     }
 
+    /// <summary>Registers an extension module in the catalog.</summary>
+    /// <remarks>If the module also implements <see cref="ISystemicSystem"/> it joins the tick schedule, and if it implements <see cref="ISystemicStatefulExtension"/> it joins save and rollback snapshots. Modules are not instantiated for you.</remarks>
     public SystemicGameBuilder AddExtension(ISystemicExtensionModule module)
     {
         EnsureNotBuilt();
@@ -644,7 +687,8 @@ public sealed class SystemicGameBuilder
             .Select(system => new SystemicSystemBridge(system,
                 new SystemicSystemContext(World, contentRules, extensionEngine,
                     new Dictionary<Type, object>(_services), systemObserver),
-                tickStats.Get(system.Id)))
+                tickStats.Get(system.Id),
+                new DeferredFactQueue()))
             .ToArray();
         DeterministicSystemSchedule? schedule = null;
         if (systemBridges.Length > 0)
@@ -660,7 +704,7 @@ public sealed class SystemicGameBuilder
 
         return new SystemicGame(Content, World, schedule, contentRules, extensionEngine,
             EntityIds, statefulExtensions, new Dictionary<Type, object>(_services), factObservers, clock, tickStats,
-            [.. _uiBindingProviders]);
+            [.. _uiBindingProviders], [.. systemBridges.Select(bridge => bridge.DeferredFacts)]);
     }
 
     private void EnsureNotBuilt()
@@ -693,7 +737,8 @@ public sealed class SystemicGame : IDisposable
         SimulationFactObserver[] factObservers,
         FixedStepClock clock,
         SystemicTickStats tickStats,
-        ISystemicUiBindingProvider[] uiBindingProviders)
+        ISystemicUiBindingProvider[] uiBindingProviders,
+        DeferredFactQueue[] deferredFactQueues)
     {
         Content = content;
         World = world;
@@ -707,7 +752,10 @@ public sealed class SystemicGame : IDisposable
         UiBindingProviders = uiBindingProviders;
         Clock = clock;
         TickStats = tickStats;
+        _deferredFactQueues = deferredFactQueues;
     }
+
+    private readonly DeferredFactQueue[] _deferredFactQueues;
 
     public static SystemicGameBuilder FromDirectory(string rootDirectory, int seed, double valueScale = 1)
     {
@@ -823,6 +871,8 @@ public sealed class SystemicGame : IDisposable
 
     private void StepWithinTransaction(WorldTransaction transaction)
     {
+        // A failed tick must not replay facts queued before its rollback.
+        ClearDeferredFacts();
         for (var index = 0; index < StatefulExtensions.Count; index++)
         {
             var extension = StatefulExtensions[index];
@@ -848,8 +898,53 @@ public sealed class SystemicGame : IDisposable
         }
         World.LogicalTick = checked(World.LogicalTick + 1);
         _schedule?.Execute(World, World.LogicalTick);
+        DispatchDeferredFacts();
 
         World.AdvanceModifiers();
+    }
+
+    private void ClearDeferredFacts()
+    {
+        for (var index = 0; index < _deferredFactQueues.Length; index++)
+        {
+            _deferredFactQueues[index].Facts.Clear();
+        }
+    }
+
+    private void DispatchDeferredFacts()
+    {
+        var pending = false;
+        for (var index = 0; index < _deferredFactQueues.Length; index++)
+        {
+            if (_deferredFactQueues[index].Facts.Count > 0)
+            {
+                pending = true;
+                break;
+            }
+        }
+
+        if (!pending)
+        {
+            return;
+        }
+
+        var observer = CombineFactObservers(null);
+        try
+        {
+            // System order, then queue order: independent of worker count and wave layout.
+            for (var index = 0; index < _deferredFactQueues.Length; index++)
+            {
+                var facts = _deferredFactQueues[index].Facts;
+                for (var factIndex = 0; factIndex < facts.Count; factIndex++)
+                {
+                    _contentRules.Dispatch(World, facts[factIndex], observer);
+                }
+            }
+        }
+        finally
+        {
+            ClearDeferredFacts();
+        }
     }
 
     /// <summary>Runs a tick with an error boundary and reports whether a failing callback followed commit.</summary>
@@ -917,18 +1012,21 @@ public sealed class SystemicGame : IDisposable
 internal sealed class SystemicSystemBridge(
     ISystemicSystem system,
     SystemicSystemContext stepContext,
-    SystemicTickStats.Measurement measurement) : IScheduledKernelSystem
+    SystemicTickStats.Measurement measurement,
+    DeferredFactQueue deferredFacts) : IScheduledKernelSystem
 {
     private readonly ISystemicSystem _system = system;
     private readonly SystemicSystemContext _stepContext = stepContext;
     private readonly bool _canWriteWorld = system.Access.Contains(SystemAccess.WriteWorld);
+    private readonly bool _canDeferWorldWrites = system.Access.Contains(SystemAccess.DeferWorldWrites);
 
     public string Id => _system.Id;
     public IReadOnlyList<SystemAccess> Access => _system.Access;
+    public DeferredFactQueue DeferredFacts => deferredFacts;
 
     public void Execute(ScheduledSystemContext context)
     {
-        _stepContext.Prepare(context, _canWriteWorld);
+        _stepContext.Prepare(context, _canWriteWorld, _canDeferWorldWrites, deferredFacts);
         var start = Stopwatch.GetTimestamp();
         var allocated = GC.GetAllocatedBytesForCurrentThread();
         try
@@ -949,3 +1047,9 @@ internal sealed class SystemicSystemBridge(
 }
 
 internal sealed record FactObserverRegistration(int Order, int RegistrationOrder, SimulationFactObserver Observer);
+
+/// <summary>One system's facts waiting for the end-of-tick flush.</summary>
+internal sealed class DeferredFactQueue
+{
+    public List<SimulationFact> Facts { get; } = [];
+}

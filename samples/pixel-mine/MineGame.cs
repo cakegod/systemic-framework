@@ -9,7 +9,16 @@ public sealed class MineGame : Game
 {
     private const int ScreenWidth = 1280;
     private const int ScreenHeight = 800;
-    private const int HudTop = 640;
+    private const int HudMargin = 26;
+    private const int IconCellSize = 24;
+    private const int IconSize = IconCellSize * 2;
+    private const float TypeLabel = 1.5f;
+    private const float TypeValue = 2f;
+    private const float TypeDisplay = 3f;
+    private const int UpgradeStripHeight = 100;
+    private const int UpgradeItemWidth = 76;
+    private const int UpgradeItemGap = 12;
+    private const int UpgradeCount = MineHudFocus.UpgradeCount;
     private const int HitFlashCapacity = 24;
     private const int HitFlashDuration = 6;
     private const int DustPopDuration = 12;
@@ -18,18 +27,57 @@ public sealed class MineGame : Game
     private const float MaximumZoom = 16f;
 
     private static readonly XnaColor s_ballColor = new(255, 144, 0);
+    private static readonly XnaColor s_outline = new(10, 7, 4, 235);
+    private static readonly XnaColor s_label = new(226, 190, 132);
+    private static readonly XnaColor s_muted = new(214, 192, 158);
+    private static readonly XnaColor s_prismColor = new(206, 152, 255);
+    private static readonly XnaColor s_minedColor = new(154, 216, 104);
+    private static readonly XnaColor s_goldColor = new(255, 216, 64);
+    private static readonly XnaColor s_keyLabel = new(226, 190, 132, 220);
+    private static readonly XnaColor s_brass = new(158, 115, 65);
+    private static readonly XnaColor s_ivory = new(255, 235, 193);
+    private static readonly XnaColor s_obsidian = new(18, 23, 21);
+    private static readonly Rectangle s_resources = new(HudMargin, HudMargin, 302, 124);
+    private static readonly Rectangle s_upgradeStrip =
+        new((ScreenWidth - (UpgradeCount * UpgradeItemWidth) - ((UpgradeCount - 1) * UpgradeItemGap)) / 2,
+            ScreenHeight - HudMargin - UpgradeStripHeight,
+            (UpgradeCount * UpgradeItemWidth) + ((UpgradeCount - 1) * UpgradeItemGap),
+            UpgradeStripHeight);
+    private static readonly Rectangle s_upgradeDetail = new((ScreenWidth - 560) / 2, s_upgradeStrip.Top - 168, 560, 144);
+    private static readonly Rectangle s_ballStatus = new(ScreenWidth - HudMargin - 280, HudMargin, 280, 124);
+    private static readonly Rectangle s_ballDetail = new(ScreenWidth - HudMargin - 300, HudMargin + 140, 300, 112);
+    private static readonly Rectangle s_compass = new((ScreenWidth - 272) / 2, HudMargin, 272, 60);
+
+    private enum HudIcon
+    {
+        Dust,
+        Prism,
+        Ball,
+        Mined,
+        Power,
+        Speed,
+        Balls,
+        Auto,
+        Rod,
+        Smash,
+        Drill
+    }
 
     private readonly GraphicsDeviceManager _graphics;
     private readonly MineOptions _options;
     private readonly PixelMineHost _host;
     private readonly PixelMineSimulation _simulation;
     private readonly MineMenu _menu;
+    private readonly MineHudFocus _hudFocus = new();
     private readonly HitFlash[] _hitFlashes = new HitFlash[HitFlashCapacity];
     private SpriteBatch _batch = null!;
     private PixelFont _font = null!;
+    private Texture2D _iconAtlas = null!;
+    private readonly RasterizerState _hudClip = new() { ScissorTestEnable = true };
     private PixelMineRenderer _renderer = null!;
     private MineMenuBackdrop _menuBackdrop = null!;
     private RenderTarget2D _frame = null!;
+    private KeyboardState _keyboard;
     private KeyboardState _previousKeyboard;
     private MouseState _previousMouse;
     private float _zoom = 4f;
@@ -44,7 +92,6 @@ public sealed class MineGame : Game
     private int _dustPopCooldown;
     private int _nextHitFlash;
     private int _frames;
-    private long _simulationRemainder;
     private float _menuBallY = 450f;
 
     public MineGame(MineOptions options)
@@ -77,12 +124,18 @@ public sealed class MineGame : Game
 
     private int ViewWidth => ScreenWidth / PixelScale;
 
-    private int ViewHeight => HudTop / PixelScale;
+    private int ViewHeight => ScreenHeight / PixelScale;
 
     protected override void LoadContent()
     {
         _batch = new SpriteBatch(GraphicsDevice);
         _font = new PixelFont(GraphicsDevice);
+        _iconAtlas = Texture2D.FromFile(GraphicsDevice, Path.Combine(AppContext.BaseDirectory, "content", "hud-relics.png"));
+        if (_iconAtlas.Width != Enum.GetValues<HudIcon>().Length * IconCellSize || _iconAtlas.Height != IconCellSize)
+        {
+            throw new InvalidOperationException("HUD relic atlas must contain eleven 24x24 icons.");
+        }
+
         _renderer = new PixelMineRenderer(GraphicsDevice, _simulation.World);
         _menuBackdrop = new MineMenuBackdrop(GraphicsDevice);
         _frame = new RenderTarget2D(GraphicsDevice, ScreenWidth, ScreenHeight);
@@ -138,6 +191,8 @@ public sealed class MineGame : Game
                 BallKind.Smash => BallKind.Basic,
                 _ => BallKind.Basic
             };
+
+            _hudFocus.InspectBall();
         }
 
         for (var index = 0; index < _simulation.Upgrades.Count; index++)
@@ -145,31 +200,33 @@ public sealed class MineGame : Game
             if (Pressed(keyboard, Keys.D1 + index))
             {
                 _simulation.RequestUpgrade((UpgradeKind)index);
+                _hudFocus.InspectUpgrade(index);
             }
         }
 
         HandleZoom(mouse);
         var cursorPosition = CanvasPosition(mouse);
+        var hoveredUpgrade = _hudFocus.UpgradeReveal > 0f && s_upgradeDetail.Contains(cursorPosition)
+            ? _hudFocus.UpgradeIndex
+            : UpgradeAt((int)cursorPosition.X, (int)cursorPosition.Y);
+        _hudFocus.Update(gameTime.ElapsedGameTime, hoveredUpgrade,
+            s_ballStatus.Contains(cursorPosition)
+            || (_hudFocus.BallReveal > 0f && s_ballDetail.Contains(cursorPosition)));
 
         if (mouse.LeftButton == ButtonState.Pressed
             && _previousMouse.LeftButton == ButtonState.Released
-            && cursorPosition.Y < HudTop)
+            && !IsOverHud(cursorPosition))
         {
             var worldX = _cameraLeft + (int)(cursorPosition.X / PixelScale);
             var worldY = _cameraTop + (int)(cursorPosition.Y / PixelScale);
             _simulation.RequestShot(worldX, worldY, _selected);
         }
 
-        var ticks = SimulationTicks(ref _simulationRemainder, gameTime.ElapsedGameTime);
-        for (var tick = 0; tick < ticks; tick++)
+        _keyboard = keyboard;
+        _host.Game.Clock.Advance(gameTime.ElapsedGameTime, StepSimulation);
+        for (var index = 0; index < _simulation.Upgrades.Count; index++)
         {
-            HandlePan(keyboard);
-            UpdateHitFlashTimers();
-            if (!_paused)
-            {
-                _host.Step(1);
-                UpdateMiningFeedback();
-            }
+            _hudFocus.ObserveUpgrade(index, _simulation.Upgrades[index].Level);
         }
 
         _previousKeyboard = keyboard;
@@ -198,7 +255,7 @@ public sealed class MineGame : Game
         _batch.Begin(samplerState: SamplerState.PointClamp);
         if (_menu.Screen == MineScreen.Playing)
         {
-            _renderer.DrawWorld(_batch, new Rectangle(0, 0, ScreenWidth, HudTop));
+            _renderer.DrawWorld(_batch, new Rectangle(0, 0, ScreenWidth, ScreenHeight));
             _renderer.DrawPrismGlows(_batch, PixelScale);
             DrawHitFlashes();
             DrawBalls();
@@ -225,12 +282,17 @@ public sealed class MineGame : Game
         base.Draw(gameTime);
     }
 
-    internal static int SimulationTicks(ref long remainder, TimeSpan elapsed)
+    private void StepSimulation()
     {
-        remainder += elapsed.Ticks * 60;
-        var ticks = (int)(remainder / TimeSpan.TicksPerSecond);
-        remainder %= TimeSpan.TicksPerSecond;
-        return ticks;
+        HandlePan(_keyboard);
+        UpdateHitFlashTimers();
+        if (_paused)
+        {
+            return;
+        }
+
+        _host.Step(1);
+        UpdateMiningFeedback();
     }
 
     private void UpdateMenu(KeyboardState keyboard, MouseState mouse)
@@ -408,6 +470,8 @@ public sealed class MineGame : Game
             _menuBackdrop?.Dispose();
             _renderer?.Dispose();
             _font?.Dispose();
+            _iconAtlas?.Dispose();
+            _hudClip.Dispose();
             _batch?.Dispose();
             _frame?.Dispose();
         }
@@ -417,24 +481,23 @@ public sealed class MineGame : Game
 
     private void DrawBalls()
     {
-        var kinds = _simulation.BallKinds;
-        var positionsX = _simulation.BallX;
-        var positionsY = _simulation.BallY;
-        for (var row = 0; row < kinds.Length; row++)
+        var balls = _simulation.Balls;
+        for (var row = 0; row < balls.Length; row++)
         {
-            if (kinds[row] < 0)
+            var ball = balls[row];
+            if (ball.Kind < 0)
             {
                 continue;
             }
 
-            var screenX = ((positionsX[row] / 65536f) - _cameraLeft) * PixelScale;
-            var screenY = ((positionsY[row] / 65536f) - _cameraTop) * PixelScale;
-            if (screenX < -32 || screenY < -32 || screenX > ScreenWidth + 32 || screenY > HudTop + 32)
+            var screenX = ((ball.X / 65536f) - _cameraLeft) * PixelScale;
+            var screenY = ((ball.Y / 65536f) - _cameraTop) * PixelScale;
+            if (screenX < -32 || screenY < -32 || screenX > ScreenWidth + 32 || screenY > ScreenHeight + 32)
             {
                 continue;
             }
 
-            var kind = (BallKind)kinds[row];
+            var kind = (BallKind)ball.Kind;
             _renderer.DrawBall(_batch, new Vector2(screenX, screenY), (kind == BallKind.Smash ? 3.2f : 2.4f) * (_zoom / 2f), kind);
         }
 
@@ -527,73 +590,348 @@ public sealed class MineGame : Game
 
     private void DrawHud()
     {
-        _batch.Draw(_renderer.White, new Rectangle(0, HudTop, ScreenWidth, ScreenHeight - HudTop), XnaColor.Black);
-        _batch.Draw(_renderer.White, new Rectangle(0, HudTop, ScreenWidth, 2), new XnaColor(70, 60, 80));
-
-        var hud = _batch;
-        var dustScale = 2.5f;
-        if (_dustPopTicks > 0)
+        if (_paused || _simulation.Won)
         {
-            var progress = 1f - (_dustPopTicks / (float)DustPopDuration);
-            dustScale += MathF.Sin(progress * MathF.PI) * 0.45f;
-            var alpha = (byte)(255 * (1f - progress));
-            _font.Draw(hud, $"+{_dustPopAmount}", 164, HudTop + 8 - (int)(progress * 10f), 1.5f,
-                new XnaColor(255, 230, 120, (int)alpha));
+            _batch.Draw(_renderer.White, new Rectangle(0, 0, ScreenWidth, ScreenHeight), new XnaColor(3, 10, 6) * 0.75f);
         }
 
-        _font.Draw(hud, $"DUST {_simulation.Dust}", 16, HudTop + 12, dustScale, new XnaColor(255, 214, 140));
-        _font.Draw(hud, $"PRISMS {_simulation.Prisms}", 320, HudTop + 12, 2.5f, new XnaColor(198, 140, 255));
-        _font.Draw(hud, $"BALLS {_simulation.BallCount}/{_simulation.BallLimit}", 620, HudTop + 12, 2.5f, s_ballColor);
-        _font.Draw(hud, $"MINED {_simulation.MinedPixels}", 940, HudTop + 12, 2.5f, new XnaColor(140, 200, 255));
-
-        _font.Draw(hud, $"SELECTED {Name(_selected)} (TAB)  {ShotHint()}", 16, HudTop + 44, 2f, new XnaColor(190, 190, 200));
-
-        var panels = _simulation.Upgrades;
-        for (var index = 0; index < panels.Count; index++)
-        {
-            var upgrade = panels[index];
-            var x = 16 + (index * 178);
-            var y = HudTop + 82;
-            var color = upgrade.Level >= upgrade.MaxLevel
-                ? new XnaColor(120, 220, 140)
-                : upgrade.UsesPrisms && _simulation.Prisms < upgrade.Cost
-                    ? new XnaColor(150, 110, 170)
-                    : upgrade.UsesPrisms ? new XnaColor(198, 140, 255) : new XnaColor(230, 230, 230);
-            var price = upgrade.Level >= upgrade.MaxLevel
-                ? "MAX"
-                : upgrade.UsesPrisms ? $"{upgrade.Cost} P" : $"{upgrade.Cost}";
-            _font.Draw(hud, $"{index + 1} {upgrade.Name}", x, y, 1.7f, color);
-            _font.Draw(hud, $"LV{upgrade.Level} {price}", x, y + 18, 1.5f, color);
-        }
-
-        _font.Draw(hud, "WASD PAN  WHEEL ZOOM  CLICK SHOOT  1-7 BUY  SPACE PAUSE", 16, ScreenHeight - 28, 1.5f,
-            new XnaColor(120, 120, 135));
-
+        DrawResources();
+        DrawStatus();
+        DrawUpgrades();
         if (_simulation.HasRod)
         {
-            var (directionX, directionY) = _simulation.GoldDirection;
-            var from = new Vector2(ScreenWidth - 150, HudTop - 60);
-            var to = from + new Vector2(directionX / 256f, directionY / 256f) * 44f;
-            _renderer.DrawLine(_batch, from, to, 5f, new XnaColor(255, 216, 64));
-            _font.Draw(hud, $"GOLD {_simulation.GoldDistance}", (int)from.X + 30, (int)from.Y - 8, 1.8f,
-                new XnaColor(255, 216, 64));
+            DrawCompass();
         }
 
         if (_simulation.Message.Length > 0)
         {
-            _font.Draw(hud, _simulation.Message, 16, HudTop - 34, 2.2f, new XnaColor(255, 236, 140));
-        }
-
-        if (_simulation.Won)
-        {
-            _font.Draw(hud, "GOLDEN PIXEL FOUND - PRESS ESC", 16, HudTop - 70, 2.6f, new XnaColor(255, 216, 64));
+            DrawToast(_simulation.Message);
         }
 
         if (_paused)
         {
-            _font.Draw(hud, "PAUSED", (ScreenWidth / 2) - 60, (HudTop / 2) - 10, 3f, s_ballColor);
+            DrawBanner("PAUSED", "SPACE TO RESUME", s_ballColor);
+        }
+        else if (_simulation.Won)
+        {
+            DrawBanner("GOLDEN PIXEL FOUND", "PRESS ESC TO LEAVE", s_goldColor);
+        }
+
+        DrawControls();
+    }
+
+    private void DrawHudText(string text, int x, int y, float scale, XnaColor color) =>
+        DrawHudText(text, x, y, scale, color, s_outline);
+
+    private void DrawHudText(string text, int x, int y, float scale, XnaColor color, XnaColor outline)
+    {
+        var thickness = scale >= TypeDisplay ? 2 : 1;
+        for (var offsetY = -thickness; offsetY <= thickness; offsetY++)
+        {
+            for (var offsetX = -thickness; offsetX <= thickness; offsetX++)
+            {
+                if (offsetX == 0 && offsetY == 0)
+                {
+                    continue;
+                }
+
+                _font.Draw(_batch, text, x + offsetX, y + offsetY, scale, outline);
+            }
+        }
+
+        _font.Draw(_batch, text, x, y, scale, color);
+    }
+
+    private void DrawHudTextRight(string text, int right, int y, float scale, XnaColor color) =>
+        DrawHudText(text, right - _font.Measure(text, scale), y, scale, color);
+
+    private void DrawHudTextCentered(string text, int y, float scale, XnaColor color) =>
+        DrawHudText(text, (ScreenWidth - _font.Measure(text, scale)) / 2, y, scale, color);
+
+    private void DrawIcon(HudIcon icon, int x, int y, int size = IconSize, float opacity = 1f) =>
+        _batch.Draw(_iconAtlas, new Rectangle(x, y, size, size),
+            new Rectangle((int)icon * IconCellSize, 0, IconCellSize, IconCellSize), XnaColor.White * opacity);
+
+    private void DrawForgePanel(Rectangle bounds, XnaColor edge, float opacity = 1f)
+    {
+        var x = bounds.X;
+        var y = bounds.Y;
+        var w = bounds.Width;
+        var h = bounds.Height;
+        _batch.Draw(_renderer.White, new Rectangle(x + 4, y, w - 8, h), s_outline * opacity);
+        _batch.Draw(_renderer.White, new Rectangle(x, y + 4, w, h - 8), s_outline * opacity);
+        _batch.Draw(_renderer.White, new Rectangle(x + 2, y + 6, w - 4, h - 12), s_obsidian * opacity);
+        _batch.Draw(_renderer.White, new Rectangle(x + 6, y + 2, w - 12, h - 4), s_obsidian * opacity);
+
+        _batch.Draw(_renderer.White, new Rectangle(x + 6, y + 2, w - 12, 2), edge * opacity);
+        _batch.Draw(_renderer.White, new Rectangle(x + 2, y + 6, 2, h - 12), edge * (0.7f * opacity));
+        _batch.Draw(_renderer.White, new Rectangle(x + 6, bounds.Bottom - 4, w - 12, 2), edge * (0.4f * opacity));
+        _batch.Draw(_renderer.White, new Rectangle(bounds.Right - 4, y + 6, 2, h - 12), edge * (0.4f * opacity));
+        _batch.Draw(_renderer.White, new Rectangle(x + 8, y + 4, Math.Min(28, w - 16), 1), s_ivory * (0.5f * opacity));
+    }
+
+    private void DrawResources()
+    {
+        var x = s_resources.X;
+        var y = s_resources.Y;
+        var dust = _simulation.Dust.ToString();
+        var scale = Math.Min(4f, (s_resources.Width - 106f) / _font.Measure(dust, 1f));
+        DrawForgePanel(s_resources, s_brass);
+        DrawIcon(HudIcon.Dust, x + 8, y + 4, 72);
+        DrawHudText("DUST", x + 90, y + 18, TypeLabel, s_label);
+        DrawHudText(dust, x + 90, y + 40, scale, s_ivory);
+
+        if (_dustPopTicks > 0)
+        {
+            var progress = 1f - (_dustPopTicks / (float)DustPopDuration);
+            DrawHudTextRight($"+{_dustPopAmount}", s_resources.Right - 16,
+                y + 18 - (int)(progress * 8f), TypeLabel, s_goldColor * (1f - progress));
+        }
+
+        _batch.Draw(_renderer.White, new Rectangle(x + 18, y + 82, s_resources.Width - 36, 1), s_brass * 0.4f);
+        DrawIcon(HudIcon.Prism, x + 20, y + 92, IconCellSize);
+        DrawHudText("PRISMS", x + 56, y + 98, TypeLabel, s_muted);
+        DrawHudTextRight($"{_simulation.Prisms}", s_resources.Right - 18, y + 94, TypeValue, s_prismColor);
+    }
+
+    private void DrawStatus()
+    {
+        var x = s_ballStatus.X;
+        var y = s_ballStatus.Y;
+        var right = s_ballStatus.Right - 18;
+        var tint = BallTint(_selected);
+        var icon = _selected == BallKind.Smash ? HudIcon.Smash
+            : _selected == BallKind.Directional ? HudIcon.Drill : HudIcon.Ball;
+        var balls = $"{_simulation.BallCount}/{_simulation.BallLimit}";
+        DrawForgePanel(s_ballStatus, XnaColor.Lerp(s_brass, tint, _hudFocus.BallReveal));
+        DrawIcon(icon, x + 12, y + 14);
+        DrawHudText(balls, x + 76, y + 18, TypeDisplay, s_ivory);
+        DrawHudText($"{Name(_selected)} BALL", x + 76, y + 50, TypeLabel, tint);
+        DrawHudTextRight("[TAB]", right, y + 50, TypeLabel, s_muted);
+
+        _batch.Draw(_renderer.White, new Rectangle(x + 18, y + 82, s_ballStatus.Width - 36, 1), s_brass * 0.4f);
+        DrawIcon(HudIcon.Mined, x + 20, y + 92, IconCellSize);
+        DrawHudText("MINED", x + 56, y + 98, TypeLabel, s_muted);
+        DrawHudTextRight($"{_simulation.MinedPixels}", right, y + 94, TypeValue, s_minedColor);
+
+        var reveal = _hudFocus.BallReveal;
+        if (reveal > 0f)
+        {
+            BeginFocusSurface(s_ballDetail, reveal, tint, s_ballStatus.Center.X);
+            DrawIcon(icon, s_ballDetail.X + 14, s_ballDetail.Y + 10, 72, reveal);
+            DrawHudText(Name(_selected), s_ballDetail.X + 104, s_ballDetail.Y + 20, TypeDisplay, tint * reveal, s_outline * reveal);
+            DrawHudText(ShotHint(), s_ballDetail.X + 104, s_ballDetail.Y + 53, TypeLabel, s_ivory * reveal, s_outline * reveal);
+            DrawHudText("TAB CHANGE BALL", s_ballDetail.X + 24, s_ballDetail.Y + 88, TypeLabel, s_muted * reveal, s_outline * reveal);
+            EndFocusSurface();
         }
     }
+
+    private void DrawCompass()
+    {
+        var (directionX, directionY) = _simulation.GoldDirection;
+        var direction = new Vector2(directionX / 256f, directionY / 256f);
+        var origin = new Vector2(s_compass.Right - 36, s_compass.Center.Y);
+        var tip = origin + (direction * 18f);
+        var side = new Vector2(-direction.Y, direction.X) * 6f;
+        DrawForgePanel(s_compass, s_brass);
+        DrawIcon(HudIcon.Rod, s_compass.X + 8, s_compass.Y + 6);
+        DrawHudText("GOLD", s_compass.X + 68, s_compass.Y + 12, TypeLabel, s_label);
+        DrawHudText($"{_simulation.GoldDistance}", s_compass.X + 68, s_compass.Y + 32, TypeValue, s_goldColor);
+
+        _renderer.DrawLine(_batch, origin - (direction * 12f), tip, 3f, s_goldColor);
+        _renderer.DrawLine(_batch, tip, tip - (direction * 8f) + side, 3f, s_goldColor);
+        _renderer.DrawLine(_batch, tip, tip - (direction * 8f) - side, 3f, s_goldColor);
+    }
+
+    private void DrawUpgrades()
+    {
+        var upgrades = _simulation.Upgrades;
+        for (var index = 0; index < upgrades.Count; index++)
+        {
+            var upgrade = upgrades[index];
+            var kind = (UpgradeKind)index;
+            var bounds = UpgradeBounds(index);
+            var focused = _hudFocus.UpgradeIndex == index && _hudFocus.UpgradeReveal > 0f;
+            var tint = UpgradeTint(kind);
+            var balance = upgrade.UsesPrisms ? _simulation.Prisms : _simulation.Dust;
+            var maxed = upgrade.Level >= upgrade.MaxLevel;
+            var saved = maxed ? 1f : (float)Math.Clamp(balance / (double)upgrade.Cost, 0d, 1d);
+            var ready = !maxed && balance >= upgrade.Cost;
+            var flash = _hudFocus.UpgradeFlash(index);
+            var focus = focused ? 1f - MathF.Pow(1f - _hudFocus.UpgradeReveal, 3f) : 0f;
+            var edge = XnaColor.Lerp(ready || maxed ? s_brass : s_brass * 0.55f, tint, focus);
+            DrawForgePanel(bounds, XnaColor.Lerp(edge, s_ivory, flash));
+
+            _batch.Draw(_renderer.White, new Rectangle(bounds.X + 8, bounds.Y + 7, 17, 17),
+                focused || ready ? new XnaColor(84, 61, 35) : new XnaColor(43, 45, 35));
+            DrawHudText($"{index + 1}", bounds.X + 12, bounds.Y + 10, TypeLabel, focused || ready ? s_ivory : s_keyLabel);
+            DrawIcon(UpgradeIcon(kind), bounds.X + 14,
+                bounds.Y + 21 - (int)(focus * 4f) - (int)(MathF.Sin(flash * MathF.PI) * 6f));
+            DrawHudText(upgrade.Name, bounds.Center.X - (_font.Measure(upgrade.Name, TypeLabel) / 2),
+                bounds.Y + 70, TypeLabel, focused || ready || maxed ? s_ivory : s_muted);
+
+            for (var segment = 0; segment < 8; segment++)
+            {
+                var filled = Math.Clamp((saved * 8f) - segment, 0f, 1f);
+                var bar = new Rectangle(bounds.X + 8 + (segment * 8), bounds.Bottom - 10, 5, 3);
+                _batch.Draw(_renderer.White, bar, new XnaColor(50, 52, 42));
+                _batch.Draw(_renderer.White, new Rectangle(bar.X, bar.Y, (int)MathF.Ceiling(bar.Width * filled), bar.Height),
+                    maxed ? s_minedColor : tint);
+            }
+
+            if (ready)
+            {
+                DrawHudText("+", bounds.Right - 19, bounds.Y + 10, TypeLabel, s_goldColor);
+            }
+            else if (maxed)
+            {
+                _renderer.DrawLine(_batch, new Vector2(bounds.Right - 21, bounds.Y + 15),
+                    new Vector2(bounds.Right - 17, bounds.Y + 19), 2f, s_minedColor);
+                _renderer.DrawLine(_batch, new Vector2(bounds.Right - 17, bounds.Y + 19),
+                    new Vector2(bounds.Right - 10, bounds.Y + 10), 2f, s_minedColor);
+            }
+
+            if (flash > 0f)
+            {
+                var spread = (1f - flash) * 20f;
+                for (var spark = 0; spark < 4; spark++)
+                {
+                    var offset = (spark - 1.5f) * (10f + spread);
+                    var lift = 5f + (spread * (spark is 1 or 2 ? 1.4f : 0.7f));
+                    _batch.Draw(_renderer.White, new Rectangle(bounds.Center.X + (int)offset, bounds.Top - (int)lift, 3, 3), s_ivory * flash);
+                }
+            }
+        }
+
+        if (_hudFocus.UpgradeIndex >= 0 && _hudFocus.UpgradeReveal > 0f)
+        {
+            DrawUpgradeDetail(_hudFocus.UpgradeIndex, _hudFocus.UpgradeReveal);
+        }
+        else
+        {
+            DrawHudTextCentered("1-7 BUY / HOVER INSPECT", s_upgradeStrip.Y - 22, TypeLabel, s_muted);
+        }
+    }
+
+    private void BeginFocusSurface(Rectangle bounds, float reveal, XnaColor accent, int originX)
+    {
+        var eased = 1f - MathF.Pow(1f - reveal, 3f);
+        var width = (int)MathHelper.Lerp(UpgradeItemWidth, bounds.Width, eased);
+        var height = (int)MathHelper.Lerp(16, bounds.Height, eased);
+        var left = (int)MathHelper.Lerp(originX - (UpgradeItemWidth / 2), bounds.Left, eased);
+        var surface = new Rectangle(left, bounds.Bottom - height, width, height);
+        DrawForgePanel(surface, accent, reveal);
+
+        _batch.End();
+        GraphicsDevice.ScissorRectangle = surface;
+        _batch.Begin(samplerState: SamplerState.PointClamp, rasterizerState: _hudClip);
+    }
+
+    private void EndFocusSurface()
+    {
+        _batch.End();
+
+        _batch.Begin(samplerState: SamplerState.PointClamp);
+    }
+
+    private void DrawUpgradeDetail(int index, float reveal)
+    {
+        var upgrade = _simulation.Upgrades[index];
+        var tint = UpgradeTint((UpgradeKind)index);
+        var balance = upgrade.UsesPrisms ? _simulation.Prisms : _simulation.Dust;
+        var maxed = upgrade.Level >= upgrade.MaxLevel;
+        var currency = upgrade.UsesPrisms ? "PRISMS" : "DUST";
+        var price = maxed ? "MAX LEVEL" : $"{upgrade.Cost} {currency}";
+        var action = _hudFocus.UpgradeFlash(index) > 0f ? "FORGED"
+            : maxed ? "FULLY UPGRADED"
+            : balance < upgrade.Cost ? $"NEED {upgrade.Cost - balance} {currency}"
+            : _paused ? "RESUME TO BUY" : $"[{index + 1}] BUY UPGRADE";
+        var bounds = s_upgradeDetail;
+        var slot = UpgradeBounds(index);
+        _batch.Draw(_renderer.White, new Rectangle(slot.Center.X - 1, bounds.Bottom, 2, s_upgradeStrip.Top - bounds.Bottom), tint * (0.65f * reveal));
+        BeginFocusSurface(bounds, reveal, tint, slot.Center.X);
+        DrawIcon(UpgradeIcon((UpgradeKind)index), bounds.X + 18, bounds.Y + 12, 72, reveal);
+
+        DrawHudText(upgrade.Name, bounds.X + 110, bounds.Y + 18, TypeDisplay, s_ivory * reveal, s_outline * reveal);
+        DrawHudTextRight($"L{upgrade.Level}/{upgrade.MaxLevel}", bounds.Right - 22, bounds.Y + 24, TypeValue, tint * reveal);
+        DrawHudText(UpgradeDescription((UpgradeKind)index), bounds.X + 110, bounds.Y + 54, TypeLabel, s_muted * reveal, s_outline * reveal);
+        _batch.Draw(_renderer.White, new Rectangle(bounds.X + 22, bounds.Y + 92, bounds.Width - 44, 1), s_brass * (0.5f * reveal));
+
+        DrawIcon(upgrade.UsesPrisms ? HudIcon.Prism : HudIcon.Dust, bounds.X + 20, bounds.Y + 106, IconCellSize, reveal);
+        DrawHudText(price, bounds.X + 56, bounds.Y + 112, TypeValue,
+            (upgrade.UsesPrisms ? s_prismColor : s_goldColor) * reveal, s_outline * reveal);
+        DrawHudTextRight(action, bounds.Right - 22, bounds.Y + 115, TypeLabel,
+            (maxed || balance >= upgrade.Cost ? s_minedColor : s_muted) * reveal);
+        EndFocusSurface();
+    }
+
+    private void DrawControls()
+    {
+        if (_paused)
+        {
+            DrawHudTextCentered("CLICK SHOOT   TAB CHANGE BALL   1-7 BUY", 422, TypeValue, s_muted);
+            DrawHudTextCentered("WASD / ARROWS PAN   WHEEL ZOOM", 456, TypeValue, s_muted);
+            DrawHudTextCentered("SHIFT FAST PAN   F11 FULLSCREEN   ESC QUIT", 490, TypeValue, s_muted);
+            return;
+        }
+
+        DrawHudText("CLICK SHOOT", HudMargin, ScreenHeight - HudMargin - 30, TypeLabel, s_muted);
+        DrawHudText("TAB BALL", HudMargin, ScreenHeight - HudMargin - 12, TypeLabel, s_muted);
+        DrawHudTextRight("SPACE PAUSE / HELP", ScreenWidth - HudMargin, ScreenHeight - HudMargin - 30, TypeLabel, s_muted);
+    }
+
+    private void DrawToast(string message)
+    {
+        var width = _font.Measure(message, TypeValue) + 40;
+        var y = _paused || _simulation.Won ? 264 : s_upgradeDetail.Top - 46;
+        DrawForgePanel(new Rectangle((ScreenWidth - width) / 2, y, width, 32), s_brass);
+        DrawHudTextCentered(message, y + 9, TypeValue, s_ivory);
+    }
+
+    private void DrawBanner(string title, string? subtitle, XnaColor accent)
+    {
+        DrawForgePanel(new Rectangle((ScreenWidth - 660) / 2, 320, 660, _paused ? 216 : 104), s_brass);
+        DrawHudTextCentered(title, (ScreenHeight / 2) - 52, 4f, accent);
+        if (subtitle is not null)
+        {
+            DrawHudTextCentered(subtitle, (ScreenHeight / 2) - 18, TypeValue, s_muted);
+        }
+    }
+
+    internal static Rectangle UpgradeBounds(int index) =>
+        new(s_upgradeStrip.X + (index * (UpgradeItemWidth + UpgradeItemGap)), s_upgradeStrip.Y, UpgradeItemWidth, UpgradeStripHeight);
+
+    internal static int UpgradeAt(int x, int y)
+    {
+        if (!s_upgradeStrip.Contains(x, y))
+        {
+            return -1;
+        }
+
+        var index = (x - s_upgradeStrip.X) / (UpgradeItemWidth + UpgradeItemGap);
+        return UpgradeBounds(index).Contains(x, y) ? index : -1;
+    }
+
+    private bool IsOverHud(Vector2 point) => IsOverHud((int)point.X, (int)point.Y);
+
+    private bool IsOverHud(int x, int y) =>
+        s_upgradeStrip.Contains(x, y)
+        || s_resources.Contains(x, y)
+        || s_ballStatus.Contains(x, y)
+        || (_simulation.HasRod && s_compass.Contains(x, y))
+        || (_hudFocus.UpgradeReveal > 0f && s_upgradeDetail.Contains(x, y))
+        || (_hudFocus.BallReveal > 0f && s_ballDetail.Contains(x, y));
+
+    private static string UpgradeDescription(UpgradeKind kind) => kind switch
+    {
+        UpgradeKind.Power => "BREAK HARDER ROCK WITH EVERY HIT",
+        UpgradeKind.Speed => "SEND EVERY BALL THROUGH ROCK FASTER",
+        UpgradeKind.Capacity => "MAKE ROOM FOR MORE ACTIVE BALLS",
+        UpgradeKind.AutoFire => "FIRE BASIC BALLS AUTOMATICALLY",
+        UpgradeKind.Rod => "POINT TOWARD THE HIDDEN GOLDEN PIXEL",
+        UpgradeKind.Smash => "UNLOCK BALLS THAT BREAK NEARBY PIXELS",
+        _ => "UNLOCK BALLS THAT TUNNEL STRAIGHT THROUGH"
+    };
 
     private string ShotHint()
     {
@@ -610,6 +948,35 @@ public sealed class MineGame : Game
         BallKind.Smash => "SMASH",
         BallKind.Directional => "DRILL",
         _ => "BASIC"
+    };
+
+    private static XnaColor BallTint(BallKind kind) => kind switch
+    {
+        BallKind.Smash => new XnaColor(255, 110, 70),
+        BallKind.Directional => new XnaColor(255, 214, 80),
+        _ => new XnaColor(255, 144, 0)
+    };
+
+    private static HudIcon UpgradeIcon(UpgradeKind kind) => kind switch
+    {
+        UpgradeKind.Power => HudIcon.Power,
+        UpgradeKind.Speed => HudIcon.Speed,
+        UpgradeKind.Capacity => HudIcon.Balls,
+        UpgradeKind.AutoFire => HudIcon.Auto,
+        UpgradeKind.Rod => HudIcon.Rod,
+        UpgradeKind.Smash => HudIcon.Smash,
+        _ => HudIcon.Drill
+    };
+
+    private static XnaColor UpgradeTint(UpgradeKind kind) => kind switch
+    {
+        UpgradeKind.Power => new XnaColor(255, 176, 72),
+        UpgradeKind.Speed => new XnaColor(255, 226, 104),
+        UpgradeKind.Capacity => new XnaColor(255, 144, 0),
+        UpgradeKind.AutoFire => new XnaColor(176, 222, 126),
+        UpgradeKind.Rod => s_goldColor,
+        UpgradeKind.Smash => new XnaColor(255, 110, 70),
+        _ => new XnaColor(210, 180, 140)
     };
 
     private void HandleZoom(MouseState mouse)
@@ -722,8 +1089,8 @@ public sealed class MineGame : Game
             return colors.Count;
         }
 
-        var worldColors = Variety(0, 0, ScreenWidth, HudTop);
-        var hudColors = Variety(0, HudTop, ScreenWidth, ScreenHeight - HudTop);
+        var worldColors = Variety(ScreenWidth / 4, ScreenHeight / 4, ScreenWidth / 2, ScreenHeight / 2);
+        var hudColors = Variety(0, 0, ScreenWidth, 140);
 
         var materials = new bool[8];
         for (var y = _cameraTop; y < _cameraTop + ViewHeight; y++)
@@ -745,7 +1112,9 @@ public sealed class MineGame : Game
                 ballPixels++;
             }
 
-            if ((i / ScreenWidth) < HudTop
+            var y = i / ScreenWidth;
+            var x = i - (y * ScreenWidth);
+            if (!IsOverHud(x, y)
                 && pixels[i].B > pixels[i].R
                 && pixels[i].R > pixels[i].G
                 && pixels[i].B > 100)

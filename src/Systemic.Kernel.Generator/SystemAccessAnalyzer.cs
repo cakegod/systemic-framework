@@ -85,9 +85,29 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         description: "A parallel callback may read only its assigned rows from a single-buffered column that any partition writes.",
         helpLinkUri: Guide + "#sysacc006");
 
+    private static readonly DiagnosticDescriptor DeferredFactAccess = new(
+        id: "SYSACC008",
+        title: "Deferred fact dispatch is undeclared",
+        messageFormat: "SystemicSystemContext.DeferFact requires SystemAccess.DeferWorldWrites or SystemAccess.WriteWorld in Access",
+        category: "SystemAccess",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "Deferred facts dispatch at the end of the tick and require deferred or exclusive World write access.",
+        helpLinkUri: Guide + "#sysacc008");
+
+    private static readonly DiagnosticDescriptor ExclusiveDefaultAccess = new(
+        id: "SYSACC007",
+        title: "System runs with exclusive World access",
+        messageFormat: "System '{0}' does not declare Access, so it runs exclusively; declare the columns it uses to share a schedule wave",
+        category: "SystemAccess",
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        description: "ISystemicSystem.Access defaults to SystemAccess.WriteWorld, which excludes other systems from the scheduling wave.",
+        helpLinkUri: Guide + "#sysacc007");
+
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         [ImmediateWorldAccess, DeferredPopulationAccess, DirectRangeMutation, ColumnAccess, UnsafeRangeMutation,
-            ParallelWholeColumnRead];
+            ParallelWholeColumnRead, ExclusiveDefaultAccess, DeferredFactAccess];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -117,6 +137,9 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
             if (accessProperty is null)
                 return;
 
+            startContext.RegisterSymbolAction(symbolContext => AnalyzeDefaultAccess(
+                    symbolContext, systemicSystem, accessProperty),
+                SymbolKind.NamedType);
             startContext.RegisterSyntaxNodeAction(syntaxContext => AnalyzeInvocation(
                     syntaxContext, systemicSystem, accessProperty, systemicSystemContext, systemAccess,
                     populationColumn, doubleBufferedPopulationColumn, populationColumnKey, populationAccessScope,
@@ -127,6 +150,25 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
                     populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray),
                 Microsoft.CodeAnalysis.CSharp.SyntaxKind.SimpleMemberAccessExpression);
         });
+    }
+
+    private static void AnalyzeDefaultAccess(
+        SymbolAnalysisContext context,
+        INamedTypeSymbol systemicSystem,
+        IPropertySymbol accessProperty)
+    {
+        if (context.Symbol is not INamedTypeSymbol type || type.TypeKind != TypeKind.Class
+            || !type.AllInterfaces.Any(iface => SymbolEqualityComparer.Default.Equals(iface, systemicSystem)))
+            return;
+
+        var implementation = type.FindImplementationForInterfaceMember(accessProperty);
+        if (implementation is not null && implementation.ContainingType?.TypeKind != TypeKind.Interface
+            && !SymbolEqualityComparer.Default.Equals(implementation, accessProperty))
+            return;
+
+        var location = type.Locations.FirstOrDefault(candidate => candidate.IsInSource);
+        if (location is not null)
+            context.ReportDiagnostic(Diagnostic.Create(ExclusiveDefaultAccess, location, type.Name));
     }
 
     private static INamedTypeSymbol? GetSystemicType(Compilation compilation, string metadataName, string assemblyName)
@@ -174,6 +216,17 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
                     populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray);
                 if (access.IsKnown && !access.HasWriteWorld && !access.HasDeferWorldWrites)
                     context.ReportDiagnostic(Diagnostic.Create(DeferredPopulationAccess, invocationSyntax.GetLocation()));
+                return;
+            }
+
+            if (method.Name == "DeferFact")
+            {
+                var access = GetDeclaredAccess(context, systemicSystem, accessProperty, systemAccess,
+                    populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray);
+                if (access.IsKnown && !access.HasWriteWorld && !access.HasDeferWorldWrites)
+                    context.ReportDiagnostic(Diagnostic.Create(DeferredFactAccess, invocationSyntax.GetLocation()));
+                if (IsInsideForEachRangeCallback(invocationSyntax, context.SemanticModel, systemicSystemContext, context.CancellationToken))
+                    context.ReportDiagnostic(Diagnostic.Create(UnsafeRangeMutation, invocationSyntax.GetLocation()));
                 return;
             }
         }

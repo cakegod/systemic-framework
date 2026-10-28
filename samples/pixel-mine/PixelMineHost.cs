@@ -28,9 +28,9 @@ public sealed class PixelMineHost : IDisposable
         var materialized = content.CreateWorld(seed, 1);
         var simulation = new PixelMineSimulation(
             materialized.World,
-            materialized.EntityIds["pixel.mine"],
-            materialized.EntityIds["pixel.dust"],
-            materialized.EntityIds["pixel.prism"],
+            materialized.EntityIds[MineContent.MineEntity],
+            materialized.EntityIds[MineContent.DustEntity],
+            materialized.EntityIds[MineContent.PrismEntity],
             seed,
             stressBallCount,
             speedMultiplier);

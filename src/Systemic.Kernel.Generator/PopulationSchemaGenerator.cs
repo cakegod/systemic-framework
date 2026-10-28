@@ -73,6 +73,7 @@ public sealed class PopulationSchemaGenerator : IIncrementalGenerator
         }
 
         builder.AppendLine($"    public static Columns Bind(global::Systemic.Kernel.Population<{schemaType}> population) => new(population);");
+        EmitSnapshot(builder, schemaType, columns!);
         builder.AppendLine("    /// <summary>A detached snapshot of one row. Edit its values and pass it to WriteRow or RangeWriter.Write.</summary>");
         builder.AppendLine("    public struct Row");
         builder.AppendLine("    {");
@@ -364,6 +365,62 @@ public sealed class PopulationSchemaGenerator : IIncrementalGenerator
         builder.AppendLine("                }");
         builder.AppendLine("            });");
         builder.AppendLine("    }");
+    }
+
+    private static void EmitSnapshot(
+        StringBuilder builder,
+        string schemaType,
+        List<ColumnModel> columns)
+    {
+        builder.AppendLine("    /// <summary>Copies the current rows of a range into a caller-owned buffer for use outside access callbacks.</summary>");
+        builder.AppendLine("    /// <remarks>Writes range.Length entries starting at index zero and reads the current buffer of double-buffered columns.</remarks>");
+        builder.AppendLine("    public static void Snapshot(");
+        builder.AppendLine($"        global::Systemic.Kernel.Population<{schemaType}> population,");
+        builder.AppendLine("        global::Systemic.Kernel.PopulationRange range,");
+        builder.AppendLine($"        global::System.Memory<{schemaType}> destination)");
+        builder.AppendLine("    {");
+        builder.AppendLine("        global::System.ArgumentNullException.ThrowIfNull(population);");
+        builder.AppendLine("        if (destination.Length < range.Length)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            throw new global::System.ArgumentException(\"The destination buffer must hold the whole range.\", nameof(destination));");
+        builder.AppendLine("        }");
+        builder.AppendLine("        population.WithAccess(range, new SnapshotTarget(destination, Bind(population)),");
+        builder.AppendLine($"            static (SnapshotTarget target, scoped ref global::Systemic.Kernel.PopulationAccessScope<{schemaType}> access) =>");
+        builder.AppendLine("            {");
+        for (var columnIndex = 0; columnIndex < columns.Count; columnIndex++)
+        {
+            var readMethod = columns[columnIndex].DoubleBuffered ? "ReadCurrentRange" : "ReadRange";
+            builder.AppendLine($"                var column{columnIndex} = access.{readMethod}(target.Columns.{Escape(columns[columnIndex].Name)});");
+        }
+
+        builder.AppendLine("                var rows = target.Destination.Span;");
+        builder.AppendLine("                for (var offset = 0; offset < access.Range.Length; offset++)");
+        builder.AppendLine("                {");
+        builder.AppendLine($"                    rows[offset] = new {schemaType}");
+        builder.AppendLine("                    {");
+        for (var columnIndex = 0; columnIndex < columns.Count; columnIndex++)
+        {
+            builder.AppendLine($"                        {Escape(columns[columnIndex].Name)} = column{columnIndex}[offset],");
+        }
+
+        builder.AppendLine("                    };");
+        builder.AppendLine("                }");
+        builder.AppendLine("            });");
+        builder.AppendLine("    }");
+        builder.AppendLine();
+        builder.AppendLine("    /// <summary>Destination and bound columns for Snapshot; a struct keeps the callback allocation-free.</summary>");
+        builder.AppendLine("    public readonly struct SnapshotTarget");
+        builder.AppendLine("    {");
+        builder.AppendLine($"        public SnapshotTarget(global::System.Memory<{schemaType}> destination, Columns columns)");
+        builder.AppendLine("        {");
+        builder.AppendLine("            Destination = destination;");
+        builder.AppendLine("            Columns = columns;");
+        builder.AppendLine("        }");
+        builder.AppendLine();
+        builder.AppendLine($"        public global::System.Memory<{schemaType}> Destination {{ get; }}");
+        builder.AppendLine("        public Columns Columns { get; }");
+        builder.AppendLine("    }");
+        builder.AppendLine();
     }
 
     private static string? GetCodecExpression(ITypeSymbol type, ITypeSymbol? customCodec)

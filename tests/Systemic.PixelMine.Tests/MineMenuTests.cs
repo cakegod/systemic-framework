@@ -38,26 +38,6 @@ public sealed class MineMenuTests
         Assert.Equal(0, menu.FrameLimit);
     }
 
-    [Theory]
-    [InlineData(30)]
-    [InlineData(60)]
-    [InlineData(120)]
-    [InlineData(240)]
-    public void SimulationRunsAtSixtyTicksRegardlessOfFrameRate(int framesPerSecond)
-    {
-        long remainder = 0;
-        var ticks = 0;
-        for (var frame = 0; frame < framesPerSecond; frame++)
-        {
-            var start = frame * TimeSpan.TicksPerSecond / framesPerSecond;
-            var end = (frame + 1) * TimeSpan.TicksPerSecond / framesPerSecond;
-            ticks += MineGame.SimulationTicks(ref remainder, TimeSpan.FromTicks(end - start));
-        }
-
-        Assert.Equal(60, ticks);
-        Assert.Equal(0, remainder);
-    }
-
     [Fact]
     public void BackdropBallBouncesOffTheCaveBoundary()
     {

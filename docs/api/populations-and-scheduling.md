@@ -50,6 +50,15 @@ context.ForEachPopulationRange(agents, columns,
 
 Serial initialization uses the same scope. Generated `InitializeRange` binds columns before access, reads the caller's input span directly without copying it, writes only the requested range, and initializes both buffers. Structural changes, buffer swaps, transactions, and cloning remain blocked until the callback returns and its access scope is released.
 
+Rendering, UI and tests read rows outside an access callback with the generated snapshot, which copies a range into a caller-owned buffer using one scoped callback:
+
+```csharp
+var snapshot = new Agent[1000];
+AgentPopulation.Snapshot(agents, new PopulationRange(0, snapshot.Length), snapshot);
+```
+
+`Snapshot` reads the current buffer of double-buffered columns and writes `range.Length` entries starting at index zero, so callers must not keep population spans alive instead. It allocates nothing beyond the buffer the caller supplies.
+
 The system must declare every column touched by this example:
 
 ```csharp
