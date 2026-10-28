@@ -35,7 +35,8 @@ dotnet run --project src/tools/Systemic.Cli -- validate samples/crowd-million/co
 
 ## What the run does per tick
 
-1. Moves one quarter of the crowd. `crowd.prey.position` and `crowd.prey.velocity` are `Fixed64`
+1. Moves one eighth of the crowd (the crowd is split into eight movement buckets).
+   `crowd.prey.position` and `crowd.prey.velocity` are `Fixed64`
    columns, so the move is exact and the validation can assert bits rather than a tolerance.
 2. Evaluates `crowd.prey.burn` against every one of the million rows in one scope. The rule's first
    condition is a tag, so the scan reads one mask bit per row and only evaluates the full rule for

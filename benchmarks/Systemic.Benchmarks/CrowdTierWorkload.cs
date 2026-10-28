@@ -11,9 +11,9 @@ namespace Systemic.Benchmarks;
 // vocabulary a game actually authors rather than a hand-written loop. Movement is fixed point, so
 // the validation below can assert exact bits instead of a tolerance.
 //
-// Movement is staggered one quarter of the crowd per tick, which is how a crowd demo keeps moving
-// while the tick stays inside the simulation share of the frame; every agent still evaluates the
-// rule on every tick, which is what the gate is actually about.
+// Movement is staggered over eight buckets, so one eighth of the crowd moves per tick: that is how a
+// crowd demo keeps moving while the tick stays inside the simulation share of the frame, and every
+// agent still evaluates the rule on every tick, which is what the gate is actually about.
 internal sealed class CrowdTierWorkload : IDisposable
 {
     public const int AgentCount = 1_000_000;
