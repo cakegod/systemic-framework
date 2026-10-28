@@ -53,7 +53,7 @@ public sealed class PopulationComputeBridgeTests
     {
         for (ulong id = 0; id < 200; id++)
         {
-            Assert.Single(Enumerable.Range(0, 7).Where(tick => FixedUpdateLod.ShouldUpdate(id, tick, 7)));
+            Assert.Single(Enumerable.Range(0, 7), tick => FixedUpdateLod.ShouldUpdate(id, tick, 7));
         }
         Assert.Throws<ArgumentOutOfRangeException>(() => FixedUpdateLod.ShouldUpdate(0, 0, 0));
     }
