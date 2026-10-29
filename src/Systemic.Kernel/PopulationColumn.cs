@@ -1282,14 +1282,22 @@ internal static class PopulationNumeric
     {
         if (typeof(T) == typeof(double)) Unsafe.As<T, double>(ref cell) += amount;
         else if (typeof(T) == typeof(float)) Unsafe.As<T, float>(ref cell) += (float)amount;
-        else if (typeof(T) == typeof(int)) Unsafe.As<T, int>(ref cell) = checked(Unsafe.As<T, int>(ref cell) + (int)amount);
-        else if (typeof(T) == typeof(long)) Unsafe.As<T, long>(ref cell) = checked(Unsafe.As<T, long>(ref cell) + (long)amount);
-        else if (typeof(T) == typeof(short)) Unsafe.As<T, short>(ref cell) = checked((short)(Unsafe.As<T, short>(ref cell) + (short)amount));
-        else if (typeof(T) == typeof(sbyte)) Unsafe.As<T, sbyte>(ref cell) = checked((sbyte)(Unsafe.As<T, sbyte>(ref cell) + (sbyte)amount));
-        else if (typeof(T) == typeof(uint)) Unsafe.As<T, uint>(ref cell) = checked(Unsafe.As<T, uint>(ref cell) + (uint)amount);
-        else if (typeof(T) == typeof(ulong)) Unsafe.As<T, ulong>(ref cell) = checked(Unsafe.As<T, ulong>(ref cell) + (ulong)amount);
-        else if (typeof(T) == typeof(ushort)) Unsafe.As<T, ushort>(ref cell) = checked((ushort)(Unsafe.As<T, ushort>(ref cell) + (ushort)amount));
-        else if (typeof(T) == typeof(byte)) Unsafe.As<T, byte>(ref cell) = checked((byte)(Unsafe.As<T, byte>(ref cell) + (byte)amount));
+        else if (typeof(T) == typeof(int)) Unsafe.As<T, int>(ref cell) = checked((int)AddSigned(Unsafe.As<T, int>(ref cell), amount));
+        else if (typeof(T) == typeof(long)) Unsafe.As<T, long>(ref cell) = AddSigned(Unsafe.As<T, long>(ref cell), amount);
+        else if (typeof(T) == typeof(short)) Unsafe.As<T, short>(ref cell) = checked((short)AddSigned(Unsafe.As<T, short>(ref cell), amount));
+        else if (typeof(T) == typeof(sbyte)) Unsafe.As<T, sbyte>(ref cell) = checked((sbyte)AddSigned(Unsafe.As<T, sbyte>(ref cell), amount));
+        else if (typeof(T) == typeof(uint)) Unsafe.As<T, uint>(ref cell) = checked((uint)AddUnsigned(Unsafe.As<T, uint>(ref cell), amount));
+        else if (typeof(T) == typeof(ulong)) Unsafe.As<T, ulong>(ref cell) = AddUnsigned(Unsafe.As<T, ulong>(ref cell), amount);
+        else if (typeof(T) == typeof(ushort)) Unsafe.As<T, ushort>(ref cell) = checked((ushort)AddUnsigned(Unsafe.As<T, ushort>(ref cell), amount));
+        else if (typeof(T) == typeof(byte)) Unsafe.As<T, byte>(ref cell) = checked((byte)AddUnsigned(Unsafe.As<T, byte>(ref cell), amount));
         else throw new InvalidOperationException($"'{typeof(T).Name}' is not a numeric population column type.");
     }
+
+    // WHY: a negative whole-number adjustment must decrease an integral cell. Casting the amount to
+    // the cell's own unsigned type first would make every decrement of an unsigned column throw.
+    private static long AddSigned(long cell, double amount) => checked(cell + (long)amount);
+
+    private static ulong AddUnsigned(ulong cell, double amount) => amount < 0
+        ? checked(cell - (ulong)-amount)
+        : checked(cell + (ulong)amount);
 }

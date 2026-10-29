@@ -524,6 +524,10 @@ public sealed class World
                 _journal.Add(UndoRecord.ForColumnUndo(batch));
                 PopulationJournalBytes += column.GetPageSnapshotByteLength(length);
                 batch = null;
+                // WHY: a row batch grows in place but keeps its journal position, so rows captured
+                // after this page would be restored before it and win with post-page values. Start a
+                // fresh batch so later row captures are journaled after the page they follow.
+                scope.ReleaseRowsBatch(column, bufferIndex);
             }
             catch
             {
@@ -566,6 +570,7 @@ public sealed class World
                 _journal.Add(UndoRecord.ForColumnUndo(batch));
                 PopulationJournalBytes += column.GetPageSnapshotByteLength(capacity);
                 batch = null;
+                scope.ReleaseRowsBatch(column, bufferIndex);
                 return true;
             }
             catch
@@ -810,6 +815,7 @@ public sealed class World
 
             _populationsByKind.Add(kind, registration);
             _populationsById.Add(TKind.Id, registration);
+            PopulationDefinitionRevision++;
             return population;
         }
     }
@@ -822,6 +828,10 @@ public sealed class World
             ? (Population<TKind>)population.Value
             : throw new KeyNotFoundException($"Population '{TKind.Id}' is not defined in this world.");
     }
+
+    /// <summary>Gets a counter that changes whenever a population definition is added or rolled back.</summary>
+    /// <remarks>Lets caches that hold population columns notice a world they are no longer valid for.</remarks>
+    internal long PopulationDefinitionRevision { get; private set; }
 
     /// <summary>Looks up a population column by schema ID and column ID for row-addressed rules.</summary>
     internal bool TryGetPopulationColumn(string populationId, string columnId, out PopulationColumnBase column)
@@ -1447,6 +1457,16 @@ public sealed class World
 
 
     private void EnsureTagIndex()
+    {
+        // WHY: read-only systems run concurrently and all reach this lazy rebuild, so the clear and
+        // refill of the shared buckets must be serialized; the second caller then sees a clean index.
+        lock (TransactionGate)
+        {
+            RebuildTagIndexUnderLock();
+        }
+    }
+
+    private void RebuildTagIndexUnderLock()
     {
         if (!_tagIndexDirty)
         {
@@ -2930,6 +2950,7 @@ public sealed class World
                     world._populationsByKind.Remove(Population!.Kind);
                     world._populationsById.Remove(Population.Id);
                     Population.DetachWorld();
+                    world.PopulationDefinitionRevision++;
                     break;
                 default:
                     throw new InvalidOperationException($"Unknown undo kind: {Kind}.");

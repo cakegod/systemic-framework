@@ -109,6 +109,40 @@ public sealed class TagQueryTests
         Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
     }
 
+    [Fact]
+    public void Concurrent_tag_queries_share_one_rebuild_of_the_index()
+    {
+        for (var repetition = 0; repetition < 20; repetition++)
+        {
+            var world = new World(seed: repetition, valueScale: 1);
+            for (var index = 0; index < 2_000; index++)
+            {
+                world.Add(new DataEntity(index % 2 == 0 ? ["bolt"] : ["rock"], []));
+            }
+
+            var mismatches = 0;
+            Parallel.For(0, 8, _ =>
+            {
+                if (world.EntitiesWithTag("bolt").Length != 1_000)
+                {
+                    Interlocked.Increment(ref mismatches);
+                }
+
+                if (world.FirstTagged("bolt", string.Empty) < 0)
+                {
+                    Interlocked.Increment(ref mismatches);
+                }
+
+                if (world.EntitiesWithTag("rock").Length != 1_000)
+                {
+                    Interlocked.Increment(ref mismatches);
+                }
+            });
+
+            Assert.Equal(0, mismatches);
+        }
+    }
+
     private readonly struct TwoTagKind : IPopulationKind
     {
         public static string Id => "test.tag-query-two-tags";

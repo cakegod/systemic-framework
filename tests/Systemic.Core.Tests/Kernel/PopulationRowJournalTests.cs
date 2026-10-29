@@ -11,6 +11,9 @@ public sealed class PopulationRowJournalTests
 {
     private const int Rows = 1_000_000;
 
+    private static readonly PopulationColumnKey<int> s_valueKey =
+        new("journal.values", 1, PopulationCodecs.Int32);
+
     [Fact]
     public void A_sparse_row_write_journals_one_row_instead_of_a_page()
     {
@@ -94,6 +97,30 @@ public sealed class PopulationRowJournalTests
             Assert.Equal(Rows * sizeof(ulong), captured);
             transaction.Rollback();
         }
+    }
+
+    [Fact]
+    public void A_row_capture_after_a_page_capture_is_journaled_after_it()
+    {
+        var world = new World(seed: 85, valueScale: 1);
+        var population = world.DefinePopulation<TaggedKind>();
+        var values = population.Column(s_valueKey);
+        population.AddRange(4);
+        var rows = values.EditRange(0, 4);
+        rows[0] = 10;
+        rows[1] = 20;
+        rows[2] = 30;
+        rows[3] = 40;
+
+        using (var transaction = world.BeginTransaction())
+        {
+            population.RemoveSwapBack(0);
+            values.EditRange(0, 3).Fill(99);
+            population.RemoveSwapBack(1);
+            transaction.Rollback();
+        }
+
+        Assert.Equal([10, 20, 30, 40], values.ReadOnlySpan.ToArray());
     }
 
     private static void WriteMask(Population<TaggedKind> population, int start, int length)
