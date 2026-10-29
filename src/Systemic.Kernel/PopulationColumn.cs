@@ -430,6 +430,13 @@ public abstract class PopulationColumnBase(
 
     public bool IsDoubleBuffered { get; } = isDoubleBuffered;
 
+    /// <summary>Gets whether the row-value bridge can read and write individual rows of this column.</summary>
+    /// <remarks>Derived from the same flag that selects the implementation, so validation cannot disagree with it.</remarks>
+    internal bool SupportsRowBridge => !IsDoubleBuffered;
+
+    /// <summary>Gets whether a population sink may aggregate this column.</summary>
+    internal bool SupportsAggregateSource => !IsDoubleBuffered;
+
     internal abstract void EnsureCapacity(int capacity);
 
     internal abstract PopulationColumnSaveState CaptureSaveState(int count);

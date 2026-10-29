@@ -338,9 +338,9 @@ public sealed class RuleEngine
                 + $"which holds '{column.ValueType.Name}'; row rules need a numeric column.");
         }
 
-        // WHY: a double-buffered column's row value bridge declines every read and write, so a rule
-        // bound to it would report applied effects that never change the simulated column.
-        if (column.IsDoubleBuffered)
+        // WHY: a column without row-bridge support declines every read and write, so a rule bound to
+        // it would report applied effects that never change the simulated column.
+        if (!column.SupportsRowBridge)
         {
             throw new InvalidOperationException(
                 $"Rule '{rule.Id}' references double-buffered column '{columnId}' of population "

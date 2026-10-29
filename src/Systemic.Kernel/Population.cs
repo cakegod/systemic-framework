@@ -57,6 +57,24 @@ public readonly record struct PopulationRange(int Start, int Length)
 {
     /// <summary>Gets the first row after this range.</summary>
     public int End => checked(Start + Length);
+
+    /// <summary>Gets one of the fixed, disjoint partitions of a row count.</summary>
+    /// <remarks>
+    /// The only definition of the split: the scheduler, the standalone host and direct reductions
+    /// must give a map the same boundaries, or the same logical partition means different rows.
+    /// The remainder belongs to the later partitions.
+    /// </remarks>
+    internal static PopulationRange Partition(int rowCount, int partitionCount, int partition)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(rowCount);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(partition);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(partition, partitionCount);
+
+        var start = (int)((long)rowCount * partition / partitionCount);
+        var end = (int)((long)rowCount * (partition + 1) / partitionCount);
+        return new PopulationRange(start, end - start);
+    }
 }
 
 /// <summary>Stores dense columns for one population kind in a World.</summary>

@@ -174,6 +174,22 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
+    public void A_sink_rejects_a_double_buffered_column_when_it_is_created()
+    {
+        var world = new World(seed: 112, valueScale: 1);
+        var population = world.DefinePopulation<Crowd>(enableHandles: true);
+        population.AddRange(2);
+        population.DoubleBufferedColumn(s_healthKey);
+
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            new PopulationSink(world, Crowd.Id, s_healthKey.Id, 0, "crowd.downed",
+                population.ReferenceOf(0)));
+
+        Assert.Contains("double-buffered", error.Message, StringComparison.Ordinal);
+        Assert.Contains(s_healthKey.Id, error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_sink_rejects_an_unknown_column_and_a_non_numeric_one()
     {
         var world = new World(seed: 109, valueScale: 1);

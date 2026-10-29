@@ -1122,9 +1122,7 @@ public sealed class ScheduledSystemContext
 
         public void Execute(int partition)
         {
-            var start = (int)((long)_rowCount * partition / Count);
-            var end = (int)((long)_rowCount * (partition + 1) / Count);
-            var range = new PopulationRange(start, end - start);
+            var range = PopulationRange.Partition(_rowCount, Count, partition);
             var lifetime = _lifetimes[partition];
             var generation = 0L;
             var scopeStarted = false;

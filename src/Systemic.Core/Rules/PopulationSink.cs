@@ -84,6 +84,13 @@ public sealed class PopulationSink
                 + $"which holds '{column.ValueType.Name}'; a sink needs a numeric column.");
         }
 
+        if (!column.SupportsAggregateSource)
+        {
+            throw new InvalidOperationException(
+                $"Population sink references double-buffered column '{columnId}' of population "
+                + $"'{populationId}'; a sink aggregates the simulated (unbuffered) column.");
+        }
+
         var tags = default(PopulationTagAccess);
         var tagBit = -1;
         if (tag is not null)

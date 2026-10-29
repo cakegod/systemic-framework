@@ -439,11 +439,7 @@ public sealed class SystemicSystemContext
         var result = identity;
         for (var partition = 0; partition < count; partition++)
         {
-            // WHY: the scheduled range split assigns the remainder to the later partitions. A direct
-            // reduction must give the map the same boundaries, or the two paths can disagree.
-            var start = (int)((long)rowCount * partition / count);
-            var end = (int)((long)rowCount * (partition + 1) / count);
-            result = merge(result, map(state, partition, new PopulationRange(start, end - start)));
+            result = merge(result, map(state, partition, PopulationRange.Partition(rowCount, count, partition)));
         }
 
         return result;
