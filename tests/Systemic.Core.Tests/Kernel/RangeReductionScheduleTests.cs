@@ -1,4 +1,6 @@
+using Systemic.Host;
 using Systemic.Kernel;
+using Systemic.Rules;
 
 namespace Systemic.Tests.Kernel;
 
@@ -21,6 +23,18 @@ public sealed class RangeReductionScheduleTests
             .Build();
 
         schedule.Execute(new World(1, 1), 1);
+
+        Assert.Equal("0:0-2;1:2-5;2:5-8;3:8-11;", result);
+    }
+
+    [Fact]
+    public void Standalone_reduction_uses_the_scheduled_partition_boundaries()
+    {
+        var world = new World(1, 1);
+        var context = new SystemicSystemContext(world, new RuleEngine(new CompiledRuleSet([])), tick: 1);
+
+        var result = context.ReduceRanges(0, 11, 4, "", static (_, partition, range) =>
+            $"{partition}:{range.Start}-{range.End};", static (left, right) => left + right);
 
         Assert.Equal("0:0-2;1:2-5;2:5-8;3:8-11;", result);
     }

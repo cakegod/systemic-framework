@@ -436,15 +436,14 @@ public sealed class SystemicSystemContext
         ArgumentNullException.ThrowIfNull(merge);
         if (rowCount == 0) return identity;
         var count = Math.Min(rowCount, partitionCount);
-        var quotient = rowCount / count;
-        var remainder = rowCount % count;
         var result = identity;
-        var start = 0;
         for (var partition = 0; partition < count; partition++)
         {
-            var length = quotient + (partition < remainder ? 1 : 0);
-            result = merge(result, map(state, partition, new PopulationRange(start, length)));
-            start += length;
+            // WHY: the scheduled range split assigns the remainder to the later partitions. A direct
+            // reduction must give the map the same boundaries, or the two paths can disagree.
+            var start = (int)((long)rowCount * partition / count);
+            var end = (int)((long)rowCount * (partition + 1) / count);
+            result = merge(result, map(state, partition, new PopulationRange(start, end - start)));
         }
 
         return result;
