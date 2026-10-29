@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 3,
+  "id": "sample.crowd-million",
+  "name": "Crowd Million",
+  "tickRateHz": 30,
+  "maxCatchUpSteps": 2,
+  "rules": "rules.json",
+  "entities": "entities.json"
+}

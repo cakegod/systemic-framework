@@ -2,13 +2,22 @@ using System.Numerics;
 
 namespace Systemic.Kernel;
 
+/// <summary>Controls how a spatial-grid rebuild handles positions outside the configured bounds.</summary>
+public enum InvalidPositionPolicy
+{
+    /// <summary>Reject the rebuild and retain the previously published grid snapshot.</summary>
+    Throw,
+
+    /// <summary>Skip invalid rows while keeping each accepted row's original population index.</summary>
+    Skip,
+}
+
 /// <summary>
 /// Dense fixed-bounds grid for row-indexed populations. Rebuild once per simulation phase, then
 /// reuse the returned snapshot for allocation-free radius and axis-aligned queries.
 /// </summary>
 public sealed class PopulationSpatialGrid2D
 {
-    private const int MaximumCellCount = 4_000_000;
     private readonly Bounds2 _bounds;
     private readonly float _cellSize;
     private readonly bool _wrapX;
@@ -45,10 +54,10 @@ public sealed class PopulationSpatialGrid2D
         _cellSize = cellSize;
         _wrapX = wrapX;
         _wrapY = wrapY;
-        _cellsX = GetCellCount(bounds.HalfWidth * 2d, cellSize);
-        _cellsY = GetCellCount(bounds.HalfHeight * 2d, cellSize);
+        _cellsX = SpatialGrid.GetCellCount(bounds.HalfWidth * 2d, cellSize);
+        _cellsY = SpatialGrid.GetCellCount(bounds.HalfHeight * 2d, cellSize);
         var cellCount = (long)_cellsX * _cellsY;
-        if (cellCount > MaximumCellCount)
+        if (cellCount > SpatialGrid.MaximumCellCount)
         {
             throw new ArgumentOutOfRangeException(nameof(bounds), "Grid exceeds the supported dense cell limit.");
         }
@@ -59,6 +68,120 @@ public sealed class PopulationSpatialGrid2D
     public Bounds2 Bounds => _bounds;
     public float CellSize => _cellSize;
     public int Count => _rowCount;
+
+    /// <summary>Number of invalid rows skipped by the most recent successful rebuild.</summary>
+    public int InvalidPositionCount { get; private set; }
+
+    /// <summary>
+    /// Finds the closest matching row, or returns false and row -1 when there is no match.
+    /// Equal distances are resolved by the smallest row index. The optional row filter must give
+    /// consistent results throughout a query and must not rebuild the grid. Filter invocation
+    /// order is unspecified.
+    /// </summary>
+    public bool TryQueryNearest(Vector2 center, out int row, Predicate<int>? filter = null) =>
+        TryQueryNearest(_version, center, null, out row, filter);
+
+    /// <summary>Finds the closest matching row within the inclusive, finite radius.</summary>
+    public bool TryQueryNearest(Vector2 center, float radius, out int row, Predicate<int>? filter = null) =>
+        TryQueryNearest(_version, center, radius, out row, filter);
+
+    /// <summary>
+    /// Writes up to k nearest matching rows, ordered by distance and then row index. The number
+    /// written is also bounded by the destination length; k must be non-negative. Expanding cell
+    /// rings stop once their conservative distance bound cannot improve the result. The worst case
+    /// still visits every cell and row, and insertion uses O(count * k) worst-case comparisons.
+    /// The destination is scratch storage; the query makes no per-query allocations.
+    /// </summary>
+    public int QueryKNearest(Vector2 center, int k, Span<int> results, Predicate<int>? filter = null) =>
+        QueryKNearest(_version, center, null, k, results, filter);
+
+    /// <summary>Writes the nearest rows whose distance is within the inclusive, finite radius.</summary>
+    public int QueryKNearest(Vector2 center, float radius, int k, Span<int> results, Predicate<int>? filter = null) =>
+        QueryKNearest(_version, center, radius, k, results, filter);
+
+    internal bool TryQueryNearest(int version, Vector2 center, float? radius, out int row, Predicate<int>? filter)
+    {
+        Span<int> result = stackalloc int[1];
+        var count = QueryKNearest(version, center, radius, 1, result, filter);
+        row = count == 0 ? -1 : result[0];
+        return count != 0;
+    }
+
+    internal int QueryKNearest(int version, Vector2 center, float? radius, int k, Span<int> results, Predicate<int>? filter)
+    {
+        ValidateSnapshot(version);
+        SpatialGrid.ValidateQuery(center, radius ?? 0);
+        ArgumentOutOfRangeException.ThrowIfNegative(k);
+        var limit = Math.Min(k, results.Length);
+        if (limit == 0 || _rowCount == 0)
+        {
+            return 0;
+        }
+
+        var maximumDistance = radius.HasValue ? (double)radius.Value * radius.Value : double.PositiveInfinity;
+        var count = 0;
+        var cutoff = maximumDistance;
+        var traversal = new SpatialCellRingTraversal(center, _bounds, _cellSize, _cellsX, _cellsY, _wrapX, _wrapY);
+        while (traversal.MoveNext(cutoff, out var cell))
+        {
+            for (var row = _cellHeads[cell]; row >= 0; row = _nextByRow[row])
+            {
+                var distance = DistanceSquared(center, _positions[row]);
+                if (distance > maximumDistance)
+                {
+                    continue;
+                }
+
+                if (filter is not null)
+                {
+                    var accepted = filter(row);
+                    ValidateSnapshot(version);
+                    if (!accepted)
+                    {
+                        continue;
+                    }
+                }
+
+                var index = count;
+                if (index == limit)
+                {
+                    var last = results[limit - 1];
+                    var lastDistance = DistanceSquared(center, _positions[last]);
+                    if (distance > lastDistance || (distance == lastDistance && row >= last))
+                    {
+                        continue;
+                    }
+
+                    index--;
+                }
+                else
+                {
+                    count++;
+                }
+
+                while (index > 0)
+                {
+                    var previous = results[index - 1];
+                    var previousDistance = DistanceSquared(center, _positions[previous]);
+                    if (distance > previousDistance || (distance == previousDistance && row >= previous))
+                    {
+                        break;
+                    }
+
+                    results[index] = previous;
+                    index--;
+                }
+
+                results[index] = row;
+                if (count == limit)
+                {
+                    cutoff = Math.Min(maximumDistance, DistanceSquared(center, _positions[results[count - 1]]));
+                }
+            }
+        }
+
+        return count;
+    }
 
     /// <summary>Preallocates storage for the expected number of population rows.</summary>
     public void Reserve(int rowCapacity)
@@ -76,17 +199,44 @@ public sealed class PopulationSpatialGrid2D
     /// Rebuilds cell links from positions. All input is validated before the prior snapshot is
     /// replaced, so invalid coordinates leave the previous grid queryable.
     /// </summary>
-    public PopulationSpatialGrid2DSnapshot Rebuild(ReadOnlySpan<Vector2> positions)
+    public PopulationSpatialGrid2DSnapshot Rebuild(ReadOnlySpan<Vector2> positions) =>
+        Rebuild(positions, "positions", InvalidPositionPolicy.Throw);
+
+    /// <summary>
+    /// Rebuilds a named population index. Strict validation reports the population, original row,
+    /// offending coordinate and configured bounds. Skip mode omits invalid rows and exposes their
+    /// count through <see cref="InvalidPositionCount"/>; the rows that remain keep their original
+    /// indexes so callers can continue using the population's columns directly.
+    /// </summary>
+    public PopulationSpatialGrid2DSnapshot Rebuild(
+        ReadOnlySpan<Vector2> positions,
+        string populationId,
+        InvalidPositionPolicy invalidPositionPolicy = InvalidPositionPolicy.Throw)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(populationId);
+        if (!Enum.IsDefined(invalidPositionPolicy))
+        {
+            throw new ArgumentOutOfRangeException(nameof(invalidPositionPolicy));
+        }
+
         var buildCellCapacity = _buildCellXByRow.Length >= positions.Length
             && _buildCellYByRow.Length >= positions.Length;
-        ValidatePositions(positions, buildCellCapacity);
+        var invalidPositionCount = ValidatePositions(positions, populationId, invalidPositionPolicy, buildCellCapacity);
         Reserve(positions.Length);
         if (!buildCellCapacity)
         {
             for (var row = 0; row < positions.Length; row++)
             {
-                GetCellCoordinates(positions[row], out _buildCellXByRow[row], out _buildCellYByRow[row]);
+                if (!IsValidPosition(positions[row]))
+                {
+                    _buildCellXByRow[row] = -1;
+                    _buildCellYByRow[row] = -1;
+                    continue;
+                }
+
+                var position = positions[row];
+                _buildCellXByRow[row] = SpatialGrid.ToBoundedCell(position.X, _bounds.Left, _cellSize, _cellsX);
+                _buildCellYByRow[row] = SpatialGrid.ToBoundedCell(position.Y, _bounds.Top, _cellSize, _cellsY);
             }
         }
 
@@ -94,6 +244,11 @@ public sealed class PopulationSpatialGrid2D
         positions.CopyTo(_positions);
         for (var row = positions.Length - 1; row >= 0; row--)
         {
+            if (_buildCellXByRow[row] < 0 || _buildCellYByRow[row] < 0)
+            {
+                continue;
+            }
+
             var cell = (_buildCellYByRow[row] * _cellsX) + _buildCellXByRow[row];
             _nextByRow[row] = _cellHeads[cell];
             _cellHeads[cell] = row;
@@ -102,6 +257,7 @@ public sealed class PopulationSpatialGrid2D
         (_cellXByRow, _buildCellXByRow) = (_buildCellXByRow, _cellXByRow);
         (_cellYByRow, _buildCellYByRow) = (_buildCellYByRow, _cellYByRow);
         _rowCount = positions.Length;
+        InvalidPositionCount = invalidPositionCount;
         _version = _version == int.MaxValue ? 1 : _version + 1;
         return new PopulationSpatialGrid2DSnapshot(this, _version);
     }
@@ -173,7 +329,7 @@ public sealed class PopulationSpatialGrid2D
                         }
                         else
                         {
-                            AddResult(results, row, maximumResults);
+                            SpatialGrid.AddResult(results, row, maximumResults);
                         }
                     }
                 }
@@ -196,7 +352,7 @@ public sealed class PopulationSpatialGrid2D
     internal int QueryRadiusCandidates(int version, Vector2 center, float radius, Span<int> results)
     {
         ValidateSnapshot(version);
-        ValidateQuery(center, radius);
+        SpatialGrid.ValidateQuery(center, radius);
         if (results.IsEmpty)
         {
             return 0;
@@ -282,9 +438,9 @@ public sealed class PopulationSpatialGrid2D
         }
 
         var position = _positions[centerRow];
-        xCells = GetAxisCells(position.X, _cellSize, _bounds.Left, _bounds.HalfWidth * 2d,
+        xCells = SpatialGrid.GetAxisCells(position.X, _cellSize, _bounds.Left, _bounds.HalfWidth * 2d,
             _cellSize, _cellsX, _wrapX);
-        yCells = GetAxisCells(position.Y, _cellSize, _bounds.Top, _bounds.HalfHeight * 2d,
+        yCells = SpatialGrid.GetAxisCells(position.Y, _cellSize, _bounds.Top, _bounds.HalfHeight * 2d,
             _cellSize, _cellsY, _wrapY);
     }
 
@@ -354,19 +510,10 @@ public sealed class PopulationSpatialGrid2D
             && center.Y >= _bounds.Top && center.Y <= _bounds.Bottom;
         xCells = fastWrappedCellQuery
             ? GetWrappedCellRadiusRange(center.X, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX)
-            : GetAxisCells(center.X, radius, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX, _wrapX);
+            : SpatialGrid.GetAxisCells(center.X, radius, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX, _wrapX);
         yCells = fastWrappedCellQuery
             ? GetWrappedCellRadiusRange(center.Y, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY)
-            : GetAxisCells(center.Y, radius, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY, _wrapY);
-    }
-
-    private static void ValidateQuery(Vector2 center, float radius)
-    {
-        if (!float.IsFinite(center.X) || !float.IsFinite(center.Y) || !float.IsFinite(radius) || radius < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(radius),
-                "Query coordinates and radius must be finite; radius must be non-negative.");
-        }
+            : SpatialGrid.GetAxisCells(center.Y, radius, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY, _wrapY);
     }
 
     internal void QueryBounds(int version, Bounds2 area, List<int> results)
@@ -379,8 +526,8 @@ public sealed class PopulationSpatialGrid2D
         }
 
         results.Clear();
-        var xCells = GetAxisCells(area.X, area.HalfWidth, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX, _wrapX);
-        var yCells = GetAxisCells(area.Y, area.HalfHeight, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY, _wrapY);
+        var xCells = SpatialGrid.GetAxisCells(area.X, area.HalfWidth, _bounds.Left, _bounds.HalfWidth * 2d, _cellSize, _cellsX, _wrapX);
+        var yCells = SpatialGrid.GetAxisCells(area.Y, area.HalfHeight, _bounds.Top, _bounds.HalfHeight * 2d, _cellSize, _cellsY, _wrapY);
         if (xCells.Count == 0 || yCells.Count == 0)
         {
             return;
@@ -405,30 +552,47 @@ public sealed class PopulationSpatialGrid2D
         results.Sort();
     }
 
-    private void ValidatePositions(ReadOnlySpan<Vector2> positions, bool buildCellIndexes)
+    private int ValidatePositions(
+        ReadOnlySpan<Vector2> positions,
+        string populationId,
+        InvalidPositionPolicy invalidPositionPolicy,
+        bool buildCellIndexes)
     {
+        var invalidPositionCount = 0;
         for (var row = 0; row < positions.Length; row++)
         {
             var position = positions[row];
-            if (!float.IsFinite(position.X) || !float.IsFinite(position.Y)
-                || position.X < _bounds.Left || position.X > _bounds.Right
-                || position.Y < _bounds.Top || position.Y > _bounds.Bottom)
+            if (!IsValidPosition(position))
             {
-                throw new ArgumentOutOfRangeException(nameof(positions), $"Position at row {row} is non-finite or outside the grid bounds.");
+                if (invalidPositionPolicy == InvalidPositionPolicy.Throw)
+                {
+                    var message = FormattableString.Invariant($"Population '{populationId}' has an invalid position at row {row}: ({position.X:R}, {position.Y:R}); bounds are [{_bounds.Left:R}, {_bounds.Top:R}] to [{_bounds.Right:R}, {_bounds.Bottom:R}].");
+                    throw new ArgumentOutOfRangeException("positions", message);
+                }
+
+                invalidPositionCount++;
+                if (buildCellIndexes)
+                {
+                    _buildCellXByRow[row] = -1;
+                    _buildCellYByRow[row] = -1;
+                }
+
+                continue;
             }
 
             if (buildCellIndexes)
             {
-                GetCellCoordinates(position, out _buildCellXByRow[row], out _buildCellYByRow[row]);
+                _buildCellXByRow[row] = SpatialGrid.ToBoundedCell(position.X, _bounds.Left, _cellSize, _cellsX);
+                _buildCellYByRow[row] = SpatialGrid.ToBoundedCell(position.Y, _bounds.Top, _cellSize, _cellsY);
             }
         }
+
+        return invalidPositionCount;
     }
 
-    private void GetCellCoordinates(Vector2 position, out int x, out int y)
-    {
-        x = Math.Clamp((int)(((double)position.X - _bounds.Left) / _cellSize), 0, _cellsX - 1);
-        y = Math.Clamp((int)(((double)position.Y - _bounds.Top) / _cellSize), 0, _cellsY - 1);
-    }
+    private bool IsValidPosition(Vector2 position) => float.IsFinite(position.X) && float.IsFinite(position.Y)
+        && position.X >= _bounds.Left && position.X <= _bounds.Right
+        && position.Y >= _bounds.Top && position.Y <= _bounds.Bottom;
 
     private static AxisCellRange GetWrappedCellRadiusRange(
         double center,
@@ -490,99 +654,12 @@ public sealed class PopulationSpatialGrid2D
         return new AxisCellRange(Math.Min(first, cellCount - 1), Math.Min(cellCount, count));
     }
 
-    private double DistanceSquared(Vector2 center, Vector2 position)
-    {
-        var dx = Math.Abs((double)center.X - position.X);
-        var dy = Math.Abs((double)center.Y - position.Y);
-        if (_wrapX)
-        {
-            dx %= _bounds.HalfWidth * 2d;
-            dx = Math.Min(dx, (_bounds.HalfWidth * 2d) - dx);
-        }
-
-        if (_wrapY)
-        {
-            dy %= _bounds.HalfHeight * 2d;
-            dy = Math.Min(dy, (_bounds.HalfHeight * 2d) - dy);
-        }
-
-        return (dx * dx) + (dy * dy);
-    }
+    private double DistanceSquared(Vector2 center, Vector2 position) =>
+        SpatialGrid.DistanceSquared(center, position, _bounds, _wrapX, _wrapY);
 
     private bool Contains(Bounds2 area, Vector2 position) =>
-        AxisDistance(area.X, position.X, _bounds.HalfWidth * 2d, _wrapX) <= area.HalfWidth
-        && AxisDistance(area.Y, position.Y, _bounds.HalfHeight * 2d, _wrapY) <= area.HalfHeight;
-
-    private static double AxisDistance(double center, double position, double size, bool wrap)
-    {
-        var distance = Math.Abs(center - position);
-        if (!wrap)
-        {
-            return distance;
-        }
-
-        distance %= size;
-        return Math.Min(distance, size - distance);
-    }
-
-    private static AxisCellRange GetAxisCells(
-        double center,
-        double extent,
-        double minimum,
-        double size,
-        double cellSize,
-        int cellCount,
-        bool wrap)
-    {
-        var start = center - extent;
-        var end = center + extent;
-        if (wrap)
-        {
-            if (extent * 2d >= size)
-            {
-                return new AxisCellRange(0, cellCount);
-            }
-
-            var startOffset = ModDouble((start - minimum) % size, size);
-            var first = (int)Math.Floor(startOffset / cellSize);
-            var endOffset = startOffset + (extent * 2d);
-            var lastBeforeWrap = Math.Min(cellCount - 1, (int)Math.Floor(Math.Min(endOffset, size) / cellSize));
-            var count = lastBeforeWrap - first + 1;
-            if (endOffset >= size)
-            {
-                var wrappedEnd = endOffset - size;
-                var wrappedCells = Math.Min(cellCount, (int)Math.Floor(wrappedEnd / cellSize) + 1);
-                count += wrappedCells;
-            }
-
-            count = Math.Min(cellCount, count);
-            var firstWrapped = Math.Min(first, cellCount - 1);
-            return new AxisCellRange(firstWrapped, count);
-        }
-
-        var maximum = minimum + size;
-        if (end < minimum || start > maximum)
-        {
-            return default;
-        }
-
-        start = Math.Max(start, minimum);
-        end = Math.Min(end, maximum);
-        var firstCell = Math.Clamp((int)Math.Floor((start - minimum) / cellSize), 0, cellCount - 1);
-        var lastCell = Math.Clamp((int)Math.Floor((end - minimum) / cellSize), 0, cellCount - 1);
-        return new AxisCellRange(firstCell, lastCell - firstCell + 1);
-    }
-
-    private static int GetCellCount(double size, float cellSize)
-    {
-        var count = Math.Ceiling(size / cellSize);
-        if (count > MaximumCellCount)
-        {
-            throw new ArgumentOutOfRangeException(nameof(cellSize), "Grid axis exceeds the supported cell limit.");
-        }
-
-        return Math.Max(1, (int)count);
-    }
+        SpatialGrid.AxisDistance(area.X, position.X, _bounds.HalfWidth * 2d, _wrapX) <= area.HalfWidth
+        && SpatialGrid.AxisDistance(area.Y, position.Y, _bounds.HalfHeight * 2d, _wrapY) <= area.HalfHeight;
 
     private void ValidateSnapshot(int version)
     {
@@ -592,58 +669,11 @@ public sealed class PopulationSpatialGrid2D
         }
     }
 
-    private static double ModDouble(double value, double modulus) => (value % modulus + modulus) % modulus;
-
-    private static void AddResult(List<int> results, int row, int maximumResults)
-    {
-        if (maximumResults == int.MaxValue)
-        {
-            results.Add(row);
-            return;
-        }
-
-        var count = results.Count;
-        if (count < maximumResults)
-        {
-            var insertAt = count;
-            while (insertAt > 0 && results[insertAt - 1] > row)
-            {
-                insertAt--;
-            }
-
-            results.Insert(insertAt, row);
-            return;
-        }
-
-        if (row >= results[^1])
-        {
-            return;
-        }
-
-        var index = count - 1;
-        while (index > 0 && results[index - 1] > row)
-        {
-            results[index] = results[index - 1];
-            index--;
-        }
-
-        results[index] = row;
-    }
-
     private static void EnsureCapacity<T>(ref T[] values, int capacity)
     {
         if (capacity > values.Length)
         {
             Array.Resize(ref values, capacity);
-        }
-    }
-
-    internal readonly record struct AxisCellRange(int Start, int Count)
-    {
-        public int At(int offset, int cellCount, bool wrap)
-        {
-            var index = Start + offset;
-            return wrap && index >= cellCount ? index - cellCount : index;
         }
     }
 
@@ -761,6 +791,18 @@ public sealed class PopulationSpatialGrid2D
 /// <summary>A short-lived view of the most recently rebuilt population grid.</summary>
 public readonly ref struct PopulationSpatialGrid2DSnapshot(PopulationSpatialGrid2D grid, int version)
 {
+    public bool TryQueryNearest(Vector2 center, out int row, Predicate<int>? filter = null) =>
+        grid.TryQueryNearest(version, center, null, out row, filter);
+
+    public bool TryQueryNearest(Vector2 center, float radius, out int row, Predicate<int>? filter = null) =>
+        grid.TryQueryNearest(version, center, radius, out row, filter);
+
+    public int QueryKNearest(Vector2 center, int k, Span<int> results, Predicate<int>? filter = null) =>
+        grid.QueryKNearest(version, center, null, k, results, filter);
+
+    public int QueryKNearest(Vector2 center, float radius, int k, Span<int> results, Predicate<int>? filter = null) =>
+        grid.QueryKNearest(version, center, radius, k, results, filter);
+
     public void QueryRadius(Vector2 center, float radius, List<int> results) =>
         grid.QueryRadius(version, center, radius, results);
 

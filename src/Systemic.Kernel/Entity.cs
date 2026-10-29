@@ -217,10 +217,16 @@ public abstract class Entity
 
     protected internal virtual bool SupportsCompactPropertyUndo => false;
 
+    /// <summary>Gets whether this entity is marked for removal at the next prune.</summary>
+    /// <remarks>
+    /// The flag is owned by the World: callers mark an entity with <see cref="World.Remove"/> or
+    /// queue a command with <see cref="WorldCommandBuffer.Remove"/>, so a pending removal is part of
+    /// the world's journalled state instead of a write behind its back.
+    /// </remarks>
     public bool ToRemove
     {
         get;
-        set
+        internal set
         {
             if (field == value)
             {

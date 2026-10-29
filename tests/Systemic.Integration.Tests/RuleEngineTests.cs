@@ -52,6 +52,29 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
+    public void Repeated_reaction_property_writes_still_rollback_to_the_dispatch_start_value()
+    {
+        var world = new World(seed: 23, valueScale: 1);
+        var entity = world.Add(new DataEntity([], [], ("score", 0), ("heat", double.MaxValue)));
+        var rules = new CompiledRuleSet([
+            new CompiledRule("start", "start", 0, [], [
+                RuleEffect.AdjustProperty(RuleSubject.Target, "score", 1),
+                RuleEffect.Emit("chain")]),
+            new CompiledRule("chain", "chain", 0, [], [
+                RuleEffect.AdjustProperty(RuleSubject.Target, "score", 2),
+                RuleEffect.AdjustProperty(RuleSubject.Target, "score", 3),
+                RuleEffect.AdjustProperty(RuleSubject.Target, "heat", double.MaxValue)])
+        ]);
+
+        var result = new RuleEngine(rules).Dispatch(world, new SimulationFact("start", entity.Id, entity.Id));
+
+        Assert.True(result.RolledBack);
+        Assert.Equal("non_finite_property", result.CutoffReason);
+        Assert.Equal(0, world.EffectiveProperty(entity, "score"));
+        Assert.Equal(double.MaxValue, world.EffectiveProperty(entity, "heat"));
+    }
+
+    [Fact]
     public void Modifier_effect_overflow_rolls_back_the_rule_dispatch()
     {
         var world = new World(seed: 35, valueScale: 1);
@@ -458,24 +481,17 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Typed_extensions_are_explicit_and_duplicate_modules_are_rejected()
+    public void Extensions_are_explicit_and_duplicate_modules_are_rejected()
     {
         var catalog = new ExtensionModuleCatalog().Add(new TestExtension());
 
-        Assert.Contains("sample.typed", catalog.ModuleIds);
+        Assert.Contains("sample.extension", catalog.ModuleIds);
         Assert.Throws<InvalidOperationException>(() => catalog.Add(new TestExtension()));
-        Assert.Single(catalog.BuildEngine().Triggers);
     }
-
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1067:Override Object.Equals when implementing IEquatable",
-        Justification = "Record declarations synthesize object equality and matching hash codes.")]
-    private sealed record TestFact(int SourceId) : KernelEvent(SourceId);
 
     private sealed class TestExtension : ISystemicExtensionModule
     {
-        public string Id => "sample.typed";
-
-        public void Register(EngineBuilder engine) => engine.On<TestFact>("sample.typed.observe", _ => { });
+        public string Id => "sample.extension";
     }
 }
 

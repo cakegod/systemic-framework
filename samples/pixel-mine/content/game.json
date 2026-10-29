@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 3,
+  "id": "sample.pixel-mine",
+  "name": "Pixel Mine",
+  "tickRateHz": 60,
+  "maxCatchUpSteps": 4,
+  "rules": "rules.json",
+  "entities": "entities.json"
+}

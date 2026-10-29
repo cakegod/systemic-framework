@@ -1,0 +1,101 @@
+#nullable enable
+const Systemic.Gameplay2D.Gameplay2D.ActorTag = "gameplay2d.actor" -> string!
+const Systemic.Gameplay2D.Gameplay2D.HalfHeight = "bounds.halfHeight" -> string!
+const Systemic.Gameplay2D.Gameplay2D.HalfWidth = "bounds.halfWidth" -> string!
+const Systemic.Gameplay2D.Gameplay2D.PositionX = "position.x" -> string!
+const Systemic.Gameplay2D.Gameplay2D.PositionY = "position.y" -> string!
+const Systemic.Gameplay2D.Gameplay2D.ProjectileTag = "gameplay2d.projectile" -> string!
+const Systemic.Gameplay2D.Gameplay2D.RemainingTicks = "lifetime.remainingTicks" -> string!
+const Systemic.Gameplay2D.Gameplay2D.VelocityX = "velocity.x" -> string!
+const Systemic.Gameplay2D.Gameplay2D.VelocityY = "velocity.y" -> string!
+const Systemic.Gameplay2D.Gameplay2DContentModule.ModuleId = "systemic.gameplay2d" -> string!
+override Systemic.Gameplay2D.ActorDefinition.Equals(object? obj) -> bool
+override Systemic.Gameplay2D.ActorDefinition.GetHashCode() -> int
+override Systemic.Gameplay2D.ActorDefinition.ToString() -> string!
+override Systemic.Gameplay2D.StatusEffectDefinition.Equals(object? obj) -> bool
+override Systemic.Gameplay2D.StatusEffectDefinition.GetHashCode() -> int
+override Systemic.Gameplay2D.StatusEffectDefinition.ToString() -> string!
+static Systemic.Gameplay2D.ActorDefinition.operator !=(Systemic.Gameplay2D.ActorDefinition? left, Systemic.Gameplay2D.ActorDefinition? right) -> bool
+static Systemic.Gameplay2D.ActorDefinition.operator ==(Systemic.Gameplay2D.ActorDefinition? left, Systemic.Gameplay2D.ActorDefinition? right) -> bool
+static Systemic.Gameplay2D.DeterministicNavigation2D.CreateFlowField(Systemic.Kernel.StaticBlockingField2D! field, Systemic.Kernel.GridCell2D target) -> Systemic.Gameplay2D.NavigationFlowField2D?
+static Systemic.Gameplay2D.DeterministicNavigation2D.FindPath(Systemic.Kernel.StaticBlockingField2D! field, Systemic.Kernel.GridCell2D start, Systemic.Kernel.GridCell2D target) -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.GridCell2D>!
+static Systemic.Gameplay2D.Gameplay2D.ApplyStatus(Systemic.Kernel.World! world, Systemic.Kernel.Entity! target, Systemic.Gameplay2D.StatusEffectDefinition! status) -> int
+static Systemic.Gameplay2D.Gameplay2D.SelectFarthestTarget(Systemic.Kernel.World! world, Systemic.Kernel.Point2 position, float radius, string! requiredTag, System.Collections.Generic.List<int>! candidates) -> Systemic.Kernel.Entity?
+static Systemic.Gameplay2D.Gameplay2D.SelectNearestTarget(Systemic.Kernel.World! world, Systemic.Kernel.Point2 position, float radius, string! requiredTag, System.Collections.Generic.List<int>! candidates) -> Systemic.Kernel.Entity?
+static Systemic.Gameplay2D.Gameplay2D.SpawnActor(Systemic.Kernel.World! world, Systemic.Gameplay2D.ActorDefinition! definition, Systemic.Kernel.Point2 position) -> Systemic.Kernel.Entity!
+static Systemic.Gameplay2D.Gameplay2D.SpawnProjectile(Systemic.Kernel.World! world, Systemic.Gameplay2D.ActorDefinition! definition, Systemic.Kernel.Point2 position, System.Numerics.Vector2 velocity, int lifetimeTicks) -> Systemic.Kernel.Entity!
+static Systemic.Gameplay2D.Gameplay2D.TryTransferResource(Systemic.Kernel.World! world, int sourceId, int targetId, string! property, double amount, string? capacityProperty = null) -> bool
+static Systemic.Gameplay2D.Gameplay2DContentLoader.Load(string! path) -> Systemic.Gameplay2D.Gameplay2DContent!
+static Systemic.Gameplay2D.Gameplay2DContentLoader.Parse(string! json, string! sourceFile = "gameplay2d.json") -> Systemic.Gameplay2D.Gameplay2DContent!
+static Systemic.Gameplay2D.StatusEffectDefinition.operator !=(Systemic.Gameplay2D.StatusEffectDefinition? left, Systemic.Gameplay2D.StatusEffectDefinition? right) -> bool
+static Systemic.Gameplay2D.StatusEffectDefinition.operator ==(Systemic.Gameplay2D.StatusEffectDefinition? left, Systemic.Gameplay2D.StatusEffectDefinition? right) -> bool
+Systemic.Gameplay2D.ActorDefinition
+Systemic.Gameplay2D.ActorDefinition.<Clone>$() -> Systemic.Gameplay2D.ActorDefinition!
+Systemic.Gameplay2D.ActorDefinition.ActorDefinition(string! Id, System.Collections.Generic.IReadOnlyCollection<string!>! Tags, System.Collections.Generic.IReadOnlyCollection<string!>! Capabilities, System.Collections.Generic.IReadOnlyDictionary<string!, double>! Properties, float HalfWidth, float HalfHeight) -> void
+Systemic.Gameplay2D.ActorDefinition.Capabilities.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Systemic.Gameplay2D.ActorDefinition.Capabilities.init -> void
+Systemic.Gameplay2D.ActorDefinition.Deconstruct(out string! Id, out System.Collections.Generic.IReadOnlyCollection<string!>! Tags, out System.Collections.Generic.IReadOnlyCollection<string!>! Capabilities, out System.Collections.Generic.IReadOnlyDictionary<string!, double>! Properties, out float HalfWidth, out float HalfHeight) -> void
+Systemic.Gameplay2D.ActorDefinition.Equals(Systemic.Gameplay2D.ActorDefinition? other) -> bool
+Systemic.Gameplay2D.ActorDefinition.HalfHeight.get -> float
+Systemic.Gameplay2D.ActorDefinition.HalfHeight.init -> void
+Systemic.Gameplay2D.ActorDefinition.HalfWidth.get -> float
+Systemic.Gameplay2D.ActorDefinition.HalfWidth.init -> void
+Systemic.Gameplay2D.ActorDefinition.Id.get -> string!
+Systemic.Gameplay2D.ActorDefinition.Id.init -> void
+Systemic.Gameplay2D.ActorDefinition.Properties.get -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+Systemic.Gameplay2D.ActorDefinition.Properties.init -> void
+Systemic.Gameplay2D.ActorDefinition.Tags.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Systemic.Gameplay2D.ActorDefinition.Tags.init -> void
+Systemic.Gameplay2D.DeterministicNavigation2D
+Systemic.Gameplay2D.Gameplay2D
+Systemic.Gameplay2D.Gameplay2DContent
+Systemic.Gameplay2D.Gameplay2DContent.Actors.get -> System.Collections.Immutable.ImmutableDictionary<string!, Systemic.Gameplay2D.ActorDefinition!>!
+Systemic.Gameplay2D.Gameplay2DContent.Gameplay2DContent(System.Collections.Immutable.ImmutableDictionary<string!, Systemic.Gameplay2D.ActorDefinition!>! actors, System.Collections.Immutable.ImmutableDictionary<string!, Systemic.Gameplay2D.StatusEffectDefinition!>! statuses) -> void
+Systemic.Gameplay2D.Gameplay2DContent.Statuses.get -> System.Collections.Immutable.ImmutableDictionary<string!, Systemic.Gameplay2D.StatusEffectDefinition!>!
+Systemic.Gameplay2D.Gameplay2DContentException
+Systemic.Gameplay2D.Gameplay2DContentException.ContentPath.get -> string!
+Systemic.Gameplay2D.Gameplay2DContentException.Gameplay2DContentException(string! sourceFile, string! contentPath, string! message, System.Exception? innerException = null) -> void
+Systemic.Gameplay2D.Gameplay2DContentException.SourceFile.get -> string!
+Systemic.Gameplay2D.Gameplay2DContentLoader
+Systemic.Gameplay2D.Gameplay2DContentModule
+Systemic.Gameplay2D.Gameplay2DContentModule.Compile(Systemic.Content.ContentModuleContext! context, System.Text.Json.JsonElement declaration) -> Systemic.Content.ISystemicModuleContent!
+Systemic.Gameplay2D.Gameplay2DContentModule.Configure(Systemic.Host.SystemicGameBuilder! builder, Systemic.Content.ISystemicModuleContent! content) -> void
+Systemic.Gameplay2D.Gameplay2DContentModule.Gameplay2DContentModule() -> void
+Systemic.Gameplay2D.Gameplay2DContentModule.Id.get -> string!
+Systemic.Gameplay2D.Gameplay2DModule
+Systemic.Gameplay2D.Gameplay2DModule.Access.get -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.SystemAccess>!
+Systemic.Gameplay2D.Gameplay2DModule.Gameplay2DModule() -> void
+Systemic.Gameplay2D.Gameplay2DModule.Id.get -> string!
+Systemic.Gameplay2D.Gameplay2DModule.Order.get -> int
+Systemic.Gameplay2D.Gameplay2DModule.Step(Systemic.Host.SystemicSystemContext! context) -> void
+Systemic.Gameplay2D.NavigationFlowField2D
+Systemic.Gameplay2D.NavigationFlowField2D.Distances.get -> System.Collections.Generic.IReadOnlyList<int>!
+Systemic.Gameplay2D.NavigationFlowField2D.Target.get -> Systemic.Kernel.GridCell2D
+Systemic.Gameplay2D.NavigationFlowField2D.TryGetDistance(Systemic.Kernel.GridCell2D cell, out int distance) -> bool
+Systemic.Gameplay2D.NavigationFlowField2D.TryGetNextCell(Systemic.Kernel.GridCell2D cell, out Systemic.Kernel.GridCell2D next) -> bool
+Systemic.Gameplay2D.StatusEffectDefinition
+Systemic.Gameplay2D.StatusEffectDefinition.<Clone>$() -> Systemic.Gameplay2D.StatusEffectDefinition!
+Systemic.Gameplay2D.StatusEffectDefinition.Deconstruct(out string! Id, out string! Tag, out string! Property, out Systemic.Kernel.ModifierOperation Operation, out double Value, out int DurationTicks, out Systemic.Kernel.ModifierStage Stage, out Systemic.Gameplay2D.StatusStackingMode Stacking, out int MaximumStacks) -> void
+Systemic.Gameplay2D.StatusEffectDefinition.DurationTicks.get -> int
+Systemic.Gameplay2D.StatusEffectDefinition.DurationTicks.init -> void
+Systemic.Gameplay2D.StatusEffectDefinition.Equals(Systemic.Gameplay2D.StatusEffectDefinition? other) -> bool
+Systemic.Gameplay2D.StatusEffectDefinition.Id.get -> string!
+Systemic.Gameplay2D.StatusEffectDefinition.Id.init -> void
+Systemic.Gameplay2D.StatusEffectDefinition.MaximumStacks.get -> int
+Systemic.Gameplay2D.StatusEffectDefinition.MaximumStacks.init -> void
+Systemic.Gameplay2D.StatusEffectDefinition.Operation.get -> Systemic.Kernel.ModifierOperation
+Systemic.Gameplay2D.StatusEffectDefinition.Operation.init -> void
+Systemic.Gameplay2D.StatusEffectDefinition.Property.get -> string!
+Systemic.Gameplay2D.StatusEffectDefinition.Property.init -> void
+Systemic.Gameplay2D.StatusEffectDefinition.Stacking.get -> Systemic.Gameplay2D.StatusStackingMode
+Systemic.Gameplay2D.StatusEffectDefinition.Stacking.init -> void
+Systemic.Gameplay2D.StatusEffectDefinition.Stage.get -> Systemic.Kernel.ModifierStage
+Systemic.Gameplay2D.StatusEffectDefinition.Stage.init -> void
+Systemic.Gameplay2D.StatusEffectDefinition.StatusEffectDefinition(string! Id, string! Tag, string! Property, Systemic.Kernel.ModifierOperation Operation, double Value, int DurationTicks, Systemic.Kernel.ModifierStage Stage = Systemic.Kernel.ModifierStage.Standard, Systemic.Gameplay2D.StatusStackingMode Stacking = Systemic.Gameplay2D.StatusStackingMode.Refresh, int MaximumStacks = 1) -> void
+Systemic.Gameplay2D.StatusEffectDefinition.Tag.get -> string!
+Systemic.Gameplay2D.StatusEffectDefinition.Tag.init -> void
+Systemic.Gameplay2D.StatusEffectDefinition.Value.get -> double
+Systemic.Gameplay2D.StatusEffectDefinition.Value.init -> void
+Systemic.Gameplay2D.StatusStackingMode
+Systemic.Gameplay2D.StatusStackingMode.Refresh = 0 -> Systemic.Gameplay2D.StatusStackingMode
+Systemic.Gameplay2D.StatusStackingMode.Stack = 1 -> Systemic.Gameplay2D.StatusStackingMode

@@ -1,0 +1,526 @@
+#nullable enable
+const Systemic.Presentation.PresentationContentModule.ModuleId = "systemic.presentation" -> string!
+const Systemic.Presentation.ProceduralRasterizer.GeneratorVersion = 3 -> int
+const Systemic.Presentation.ProceduralRasterizer.MaximumPixelWork = 16777216 -> long
+override Systemic.Presentation.CompiledUi.Equals(object? obj) -> bool
+override Systemic.Presentation.CompiledUi.GetHashCode() -> int
+override Systemic.Presentation.CompiledUi.ToString() -> string!
+override Systemic.Presentation.CompiledVisuals.Equals(object? obj) -> bool
+override Systemic.Presentation.CompiledVisuals.GetHashCode() -> int
+override Systemic.Presentation.CompiledVisuals.ToString() -> string!
+override Systemic.Presentation.PresentationCatalog.Equals(object? obj) -> bool
+override Systemic.Presentation.PresentationCatalog.GetHashCode() -> int
+override Systemic.Presentation.PresentationCatalog.ToString() -> string!
+override Systemic.Presentation.PresentationCue.GetHashCode() -> int
+override Systemic.Presentation.PresentationCueBinding.Equals(object? obj) -> bool
+override Systemic.Presentation.PresentationCueBinding.GetHashCode() -> int
+override Systemic.Presentation.PresentationCueBinding.ToString() -> string!
+override Systemic.Presentation.PresentationCueStreamEvent.GetHashCode() -> int
+override Systemic.Presentation.PresentationFrame.GetHashCode() -> int
+override Systemic.Presentation.PresentationIdentityState.GetHashCode() -> int
+override Systemic.Presentation.PresentationKeyframe.Equals(object? obj) -> bool
+override Systemic.Presentation.PresentationKeyframe.GetHashCode() -> int
+override Systemic.Presentation.PresentationKeyframe.ToString() -> string!
+override Systemic.Presentation.PresentationModuleContent.Equals(object? obj) -> bool
+override Systemic.Presentation.PresentationModuleContent.GetHashCode() -> int
+override Systemic.Presentation.PresentationModuleContent.ToString() -> string!
+override Systemic.Presentation.PresentationTimeline.Equals(object? obj) -> bool
+override Systemic.Presentation.PresentationTimeline.GetHashCode() -> int
+override Systemic.Presentation.PresentationTimeline.ToString() -> string!
+override Systemic.Presentation.Rgba32.GetHashCode() -> int
+override Systemic.Presentation.UiLayout.Equals(object? obj) -> bool
+override Systemic.Presentation.UiLayout.GetHashCode() -> int
+override Systemic.Presentation.UiLayout.ToString() -> string!
+override Systemic.Presentation.UiNode.Equals(object? obj) -> bool
+override Systemic.Presentation.UiNode.GetHashCode() -> int
+override Systemic.Presentation.UiNode.ToString() -> string!
+override Systemic.Presentation.UiNodeState.Equals(object? obj) -> bool
+override Systemic.Presentation.UiNodeState.GetHashCode() -> int
+override Systemic.Presentation.UiNodeState.ToString() -> string!
+override Systemic.Presentation.VisualAssetResolution.Equals(object? obj) -> bool
+override Systemic.Presentation.VisualAssetResolution.GetHashCode() -> int
+override Systemic.Presentation.VisualAssetResolution.ToString() -> string!
+override Systemic.Presentation.VisualLayer.Equals(object? obj) -> bool
+override Systemic.Presentation.VisualLayer.GetHashCode() -> int
+override Systemic.Presentation.VisualLayer.ToString() -> string!
+override Systemic.Presentation.VisualPart.Equals(object? obj) -> bool
+override Systemic.Presentation.VisualPart.GetHashCode() -> int
+override Systemic.Presentation.VisualPart.ToString() -> string!
+override Systemic.Presentation.VisualRecipe.Equals(object? obj) -> bool
+override Systemic.Presentation.VisualRecipe.GetHashCode() -> int
+override Systemic.Presentation.VisualRecipe.ToString() -> string!
+static Systemic.Presentation.CompiledUi.operator !=(Systemic.Presentation.CompiledUi? left, Systemic.Presentation.CompiledUi? right) -> bool
+static Systemic.Presentation.CompiledUi.operator ==(Systemic.Presentation.CompiledUi? left, Systemic.Presentation.CompiledUi? right) -> bool
+static Systemic.Presentation.CompiledVisuals.operator !=(Systemic.Presentation.CompiledVisuals? left, Systemic.Presentation.CompiledVisuals? right) -> bool
+static Systemic.Presentation.CompiledVisuals.operator ==(Systemic.Presentation.CompiledVisuals? left, Systemic.Presentation.CompiledVisuals? right) -> bool
+static Systemic.Presentation.DeclarativeUiEvaluator.Evaluate(Systemic.Presentation.UiLayout! layout, Systemic.Presentation.UiBindingContext! context) -> Systemic.Presentation.UiNodeState!
+static Systemic.Presentation.PresentationCatalog.operator !=(Systemic.Presentation.PresentationCatalog? left, Systemic.Presentation.PresentationCatalog? right) -> bool
+static Systemic.Presentation.PresentationCatalog.operator ==(Systemic.Presentation.PresentationCatalog? left, Systemic.Presentation.PresentationCatalog? right) -> bool
+static Systemic.Presentation.PresentationCue.operator !=(Systemic.Presentation.PresentationCue left, Systemic.Presentation.PresentationCue right) -> bool
+static Systemic.Presentation.PresentationCue.operator ==(Systemic.Presentation.PresentationCue left, Systemic.Presentation.PresentationCue right) -> bool
+static Systemic.Presentation.PresentationCueBinding.operator !=(Systemic.Presentation.PresentationCueBinding? left, Systemic.Presentation.PresentationCueBinding? right) -> bool
+static Systemic.Presentation.PresentationCueBinding.operator ==(Systemic.Presentation.PresentationCueBinding? left, Systemic.Presentation.PresentationCueBinding? right) -> bool
+static Systemic.Presentation.PresentationCueStreamEvent.operator !=(Systemic.Presentation.PresentationCueStreamEvent left, Systemic.Presentation.PresentationCueStreamEvent right) -> bool
+static Systemic.Presentation.PresentationCueStreamEvent.operator ==(Systemic.Presentation.PresentationCueStreamEvent left, Systemic.Presentation.PresentationCueStreamEvent right) -> bool
+static Systemic.Presentation.PresentationFrame.operator !=(Systemic.Presentation.PresentationFrame left, Systemic.Presentation.PresentationFrame right) -> bool
+static Systemic.Presentation.PresentationFrame.operator ==(Systemic.Presentation.PresentationFrame left, Systemic.Presentation.PresentationFrame right) -> bool
+static Systemic.Presentation.PresentationGameExtensions.AllocateActorVisualId(this Systemic.Host.SystemicGame! game) -> long
+static Systemic.Presentation.PresentationGameExtensions.EvaluateUi(this Systemic.Host.SystemicGame! game, string! layoutId, System.Collections.Generic.IReadOnlyDictionary<string!, double>? selection = null, Systemic.Rules.SimulationFact? eventFact = null, int? choiceOwnerEntityId = null) -> Systemic.Presentation.UiNodeState!
+static Systemic.Presentation.PresentationGameExtensions.Presentation(this Systemic.Host.SystemicGame! game) -> Systemic.Presentation.PresentationRuntime!
+static Systemic.Presentation.PresentationGameExtensions.PresentationContent(this Systemic.Host.SystemicGame! game) -> Systemic.Presentation.PresentationModuleContent!
+static Systemic.Presentation.PresentationGameExtensions.PresentationCues(this Systemic.Host.SystemicGame! game) -> Systemic.Presentation.PresentationCueStream!
+static Systemic.Presentation.PresentationGameExtensions.PresentationIdentity(this Systemic.Host.SystemicGame! game) -> Systemic.Presentation.PresentationIdentityState
+static Systemic.Presentation.PresentationGameExtensions.TryGetPresentationTimeline(this Systemic.Host.SystemicGame! game, string! timelineId, out Systemic.Presentation.PresentationTimeline! timeline) -> bool
+static Systemic.Presentation.PresentationGameExtensions.TrySamplePresentation(this Systemic.Host.SystemicGame! game, Systemic.Presentation.PresentationCue cue, int ageTicks, out Systemic.Presentation.PresentationFrame frame) -> bool
+static Systemic.Presentation.PresentationIdentityState.operator !=(Systemic.Presentation.PresentationIdentityState left, Systemic.Presentation.PresentationIdentityState right) -> bool
+static Systemic.Presentation.PresentationIdentityState.operator ==(Systemic.Presentation.PresentationIdentityState left, Systemic.Presentation.PresentationIdentityState right) -> bool
+static Systemic.Presentation.PresentationKeyframe.operator !=(Systemic.Presentation.PresentationKeyframe? left, Systemic.Presentation.PresentationKeyframe? right) -> bool
+static Systemic.Presentation.PresentationKeyframe.operator ==(Systemic.Presentation.PresentationKeyframe? left, Systemic.Presentation.PresentationKeyframe? right) -> bool
+static Systemic.Presentation.PresentationModuleContent.operator !=(Systemic.Presentation.PresentationModuleContent? left, Systemic.Presentation.PresentationModuleContent? right) -> bool
+static Systemic.Presentation.PresentationModuleContent.operator ==(Systemic.Presentation.PresentationModuleContent? left, Systemic.Presentation.PresentationModuleContent? right) -> bool
+static Systemic.Presentation.PresentationTimeline.operator !=(Systemic.Presentation.PresentationTimeline? left, Systemic.Presentation.PresentationTimeline? right) -> bool
+static Systemic.Presentation.PresentationTimeline.operator ==(Systemic.Presentation.PresentationTimeline? left, Systemic.Presentation.PresentationTimeline? right) -> bool
+static Systemic.Presentation.PresentationTimelineEvaluator.TrySample(Systemic.Presentation.PresentationTimeline! timeline, Systemic.Presentation.PresentationCue cue, int ageTicks, out Systemic.Presentation.PresentationFrame frame) -> bool
+static Systemic.Presentation.ProceduralRasterizer.Rasterize(Systemic.Presentation.VisualRecipe! recipe, ulong variantSeed = 0, string? visualState = null) -> Systemic.Presentation.PixelBuffer!
+static Systemic.Presentation.Rgba32.operator !=(Systemic.Presentation.Rgba32 left, Systemic.Presentation.Rgba32 right) -> bool
+static Systemic.Presentation.Rgba32.operator ==(Systemic.Presentation.Rgba32 left, Systemic.Presentation.Rgba32 right) -> bool
+static Systemic.Presentation.UiLayout.operator !=(Systemic.Presentation.UiLayout? left, Systemic.Presentation.UiLayout? right) -> bool
+static Systemic.Presentation.UiLayout.operator ==(Systemic.Presentation.UiLayout? left, Systemic.Presentation.UiLayout? right) -> bool
+static Systemic.Presentation.UiNode.operator !=(Systemic.Presentation.UiNode? left, Systemic.Presentation.UiNode? right) -> bool
+static Systemic.Presentation.UiNode.operator ==(Systemic.Presentation.UiNode? left, Systemic.Presentation.UiNode? right) -> bool
+static Systemic.Presentation.UiNodeState.operator !=(Systemic.Presentation.UiNodeState? left, Systemic.Presentation.UiNodeState? right) -> bool
+static Systemic.Presentation.UiNodeState.operator ==(Systemic.Presentation.UiNodeState? left, Systemic.Presentation.UiNodeState? right) -> bool
+static Systemic.Presentation.VisualAssetResolution.operator !=(Systemic.Presentation.VisualAssetResolution? left, Systemic.Presentation.VisualAssetResolution? right) -> bool
+static Systemic.Presentation.VisualAssetResolution.operator ==(Systemic.Presentation.VisualAssetResolution? left, Systemic.Presentation.VisualAssetResolution? right) -> bool
+static Systemic.Presentation.VisualAssetResolver.Resolve(Systemic.Presentation.VisualRecipe! recipe, Systemic.Presentation.IVisualAssetProvider? provider, ulong variantSeed = 0, string? visualState = null) -> Systemic.Presentation.VisualAssetResolution!
+static Systemic.Presentation.VisualLayer.operator !=(Systemic.Presentation.VisualLayer? left, Systemic.Presentation.VisualLayer? right) -> bool
+static Systemic.Presentation.VisualLayer.operator ==(Systemic.Presentation.VisualLayer? left, Systemic.Presentation.VisualLayer? right) -> bool
+static Systemic.Presentation.VisualPart.operator !=(Systemic.Presentation.VisualPart? left, Systemic.Presentation.VisualPart? right) -> bool
+static Systemic.Presentation.VisualPart.operator ==(Systemic.Presentation.VisualPart? left, Systemic.Presentation.VisualPart? right) -> bool
+static Systemic.Presentation.VisualRecipe.operator !=(Systemic.Presentation.VisualRecipe? left, Systemic.Presentation.VisualRecipe? right) -> bool
+static Systemic.Presentation.VisualRecipe.operator ==(Systemic.Presentation.VisualRecipe? left, Systemic.Presentation.VisualRecipe? right) -> bool
+static Systemic.Preview.ContentPreviewPage.Render(Systemic.Content.ContentPack! pack) -> string!
+static Systemic.Preview.ContentPreviewServer.RunAsync(Systemic.Content.ContentPack! pack, int port, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Systemic.Presentation.CompiledUi
+Systemic.Presentation.CompiledUi.<Clone>$() -> Systemic.Presentation.CompiledUi!
+Systemic.Presentation.CompiledUi.CompiledUi(System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiLayout!> Layouts) -> void
+Systemic.Presentation.CompiledUi.Deconstruct(out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiLayout!> Layouts) -> void
+Systemic.Presentation.CompiledUi.Equals(Systemic.Presentation.CompiledUi? other) -> bool
+Systemic.Presentation.CompiledUi.Layouts.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiLayout!>
+Systemic.Presentation.CompiledUi.Layouts.init -> void
+Systemic.Presentation.CompiledVisuals
+Systemic.Presentation.CompiledVisuals.<Clone>$() -> Systemic.Presentation.CompiledVisuals!
+Systemic.Presentation.CompiledVisuals.CompiledVisuals(System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualRecipe!> Recipes) -> void
+Systemic.Presentation.CompiledVisuals.Deconstruct(out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualRecipe!> Recipes) -> void
+Systemic.Presentation.CompiledVisuals.Equals(Systemic.Presentation.CompiledVisuals? other) -> bool
+Systemic.Presentation.CompiledVisuals.Recipes.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualRecipe!>
+Systemic.Presentation.CompiledVisuals.Recipes.init -> void
+Systemic.Presentation.DeclarativeUiEvaluator
+Systemic.Presentation.ImportedAssetMode
+Systemic.Presentation.ImportedAssetMode.Overlay = 1 -> Systemic.Presentation.ImportedAssetMode
+Systemic.Presentation.ImportedAssetMode.Replace = 2 -> Systemic.Presentation.ImportedAssetMode
+Systemic.Presentation.ImportedAssetMode.Underlay = 0 -> Systemic.Presentation.ImportedAssetMode
+Systemic.Presentation.IVisualAssetProvider
+Systemic.Presentation.IVisualAssetProvider.TryGetPixels(string! assetId, out Systemic.Presentation.PixelBuffer? pixels) -> bool
+Systemic.Presentation.PixelBuffer
+Systemic.Presentation.PixelBuffer.GetPixel(int x, int y) -> Systemic.Presentation.Rgba32
+Systemic.Presentation.PixelBuffer.Height.get -> int
+Systemic.Presentation.PixelBuffer.PixelBuffer(int width, int height, byte[]! pixels) -> void
+Systemic.Presentation.PixelBuffer.Pixels.get -> System.ReadOnlyMemory<byte>
+Systemic.Presentation.PixelBuffer.Width.get -> int
+Systemic.Presentation.PresentationAnchor
+Systemic.Presentation.PresentationAnchor.Midpoint = 2 -> Systemic.Presentation.PresentationAnchor
+Systemic.Presentation.PresentationAnchor.Source = 0 -> Systemic.Presentation.PresentationAnchor
+Systemic.Presentation.PresentationAnchor.Target = 1 -> Systemic.Presentation.PresentationAnchor
+Systemic.Presentation.PresentationCatalog
+Systemic.Presentation.PresentationCatalog.<Clone>$() -> Systemic.Presentation.PresentationCatalog!
+Systemic.Presentation.PresentationCatalog.Bindings.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationCueBinding!>
+Systemic.Presentation.PresentationCatalog.Bindings.init -> void
+Systemic.Presentation.PresentationCatalog.Deconstruct(out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationTimeline!> Timelines, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationCueBinding!> Bindings) -> void
+Systemic.Presentation.PresentationCatalog.Equals(Systemic.Presentation.PresentationCatalog? other) -> bool
+Systemic.Presentation.PresentationCatalog.ForEvent(string! eventType) -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationCueBinding!>
+Systemic.Presentation.PresentationCatalog.PresentationCatalog(System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationTimeline!> Timelines, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationCueBinding!> Bindings) -> void
+Systemic.Presentation.PresentationCatalog.Timelines.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationTimeline!>
+Systemic.Presentation.PresentationCatalog.Timelines.init -> void
+Systemic.Presentation.PresentationContentModule
+Systemic.Presentation.PresentationContentModule.Compile(Systemic.Content.ContentModuleContext! context, System.Text.Json.JsonElement declaration) -> Systemic.Content.ISystemicModuleContent!
+Systemic.Presentation.PresentationContentModule.Configure(Systemic.Host.SystemicGameBuilder! builder, Systemic.Content.ISystemicModuleContent! content) -> void
+Systemic.Presentation.PresentationContentModule.Id.get -> string!
+Systemic.Presentation.PresentationContentModule.PresentationContentModule() -> void
+Systemic.Presentation.PresentationCue
+Systemic.Presentation.PresentationCue.Amount.get -> double
+Systemic.Presentation.PresentationCue.Amount.init -> void
+Systemic.Presentation.PresentationCue.AnchorPosition.get -> Systemic.Kernel.Point2?
+Systemic.Presentation.PresentationCue.AnchorPosition.init -> void
+Systemic.Presentation.PresentationCue.Deconstruct(out long Sequence, out int Tick, out string! FactType, out string! TimelineId, out int SourceEntityId, out int TargetEntityId, out Systemic.Kernel.Point2? SourcePosition, out Systemic.Kernel.Point2? TargetPosition, out Systemic.Kernel.Point2? AnchorPosition, out ulong VisualSeed, out int ParticleCount, out int ReactionDepth, out double Amount) -> void
+Systemic.Presentation.PresentationCue.Equals(Systemic.Presentation.PresentationCue other) -> bool
+Systemic.Presentation.PresentationCue.FactType.get -> string!
+Systemic.Presentation.PresentationCue.FactType.init -> void
+Systemic.Presentation.PresentationCue.ParticleCount.get -> int
+Systemic.Presentation.PresentationCue.ParticleCount.init -> void
+Systemic.Presentation.PresentationCue.PresentationCue() -> void
+Systemic.Presentation.PresentationCue.PresentationCue(long Sequence, int Tick, string! FactType, string! TimelineId, int SourceEntityId, int TargetEntityId, Systemic.Kernel.Point2? SourcePosition, Systemic.Kernel.Point2? TargetPosition, Systemic.Kernel.Point2? AnchorPosition, ulong VisualSeed, int ParticleCount, int ReactionDepth, double Amount) -> void
+Systemic.Presentation.PresentationCue.ReactionDepth.get -> int
+Systemic.Presentation.PresentationCue.ReactionDepth.init -> void
+Systemic.Presentation.PresentationCue.Sequence.get -> long
+Systemic.Presentation.PresentationCue.Sequence.init -> void
+Systemic.Presentation.PresentationCue.SourceEntityId.get -> int
+Systemic.Presentation.PresentationCue.SourceEntityId.init -> void
+Systemic.Presentation.PresentationCue.SourcePosition.get -> Systemic.Kernel.Point2?
+Systemic.Presentation.PresentationCue.SourcePosition.init -> void
+Systemic.Presentation.PresentationCue.TargetEntityId.get -> int
+Systemic.Presentation.PresentationCue.TargetEntityId.init -> void
+Systemic.Presentation.PresentationCue.TargetPosition.get -> Systemic.Kernel.Point2?
+Systemic.Presentation.PresentationCue.TargetPosition.init -> void
+Systemic.Presentation.PresentationCue.Tick.get -> int
+Systemic.Presentation.PresentationCue.Tick.init -> void
+Systemic.Presentation.PresentationCue.TimelineId.get -> string!
+Systemic.Presentation.PresentationCue.TimelineId.init -> void
+Systemic.Presentation.PresentationCue.VisualSeed.get -> ulong
+Systemic.Presentation.PresentationCue.VisualSeed.init -> void
+Systemic.Presentation.PresentationCueBinding
+Systemic.Presentation.PresentationCueBinding.<Clone>$() -> Systemic.Presentation.PresentationCueBinding!
+Systemic.Presentation.PresentationCueBinding.Anchor.get -> Systemic.Presentation.PresentationAnchor
+Systemic.Presentation.PresentationCueBinding.Anchor.init -> void
+Systemic.Presentation.PresentationCueBinding.Deconstruct(out string! EventType, out string! TimelineId, out Systemic.Presentation.PresentationAnchor Anchor, out long SeedSalt) -> void
+Systemic.Presentation.PresentationCueBinding.Equals(Systemic.Presentation.PresentationCueBinding? other) -> bool
+Systemic.Presentation.PresentationCueBinding.EventType.get -> string!
+Systemic.Presentation.PresentationCueBinding.EventType.init -> void
+Systemic.Presentation.PresentationCueBinding.PresentationCueBinding(string! EventType, string! TimelineId, Systemic.Presentation.PresentationAnchor Anchor, long SeedSalt = 0) -> void
+Systemic.Presentation.PresentationCueBinding.SeedSalt.get -> long
+Systemic.Presentation.PresentationCueBinding.SeedSalt.init -> void
+Systemic.Presentation.PresentationCueBinding.TimelineId.get -> string!
+Systemic.Presentation.PresentationCueBinding.TimelineId.init -> void
+Systemic.Presentation.PresentationCueOverflowPolicy
+Systemic.Presentation.PresentationCueOverflowPolicy.Coalesce = 2 -> Systemic.Presentation.PresentationCueOverflowPolicy
+Systemic.Presentation.PresentationCueOverflowPolicy.DropNewest = 1 -> Systemic.Presentation.PresentationCueOverflowPolicy
+Systemic.Presentation.PresentationCueOverflowPolicy.DropOldest = 0 -> Systemic.Presentation.PresentationCueOverflowPolicy
+Systemic.Presentation.PresentationCueOverflowPolicy.Sample = 3 -> Systemic.Presentation.PresentationCueOverflowPolicy
+Systemic.Presentation.PresentationCueStream
+Systemic.Presentation.PresentationCueStream.AcceptedCount.get -> long
+Systemic.Presentation.PresentationCueStream.AttemptedCount.get -> long
+Systemic.Presentation.PresentationCueStream.Capacity.get -> int
+Systemic.Presentation.PresentationCueStream.CoalescedCount.get -> long
+Systemic.Presentation.PresentationCueStream.Count.get -> int
+Systemic.Presentation.PresentationCueStream.DroppedCount.get -> long
+Systemic.Presentation.PresentationCueStream.Enqueue(Systemic.Presentation.PresentationCue cue) -> long
+Systemic.Presentation.PresentationCueStream.Expire(int currentTick) -> int
+Systemic.Presentation.PresentationCueStream.ExpiredCount.get -> long
+Systemic.Presentation.PresentationCueStream.MaxAgeTicks.get -> int?
+Systemic.Presentation.PresentationCueStream.PresentationCueStream(int capacity = 1024) -> void
+Systemic.Presentation.PresentationCueStream.PresentationCueStream(Systemic.Presentation.PresentationCueStreamOptions! options) -> void
+Systemic.Presentation.PresentationCueStream.RejectedCount.get -> long
+Systemic.Presentation.PresentationCueStream.TryDequeue(out Systemic.Presentation.PresentationCue cue) -> bool
+Systemic.Presentation.PresentationCueStream.TryEnqueue(Systemic.Presentation.PresentationCue cue, out long sequence) -> bool
+Systemic.Presentation.PresentationCueStreamEvent
+Systemic.Presentation.PresentationCueStreamEvent.Cue.get -> Systemic.Presentation.PresentationCue
+Systemic.Presentation.PresentationCueStreamEvent.Cue.init -> void
+Systemic.Presentation.PresentationCueStreamEvent.Deconstruct(out Systemic.Presentation.PresentationCueStreamEventKind Kind, out Systemic.Presentation.PresentationCue Cue, out Systemic.Presentation.PresentationCue? RelatedCue) -> void
+Systemic.Presentation.PresentationCueStreamEvent.Equals(Systemic.Presentation.PresentationCueStreamEvent other) -> bool
+Systemic.Presentation.PresentationCueStreamEvent.Kind.get -> Systemic.Presentation.PresentationCueStreamEventKind
+Systemic.Presentation.PresentationCueStreamEvent.Kind.init -> void
+Systemic.Presentation.PresentationCueStreamEvent.PresentationCueStreamEvent() -> void
+Systemic.Presentation.PresentationCueStreamEvent.PresentationCueStreamEvent(Systemic.Presentation.PresentationCueStreamEventKind Kind, Systemic.Presentation.PresentationCue Cue, Systemic.Presentation.PresentationCue? RelatedCue = null) -> void
+Systemic.Presentation.PresentationCueStreamEvent.RelatedCue.get -> Systemic.Presentation.PresentationCue?
+Systemic.Presentation.PresentationCueStreamEvent.RelatedCue.init -> void
+Systemic.Presentation.PresentationCueStreamEventKind
+Systemic.Presentation.PresentationCueStreamEventKind.Coalesced = 2 -> Systemic.Presentation.PresentationCueStreamEventKind
+Systemic.Presentation.PresentationCueStreamEventKind.Dropped = 0 -> Systemic.Presentation.PresentationCueStreamEventKind
+Systemic.Presentation.PresentationCueStreamEventKind.Expired = 1 -> Systemic.Presentation.PresentationCueStreamEventKind
+Systemic.Presentation.PresentationCueStreamOptions
+Systemic.Presentation.PresentationCueStreamOptions.Capacity.get -> int
+Systemic.Presentation.PresentationCueStreamOptions.Capacity.init -> void
+Systemic.Presentation.PresentationCueStreamOptions.CoalescedParticleLimit.get -> int
+Systemic.Presentation.PresentationCueStreamOptions.CoalescedParticleLimit.init -> void
+Systemic.Presentation.PresentationCueStreamOptions.MaxAgeTicks.get -> int?
+Systemic.Presentation.PresentationCueStreamOptions.MaxAgeTicks.init -> void
+Systemic.Presentation.PresentationCueStreamOptions.Observer.get -> System.Action<Systemic.Presentation.PresentationCueStreamEvent>?
+Systemic.Presentation.PresentationCueStreamOptions.Observer.init -> void
+Systemic.Presentation.PresentationCueStreamOptions.OverflowPoliciesByFactType.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Systemic.Presentation.PresentationCueOverflowPolicy>?
+Systemic.Presentation.PresentationCueStreamOptions.OverflowPoliciesByFactType.init -> void
+Systemic.Presentation.PresentationCueStreamOptions.OverflowPolicy.get -> Systemic.Presentation.PresentationCueOverflowPolicy
+Systemic.Presentation.PresentationCueStreamOptions.OverflowPolicy.init -> void
+Systemic.Presentation.PresentationCueStreamOptions.PresentationCueStreamOptions() -> void
+Systemic.Presentation.PresentationCueStreamOptions.SampleEvery.get -> int?
+Systemic.Presentation.PresentationCueStreamOptions.SampleEvery.init -> void
+Systemic.Presentation.PresentationCueWindow
+Systemic.Presentation.PresentationCueWindow.Capacity.get -> int
+Systemic.Presentation.PresentationCueWindow.Clear(bool resetCounters = true) -> void
+Systemic.Presentation.PresentationCueWindow.Count.get -> int
+Systemic.Presentation.PresentationCueWindow.Cues.get -> System.Collections.Generic.IReadOnlyList<Systemic.Presentation.PresentationCue>!
+Systemic.Presentation.PresentationCueWindow.DroppedCount.get -> long
+Systemic.Presentation.PresentationCueWindow.Expire(int currentTick) -> int
+Systemic.Presentation.PresentationCueWindow.ExpiredCount.get -> long
+Systemic.Presentation.PresentationCueWindow.MaxAgeTicks.get -> int
+Systemic.Presentation.PresentationCueWindow.PresentationCueWindow(int capacity = 512, int maxAgeTicks = 300) -> void
+Systemic.Presentation.PresentationCueWindow.Pump(Systemic.Presentation.PresentationCueStream! stream, int currentTick) -> int
+Systemic.Presentation.PresentationFrame
+Systemic.Presentation.PresentationFrame.Deconstruct(out Systemic.Kernel.Point2 Position, out float Scale, out float Opacity, out string? VisualState) -> void
+Systemic.Presentation.PresentationFrame.Equals(Systemic.Presentation.PresentationFrame other) -> bool
+Systemic.Presentation.PresentationFrame.Opacity.get -> float
+Systemic.Presentation.PresentationFrame.Opacity.init -> void
+Systemic.Presentation.PresentationFrame.Position.get -> Systemic.Kernel.Point2
+Systemic.Presentation.PresentationFrame.Position.init -> void
+Systemic.Presentation.PresentationFrame.PresentationFrame() -> void
+Systemic.Presentation.PresentationFrame.PresentationFrame(Systemic.Kernel.Point2 Position, float Scale, float Opacity, string? VisualState) -> void
+Systemic.Presentation.PresentationFrame.Scale.get -> float
+Systemic.Presentation.PresentationFrame.Scale.init -> void
+Systemic.Presentation.PresentationFrame.VisualState.get -> string?
+Systemic.Presentation.PresentationFrame.VisualState.init -> void
+Systemic.Presentation.PresentationGameExtensions
+Systemic.Presentation.PresentationIdentityState
+Systemic.Presentation.PresentationIdentityState.Deconstruct(out long VisualRootSeed, out long NextActorVisualId, out long NextCueSeedOrdinal) -> void
+Systemic.Presentation.PresentationIdentityState.Equals(Systemic.Presentation.PresentationIdentityState other) -> bool
+Systemic.Presentation.PresentationIdentityState.NextActorVisualId.get -> long
+Systemic.Presentation.PresentationIdentityState.NextActorVisualId.init -> void
+Systemic.Presentation.PresentationIdentityState.NextCueSeedOrdinal.get -> long
+Systemic.Presentation.PresentationIdentityState.NextCueSeedOrdinal.init -> void
+Systemic.Presentation.PresentationIdentityState.PresentationIdentityState() -> void
+Systemic.Presentation.PresentationIdentityState.PresentationIdentityState(long VisualRootSeed, long NextActorVisualId, long NextCueSeedOrdinal = 0) -> void
+Systemic.Presentation.PresentationIdentityState.VisualRootSeed.get -> long
+Systemic.Presentation.PresentationIdentityState.VisualRootSeed.init -> void
+Systemic.Presentation.PresentationKeyframe
+Systemic.Presentation.PresentationKeyframe.<Clone>$() -> Systemic.Presentation.PresentationKeyframe!
+Systemic.Presentation.PresentationKeyframe.Deconstruct(out int Tick, out float OffsetX, out float OffsetY, out float Scale, out float Opacity, out string? VisualState) -> void
+Systemic.Presentation.PresentationKeyframe.Equals(Systemic.Presentation.PresentationKeyframe? other) -> bool
+Systemic.Presentation.PresentationKeyframe.OffsetX.get -> float
+Systemic.Presentation.PresentationKeyframe.OffsetX.init -> void
+Systemic.Presentation.PresentationKeyframe.OffsetY.get -> float
+Systemic.Presentation.PresentationKeyframe.OffsetY.init -> void
+Systemic.Presentation.PresentationKeyframe.Opacity.get -> float
+Systemic.Presentation.PresentationKeyframe.Opacity.init -> void
+Systemic.Presentation.PresentationKeyframe.PresentationKeyframe(int Tick, float OffsetX = 0, float OffsetY = 0, float Scale = 1, float Opacity = 1, string? VisualState = null) -> void
+Systemic.Presentation.PresentationKeyframe.Scale.get -> float
+Systemic.Presentation.PresentationKeyframe.Scale.init -> void
+Systemic.Presentation.PresentationKeyframe.Tick.get -> int
+Systemic.Presentation.PresentationKeyframe.Tick.init -> void
+Systemic.Presentation.PresentationKeyframe.VisualState.get -> string?
+Systemic.Presentation.PresentationKeyframe.VisualState.init -> void
+Systemic.Presentation.PresentationModuleContent
+Systemic.Presentation.PresentationModuleContent.<Clone>$() -> Systemic.Presentation.PresentationModuleContent!
+Systemic.Presentation.PresentationModuleContent.Catalog.get -> Systemic.Presentation.PresentationCatalog!
+Systemic.Presentation.PresentationModuleContent.Catalog.init -> void
+Systemic.Presentation.PresentationModuleContent.ChoiceVisualRecipes.get -> System.Collections.Immutable.ImmutableDictionary<string!, string!>!
+Systemic.Presentation.PresentationModuleContent.ChoiceVisualRecipes.init -> void
+Systemic.Presentation.PresentationModuleContent.Deconstruct(out Systemic.Presentation.CompiledVisuals! Visuals, out Systemic.Presentation.CompiledUi! Ui, out Systemic.Presentation.PresentationCatalog! Catalog, out System.Collections.Immutable.ImmutableDictionary<string!, string!>! ChoiceVisualRecipes) -> void
+Systemic.Presentation.PresentationModuleContent.Equals(Systemic.Presentation.PresentationModuleContent? other) -> bool
+Systemic.Presentation.PresentationModuleContent.PresentationModuleContent(Systemic.Presentation.CompiledVisuals! Visuals, Systemic.Presentation.CompiledUi! Ui, Systemic.Presentation.PresentationCatalog! Catalog, System.Collections.Immutable.ImmutableDictionary<string!, string!>! ChoiceVisualRecipes) -> void
+Systemic.Presentation.PresentationModuleContent.Ui.get -> Systemic.Presentation.CompiledUi!
+Systemic.Presentation.PresentationModuleContent.Ui.init -> void
+Systemic.Presentation.PresentationModuleContent.Visuals.get -> Systemic.Presentation.CompiledVisuals!
+Systemic.Presentation.PresentationModuleContent.Visuals.init -> void
+Systemic.Presentation.PresentationRuntime
+Systemic.Presentation.PresentationRuntime.AllocateActorVisualId() -> long
+Systemic.Presentation.PresentationRuntime.CaptureState() -> System.Text.Json.JsonElement
+Systemic.Presentation.PresentationRuntime.CaptureTransactionState() -> object!
+Systemic.Presentation.PresentationRuntime.Cues.get -> Systemic.Presentation.PresentationCueStream!
+Systemic.Presentation.PresentationRuntime.Id.get -> string!
+Systemic.Presentation.PresentationRuntime.Identity.get -> Systemic.Presentation.PresentationIdentityState
+Systemic.Presentation.PresentationRuntime.ObserveFact(Systemic.Rules.SimulationFact fact, Systemic.Rules.SimulationFactEmitter emitter) -> void
+Systemic.Presentation.PresentationRuntime.PresentationRuntime(Systemic.Kernel.World! world, Systemic.Presentation.PresentationCatalog! catalog) -> void
+Systemic.Presentation.PresentationRuntime.PresentationRuntime(Systemic.Kernel.World! world, Systemic.Presentation.PresentationCatalog! catalog, Systemic.Presentation.PresentationCueStreamOptions? cueOptions = null) -> void
+Systemic.Presentation.PresentationRuntime.RestoreState(System.Text.Json.JsonElement state) -> void
+Systemic.Presentation.PresentationRuntime.RestoreTransactionState(object! state) -> void
+Systemic.Presentation.PresentationRuntime.TryGetTimeline(string! timelineId, out Systemic.Presentation.PresentationTimeline! timeline) -> bool
+Systemic.Presentation.PresentationTimeline
+Systemic.Presentation.PresentationTimeline.<Clone>$() -> Systemic.Presentation.PresentationTimeline!
+Systemic.Presentation.PresentationTimeline.Deconstruct(out string! Id, out string! VisualRecipeId, out int DurationTicks, out bool Loop, out int ParticleCount, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationKeyframe!> Keyframes) -> void
+Systemic.Presentation.PresentationTimeline.DurationTicks.get -> int
+Systemic.Presentation.PresentationTimeline.DurationTicks.init -> void
+Systemic.Presentation.PresentationTimeline.Equals(Systemic.Presentation.PresentationTimeline? other) -> bool
+Systemic.Presentation.PresentationTimeline.Id.get -> string!
+Systemic.Presentation.PresentationTimeline.Id.init -> void
+Systemic.Presentation.PresentationTimeline.Keyframes.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationKeyframe!>
+Systemic.Presentation.PresentationTimeline.Keyframes.init -> void
+Systemic.Presentation.PresentationTimeline.Loop.get -> bool
+Systemic.Presentation.PresentationTimeline.Loop.init -> void
+Systemic.Presentation.PresentationTimeline.ParticleCount.get -> int
+Systemic.Presentation.PresentationTimeline.ParticleCount.init -> void
+Systemic.Presentation.PresentationTimeline.PresentationTimeline(string! Id, string! VisualRecipeId, int DurationTicks, bool Loop, int ParticleCount, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.PresentationKeyframe!> Keyframes) -> void
+Systemic.Presentation.PresentationTimeline.VisualRecipeId.get -> string!
+Systemic.Presentation.PresentationTimeline.VisualRecipeId.init -> void
+Systemic.Presentation.PresentationTimelineEvaluator
+Systemic.Presentation.PresentationViewport
+Systemic.Presentation.PresentationViewport.CameraCenter.get -> Systemic.Kernel.Point2
+Systemic.Presentation.PresentationViewport.IsVisible(Systemic.Kernel.Bounds2 bounds) -> bool
+Systemic.Presentation.PresentationViewport.PresentationViewport(Systemic.Kernel.Bounds2 worldBounds, Systemic.Kernel.Bounds2 screenBounds, Systemic.Kernel.Point2? cameraCenter = null, float zoom = 1) -> void
+Systemic.Presentation.PresentationViewport.Scale.get -> float
+Systemic.Presentation.PresentationViewport.ScreenBounds.get -> Systemic.Kernel.Bounds2
+Systemic.Presentation.PresentationViewport.ScreenToWorld(Systemic.Kernel.Bounds2 bounds) -> Systemic.Kernel.Bounds2
+Systemic.Presentation.PresentationViewport.ScreenToWorld(Systemic.Kernel.Point2 point) -> Systemic.Kernel.Point2
+Systemic.Presentation.PresentationViewport.VisibleWorldBounds.get -> Systemic.Kernel.Bounds2
+Systemic.Presentation.PresentationViewport.WithCamera(Systemic.Kernel.Point2 center) -> Systemic.Presentation.PresentationViewport!
+Systemic.Presentation.PresentationViewport.WithZoom(float zoom) -> Systemic.Presentation.PresentationViewport!
+Systemic.Presentation.PresentationViewport.WorldBounds.get -> Systemic.Kernel.Bounds2
+Systemic.Presentation.PresentationViewport.WorldToScreen(Systemic.Kernel.Bounds2 bounds) -> Systemic.Kernel.Bounds2
+Systemic.Presentation.PresentationViewport.WorldToScreen(Systemic.Kernel.Point2 point) -> Systemic.Kernel.Point2
+Systemic.Presentation.PresentationViewport.Zoom.get -> float
+Systemic.Presentation.ProceduralRasterizer
+Systemic.Presentation.Rgba32
+Systemic.Presentation.Rgba32.A.get -> byte
+Systemic.Presentation.Rgba32.A.init -> void
+Systemic.Presentation.Rgba32.B.get -> byte
+Systemic.Presentation.Rgba32.B.init -> void
+Systemic.Presentation.Rgba32.Deconstruct(out byte R, out byte G, out byte B, out byte A) -> void
+Systemic.Presentation.Rgba32.Equals(Systemic.Presentation.Rgba32 other) -> bool
+Systemic.Presentation.Rgba32.G.get -> byte
+Systemic.Presentation.Rgba32.G.init -> void
+Systemic.Presentation.Rgba32.R.get -> byte
+Systemic.Presentation.Rgba32.R.init -> void
+Systemic.Presentation.Rgba32.Rgba32() -> void
+Systemic.Presentation.Rgba32.Rgba32(byte R, byte G, byte B, byte A = 255) -> void
+Systemic.Presentation.UiBindingContext
+Systemic.Presentation.UiBindingContext.ChoiceOwnerEntityId.get -> int?
+Systemic.Presentation.UiBindingContext.EntityIds.get -> System.Collections.Immutable.ImmutableDictionary<string!, int>!
+Systemic.Presentation.UiBindingContext.EventFact.get -> Systemic.Rules.SimulationFact?
+Systemic.Presentation.UiBindingContext.Providers.get -> System.Collections.Generic.IReadOnlyList<Systemic.Ui.ISystemicUiBindingProvider!>!
+Systemic.Presentation.UiBindingContext.Selection.get -> System.Collections.Immutable.ImmutableDictionary<string!, double>!
+Systemic.Presentation.UiBindingContext.UiBindingContext(Systemic.Kernel.World! world, System.Collections.Generic.IReadOnlyDictionary<string!, int>! entityIds, System.Collections.Generic.IReadOnlyDictionary<string!, double>? selection = null, Systemic.Rules.SimulationFact? eventFact = null, System.Collections.Generic.IReadOnlyList<Systemic.Ui.ISystemicUiBindingProvider!>? providers = null, int? choiceOwnerEntityId = null) -> void
+Systemic.Presentation.UiBindingContext.World.get -> Systemic.Kernel.World!
+Systemic.Presentation.UiLayout
+Systemic.Presentation.UiLayout.<Clone>$() -> Systemic.Presentation.UiLayout!
+Systemic.Presentation.UiLayout.Deconstruct(out string! Id, out Systemic.Presentation.UiNode! Root) -> void
+Systemic.Presentation.UiLayout.Equals(Systemic.Presentation.UiLayout? other) -> bool
+Systemic.Presentation.UiLayout.Id.get -> string!
+Systemic.Presentation.UiLayout.Id.init -> void
+Systemic.Presentation.UiLayout.Root.get -> Systemic.Presentation.UiNode!
+Systemic.Presentation.UiLayout.Root.init -> void
+Systemic.Presentation.UiLayout.UiLayout(string! Id, Systemic.Presentation.UiNode! Root) -> void
+Systemic.Presentation.UiNode
+Systemic.Presentation.UiNode.<Clone>$() -> Systemic.Presentation.UiNode!
+Systemic.Presentation.UiNode.Action.get -> string?
+Systemic.Presentation.UiNode.Action.init -> void
+Systemic.Presentation.UiNode.Bind.get -> string?
+Systemic.Presentation.UiNode.Bind.init -> void
+Systemic.Presentation.UiNode.Children.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!>
+Systemic.Presentation.UiNode.Children.init -> void
+Systemic.Presentation.UiNode.Deconstruct(out string! Type, out string? Text, out string? Bind, out string? Action, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!> Children, out double? Minimum, out double? Maximum, out string? VisualRecipeId) -> void
+Systemic.Presentation.UiNode.Equals(Systemic.Presentation.UiNode? other) -> bool
+Systemic.Presentation.UiNode.Maximum.get -> double?
+Systemic.Presentation.UiNode.Maximum.init -> void
+Systemic.Presentation.UiNode.Minimum.get -> double?
+Systemic.Presentation.UiNode.Minimum.init -> void
+Systemic.Presentation.UiNode.Text.get -> string?
+Systemic.Presentation.UiNode.Text.init -> void
+Systemic.Presentation.UiNode.Type.get -> string!
+Systemic.Presentation.UiNode.Type.init -> void
+Systemic.Presentation.UiNode.UiNode(string! Type, string? Text, string? Bind, string? Action, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!> Children, double? Minimum = null, double? Maximum = null, string? VisualRecipeId = null) -> void
+Systemic.Presentation.UiNode.VisualRecipeId.get -> string?
+Systemic.Presentation.UiNode.VisualRecipeId.init -> void
+Systemic.Presentation.UiNodeState
+Systemic.Presentation.UiNodeState.<Clone>$() -> Systemic.Presentation.UiNodeState!
+Systemic.Presentation.UiNodeState.Action.get -> string?
+Systemic.Presentation.UiNodeState.Action.init -> void
+Systemic.Presentation.UiNodeState.Children.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!>
+Systemic.Presentation.UiNodeState.Children.init -> void
+Systemic.Presentation.UiNodeState.Deconstruct(out string! Type, out string? Text, out string? Action, out string? VisualRecipeId, out bool HasValue, out double? NumberValue, out string? TextValue, out double? Progress, out string? VisualState, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children) -> void
+Systemic.Presentation.UiNodeState.Equals(Systemic.Presentation.UiNodeState? other) -> bool
+Systemic.Presentation.UiNodeState.HasValue.get -> bool
+Systemic.Presentation.UiNodeState.HasValue.init -> void
+Systemic.Presentation.UiNodeState.NumberValue.get -> double?
+Systemic.Presentation.UiNodeState.NumberValue.init -> void
+Systemic.Presentation.UiNodeState.Progress.get -> double?
+Systemic.Presentation.UiNodeState.Progress.init -> void
+Systemic.Presentation.UiNodeState.Text.get -> string?
+Systemic.Presentation.UiNodeState.Text.init -> void
+Systemic.Presentation.UiNodeState.TextValue.get -> string?
+Systemic.Presentation.UiNodeState.TextValue.init -> void
+Systemic.Presentation.UiNodeState.Type.get -> string!
+Systemic.Presentation.UiNodeState.Type.init -> void
+Systemic.Presentation.UiNodeState.UiNodeState(string! Type, string? Text, string? Action, string? VisualRecipeId, bool HasValue, double? NumberValue, string? TextValue, double? Progress, string? VisualState, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children) -> void
+Systemic.Presentation.UiNodeState.VisualRecipeId.get -> string?
+Systemic.Presentation.UiNodeState.VisualRecipeId.init -> void
+Systemic.Presentation.UiNodeState.VisualState.get -> string?
+Systemic.Presentation.UiNodeState.VisualState.init -> void
+Systemic.Presentation.VisualAssetResolution
+Systemic.Presentation.VisualAssetResolution.<Clone>$() -> Systemic.Presentation.VisualAssetResolution!
+Systemic.Presentation.VisualAssetResolution.Deconstruct(out Systemic.Presentation.PixelBuffer! Pixels, out bool UsedImportedAsset, out System.Collections.Immutable.ImmutableArray<string!> MissingAssetIds) -> void
+Systemic.Presentation.VisualAssetResolution.Equals(Systemic.Presentation.VisualAssetResolution? other) -> bool
+Systemic.Presentation.VisualAssetResolution.MissingAssetIds.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Presentation.VisualAssetResolution.MissingAssetIds.init -> void
+Systemic.Presentation.VisualAssetResolution.Pixels.get -> Systemic.Presentation.PixelBuffer!
+Systemic.Presentation.VisualAssetResolution.Pixels.init -> void
+Systemic.Presentation.VisualAssetResolution.UsedImportedAsset.get -> bool
+Systemic.Presentation.VisualAssetResolution.UsedImportedAsset.init -> void
+Systemic.Presentation.VisualAssetResolution.VisualAssetResolution(Systemic.Presentation.PixelBuffer! Pixels, bool UsedImportedAsset, System.Collections.Immutable.ImmutableArray<string!> MissingAssetIds) -> void
+Systemic.Presentation.VisualAssetResolver
+Systemic.Presentation.VisualLayer
+Systemic.Presentation.VisualLayer.<Clone>$() -> Systemic.Presentation.VisualLayer!
+Systemic.Presentation.VisualLayer.Color.get -> int
+Systemic.Presentation.VisualLayer.Color.init -> void
+Systemic.Presentation.VisualLayer.Deconstruct(out string! Shape, out int Color, out float X, out float Y, out float Width, out float Height, out int JitterPixels, out string? State) -> void
+Systemic.Presentation.VisualLayer.Equals(Systemic.Presentation.VisualLayer? other) -> bool
+Systemic.Presentation.VisualLayer.Height.get -> float
+Systemic.Presentation.VisualLayer.Height.init -> void
+Systemic.Presentation.VisualLayer.JitterPixels.get -> int
+Systemic.Presentation.VisualLayer.JitterPixels.init -> void
+Systemic.Presentation.VisualLayer.Shape.get -> string!
+Systemic.Presentation.VisualLayer.Shape.init -> void
+Systemic.Presentation.VisualLayer.State.get -> string?
+Systemic.Presentation.VisualLayer.State.init -> void
+Systemic.Presentation.VisualLayer.VisualLayer(string! Shape, int Color, float X, float Y, float Width, float Height, int JitterPixels, string? State = null) -> void
+Systemic.Presentation.VisualLayer.Width.get -> float
+Systemic.Presentation.VisualLayer.Width.init -> void
+Systemic.Presentation.VisualLayer.X.get -> float
+Systemic.Presentation.VisualLayer.X.init -> void
+Systemic.Presentation.VisualLayer.Y.get -> float
+Systemic.Presentation.VisualLayer.Y.init -> void
+Systemic.Presentation.VisualPart
+Systemic.Presentation.VisualPart.<Clone>$() -> Systemic.Presentation.VisualPart!
+Systemic.Presentation.VisualPart.Deconstruct(out Systemic.Presentation.VisualRecipe! Recipe, out int X, out int Y, out int Scale) -> void
+Systemic.Presentation.VisualPart.Equals(Systemic.Presentation.VisualPart? other) -> bool
+Systemic.Presentation.VisualPart.Recipe.get -> Systemic.Presentation.VisualRecipe!
+Systemic.Presentation.VisualPart.Recipe.init -> void
+Systemic.Presentation.VisualPart.Scale.get -> int
+Systemic.Presentation.VisualPart.Scale.init -> void
+Systemic.Presentation.VisualPart.VisualPart(Systemic.Presentation.VisualRecipe! Recipe, int X, int Y, int Scale) -> void
+Systemic.Presentation.VisualPart.X.get -> int
+Systemic.Presentation.VisualPart.X.init -> void
+Systemic.Presentation.VisualPart.Y.get -> int
+Systemic.Presentation.VisualPart.Y.init -> void
+Systemic.Presentation.VisualRecipe
+Systemic.Presentation.VisualRecipe.<Clone>$() -> Systemic.Presentation.VisualRecipe!
+Systemic.Presentation.VisualRecipe.CanvasHeight.get -> int
+Systemic.Presentation.VisualRecipe.CanvasHeight.init -> void
+Systemic.Presentation.VisualRecipe.CanvasWidth.get -> int
+Systemic.Presentation.VisualRecipe.CanvasWidth.init -> void
+Systemic.Presentation.VisualRecipe.Deconstruct(out string! Id, out string! Kind, out long Seed, out int CanvasWidth, out int CanvasHeight, out System.Collections.Immutable.ImmutableArray<string!> Palette, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualLayer!> Layers, out System.Collections.Immutable.ImmutableDictionary<string!, int>? PaletteRoles, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualPart!> Parts, out string? ImportedAssetId, out Systemic.Presentation.ImportedAssetMode ImportedMode) -> void
+Systemic.Presentation.VisualRecipe.Equals(Systemic.Presentation.VisualRecipe? other) -> bool
+Systemic.Presentation.VisualRecipe.Id.get -> string!
+Systemic.Presentation.VisualRecipe.Id.init -> void
+Systemic.Presentation.VisualRecipe.ImportedAssetId.get -> string?
+Systemic.Presentation.VisualRecipe.ImportedAssetId.init -> void
+Systemic.Presentation.VisualRecipe.ImportedMode.get -> Systemic.Presentation.ImportedAssetMode
+Systemic.Presentation.VisualRecipe.ImportedMode.init -> void
+Systemic.Presentation.VisualRecipe.Kind.get -> string!
+Systemic.Presentation.VisualRecipe.Kind.init -> void
+Systemic.Presentation.VisualRecipe.Layers.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualLayer!>
+Systemic.Presentation.VisualRecipe.Layers.init -> void
+Systemic.Presentation.VisualRecipe.Palette.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Presentation.VisualRecipe.Palette.init -> void
+Systemic.Presentation.VisualRecipe.PaletteRoles.get -> System.Collections.Immutable.ImmutableDictionary<string!, int>?
+Systemic.Presentation.VisualRecipe.PaletteRoles.init -> void
+Systemic.Presentation.VisualRecipe.Parts.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualPart!>
+Systemic.Presentation.VisualRecipe.Parts.init -> void
+Systemic.Presentation.VisualRecipe.Seed.get -> long
+Systemic.Presentation.VisualRecipe.Seed.init -> void
+Systemic.Presentation.VisualRecipe.VisualRecipe(string! Id, string! Kind, long Seed, int CanvasWidth, int CanvasHeight, System.Collections.Immutable.ImmutableArray<string!> Palette, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualLayer!> Layers, System.Collections.Immutable.ImmutableDictionary<string!, int>? PaletteRoles = null, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualPart!> Parts = default(System.Collections.Immutable.ImmutableArray<Systemic.Presentation.VisualPart!>), string? ImportedAssetId = null, Systemic.Presentation.ImportedAssetMode ImportedMode = Systemic.Presentation.ImportedAssetMode.Underlay) -> void
+Systemic.Presentation.VisualVariantCache
+Systemic.Presentation.VisualVariantCache.CachedBytes.get -> long
+Systemic.Presentation.VisualVariantCache.CachedCount.get -> int
+Systemic.Presentation.VisualVariantCache.Clear() -> void
+Systemic.Presentation.VisualVariantCache.GetOrCreate(Systemic.Presentation.VisualRecipe! recipe, ulong variantSeed = 0, string? visualState = null) -> Systemic.Presentation.PixelBuffer!
+Systemic.Presentation.VisualVariantCache.MaximumBytes.get -> long
+Systemic.Presentation.VisualVariantCache.VisualVariantCache(long maximumBytes = 8388608) -> void
+Systemic.Preview.ContentPreviewPage
+Systemic.Preview.ContentPreviewServer
+~override Systemic.Presentation.PresentationCue.Equals(object obj) -> bool
+~override Systemic.Presentation.PresentationCue.ToString() -> string
+~override Systemic.Presentation.PresentationCueStreamEvent.Equals(object obj) -> bool
+~override Systemic.Presentation.PresentationCueStreamEvent.ToString() -> string
+~override Systemic.Presentation.PresentationFrame.Equals(object obj) -> bool
+~override Systemic.Presentation.PresentationFrame.ToString() -> string
+~override Systemic.Presentation.PresentationIdentityState.Equals(object obj) -> bool
+~override Systemic.Presentation.PresentationIdentityState.ToString() -> string
+~override Systemic.Presentation.Rgba32.Equals(object obj) -> bool
+~override Systemic.Presentation.Rgba32.ToString() -> string

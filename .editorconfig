@@ -8,6 +8,24 @@ dotnet_style_namespace_match_folder = false
 # rather than for their own bodies.
 dotnet_code_quality_unused_parameters = non_public
 
+# WHY: these legacy simulation types still use floating-point authoritative state and movement.
+# Keep only their system implementations and partial declarations relaxed; other new gameplay
+# systems in the samples retain the analyzer's strict default.
+[samples/glow-garden/GardenSimulation.cs]
+systemic_determinism = relaxed
+
+[samples/glow-garden/GardenState.cs]
+systemic_determinism = relaxed
+
+[samples/glow-garden/GardenProgression.cs]
+systemic_determinism = relaxed
+
+[samples/glow-garden/GardenTalents.cs]
+systemic_determinism = relaxed
+
+[samples/boids-monogame/BoidFlockSystem.cs]
+systemic_determinism = relaxed
+
 # WHY: a primary constructor would report the generator-read attribute parameters
 # as unread (CS9113).
 [src/Systemic.Kernel/ActionHandlerAttribute.cs]

@@ -1,11 +1,16 @@
 using System.Runtime.ExceptionServices;
+using System.Collections.Immutable;
 
 namespace Systemic.Kernel;
 
+/// <summary>Describes how a system uses a declared schedule resource.</summary>
 public enum SystemAccessMode
 {
+    /// <summary>Reads the resource without modifying it.</summary>
     Read,
+    /// <summary>Mutates the resource during system execution.</summary>
     Write,
+    /// <summary>Queues a mutation for the ordered wave barrier.</summary>
     DeferredWorldWrite,
 }
 
@@ -14,18 +19,26 @@ public readonly record struct SystemAccess(string Resource, SystemAccessMode Mod
 {
     private const string WorldResource = "$world";
 
+    /// <summary>Declares read-only access to the World.</summary>
     public static SystemAccess ReadWorld { get; } = new(WorldResource, SystemAccessMode.Read);
-    /// <summary>Exclusive access for operations that mutate World immediately, such as rule dispatch.</summary>
+    /// <summary>Exclusive access for operations that mutate World immediately, such as rule dispatch.
+    /// A system declaring this access runs in a wave by itself, but may still use parallel row ranges.</summary>
     public static SystemAccess WriteWorld { get; } = new(WorldResource, SystemAccessMode.Write);
+    /// <summary>Declares buffered World writes that apply at the end of a schedule wave.</summary>
     public static SystemAccess DeferWorldWrites { get; } = new(WorldResource, SystemAccessMode.DeferredWorldWrite);
 
+    /// <summary>Declares read access to a named application resource.</summary>
     public static SystemAccess ReadResource(string resource) => Create(resource, SystemAccessMode.Read);
+
+    /// <summary>Declares write access to a named application resource.</summary>
     public static SystemAccess WriteResource(string resource) => Create(resource, SystemAccessMode.Write);
 
+    /// <summary>Declares read access to a population column.</summary>
     public static SystemAccess ReadColumn<TKind, TValue>(PopulationColumnKey<TValue> column)
         where TKind : IPopulationKind
         where TValue : unmanaged => CreateColumnAccess<TKind, TValue>(column, SystemAccessMode.Read);
 
+    /// <summary>Declares write access to a population column.</summary>
     public static SystemAccess WriteColumn<TKind, TValue>(PopulationColumnKey<TValue> column)
         where TKind : IPopulationKind
         where TValue : unmanaged => CreateColumnAccess<TKind, TValue>(column, SystemAccessMode.Write);
@@ -45,13 +58,68 @@ public readonly record struct SystemAccess(string Resource, SystemAccessMode Mod
         ArgumentException.ThrowIfNullOrWhiteSpace(resource);
         return new SystemAccess(resource, mode);
     }
+
+    /// <summary>Reports whether two declared access sets cannot run at the same time.</summary>
+    /// <remarks>
+    /// The schedule uses this to build waves, and a population storage uses it to admit overlapping
+    /// scopes of the same population, so both agree on what "compatible" means.
+    /// </remarks>
+    internal static bool Conflicts(ImmutableArray<SystemAccess> left, ImmutableArray<SystemAccess> right)
+    {
+        // An immediate World writer excludes every other system, including systems that
+        // declare no World access (or no resources at all).
+        if (left.Contains(WriteWorld) || right.Contains(WriteWorld))
+        {
+            return true;
+        }
+
+        foreach (var first in left)
+        {
+            foreach (var second in right)
+            {
+                if (!string.Equals(first.Resource, second.Resource, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (first.Mode == SystemAccessMode.Read && second.Mode == SystemAccessMode.Read)
+                {
+                    continue;
+                }
+
+                // Buffered World commands are private to each system until an ordered barrier.
+                if (first.Mode == SystemAccessMode.DeferredWorldWrite
+                    && second.Mode == SystemAccessMode.DeferredWorldWrite)
+                {
+                    continue;
+                }
+
+                // A reader only observes pre-barrier state, so a buffered writer in the same wave
+                // cannot race it: the buffered commands land at the barrier, after every reader.
+                if ((first.Mode == SystemAccessMode.Read && second.Mode == SystemAccessMode.DeferredWorldWrite)
+                    || (first.Mode == SystemAccessMode.DeferredWorldWrite && second.Mode == SystemAccessMode.Read))
+                {
+                    continue;
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
 /// <summary>Opt-in simulation work. Direct population writes must match the declared access set.</summary>
 public interface IScheduledKernelSystem
 {
+    /// <summary>Gets the stable identifier used by schedule diagnostics.</summary>
     string Id { get; }
+
+    /// <summary>Gets the resource reads and writes used to order this system.</summary>
     IReadOnlyList<SystemAccess> Access { get; }
+
+    /// <summary>Executes this system for the supplied logical tick.</summary>
     void Execute(ScheduledSystemContext context);
 }
 
@@ -62,6 +130,8 @@ public sealed class DeterministicSystemScheduleBuilder
     private readonly int _workerCount;
     private bool _built;
 
+    /// <summary>Creates a builder for a deterministic access-declared schedule.</summary>
+    /// <param name="workerCount">Worker count, or zero to choose a default capped at four.</param>
     public DeterministicSystemScheduleBuilder(int workerCount = 0)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(workerCount);
@@ -71,6 +141,7 @@ public sealed class DeterministicSystemScheduleBuilder
         _workerCount = workerCount == 0 ? Math.Clamp(Environment.ProcessorCount, 1, 4) : workerCount;
     }
 
+    /// <summary>Adds a system to the schedule in registration order.</summary>
     public DeterministicSystemScheduleBuilder Add(IScheduledKernelSystem system)
     {
         if (_built)
@@ -86,7 +157,7 @@ public sealed class DeterministicSystemScheduleBuilder
         }
 
         ArgumentNullException.ThrowIfNull(system.Access);
-        var access = system.Access.ToArray();
+        ImmutableArray<SystemAccess> access = [.. system.Access];
         if (access.Any(item => string.IsNullOrWhiteSpace(item.Resource)
             || !Enum.IsDefined(item.Mode)))
         {
@@ -97,6 +168,7 @@ public sealed class DeterministicSystemScheduleBuilder
         return this;
     }
 
+    /// <summary>Builds the schedule once from the registered access declarations.</summary>
     public DeterministicSystemSchedule Build()
     {
         if (_built)
@@ -127,37 +199,10 @@ public sealed class DeterministicSystemScheduleBuilder
         return new DeterministicSystemSchedule(waves, _workerCount);
     }
 
-    private static bool Conflicts(SystemAccess[] left, SystemAccess[] right)
-    {
-        foreach (var first in left)
-        {
-            foreach (var second in right)
-            {
-                if (!string.Equals(first.Resource, second.Resource, StringComparison.Ordinal))
-                {
-                    continue;
-                }
+    private static bool Conflicts(ImmutableArray<SystemAccess> left, ImmutableArray<SystemAccess> right) =>
+        SystemAccess.Conflicts(left, right);
 
-                if (first.Mode == SystemAccessMode.Read && second.Mode == SystemAccessMode.Read)
-                {
-                    continue;
-                }
-
-                // Buffered World commands are private to each system until an ordered barrier.
-                if (first.Mode == SystemAccessMode.DeferredWorldWrite
-                    && second.Mode == SystemAccessMode.DeferredWorldWrite)
-                {
-                    continue;
-                }
-
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    internal sealed record SystemNode(IScheduledKernelSystem System, SystemAccess[] Access, int Order);
+    internal sealed record SystemNode(IScheduledKernelSystem System, ImmutableArray<SystemAccess> Access, int Order);
 }
 
 /// <summary>
@@ -179,6 +224,7 @@ public sealed class DeterministicSystemSchedule : IDisposable
         int workerCount)
     {
         _waves = waves;
+        Waves = [.. waves.Select(wave => ImmutableArray.CreateRange(wave.Select(node => node.System.Id)))];
         _workerCount = workerCount;
         _workerPool = new ReusableWorkerPool(workerCount);
         _waveBatch = new SystemWaveBatch(this);
@@ -195,9 +241,18 @@ public sealed class DeterministicSystemSchedule : IDisposable
         }
     }
 
+    /// <summary>Gets the worker count selected when the schedule was built.</summary>
     public int WorkerCount => _workerCount;
+
+    /// <summary>Gets the number of registered systems.</summary>
     public int SystemCount => _contexts.Length;
 
+    /// <summary>Stable system IDs grouped by their immutable execution wave.</summary>
+    public ImmutableArray<ImmutableArray<string>> Waves { get; }
+
+    /// <summary>Executes every schedule wave inside one World transaction.</summary>
+    /// <param name="world">World used by each scheduled system.</param>
+    /// <param name="tick">Logical tick supplied to each system.</param>
     public void Execute(World world, int tick)
     {
         ArgumentNullException.ThrowIfNull(world);
@@ -211,31 +266,55 @@ public sealed class DeterministicSystemSchedule : IDisposable
 
         try
         {
-            using var transaction = world.BeginTransaction();
-            foreach (var wave in _waves)
+            var transaction = world.BeginTransaction();
+            try
             {
-                Array.Clear(_failures);
+                foreach (var wave in _waves)
+                {
+                    Array.Clear(_failures);
+                    try
+                    {
+                        RunWave(wave, world, tick);
+                        ThrowFirstFailure(wave);
+                        foreach (var node in wave) _contexts[node.Order].ReleasePopulationLeases();
+                        FlushDeferredPopulationCommands(wave);
+                        foreach (var node in wave)
+                        {
+                            _contexts[node.Order].FlushCommands(world);
+                        }
+                    }
+                    finally
+                    {
+                        foreach (var node in wave)
+                        {
+                            var context = _contexts[node.Order];
+                            context.RegisterRollbackActions(transaction);
+                            context.EndExecution();
+                        }
+                    }
+                }
+
+                transaction.Commit();
+            }
+            catch (Exception failure)
+            {
                 try
                 {
-                    RunWave(wave, world, tick);
-                    ThrowFirstFailure(wave);
-                    foreach (var node in wave)
-                    {
-                        _contexts[node.Order].FlushCommands(world);
-                    }
+                    transaction.Rollback();
                 }
-                finally
+                catch (Exception rollbackFailure)
                 {
-                    foreach (var node in wave)
-                    {
-                        var context = _contexts[node.Order];
-                        context.RegisterRollbackActions(transaction);
-                        context.EndExecution();
-                    }
+                    // Disposal would otherwise replace the system failure with the rollback failure.
+                    throw new AggregateException("The tick failed and rollback also failed.",
+                        failure, rollbackFailure);
                 }
-            }
 
-            transaction.Commit();
+                throw;
+            }
+            finally
+            {
+                transaction.Dispose();
+            }
         }
         finally
         {
@@ -248,6 +327,7 @@ public sealed class DeterministicSystemSchedule : IDisposable
         }
     }
 
+    /// <summary>Stops the reusable workers owned by this schedule.</summary>
     public void Dispose()
     {
         var state = Interlocked.CompareExchange(ref _state, 2, 0);
@@ -286,12 +366,16 @@ public sealed class DeterministicSystemSchedule : IDisposable
     {
         try
         {
-            _contexts[node.Order].Prepare(world, tick, systemWorkerCount);
+            _contexts[node.Order].Prepare(world, tick, systemWorkerCount, node.Access);
             node.System.Execute(_contexts[node.Order]);
         }
         catch (Exception exception)
         {
             _failures[node.Order] = ExceptionDispatchInfo.Capture(exception);
+        }
+        finally
+        {
+            _contexts[node.Order].EndScheduledSystemAccess();
         }
     }
 
@@ -300,6 +384,34 @@ public sealed class DeterministicSystemSchedule : IDisposable
         foreach (var node in wave)
         {
             _failures[node.Order]?.Throw();
+        }
+    }
+
+    private void FlushDeferredPopulationCommands(DeterministicSystemScheduleBuilder.SystemNode[] wave)
+    {
+        Dictionary<object, IDeferredPopulationCommands>? byPopulation = null;
+        List<IDeferredPopulationCommands>? ordered = null;
+        foreach (var node in wave)
+        {
+            foreach (var commands in _contexts[node.Order].DeferredPopulationCommands)
+            {
+                byPopulation ??= new Dictionary<object, IDeferredPopulationCommands>(ReferenceEqualityComparer.Instance);
+                ordered ??= [];
+                if (byPopulation.TryGetValue(commands.PopulationIdentity, out var group))
+                {
+                    group.MergeFrom(commands);
+                }
+                else
+                {
+                    byPopulation.Add(commands.PopulationIdentity, commands);
+                    ordered.Add(commands);
+                }
+            }
+        }
+
+        if (ordered is not null)
+        {
+            foreach (var commands in ordered) commands.FlushAtBarrier();
         }
     }
 
@@ -329,6 +441,7 @@ internal interface IReusableWorkBatch
 }
 
 internal interface IReusableRangeBatch : IReusableWorkBatch;
+internal interface IReusableDynamicBatch : IReusableWorkBatch;
 
 /// <summary>Owns persistent workers so warmed schedules never queue per-tick ThreadPool work.</summary>
 internal sealed class ReusableWorkerPool : IDisposable
@@ -342,6 +455,7 @@ internal sealed class ReusableWorkerPool : IDisposable
     private int _completedWorkerCount;
     private int _generation;
     private int _running;
+    private long _nextPartition;
     private bool _disposed;
 
     public ReusableWorkerPool(int workerCount)
@@ -362,7 +476,7 @@ internal sealed class ReusableWorkerPool : IDisposable
         }
     }
 
-    public void Run(IReusableWorkBatch batch)
+    public void Run(IReusableWorkBatch batch, int maxWorkers = int.MaxValue)
     {
         ArgumentNullException.ThrowIfNull(batch);
         if (batch.Count == 0)
@@ -370,11 +484,14 @@ internal sealed class ReusableWorkerPool : IDisposable
             return;
         }
 
-        var activeWorkers = Math.Min(_workerCount, batch.Count);
+        var activeWorkers = Math.Min(Math.Min(_workerCount, maxWorkers), batch.Count);
         if (activeWorkers == 1)
         {
             ThrowIfDisposed();
-            batch.Execute(0);
+            for (var partition = 0; partition < batch.Count; partition++)
+            {
+                batch.Execute(partition);
+            }
             return;
         }
 
@@ -390,6 +507,7 @@ internal sealed class ReusableWorkerPool : IDisposable
             _batch = batch;
             _activeWorkerCount = activeWorkers;
             _completedWorkerCount = 0;
+            _nextPartition = -1;
             Array.Clear(_failures, 0, activeWorkers);
             _generation++;
             Monitor.PulseAll(_gate);
@@ -427,6 +545,17 @@ internal sealed class ReusableWorkerPool : IDisposable
     {
         try
         {
+            if (batch is IReusableDynamicBatch)
+            {
+                long partition;
+                while ((partition = Interlocked.Increment(ref _nextPartition)) < batch.Count)
+                {
+                    batch.Execute((int)partition);
+                }
+
+                return;
+            }
+
             for (var partition = worker; partition < batch.Count; partition += activeWorkers)
             {
                 batch.Execute(partition);
@@ -523,9 +652,20 @@ public sealed class ScheduledSystemContext
 {
     private World? _world;
     private int _workerCount = 1;
+    private bool _canDeferPopulation;
+    private int _executionThreadId;
+    private int _dispatchingRanges;
     private readonly ReusableWorkerPool _workerPool;
     private readonly WorldCommandStorage _commands;
     private readonly Dictionary<Type, IReusableRangeBatch> _rangeBatches = [];
+    private readonly Dictionary<(Type Kind, Type State), IReusableRangeBatch> _populationRangeBatches = [];
+    private readonly Dictionary<(Type State, Type Result), IReusableDynamicBatch> _reductionBatches = [];
+    private readonly List<IDeferredPopulationCommands> _deferredPopulationCommands = [];
+    private readonly List<IDisposable> _populationLeases = [];
+    private ImmutableArray<SystemAccess> _access = [];
+    private World? _previousSystemWorld;
+    private ImmutableArray<SystemAccess>? _previousSystemAccess;
+    private bool _systemAccessEntered;
 
     internal ScheduledSystemContext(WorldCommandStorage commands, ReusableWorkerPool workerPool)
     {
@@ -533,13 +673,80 @@ public sealed class ScheduledSystemContext
         _workerPool = workerPool;
     }
 
+    /// <summary>Gets the logical tick for the current execution.</summary>
     public int Tick { get; private set; }
+
+    /// <summary>Gets a read-only view of the World for the current execution.</summary>
     public ReadOnlyWorldView World => new(_world ?? throw new InvalidOperationException("The system is not executing."));
+
+    /// <summary>Gets the system's execution-scoped deferred World command writer.</summary>
     public WorldCommandBuffer Commands => _world is null
         ? throw new InvalidOperationException("The system is not executing.")
         : _commands.CreateWriter();
+    /// <summary>Gets the worker count available to this system's range work.</summary>
     public int WorkerCount => _workerCount;
+    internal IReadOnlyList<IDeferredPopulationCommands> DeferredPopulationCommands => _deferredPopulationCommands;
 
+    /// <summary>Leases population row identity until disposal or the end of the system's wave.</summary>
+    /// <remarks>
+    /// The schedule releases this lease after all wave workers finish and also on failure before rollback.
+    /// Column access is available only through synchronous scoped callbacks. Declare the actual columns the system reads or writes.
+    /// </remarks>
+    public PopulationLease<TKind> BorrowPopulation<TKind>(Population<TKind> population) where TKind : IPopulationKind
+    {
+        var world = _world ?? throw new InvalidOperationException("The system is not executing.");
+        if (Environment.CurrentManagedThreadId != _executionThreadId || Volatile.Read(ref _dispatchingRanges) != 0)
+            throw new InvalidOperationException("Borrow populations before dispatching range workers.");
+        ArgumentNullException.ThrowIfNull(population);
+        if (!ReferenceEquals(population.World, world))
+            throw new ArgumentException("The population belongs to a different world.", nameof(population));
+
+        var lease = population.Borrow();
+        try
+        {
+            lease.BindSystemAccess(_access, _executionThreadId);
+            _populationLeases.Add(lease);
+            return lease;
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Creates partition-local population commands applied together at this wave's barrier.</summary>
+    /// <remarks>
+    /// Declare <see cref="SystemAccess.DeferWorldWrites"/> for the system. Fill each buffer from at most one
+    /// partition and finish all range work before returning. Removals from every system in the wave refer to the
+    /// rows at the barrier before any queued removals; spawns merge in system registration and partition order.
+    /// Buffers expire when this execution ends and cannot be flushed directly. Population commands apply before
+    /// deferred World commands at the barrier. Complete all population leases before returning from the system.
+    /// </remarks>
+    public PopulationCommandBuffer<TKind>[] DeferPopulationCommands<TKind>(Population<TKind> population, int partitionCount)
+        where TKind : unmanaged, IPopulationKind, IPopulationSchema<TKind>
+    {
+        var world = _world ?? throw new InvalidOperationException("The system is not executing.");
+        if (Environment.CurrentManagedThreadId != _executionThreadId || Volatile.Read(ref _dispatchingRanges) != 0)
+            throw new InvalidOperationException("Create deferred population buffers before dispatching range workers.");
+        if (!_canDeferPopulation)
+            throw new InvalidOperationException("Deferred population commands require declared World write access.");
+        ArgumentNullException.ThrowIfNull(population);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
+        if (!ReferenceEquals(population.World, world))
+            throw new ArgumentException("The population belongs to a different world.", nameof(population));
+
+        var buffers = new PopulationCommandBuffer<TKind>[partitionCount];
+        for (var index = 0; index < partitionCount; index++)
+        {
+            buffers[index] = new PopulationCommandBuffer<TKind>(population, scheduled: true);
+            _deferredPopulationCommands.Add(buffers[index]);
+        }
+
+        return buffers;
+    }
+
+    /// <summary>Registers recovery for external state if the schedule transaction rolls back.</summary>
     public void OnRollback(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -547,7 +754,11 @@ public sealed class ScheduledSystemContext
         _commands.OnRollback(action);
     }
 
-    /// <summary>Runs deterministic disjoint row ranges, never assigning a row to more than one worker.</summary>
+    /// <summary>Runs callbacks over non-overlapping row ranges, using the schedule's reusable workers.</summary>
+    /// <typeparam name="TState">State shared read-only by the range callbacks.</typeparam>
+    /// <param name="state">State passed to every callback.</param>
+    /// <param name="rowCount">Number of rows to partition.</param>
+    /// <param name="executeRange">Callback receiving the state, partition index, and assigned range.</param>
     public void ForEachRange<TState>(
         TState state,
         int rowCount,
@@ -560,38 +771,230 @@ public sealed class ScheduledSystemContext
             return;
         }
 
-        var partitionCount = Math.Min(rowCount, _workerCount);
-        var stateType = typeof(TState);
-        if (!_rangeBatches.TryGetValue(stateType, out var existing))
+        BeginRangeDispatch();
+        try
         {
-            existing = new RangeBatch<TState>();
-            _rangeBatches.Add(stateType, existing);
-        }
+            var partitionCount = Math.Min(rowCount, _workerCount);
+            var stateType = typeof(TState);
+            if (!_rangeBatches.TryGetValue(stateType, out var existing))
+            {
+                existing = new RangeBatch<TState>();
+                _rangeBatches.Add(stateType, existing);
+            }
 
-        var batch = (RangeBatch<TState>)existing;
-        batch.Configure(state, rowCount, partitionCount, executeRange);
-        _workerPool.Run(batch);
-        batch.ThrowFirstFailure();
+            var batch = (RangeBatch<TState>)existing;
+            batch.Configure(state, rowCount, partitionCount, executeRange);
+            _workerPool.Run(batch);
+            batch.ThrowFirstFailure();
+        }
+        finally
+        {
+            Volatile.Write(ref _dispatchingRanges, 0);
+        }
     }
 
-    internal void Prepare(World world, int tick, int workerCount)
+    /// <summary>Runs fixed disjoint partitions with callback-scoped access to declared population columns.</summary>
+    /// <typeparam name="TKind">The population schema.</typeparam>
+    /// <typeparam name="TState">Caller-owned state passed to each partition.</typeparam>
+    /// <param name="lease">The population lease acquired before dispatch.</param>
+    /// <param name="state">State passed to every callback.</param>
+    /// <param name="executeRange">Callback for each scheduler-assigned partition.</param>
+    public void ForEachPopulationRange<TKind, TState>(
+        PopulationLease<TKind> lease,
+        TState state,
+        PopulationRangeAction<TKind, TState> executeRange)
+        where TKind : IPopulationKind
+    {
+        ArgumentNullException.ThrowIfNull(lease);
+        ArgumentNullException.ThrowIfNull(executeRange);
+        var world = _world ?? throw new InvalidOperationException("The system is not executing.");
+        if (!ReferenceEquals(lease.WorldIdentity, world))
+            throw new ArgumentException("The population lease belongs to a different world.", nameof(lease));
+
+        var rowCount = lease.Count;
+        if (rowCount == 0)
+            return;
+
+        BeginRangeDispatch();
+        try
+        {
+            var key = (typeof(TKind), typeof(TState));
+            if (!_populationRangeBatches.TryGetValue(key, out var existing))
+            {
+                existing = new PopulationRangeBatch<TKind, TState>();
+                _populationRangeBatches.Add(key, existing);
+            }
+
+            var batch = (PopulationRangeBatch<TKind, TState>)existing;
+            batch.Configure(lease, state, rowCount, Math.Min(rowCount, _workerCount), _access, executeRange);
+            _workerPool.Run(batch);
+            batch.ThrowFirstFailure();
+        }
+        finally
+        {
+            Volatile.Write(ref _dispatchingRanges, 0);
+        }
+    }
+
+    /// <summary>Runs fixed disjoint partitions without allocating a separate population lease.</summary>
+    /// <typeparam name="TKind">The population schema.</typeparam>
+    /// <typeparam name="TState">Caller-owned state passed to each partition.</typeparam>
+    /// <param name="population">The population whose rows are partitioned.</param>
+    /// <param name="state">State passed to every callback.</param>
+    /// <param name="executeRange">Callback for each scheduler-assigned partition.</param>
+    public void ForEachPopulationRange<TKind, TState>(
+        Population<TKind> population,
+        TState state,
+        PopulationRangeAction<TKind, TState> executeRange)
+        where TKind : IPopulationKind
+    {
+        ArgumentNullException.ThrowIfNull(population);
+        ArgumentNullException.ThrowIfNull(executeRange);
+        var world = _world ?? throw new InvalidOperationException("The system is not executing.");
+        if (!ReferenceEquals(population.World, world))
+            throw new ArgumentException("The population belongs to a different world.", nameof(population));
+
+        BeginRangeDispatch();
+        var populationLeased = false;
+        try
+        {
+            var rowCount = population.BeginScheduledRangeAccess();
+            populationLeased = true;
+            if (rowCount == 0)
+                return;
+
+            var key = (typeof(TKind), typeof(TState));
+            if (!_populationRangeBatches.TryGetValue(key, out var existing))
+            {
+                existing = new PopulationRangeBatch<TKind, TState>();
+                _populationRangeBatches.Add(key, existing);
+            }
+
+            var batch = (PopulationRangeBatch<TKind, TState>)existing;
+            batch.Configure(population, state, rowCount, Math.Min(rowCount, _workerCount), _access, executeRange);
+            _workerPool.Run(batch);
+            batch.ThrowFirstFailure();
+        }
+        finally
+        {
+            if (populationLeased)
+                population.EndScheduledRangeAccess();
+            Volatile.Write(ref _dispatchingRanges, 0);
+        }
+    }
+
+    /// <summary>Maps fixed logical row partitions concurrently, then merges their results in partition order.</summary>
+    /// <remarks>
+    /// Partition count is independent of worker count, so changing workers does not change the reduction order.
+    /// Map functions must avoid overlapping writes and order-dependent shared state. Floating-point portability
+    /// still depends on the map and merge operations and the execution platform.
+    /// </remarks>
+    public TResult ReduceRanges<TState, TResult>(
+        TState state,
+        int rowCount,
+        int partitionCount,
+        TResult identity,
+        Func<TState, int, PopulationRange, TResult> map,
+        Func<TResult, TResult, TResult> merge)
+    {
+        _ = _world ?? throw new InvalidOperationException("The system is not executing.");
+        ArgumentOutOfRangeException.ThrowIfNegative(rowCount);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(merge);
+        if (rowCount == 0) return identity;
+
+        BeginRangeDispatch();
+        try
+        {
+            var key = (typeof(TState), typeof(TResult));
+            if (!_reductionBatches.TryGetValue(key, out var existing))
+            {
+                existing = new ReductionBatch<TState, TResult>();
+                _reductionBatches.Add(key, existing);
+            }
+
+            var batch = (ReductionBatch<TState, TResult>)existing;
+            batch.Configure(state, rowCount, Math.Min(rowCount, partitionCount), map);
+            try
+            {
+                _workerPool.Run(batch, _workerCount);
+                return batch.Merge(identity, merge);
+            }
+            finally
+            {
+                batch.Clear();
+            }
+        }
+        finally
+        {
+            Volatile.Write(ref _dispatchingRanges, 0);
+        }
+    }
+
+    private void BeginRangeDispatch()
+    {
+        if (_world is null || Environment.CurrentManagedThreadId != _executionThreadId
+            || Interlocked.CompareExchange(ref _dispatchingRanges, 1, 0) != 0)
+            throw new InvalidOperationException("Range dispatch belongs to the executing system thread and cannot be nested.");
+    }
+
+    internal void Prepare(World world, int tick, int workerCount, ImmutableArray<SystemAccess> access)
     {
         _world = world;
         Tick = tick;
         _workerCount = workerCount;
+        _access = access;
+        _executionThreadId = Environment.CurrentManagedThreadId;
+        _canDeferPopulation = access.Contains(SystemAccess.DeferWorldWrites) || access.Contains(SystemAccess.WriteWorld);
         _commands.Activate();
+        world.EnterScheduledSystem(access, out _previousSystemWorld, out _previousSystemAccess);
+        _systemAccessEntered = true;
     }
 
     internal void RegisterRollbackActions(WorldTransaction transaction) =>
         _commands.RegisterRollbackActions(transaction);
 
-    internal void FlushCommands(World world) => _commands.Flush(world);
+    internal void FlushCommands(World world) => _commands.FlushAtBarrier(world);
+
+    internal void ReleasePopulationLeases()
+    {
+        foreach (var lease in _populationLeases) lease.Dispose();
+        _populationLeases.Clear();
+    }
+
+    internal void EndScheduledSystemAccess()
+    {
+        if (!_systemAccessEntered)
+            return;
+
+        _world!.ExitScheduledSystem(_previousSystemWorld, _previousSystemAccess);
+        _systemAccessEntered = false;
+        _previousSystemWorld = null;
+        _previousSystemAccess = null;
+    }
 
     internal void EndExecution()
     {
-        _commands.Deactivate();
-        _world = null;
-        _workerCount = 1;
+        try
+        {
+            ReleasePopulationLeases();
+            foreach (var commands in _deferredPopulationCommands) commands.Deactivate();
+            _deferredPopulationCommands.Clear();
+            _commands.Deactivate();
+        }
+        finally
+        {
+            EndScheduledSystemAccess();
+
+            _world = null;
+            _workerCount = 1;
+            _executionThreadId = 0;
+            _canDeferPopulation = false;
+            _access = [];
+            _previousSystemWorld = null;
+            _previousSystemAccess = null;
+        }
     }
 
     internal void Clear()
@@ -650,6 +1053,163 @@ public sealed class ScheduledSystemContext
             }
         }
     }
+
+    private sealed class PopulationRangeBatch<TKind, TState> : IReusableRangeBatch
+        where TKind : IPopulationKind
+    {
+        private readonly object _group = new();
+        private PopulationLease<TKind>? _lease;
+        private Population<TKind>? _population;
+        private TState _state = default!;
+        private int _rowCount;
+        private ImmutableArray<SystemAccess> _access = [];
+        private PopulationRangeAction<TKind, TState> _executeRange = null!;
+        private PopulationScopeLifetime[] _lifetimes = [];
+        private ExceptionDispatchInfo?[] _failures = [];
+
+        public int Count { get; private set; }
+
+        public void Configure(
+            PopulationLease<TKind> lease,
+            TState state,
+            int rowCount,
+            int partitionCount,
+            ImmutableArray<SystemAccess> access,
+            PopulationRangeAction<TKind, TState> executeRange)
+        {
+            _lease = lease;
+            _population = null;
+            ConfigureShared(state, rowCount, partitionCount, access, executeRange);
+        }
+
+        public void Configure(
+            Population<TKind> population,
+            TState state,
+            int rowCount,
+            int partitionCount,
+            ImmutableArray<SystemAccess> access,
+            PopulationRangeAction<TKind, TState> executeRange)
+        {
+            _population = population;
+            _lease = null;
+            ConfigureShared(state, rowCount, partitionCount, access, executeRange);
+        }
+
+        private void ConfigureShared(
+            TState state,
+            int rowCount,
+            int partitionCount,
+            ImmutableArray<SystemAccess> access,
+            PopulationRangeAction<TKind, TState> executeRange)
+        {
+            _state = state;
+            _rowCount = rowCount;
+            _access = access;
+            _executeRange = executeRange;
+            Count = partitionCount;
+            if (_lifetimes.Length < partitionCount)
+            {
+                var previousLength = _lifetimes.Length;
+                Array.Resize(ref _lifetimes, partitionCount);
+                for (var index = previousLength; index < partitionCount; index++)
+                    _lifetimes[index] = new PopulationScopeLifetime();
+            }
+
+            if (_failures.Length < partitionCount)
+                Array.Resize(ref _failures, partitionCount);
+            Array.Clear(_failures, 0, partitionCount);
+        }
+
+        public void Execute(int partition)
+        {
+            var range = PopulationRange.Partition(_rowCount, Count, partition);
+            var lifetime = _lifetimes[partition];
+            var generation = 0L;
+            var scopeStarted = false;
+            try
+            {
+                if (_population is { } population)
+                    generation = population.BeginScheduledRangeScope(range, lifetime, _access, _group);
+                else
+                    generation = _lease!.BeginScopedAccess(range, lifetime, _access, parallel: true, _group);
+                scopeStarted = true;
+                var scope = _population is { } owner
+                    ? new PopulationAccessScope<TKind>(owner, lifetime, generation)
+                    : new PopulationAccessScope<TKind>(_lease!, lifetime, generation);
+                _executeRange(_state, partition, ref scope);
+            }
+            catch (Exception exception)
+            {
+                _failures[partition] = ExceptionDispatchInfo.Capture(exception);
+            }
+            finally
+            {
+                if (scopeStarted)
+                {
+                    if (_population is { } population)
+                        population.EndScheduledRangeScope(lifetime, generation, _group);
+                    else
+                        _lease!.EndScopedAccess(lifetime, generation, parallel: true, _group);
+                }
+            }
+        }
+
+        public void ThrowFirstFailure()
+        {
+            for (var partition = 0; partition < Count; partition++)
+                _failures[partition]?.Throw();
+        }
+    }
+
+    private sealed class ReductionBatch<TState, TResult> : IReusableDynamicBatch
+    {
+        private TState _state = default!;
+        private int _rowCount;
+        private Func<TState, int, PopulationRange, TResult> _map = null!;
+        private TResult[] _results = [];
+        private ExceptionDispatchInfo?[] _failures = [];
+        public int Count { get; private set; }
+
+        public void Configure(TState state, int rowCount, int partitionCount,
+            Func<TState, int, PopulationRange, TResult> map)
+        {
+            _state = state;
+            _rowCount = rowCount;
+            _map = map;
+            Count = partitionCount;
+            if (_results.Length < Count) Array.Resize(ref _results, Count);
+            if (_failures.Length < Count) Array.Resize(ref _failures, Count);
+        }
+
+        public void Execute(int partition)
+        {
+            var start = (int)((long)_rowCount * partition / Count);
+            var end = (int)((long)_rowCount * (partition + 1) / Count);
+            try
+            {
+                _results[partition] = _map(_state, partition, new PopulationRange(start, end - start));
+            }
+            catch (Exception exception)
+            {
+                _failures[partition] = ExceptionDispatchInfo.Capture(exception);
+            }
+        }
+
+        public TResult Merge(TResult identity, Func<TResult, TResult, TResult> merge)
+        {
+            for (var partition = 0; partition < Count; partition++) _failures[partition]?.Throw();
+            for (var partition = 0; partition < Count; partition++) identity = merge(identity, _results[partition]);
+            return identity;
+        }
+
+        public void Clear()
+        {
+            Array.Clear(_results, 0, Count);
+            Array.Clear(_failures, 0, Count);
+            _state = default!;
+            _map = null!;
+        }
+    }
 }
 
 public readonly struct ReadOnlyWorldView(World world)
@@ -677,6 +1237,36 @@ public readonly struct ReadOnlyWorldView(World world)
     }
 
     public bool TryGetSpatialBounds(int entityId, out Bounds2 bounds) => world.TryGetSpatialBounds(entityId, out bounds);
+
+    /// <summary>Reads the stored property value without applying modifiers.</summary>
+    /// <param name="entityId">Entity to read.</param>
+    /// <param name="property">Property name.</param>
+    /// <param name="value">Stored value when the property exists.</param>
+    /// <returns><see langword="true"/> when the entity exists and stores the property.</returns>
+    /// <exception cref="ArgumentException"><paramref name="property"/> is null, empty or whitespace.</exception>
+    public bool TryGetBaseProperty(int entityId, string property, out double value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(property);
+        var entity = world.ById(entityId);
+        if (entity is { ToRemove: false })
+        {
+            return entity.TryGetProperty(world, property, out value);
+        }
+
+        value = 0;
+        return false;
+    }
+
+    /// <summary>Returns the entity IDs that currently carry the tag.</summary>
+    /// <param name="tag">Tag to enumerate.</param>
+    /// <returns>The matching entity IDs in ascending order, or empty memory when none match.</returns>
+    /// <exception cref="ArgumentException"><paramref name="tag"/> is null, empty or whitespace.</exception>
+    public ReadOnlyMemory<int> EntitiesWithTag(string tag) => world.EntitiesWithTag(tag);
+
+    /// <summary>Checks that bounds fit the spatial index without changing world state.</summary>
+    /// <param name="bounds">Bounds to validate.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The bounds cannot be indexed.</exception>
+    public void ValidateSpatialBounds(Bounds2 bounds) => world.ValidateSpatialBounds(bounds);
 }
 
 /// <summary>System-local World commands. Capacity is retained across ticks.</summary>
@@ -894,6 +1484,27 @@ internal sealed class WorldCommandStorage
     public void Flush(World world)
     {
         EnsureActive();
+        if (_executionScoped)
+        {
+            throw new InvalidOperationException("Scheduled World commands flush only at their barrier.");
+        }
+
+        FlushCore(world);
+    }
+
+    internal void FlushAtBarrier(World world)
+    {
+        EnsureActive();
+        if (!_executionScoped)
+        {
+            throw new InvalidOperationException("Only scheduled World commands can flush at a schedule barrier.");
+        }
+
+        FlushCore(world);
+    }
+
+    private void FlushCore(World world)
+    {
         ArgumentNullException.ThrowIfNull(world);
         for (var index = 0; index < _count; index++)
         {
@@ -914,7 +1525,7 @@ internal sealed class WorldCommandStorage
                     world.Add(command.Entity!);
                     break;
                 case WorldCommandKind.RemoveEntity:
-                    RequireEntity(world, command.EntityId).ToRemove = true;
+                    world.Remove(RequireEntity(world, command.EntityId));
                     break;
                 case WorldCommandKind.SetSpatialBounds:
                     world.SetSpatialBounds(RequireEntity(world, command.EntityId), command.Bounds);

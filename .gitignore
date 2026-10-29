@@ -5,3 +5,8 @@ artifacts/
 .vs/
 *.user
 *.suo
+docs/reference/
+docs/_site/
+
+# Verify snapshot diffs
+*.received.*

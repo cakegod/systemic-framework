@@ -1,0 +1,33 @@
+name: API documentation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.403
+      - name: Restore pinned DocFX tool
+        run: dotnet tool restore
+      - name: Build public framework libraries
+        run: |
+          dotnet build src/Systemic.Kernel/Systemic.Kernel.csproj --configuration Release
+          dotnet build src/Systemic.Core/Systemic.Core.csproj --configuration Release
+          dotnet build src/Systemic.Kernel.Generator/Systemic.Kernel.Generator.csproj --configuration Release
+          dotnet build src/modules/Systemic.Rendering/Systemic.Rendering.csproj --configuration Release
+          dotnet build src/modules/Systemic.Incremental/Systemic.Incremental.csproj --configuration Release
+          dotnet build src/modules/Systemic.Presentation/Systemic.Presentation.csproj --configuration Release
+          dotnet build src/modules/Systemic.Gameplay2D/Systemic.Gameplay2D.csproj --configuration Release
+          dotnet build tests/Systemic.Core.Tests/Systemic.Core.Tests.csproj --configuration Release
+      - name: Check XML API summaries and analyzer links
+        run: python3 docs/check_api_xml_docs.py --configuration Release
+      - name: Generate API metadata
+        run: dotnet tool run docfx -- metadata docs/docfx.json
+      - name: Build API documentation
+        run: dotnet tool run docfx -- build docs/docfx.json

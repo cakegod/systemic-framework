@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using BenchmarkDotNet.Attributes;
 using Systemic.Kernel;
 
@@ -44,7 +45,7 @@ public class ScheduledRangeBenchmarks
 
         public string Id => "benchmark.range";
         public IReadOnlyList<SystemAccess> Access => s_access;
-        private static readonly SystemAccess[] s_access = [SystemAccess.WriteResource("benchmark.rows")];
+        private static readonly ImmutableArray<SystemAccess> s_access = [SystemAccess.WriteResource("benchmark.rows")];
 
         public void Execute(ScheduledSystemContext context) => context.ForEachRange(values, values.Length, s_execute);
 

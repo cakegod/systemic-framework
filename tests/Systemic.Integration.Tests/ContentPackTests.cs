@@ -253,9 +253,12 @@ public sealed class ContentPackTests
 
         Assert.Equal(1, result.EffectsApplied);
         Assert.Equal(8, world.EffectiveProperty(actor, "power"));
+        world.LogicalTick = 1;
         world.AdvanceModifiers();
+        world.LogicalTick = 2;
         world.AdvanceModifiers();
         Assert.Equal(8, world.EffectiveProperty(actor, "power"));
+        world.LogicalTick = 3;
         world.AdvanceModifiers();
         Assert.Equal(4, world.EffectiveProperty(actor, "power"));
     }
@@ -856,6 +859,64 @@ public sealed class ContentPackTests
         var error = Assert.Throws<ArgumentOutOfRangeException>(() => ContentPreviewPage.Render(tooMuchWork));
 
         Assert.Contains("raster work", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Row-addressed rules are content like any other: the fact carries a row reference and the
+    // authored rule names that row with 'factRow' in both its conditions and its effects.
+    [Fact]
+    public void Compiles_row_addressed_rules_from_content_and_applies_them_to_the_facts_row()
+    {
+        using var pack = TestPack.Create();
+        File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
+            { "schemaVersion": 2, "rules": [
+              { "id": "prey.burn", "on": "prey.think", "priority": 0,
+                "when": [
+                  { "kind": "hasTag", "factRow": "test.content-prey", "tag": "burning" },
+                  { "kind": "propertyAtLeast", "factRow": "test.content-prey",
+                    "property": "test.content-prey.energy", "value": 1 }
+                ],
+                "effects": [{ "kind": "adjustProperty", "factRow": "test.content-prey",
+                  "property": "test.content-prey.energy", "amount": -1 }] }
+            ] }
+            """);
+        var content = SystemicTestContent.Load(pack.Root);
+        var world = new World(seed: 4, valueScale: 1);
+        var population = world.DefinePopulation<ContentPrey>(enableHandles: true);
+        var energyKey = new PopulationColumnKey<int>("test.content-prey.energy", 1, PopulationCodecs.Int32);
+        var energyColumn = population.Column(energyKey);
+        population.Reserve(3);
+        population.AddRange(3);
+        population.WithAccess(new PopulationRange(0, 3), energyColumn,
+            static (PopulationColumn<int> column, scoped ref PopulationAccessScope<ContentPrey> scope) =>
+            {
+                var energy = scope.EditRange(column);
+                energy[0] = 4;
+                energy[1] = 4;
+                energy[2] = 4;
+            });
+        population.AddTag(1, "burning");
+        var engine = new RuleEngine(content.Rules);
+        engine.Bind(world);
+
+        var result = engine.Dispatch(world, SimulationFact.ForRow("prey.think", population.ReferenceOf(1)));
+
+        Assert.Equal(1, result.RulesMatched);
+        Assert.Equal(1, result.EffectsApplied);
+        var energy = new int[3];
+        population.WithAccess(new PopulationRange(0, 3), (Column: energyColumn, Values: energy),
+            static ((PopulationColumn<int> Column, int[] Values) state,
+                scoped ref PopulationAccessScope<ContentPrey> scope) =>
+                scope.ReadAll(state.Column).CopyTo(state.Values));
+        Assert.Equal([4, 3, 4], energy);
+    }
+
+    private readonly struct ContentPrey : IPopulationKind
+    {
+        public static string Id => "test.content-prey";
+
+        public static int Version => 1;
+
+        public static string[] Tags => ["burning"];
     }
 
     [Fact]

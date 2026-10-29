@@ -53,9 +53,8 @@ public sealed class BoidEcologyTests
         var (world, flock) = CreateFlock(setup);
         using var disposeFlock = flock;
         var rules = new RuleEngine(new CompiledRuleSet([]));
-        var extensions = new EventEngine([]);
         var contexts = Enumerable.Range(0, warmupTicks + measuredTicks)
-            .Select(tick => new SystemicStepContext(world, rules, extensions, tick))
+            .Select(tick => new SystemicSystemContext(world, rules, tick))
             .ToArray();
         for (var tick = 0; tick < warmupTicks; tick++)
         {
@@ -102,7 +101,7 @@ public sealed class BoidEcologyTests
         using var disposeFlock = flock;
         using var game = new SystemicGameBuilder(CreateTestContent(), world)
             .AddService(flock)
-            .AddScheduledSystem(flock)
+            .AddSystem(flock)
             .WithScheduledWorkerCount(1)
             .Build();
 
@@ -128,8 +127,8 @@ public sealed class BoidEcologyTests
         using var disposeFlock = flock;
         using var game = new SystemicGameBuilder(CreateTestContent(), world)
             .AddService(flock)
-            .AddScheduledSystem(flock)
-            .AddScheduledSystem(new ThrowingScheduledSystem())
+            .AddSystem(flock)
+            .AddSystem(new ThrowingScheduledSystem())
             .WithScheduledWorkerCount(4)
             .Build();
 
@@ -141,6 +140,30 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
+    public void Multiple_ticks_inside_an_outer_transaction_restore_public_views_and_population_on_rollback()
+    {
+        var (world, flock) = CreateFlock(new Setup { BoidCount = 64, Seed = 83, AddFood = true });
+        using var disposeFlock = flock;
+        using var game = new SystemicGameBuilder(CreateTestContent(), world)
+            .AddService(flock).AddSystem(flock).WithScheduledWorkerCount(1).Build();
+        var positions = flock.Positions.ToArray();
+        var food = flock.FoodPatches.ToArray();
+        var predator = flock.PredatorState;
+        var hungry = flock.HungryFraction;
+        using var outer = world.BeginTransaction();
+        game.Step();
+        game.Step();
+
+        outer.Rollback();
+
+        Assert.Equal(0, world.LogicalTick);
+        Assert.Equal(positions, flock.Positions.ToArray());
+        Assert.Equal(food, flock.FoodPatches.ToArray());
+        Assert.Equal(predator, flock.PredatorState);
+        Assert.Equal(hungry, flock.HungryFraction);
+    }
+
+    [Fact]
     public void Kernel_schedule_preserves_seeded_ecology_across_worker_counts()
     {
         var setup = new Setup { BoidCount = 512, Seed = 127, AddFood = true };
@@ -149,12 +172,12 @@ public sealed class BoidEcologyTests
         using var disposeSecond = second.Flock;
         using var firstGame = new SystemicGameBuilder(CreateTestContent(), first.World)
             .AddService(first.Flock)
-            .AddScheduledSystem(first.Flock)
+            .AddSystem(first.Flock)
             .WithScheduledWorkerCount(1)
             .Build();
         using var secondGame = new SystemicGameBuilder(CreateTestContent(), second.World)
             .AddService(second.Flock)
-            .AddScheduledSystem(second.Flock)
+            .AddSystem(second.Flock)
             .WithScheduledWorkerCount(4)
             .Build();
 
@@ -489,10 +512,9 @@ public sealed class BoidEcologyTests
     private static void Step(BoidFlockSystem flock, World world, int ticks, int firstTick = 0)
     {
         var rules = new RuleEngine(new CompiledRuleSet([]));
-        var extensions = new EventEngine([]);
         for (var tick = firstTick; tick < firstTick + ticks; tick++)
         {
-            flock.Step(new SystemicStepContext(world, rules, extensions, tick));
+            flock.Step(new SystemicSystemContext(world, rules, tick));
         }
     }
 
@@ -507,13 +529,18 @@ public sealed class BoidEcologyTests
         "test-content",
         new GameManifest("test.boids", "Test Boids", TickRateHz, 5),
         new CompiledRuleSet([]),
-        new CompiledEntities([]));
+        new CompiledEntities([]))
+    {
+        ContentFingerprint = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes("test.boids-synthetic-content-v1")))
+    };
 
-    private sealed class ThrowingScheduledSystem : ISystemicScheduledSystem
+    private sealed class ThrowingScheduledSystem : ISystemicSystem
     {
         public string Id => "test.failure";
+        public int Order => 200;
         public IReadOnlyList<SystemAccess> Access => [SystemAccess.WriteWorld];
-        void ISystemicScheduledSystem.Step(ScheduledSystemContext kernelContext, SystemicScheduledContext gameContext) =>
+        public void Step(SystemicSystemContext gameContext) =>
             throw new InvalidOperationException("expected");
     }
 

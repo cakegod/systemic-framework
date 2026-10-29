@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Systemic.Content;
+using Systemic.Extensions;
 using Systemic.Host;
+using Systemic.Kernel;
 using Systemic.Save;
 using Systemic.Tests.Content;
 
@@ -10,45 +12,47 @@ namespace Systemic.Tests.Save;
 public sealed class SystemicSaveExtensionTests
 {
     [Fact]
-    public void Version_two_presentation_state_migrates_to_opaque_extension_state()
+    public void Future_migrations_run_sequentially_on_an_independent_checked_copy()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
         var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 3, valueScale: 1)).Build();
         var codec = new SystemicSaveCodec();
-        var root = JsonNode.Parse(codec.Save(game))!.AsObject();
-        root["schemaVersion"] = 2;
-        root["presentation"] = new JsonObject
+        var original = codec.Save(game);
+        var migrations = new ISaveMigration[]
         {
-            ["visualRootSeed"] = 23,
-            ["nextActorVisualId"] = 17,
-            ["nextCueSeedOrdinal"] = 9
+            new FutureMigration(5, root => root["extensionStates"]!["test.future"] = 23),
+            new FutureMigration(6, root => root["extensionStates"]!["test.future"] = 24),
         };
-        root.Remove("extensionStates");
+        _ = new SystemicSaveCodec(migrations: migrations);
 
-        var materialized = codec.Load(content, root.ToJsonString());
+        var upgraded = SystemicSaveMigration.Upgrade(original, 7, migrations);
 
-        var migrated = materialized.ExtensionStates!["systemic.presentation.identity"];
-        Assert.Equal(23, migrated.GetProperty("visualRootSeed"u8).GetInt64());
-        Assert.Equal(17, migrated.GetProperty("nextActorVisualId"u8).GetInt64());
-        Assert.Equal(9, migrated.GetProperty("nextCueSeedOrdinal"u8).GetInt64());
+        Assert.Equal(6, JsonNode.Parse(original)!["schemaVersion"]!.GetValue<int>());
+        Assert.Equal(7, JsonNode.Parse(upgraded)!["schemaVersion"]!.GetValue<int>());
+        Assert.Equal(24, JsonNode.Parse(upgraded)!["extensionStates"]!["test.future"]!.GetValue<int>());
+        Assert.Equal(upgraded, SystemicSaveMigration.Upgrade(upgraded, 7, []));
     }
 
     [Fact]
-    public void Version_two_migration_rejects_present_non_object_extension_state()
+    public void Future_migrations_reject_tampering_and_missing_steps()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
         var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 3, valueScale: 1)).Build();
         var codec = new SystemicSaveCodec();
-        var root = JsonNode.Parse(codec.Save(game))!.AsObject();
-        root["schemaVersion"] = 2;
-        root["presentation"] = new JsonObject { ["visualRootSeed"] = 23 };
-        root["extensionStates"] = "this value must not be discarded";
+        var saved = codec.Save(game);
+        var root = JsonNode.Parse(saved)!.AsObject();
+        root["world"]!["seed"] = 44;
 
-        var exception = Assert.Throws<SystemicSaveException>(() => codec.Load(content, root.ToJsonString()));
-
-        Assert.Contains("extensionStates", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("checksum", Assert.Throws<SystemicSaveException>(() =>
+            SystemicSaveMigration.Upgrade(root.ToJsonString(), 6,
+                [new FutureMigration(5, _ => { }), new FutureMigration(6, _ => { })])).Message,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("migration", Assert.Throws<SystemicSaveException>(() =>
+            SystemicSaveMigration.Upgrade(saved, 7, [new FutureMigration(4, _ => { })])).Message,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Throws<ArgumentException>(() => new SystemicSaveCodec(migrations: [new FutureMigration(3, _ => { })]));
     }
 
     [Fact]
@@ -62,7 +66,7 @@ public sealed class SystemicSaveExtensionTests
         var codec = new SystemicSaveCodec();
         var saved = codec.Save(game);
 
-        Assert.Equal(3, JsonNode.Parse(saved)!["schemaVersion"]!.GetValue<int>());
+        Assert.Equal(6, JsonNode.Parse(saved)!["schemaVersion"]!.GetValue<int>());
         Assert.Equal(42, JsonNode.Parse(saved)!["extensionStates"]!["test.counter"]!.GetValue<int>());
 
         var materialized = codec.Load(content, saved);
@@ -72,11 +76,35 @@ public sealed class SystemicSaveExtensionTests
         Assert.Equal(42, restoredCounter.Value);
     }
 
+    [Fact]
+    public void Version_five_documents_drop_the_retired_event_engine_state()
+    {
+        using var pack = CoreOnlyPack.Create();
+        var content = ContentPackLoader.Load(pack.Root);
+        using var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 9, valueScale: 1)).Build();
+        var root = JsonNode.Parse(new SystemicSaveCodec().Save(game))!.AsObject();
+        root["schemaVersion"] = 5;
+        root["extensionStates"]!.AsObject()["systemic.events"] = JsonNode.Parse("""{"serial":4,"chainId":2}"""u8);
+        var versionFive = SaveTestDocument.Seal(root);
+
+        var materialized = new SystemicSaveCodec().Load(content, versionFive);
+
+        Assert.DoesNotContain("systemic.events", materialized.ExtensionStates!.Keys);
+        using var restored = new SystemicGameBuilder(content, materialized).Build();
+        Assert.Equal(0, restored.World.LogicalTick);
+    }
+
     private sealed class StatefulCounter : ISystemicStatefulExtension
     {
         public string Id => "test.counter";
         public int Value { get; set; }
         public JsonElement CaptureState() => JsonSerializer.SerializeToElement(Value);
         public void RestoreState(JsonElement state) => Value = state.GetInt32();
+    }
+
+    private sealed class FutureMigration(int version, Action<JsonObject> apply) : ISaveMigration
+    {
+        public int FromVersion => version;
+        public void Apply(JsonObject document) => apply(document);
     }
 }

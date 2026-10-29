@@ -1,0 +1,1017 @@
+#nullable enable
+const Systemic.Content.ContentTuningSchema.MaximumDocumentBytes = 1048576 -> int
+const Systemic.Content.ContentTuningSchema.MaximumProperties = 256 -> int
+const Systemic.Content.ContentTuningSchema.MaximumTags = 128 -> int
+const Systemic.Rules.ExpressionCompiler.MaximumInstructions = 256 -> int
+const Systemic.Rules.ExpressionCompiler.MaximumNesting = 32 -> int
+const Systemic.Rules.ExpressionCompiler.MaximumSourceLength = 4096 -> int
+const Systemic.Rules.ExpressionCompiler.MaximumTokens = 256 -> int
+const Systemic.Rules.SimulationFactPayload.MaximumEntries = 16 -> int
+const Systemic.Rules.SimulationFactPayload.MaximumKeyLength = 64 -> int
+const Systemic.Rules.SimulationFactValue.MaximumTextLength = 256 -> int
+const Systemic.Save.SystemicSaveCodec.CurrentSchemaVersion = 6 -> int
+override Systemic.Content.CompiledEntities.Equals(object? obj) -> bool
+override Systemic.Content.CompiledEntities.GetHashCode() -> int
+override Systemic.Content.CompiledEntities.ToString() -> string!
+override Systemic.Content.CompiledSystemicModule.Equals(object? obj) -> bool
+override Systemic.Content.CompiledSystemicModule.GetHashCode() -> int
+override Systemic.Content.CompiledSystemicModule.ToString() -> string!
+override Systemic.Content.ContentDiagnostic.Equals(object? obj) -> bool
+override Systemic.Content.ContentDiagnostic.GetHashCode() -> int
+override Systemic.Content.ContentDiagnostic.ToString() -> string!
+override Systemic.Content.ContentFieldSource.Equals(object? obj) -> bool
+override Systemic.Content.ContentFieldSource.GetHashCode() -> int
+override Systemic.Content.ContentFieldSource.ToString() -> string!
+override Systemic.Content.ContentPack.Equals(object? obj) -> bool
+override Systemic.Content.ContentPack.GetHashCode() -> int
+override Systemic.Content.ContentPack.ToString() -> string!
+override Systemic.Content.ContentTuningDiagnostic.Equals(object? obj) -> bool
+override Systemic.Content.ContentTuningDiagnostic.GetHashCode() -> int
+override Systemic.Content.ContentTuningDiagnostic.ToString() -> string!
+override Systemic.Content.EntityDefinition.Equals(object? obj) -> bool
+override Systemic.Content.EntityDefinition.GetHashCode() -> int
+override Systemic.Content.EntityDefinition.ToString() -> string!
+override Systemic.Content.GameManifest.Equals(object? obj) -> bool
+override Systemic.Content.GameManifest.GetHashCode() -> int
+override Systemic.Content.GameManifest.ToString() -> string!
+override Systemic.Content.MaterializedContentWorld.Equals(object? obj) -> bool
+override Systemic.Content.MaterializedContentWorld.GetHashCode() -> int
+override Systemic.Content.MaterializedContentWorld.ToString() -> string!
+override Systemic.Content.TuningValue.GetHashCode() -> int
+override Systemic.Host.FixedStepClockState.GetHashCode() -> int
+override Systemic.Host.FixedStepResult.GetHashCode() -> int
+override Systemic.Host.SystemicTickFailure.Equals(object? obj) -> bool
+override Systemic.Host.SystemicTickFailure.GetHashCode() -> int
+override Systemic.Host.SystemicTickFailure.ToString() -> string!
+override Systemic.Host.SystemicTickResult.GetHashCode() -> int
+override Systemic.Host.SystemTickStats.GetHashCode() -> int
+override Systemic.Replay.ReplayArtifact.Equals(object? obj) -> bool
+override Systemic.Replay.ReplayArtifact.GetHashCode() -> int
+override Systemic.Replay.ReplayArtifact.ToString() -> string!
+override Systemic.Replay.ReplayInput.Equals(object? obj) -> bool
+override Systemic.Replay.ReplayInput.GetHashCode() -> int
+override Systemic.Replay.ReplayInput.ToString() -> string!
+override Systemic.Replay.ReplayMismatch.Equals(object? obj) -> bool
+override Systemic.Replay.ReplayMismatch.GetHashCode() -> int
+override Systemic.Replay.ReplayMismatch.ToString() -> string!
+override Systemic.Replay.ReplayTick.Equals(object? obj) -> bool
+override Systemic.Replay.ReplayTick.GetHashCode() -> int
+override Systemic.Replay.ReplayTick.ToString() -> string!
+override Systemic.Replay.ReplayVerificationResult.Equals(object? obj) -> bool
+override Systemic.Replay.ReplayVerificationResult.GetHashCode() -> int
+override Systemic.Replay.ReplayVerificationResult.ToString() -> string!
+override Systemic.Rules.CompiledRule.Equals(object? obj) -> bool
+override Systemic.Rules.CompiledRule.GetHashCode() -> int
+override Systemic.Rules.CompiledRule.ToString() -> string!
+override Systemic.Rules.FactTypeId.GetHashCode() -> int
+override Systemic.Rules.FactTypeId.ToString() -> string!
+override Systemic.Rules.RuleCondition.GetHashCode() -> int
+override Systemic.Rules.RuleDispatchResult.GetHashCode() -> int
+override Systemic.Rules.RuleDispatchTrace.Equals(object? obj) -> bool
+override Systemic.Rules.RuleDispatchTrace.GetHashCode() -> int
+override Systemic.Rules.RuleDispatchTrace.ToString() -> string!
+override Systemic.Rules.RuleEffect.GetHashCode() -> int
+override Systemic.Rules.RuleEventHistorySample.GetHashCode() -> int
+override Systemic.Rules.RuleRowScanResult.GetHashCode() -> int
+override Systemic.Rules.RuleScheduleDefinition.Equals(object? obj) -> bool
+override Systemic.Rules.RuleScheduleDefinition.GetHashCode() -> int
+override Systemic.Rules.RuleScheduleDefinition.ToString() -> string!
+override Systemic.Rules.RuleSubject.GetHashCode() -> int
+override Systemic.Rules.RuleSubject.ToString() -> string!
+override Systemic.Rules.RuleTraceFact.Equals(object? obj) -> bool
+override Systemic.Rules.RuleTraceFact.GetHashCode() -> int
+override Systemic.Rules.RuleTraceFact.ToString() -> string!
+override Systemic.Rules.SimulationFact.GetHashCode() -> int
+override Systemic.Rules.SimulationFactPayloadEntry.GetHashCode() -> int
+override Systemic.Rules.SimulationFactPosition.GetHashCode() -> int
+override Systemic.Rules.SimulationFactValue.GetHashCode() -> int
+override Systemic.Ui.SystemicUiBindingContext.Equals(object? obj) -> bool
+override Systemic.Ui.SystemicUiBindingContext.GetHashCode() -> int
+override Systemic.Ui.SystemicUiBindingContext.ToString() -> string!
+override Systemic.Ui.SystemicUiBindingValue.GetHashCode() -> int
+static Systemic.Content.CompiledEntities.operator !=(Systemic.Content.CompiledEntities? left, Systemic.Content.CompiledEntities? right) -> bool
+static Systemic.Content.CompiledEntities.operator ==(Systemic.Content.CompiledEntities? left, Systemic.Content.CompiledEntities? right) -> bool
+static Systemic.Content.CompiledSystemicModule.operator !=(Systemic.Content.CompiledSystemicModule? left, Systemic.Content.CompiledSystemicModule? right) -> bool
+static Systemic.Content.CompiledSystemicModule.operator ==(Systemic.Content.CompiledSystemicModule? left, Systemic.Content.CompiledSystemicModule? right) -> bool
+static Systemic.Content.ContentDiagnostic.operator !=(Systemic.Content.ContentDiagnostic? left, Systemic.Content.ContentDiagnostic? right) -> bool
+static Systemic.Content.ContentDiagnostic.operator ==(Systemic.Content.ContentDiagnostic? left, Systemic.Content.ContentDiagnostic? right) -> bool
+static Systemic.Content.ContentFieldSource.operator !=(Systemic.Content.ContentFieldSource? left, Systemic.Content.ContentFieldSource? right) -> bool
+static Systemic.Content.ContentFieldSource.operator ==(Systemic.Content.ContentFieldSource? left, Systemic.Content.ContentFieldSource? right) -> bool
+static Systemic.Content.ContentModuleContext.ReadPath(System.Text.Json.JsonElement declaration, string! fileKey, string! objectPath) -> string!
+static Systemic.Content.ContentPack.operator !=(Systemic.Content.ContentPack? left, Systemic.Content.ContentPack? right) -> bool
+static Systemic.Content.ContentPack.operator ==(Systemic.Content.ContentPack? left, Systemic.Content.ContentPack? right) -> bool
+static Systemic.Content.ContentPackLoader.Load(string! rootDirectory, Systemic.Content.ContentModuleRegistry? moduleRegistry = null) -> Systemic.Content.ContentPack!
+static Systemic.Content.ContentReload.Prepare(Systemic.Content.ContentPack! active, string! rootDirectory, System.Collections.Generic.IEnumerable<Systemic.Content.ISystemicContentModule!>? modules = null, System.Collections.Generic.IReadOnlyDictionary<string!, Systemic.Content.ContentTuningSchema!>? tuningSchemas = null) -> Systemic.Content.ContentReloadResult!
+static Systemic.Content.ContentTuningDiagnostic.operator !=(Systemic.Content.ContentTuningDiagnostic? left, Systemic.Content.ContentTuningDiagnostic? right) -> bool
+static Systemic.Content.ContentTuningDiagnostic.operator ==(Systemic.Content.ContentTuningDiagnostic? left, Systemic.Content.ContentTuningDiagnostic? right) -> bool
+static Systemic.Content.EntityDefinition.operator !=(Systemic.Content.EntityDefinition? left, Systemic.Content.EntityDefinition? right) -> bool
+static Systemic.Content.EntityDefinition.operator ==(Systemic.Content.EntityDefinition? left, Systemic.Content.EntityDefinition? right) -> bool
+static Systemic.Content.GameManifest.operator !=(Systemic.Content.GameManifest? left, Systemic.Content.GameManifest? right) -> bool
+static Systemic.Content.GameManifest.operator ==(Systemic.Content.GameManifest? left, Systemic.Content.GameManifest? right) -> bool
+static Systemic.Content.MaterializedContentWorld.operator !=(Systemic.Content.MaterializedContentWorld? left, Systemic.Content.MaterializedContentWorld? right) -> bool
+static Systemic.Content.MaterializedContentWorld.operator ==(Systemic.Content.MaterializedContentWorld? left, Systemic.Content.MaterializedContentWorld? right) -> bool
+static Systemic.Content.TuningProperty.Boolean(string! name, bool? defaultValue = null, bool required = false) -> Systemic.Content.TuningProperty!
+static Systemic.Content.TuningProperty.Integer(string! name, long? minimum = null, long? maximum = null, long? defaultValue = null, bool required = false) -> Systemic.Content.TuningProperty!
+static Systemic.Content.TuningProperty.Number(string! name, double? minimum = null, double? maximum = null, double? defaultValue = null, bool required = false) -> Systemic.Content.TuningProperty!
+static Systemic.Content.TuningProperty.Text(string! name, int maxLength = 256, string? defaultValue = null, bool required = false) -> Systemic.Content.TuningProperty!
+static Systemic.Content.TuningValue.operator !=(Systemic.Content.TuningValue left, Systemic.Content.TuningValue right) -> bool
+static Systemic.Content.TuningValue.operator ==(Systemic.Content.TuningValue left, Systemic.Content.TuningValue right) -> bool
+static Systemic.Host.FixedStepClockState.operator !=(Systemic.Host.FixedStepClockState left, Systemic.Host.FixedStepClockState right) -> bool
+static Systemic.Host.FixedStepClockState.operator ==(Systemic.Host.FixedStepClockState left, Systemic.Host.FixedStepClockState right) -> bool
+static Systemic.Host.FixedStepResult.operator !=(Systemic.Host.FixedStepResult left, Systemic.Host.FixedStepResult right) -> bool
+static Systemic.Host.FixedStepResult.operator ==(Systemic.Host.FixedStepResult left, Systemic.Host.FixedStepResult right) -> bool
+static Systemic.Host.HeadlessSystemicHost.Create(Systemic.Content.ContentPack! content, int seed, double valueScale = 1, System.Action<Systemic.Host.SystemicGameBuilder!>? configure = null, Systemic.Save.SystemicSaveCodec? saveCodec = null) -> Systemic.Host.HeadlessSystemicHost!
+static Systemic.Host.HeadlessSystemicHost.FromDirectory(string! rootDirectory, int seed, double valueScale = 1, System.Action<Systemic.Host.SystemicGameBuilder!>? configure = null, Systemic.Save.SystemicSaveCodec? saveCodec = null) -> Systemic.Host.HeadlessSystemicHost!
+static Systemic.Host.HeadlessSystemicHost.Restore(Systemic.Content.ContentPack! content, string! save, System.Action<Systemic.Host.SystemicGameBuilder!>? configure = null, Systemic.Save.SystemicSaveCodec? saveCodec = null) -> Systemic.Host.HeadlessSystemicHost!
+static Systemic.Host.SystemicGame.FromDirectory(string! rootDirectory, int seed, double valueScale = 1) -> Systemic.Host.SystemicGameBuilder!
+static Systemic.Host.SystemicTickFailure.operator !=(Systemic.Host.SystemicTickFailure? left, Systemic.Host.SystemicTickFailure? right) -> bool
+static Systemic.Host.SystemicTickFailure.operator ==(Systemic.Host.SystemicTickFailure? left, Systemic.Host.SystemicTickFailure? right) -> bool
+static Systemic.Host.SystemicTickResult.operator !=(Systemic.Host.SystemicTickResult left, Systemic.Host.SystemicTickResult right) -> bool
+static Systemic.Host.SystemicTickResult.operator ==(Systemic.Host.SystemicTickResult left, Systemic.Host.SystemicTickResult right) -> bool
+static Systemic.Host.SystemTickStats.operator !=(Systemic.Host.SystemTickStats left, Systemic.Host.SystemTickStats right) -> bool
+static Systemic.Host.SystemTickStats.operator ==(Systemic.Host.SystemTickStats left, Systemic.Host.SystemTickStats right) -> bool
+static Systemic.Replay.ReplayArtifact.operator !=(Systemic.Replay.ReplayArtifact? left, Systemic.Replay.ReplayArtifact? right) -> bool
+static Systemic.Replay.ReplayArtifact.operator ==(Systemic.Replay.ReplayArtifact? left, Systemic.Replay.ReplayArtifact? right) -> bool
+static Systemic.Replay.ReplayCodec.Deserialize(string! json) -> Systemic.Replay.ReplayArtifact!
+static Systemic.Replay.ReplayCodec.Serialize(Systemic.Replay.ReplayArtifact! artifact) -> string!
+static Systemic.Replay.ReplayDiff.Compare(Systemic.Replay.ReplayArtifact! first, Systemic.Replay.ReplayArtifact! second) -> Systemic.Replay.ReplayMismatch?
+static Systemic.Replay.ReplayInput.operator !=(Systemic.Replay.ReplayInput? left, Systemic.Replay.ReplayInput? right) -> bool
+static Systemic.Replay.ReplayInput.operator ==(Systemic.Replay.ReplayInput? left, Systemic.Replay.ReplayInput? right) -> bool
+static Systemic.Replay.ReplayMismatch.operator !=(Systemic.Replay.ReplayMismatch? left, Systemic.Replay.ReplayMismatch? right) -> bool
+static Systemic.Replay.ReplayMismatch.operator ==(Systemic.Replay.ReplayMismatch? left, Systemic.Replay.ReplayMismatch? right) -> bool
+static Systemic.Replay.ReplayRunner.Verify(Systemic.Replay.ReplayArtifact! artifact, Systemic.Replay.IReplayTarget! target) -> Systemic.Replay.ReplayVerificationResult!
+static Systemic.Replay.ReplayStateHash.Compute(System.ReadOnlySpan<byte> state) -> string!
+static Systemic.Replay.ReplayTick.operator !=(Systemic.Replay.ReplayTick? left, Systemic.Replay.ReplayTick? right) -> bool
+static Systemic.Replay.ReplayTick.operator ==(Systemic.Replay.ReplayTick? left, Systemic.Replay.ReplayTick? right) -> bool
+static Systemic.Replay.ReplayVerificationResult.operator !=(Systemic.Replay.ReplayVerificationResult? left, Systemic.Replay.ReplayVerificationResult? right) -> bool
+static Systemic.Replay.ReplayVerificationResult.operator ==(Systemic.Replay.ReplayVerificationResult? left, Systemic.Replay.ReplayVerificationResult? right) -> bool
+static Systemic.Rules.CompiledRule.operator !=(Systemic.Rules.CompiledRule? left, Systemic.Rules.CompiledRule? right) -> bool
+static Systemic.Rules.CompiledRule.operator ==(Systemic.Rules.CompiledRule? left, Systemic.Rules.CompiledRule? right) -> bool
+static Systemic.Rules.ExpressionCompiler.Compile(string! source) -> Systemic.Rules.CompiledExpression!
+static Systemic.Rules.FactTypeId.operator !=(Systemic.Rules.FactTypeId left, Systemic.Rules.FactTypeId right) -> bool
+static Systemic.Rules.FactTypeId.operator ==(Systemic.Rules.FactTypeId left, Systemic.Rules.FactTypeId right) -> bool
+static Systemic.Rules.RuleCondition.Chance(double probability) -> Systemic.Rules.RuleCondition
+static Systemic.Rules.RuleCondition.FromExpression(Systemic.Rules.CompiledExpression! formula) -> Systemic.Rules.RuleCondition
+static Systemic.Rules.RuleCondition.HasTag(Systemic.Rules.RuleSubject subject, string! tag) -> Systemic.Rules.RuleCondition
+static Systemic.Rules.RuleCondition.operator !=(Systemic.Rules.RuleCondition left, Systemic.Rules.RuleCondition right) -> bool
+static Systemic.Rules.RuleCondition.operator ==(Systemic.Rules.RuleCondition left, Systemic.Rules.RuleCondition right) -> bool
+static Systemic.Rules.RuleCondition.PropertyAtLeast(Systemic.Rules.RuleSubject subject, string! property, double value) -> Systemic.Rules.RuleCondition
+static Systemic.Rules.RuleDispatchResult.operator !=(Systemic.Rules.RuleDispatchResult left, Systemic.Rules.RuleDispatchResult right) -> bool
+static Systemic.Rules.RuleDispatchResult.operator ==(Systemic.Rules.RuleDispatchResult left, Systemic.Rules.RuleDispatchResult right) -> bool
+static Systemic.Rules.RuleDispatchTrace.operator !=(Systemic.Rules.RuleDispatchTrace? left, Systemic.Rules.RuleDispatchTrace? right) -> bool
+static Systemic.Rules.RuleDispatchTrace.operator ==(Systemic.Rules.RuleDispatchTrace? left, Systemic.Rules.RuleDispatchTrace? right) -> bool
+static Systemic.Rules.RuleEffect.AddTag(Systemic.Rules.RuleSubject subject, string! tag) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.AdjustProperty(Systemic.Rules.RuleSubject subject, string! property, double amount) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.Emit(string! eventType) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.operator !=(Systemic.Rules.RuleEffect left, Systemic.Rules.RuleEffect right) -> bool
+static Systemic.Rules.RuleEffect.operator ==(Systemic.Rules.RuleEffect left, Systemic.Rules.RuleEffect right) -> bool
+static Systemic.Rules.RuleEffect.SetModifier(Systemic.Rules.RuleSubject subject, string! property, Systemic.Kernel.ModifierOperation operation, double value, Systemic.Kernel.ModifierStage stage = Systemic.Kernel.ModifierStage.Standard, int durationTicks = -1) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEventHistorySample.operator !=(Systemic.Rules.RuleEventHistorySample left, Systemic.Rules.RuleEventHistorySample right) -> bool
+static Systemic.Rules.RuleEventHistorySample.operator ==(Systemic.Rules.RuleEventHistorySample left, Systemic.Rules.RuleEventHistorySample right) -> bool
+static Systemic.Rules.RuleRowScanResult.operator !=(Systemic.Rules.RuleRowScanResult left, Systemic.Rules.RuleRowScanResult right) -> bool
+static Systemic.Rules.RuleRowScanResult.operator ==(Systemic.Rules.RuleRowScanResult left, Systemic.Rules.RuleRowScanResult right) -> bool
+static Systemic.Rules.RuleScheduleDefinition.operator !=(Systemic.Rules.RuleScheduleDefinition? left, Systemic.Rules.RuleScheduleDefinition? right) -> bool
+static Systemic.Rules.RuleScheduleDefinition.operator ==(Systemic.Rules.RuleScheduleDefinition? left, Systemic.Rules.RuleScheduleDefinition? right) -> bool
+static Systemic.Rules.RuleSubject.Entity(int entityId) -> Systemic.Rules.RuleSubject
+static Systemic.Rules.RuleSubject.FactRow(string! populationId) -> Systemic.Rules.RuleSubject
+static Systemic.Rules.RuleSubject.operator !=(Systemic.Rules.RuleSubject left, Systemic.Rules.RuleSubject right) -> bool
+static Systemic.Rules.RuleSubject.operator ==(Systemic.Rules.RuleSubject left, Systemic.Rules.RuleSubject right) -> bool
+static Systemic.Rules.RuleSubject.Row(string! populationId, int slot) -> Systemic.Rules.RuleSubject
+static Systemic.Rules.RuleSubject.Source.get -> Systemic.Rules.RuleSubject
+static Systemic.Rules.RuleSubject.Target.get -> Systemic.Rules.RuleSubject
+static Systemic.Rules.RuleTraceFact.operator !=(Systemic.Rules.RuleTraceFact? left, Systemic.Rules.RuleTraceFact? right) -> bool
+static Systemic.Rules.RuleTraceFact.operator ==(Systemic.Rules.RuleTraceFact? left, Systemic.Rules.RuleTraceFact? right) -> bool
+static Systemic.Rules.SimulationFact.ForRow(string! type, Systemic.Kernel.PopulationRowReference row, int depth = 0, double amount = 0) -> Systemic.Rules.SimulationFact
+static Systemic.Rules.SimulationFact.operator !=(Systemic.Rules.SimulationFact left, Systemic.Rules.SimulationFact right) -> bool
+static Systemic.Rules.SimulationFact.operator ==(Systemic.Rules.SimulationFact left, Systemic.Rules.SimulationFact right) -> bool
+static Systemic.Rules.SimulationFactPayloadEntry.operator !=(Systemic.Rules.SimulationFactPayloadEntry left, Systemic.Rules.SimulationFactPayloadEntry right) -> bool
+static Systemic.Rules.SimulationFactPayloadEntry.operator ==(Systemic.Rules.SimulationFactPayloadEntry left, Systemic.Rules.SimulationFactPayloadEntry right) -> bool
+static Systemic.Rules.SimulationFactPosition.operator !=(Systemic.Rules.SimulationFactPosition left, Systemic.Rules.SimulationFactPosition right) -> bool
+static Systemic.Rules.SimulationFactPosition.operator ==(Systemic.Rules.SimulationFactPosition left, Systemic.Rules.SimulationFactPosition right) -> bool
+static Systemic.Rules.SimulationFactValue.FromBoolean(bool value) -> Systemic.Rules.SimulationFactValue
+static Systemic.Rules.SimulationFactValue.FromInteger(long value) -> Systemic.Rules.SimulationFactValue
+static Systemic.Rules.SimulationFactValue.FromNumber(double value) -> Systemic.Rules.SimulationFactValue
+static Systemic.Rules.SimulationFactValue.FromText(string! value) -> Systemic.Rules.SimulationFactValue
+static Systemic.Rules.SimulationFactValue.operator !=(Systemic.Rules.SimulationFactValue left, Systemic.Rules.SimulationFactValue right) -> bool
+static Systemic.Rules.SimulationFactValue.operator ==(Systemic.Rules.SimulationFactValue left, Systemic.Rules.SimulationFactValue right) -> bool
+static Systemic.Save.SystemicSaveMigration.Upgrade(string! json, int targetVersion, System.Collections.Generic.IEnumerable<Systemic.Save.ISaveMigration!>! migrations) -> string!
+static Systemic.Ui.SystemicUiBindingContext.operator !=(Systemic.Ui.SystemicUiBindingContext? left, Systemic.Ui.SystemicUiBindingContext? right) -> bool
+static Systemic.Ui.SystemicUiBindingContext.operator ==(Systemic.Ui.SystemicUiBindingContext? left, Systemic.Ui.SystemicUiBindingContext? right) -> bool
+static Systemic.Ui.SystemicUiBindingValue.FromNumber(double value) -> Systemic.Ui.SystemicUiBindingValue
+static Systemic.Ui.SystemicUiBindingValue.FromText(string! value) -> Systemic.Ui.SystemicUiBindingValue
+static Systemic.Ui.SystemicUiBindingValue.operator !=(Systemic.Ui.SystemicUiBindingValue left, Systemic.Ui.SystemicUiBindingValue right) -> bool
+static Systemic.Ui.SystemicUiBindingValue.operator ==(Systemic.Ui.SystemicUiBindingValue left, Systemic.Ui.SystemicUiBindingValue right) -> bool
+Systemic.Content.CompiledEntities
+Systemic.Content.CompiledEntities.<Clone>$() -> Systemic.Content.CompiledEntities!
+Systemic.Content.CompiledEntities.CompiledEntities(System.Collections.Immutable.ImmutableArray<Systemic.Content.EntityDefinition!> Definitions) -> void
+Systemic.Content.CompiledEntities.Deconstruct(out System.Collections.Immutable.ImmutableArray<Systemic.Content.EntityDefinition!> Definitions) -> void
+Systemic.Content.CompiledEntities.Definitions.get -> System.Collections.Immutable.ImmutableArray<Systemic.Content.EntityDefinition!>
+Systemic.Content.CompiledEntities.Definitions.init -> void
+Systemic.Content.CompiledEntities.Equals(Systemic.Content.CompiledEntities? other) -> bool
+Systemic.Content.CompiledSystemicModule
+Systemic.Content.CompiledSystemicModule.<Clone>$() -> Systemic.Content.CompiledSystemicModule!
+Systemic.Content.CompiledSystemicModule.CompiledSystemicModule(Systemic.Content.ISystemicContentModule! Module, Systemic.Content.ISystemicModuleContent! Content) -> void
+Systemic.Content.CompiledSystemicModule.Content.get -> Systemic.Content.ISystemicModuleContent!
+Systemic.Content.CompiledSystemicModule.Content.init -> void
+Systemic.Content.CompiledSystemicModule.Deconstruct(out Systemic.Content.ISystemicContentModule! Module, out Systemic.Content.ISystemicModuleContent! Content) -> void
+Systemic.Content.CompiledSystemicModule.Equals(Systemic.Content.CompiledSystemicModule? other) -> bool
+Systemic.Content.CompiledSystemicModule.Module.get -> Systemic.Content.ISystemicContentModule!
+Systemic.Content.CompiledSystemicModule.Module.init -> void
+Systemic.Content.ContentDiagnostic
+Systemic.Content.ContentDiagnostic.<Clone>$() -> Systemic.Content.ContentDiagnostic!
+Systemic.Content.ContentDiagnostic.Code.get -> string!
+Systemic.Content.ContentDiagnostic.Code.init -> void
+Systemic.Content.ContentDiagnostic.Column.get -> int?
+Systemic.Content.ContentDiagnostic.Column.init -> void
+Systemic.Content.ContentDiagnostic.ContentDiagnostic(string! Code, string! File, string! Path, string! Message, int? Line = null, int? Column = null) -> void
+Systemic.Content.ContentDiagnostic.Deconstruct(out string! Code, out string! File, out string! Path, out string! Message, out int? Line, out int? Column) -> void
+Systemic.Content.ContentDiagnostic.Equals(Systemic.Content.ContentDiagnostic? other) -> bool
+Systemic.Content.ContentDiagnostic.File.get -> string!
+Systemic.Content.ContentDiagnostic.File.init -> void
+Systemic.Content.ContentDiagnostic.Line.get -> int?
+Systemic.Content.ContentDiagnostic.Line.init -> void
+Systemic.Content.ContentDiagnostic.Message.get -> string!
+Systemic.Content.ContentDiagnostic.Message.init -> void
+Systemic.Content.ContentDiagnostic.Path.get -> string!
+Systemic.Content.ContentDiagnostic.Path.init -> void
+Systemic.Content.ContentFieldSource
+Systemic.Content.ContentFieldSource.<Clone>$() -> Systemic.Content.ContentFieldSource!
+Systemic.Content.ContentFieldSource.ContentFieldSource(string! File, string! Path) -> void
+Systemic.Content.ContentFieldSource.Deconstruct(out string! File, out string! Path) -> void
+Systemic.Content.ContentFieldSource.Equals(Systemic.Content.ContentFieldSource? other) -> bool
+Systemic.Content.ContentFieldSource.File.get -> string!
+Systemic.Content.ContentFieldSource.File.init -> void
+Systemic.Content.ContentFieldSource.Path.get -> string!
+Systemic.Content.ContentFieldSource.Path.init -> void
+Systemic.Content.ContentModuleContext
+Systemic.Content.ContentModuleContext.ContentModuleContext(string! rootDirectory, Systemic.Content.GameManifest! manifest, Systemic.Content.CompiledEntities! entities, Systemic.Rules.CompiledRuleSet! rules, Systemic.Content.ContentReferenceCatalog! references, string? entitiesSourceFile = null, string? rulesSourceFile = null) -> void
+Systemic.Content.ContentModuleContext.Entities.get -> Systemic.Content.CompiledEntities!
+Systemic.Content.ContentModuleContext.EntitiesSourceFile.get -> string?
+Systemic.Content.ContentModuleContext.Manifest.get -> Systemic.Content.GameManifest!
+Systemic.Content.ContentModuleContext.ReadFile<T>(System.Text.Json.JsonElement declaration, string! fileKey, string! fieldPath) -> T
+Systemic.Content.ContentModuleContext.ReadFile<T>(System.Text.Json.JsonElement declaration, string! fileKey, string! objectPath, out string! relativePath) -> T
+Systemic.Content.ContentModuleContext.ReadFile<T>(System.Text.Json.JsonElement declaration, string! fileKey, string! objectPath, string! schemaKey, string! schemaText, out string! relativePath) -> T
+Systemic.Content.ContentModuleContext.ReadJson(string! relativePath) -> System.Text.Json.JsonElement
+Systemic.Content.ContentModuleContext.ReadJson(System.Text.Json.JsonElement declaration, string! fileKey, string! objectPath, out string! relativePath) -> System.Text.Json.JsonElement
+Systemic.Content.ContentModuleContext.ReadJson(System.Text.Json.JsonElement declaration, string! fileKey, string! objectPath, string! schemaKey, string! schemaText, out string! relativePath) -> System.Text.Json.JsonElement
+Systemic.Content.ContentModuleContext.References.get -> Systemic.Content.ContentReferenceCatalog!
+Systemic.Content.ContentModuleContext.RootDirectory.get -> string!
+Systemic.Content.ContentModuleContext.Rules.get -> Systemic.Rules.CompiledRuleSet!
+Systemic.Content.ContentModuleContext.RulesSourceFile.get -> string?
+Systemic.Content.ContentModuleRegistry
+Systemic.Content.ContentModuleRegistry.Add(Systemic.Content.ISystemicContentModule! module) -> Systemic.Content.ContentModuleRegistry!
+Systemic.Content.ContentModuleRegistry.AddTuningSchema(string! entityId, Systemic.Content.ContentTuningSchema! schema) -> Systemic.Content.ContentModuleRegistry!
+Systemic.Content.ContentModuleRegistry.ContentModuleRegistry() -> void
+Systemic.Content.ContentPack
+Systemic.Content.ContentPack.<Clone>$() -> Systemic.Content.ContentPack!
+Systemic.Content.ContentPack.ContentFingerprint.get -> string?
+Systemic.Content.ContentPack.ContentFingerprint.init -> void
+Systemic.Content.ContentPack.ContentPack(string! RootDirectory, Systemic.Content.GameManifest! Manifest, Systemic.Rules.CompiledRuleSet! Rules, Systemic.Content.CompiledEntities! Entities, System.Collections.Immutable.ImmutableArray<Systemic.Content.CompiledSystemicModule!> Modules = default(System.Collections.Immutable.ImmutableArray<Systemic.Content.CompiledSystemicModule!>)) -> void
+Systemic.Content.ContentPack.CreateWorld(int seed, double valueScale, float spatialCellSize = 32, System.Collections.Immutable.ImmutableDictionary<string!, System.Text.Json.JsonElement>? extensionStates = null) -> Systemic.Content.MaterializedContentWorld!
+Systemic.Content.ContentPack.Deconstruct(out string! RootDirectory, out Systemic.Content.GameManifest! Manifest, out Systemic.Rules.CompiledRuleSet! Rules, out Systemic.Content.CompiledEntities! Entities, out System.Collections.Immutable.ImmutableArray<Systemic.Content.CompiledSystemicModule!> Modules) -> void
+Systemic.Content.ContentPack.Entities.get -> Systemic.Content.CompiledEntities!
+Systemic.Content.ContentPack.Entities.init -> void
+Systemic.Content.ContentPack.Equals(Systemic.Content.ContentPack? other) -> bool
+Systemic.Content.ContentPack.Manifest.get -> Systemic.Content.GameManifest!
+Systemic.Content.ContentPack.Manifest.init -> void
+Systemic.Content.ContentPack.Modules.get -> System.Collections.Immutable.ImmutableArray<Systemic.Content.CompiledSystemicModule!>
+Systemic.Content.ContentPack.Modules.init -> void
+Systemic.Content.ContentPack.RootDirectory.get -> string!
+Systemic.Content.ContentPack.RootDirectory.init -> void
+Systemic.Content.ContentPack.Rules.get -> Systemic.Rules.CompiledRuleSet!
+Systemic.Content.ContentPack.Rules.init -> void
+Systemic.Content.ContentPack.Tuning(string! entityId) -> Systemic.Content.TuningDocument!
+Systemic.Content.ContentPack.TuningDocuments.get -> System.Collections.Immutable.ImmutableDictionary<string!, Systemic.Content.TuningDocument!>!
+Systemic.Content.ContentPack.TuningDocuments.init -> void
+Systemic.Content.ContentPackException
+Systemic.Content.ContentPackException.ContentPackException(string! message, string! fieldPath, System.Exception? innerException = null) -> void
+Systemic.Content.ContentPackException.ContentPackException(string! message, System.Exception? innerException = null) -> void
+Systemic.Content.ContentPackException.ContentPackException(System.Collections.Generic.IEnumerable<Systemic.Content.ContentDiagnostic!>! diagnostics) -> void
+Systemic.Content.ContentPackException.Diagnostics.get -> System.Collections.Immutable.ImmutableArray<Systemic.Content.ContentDiagnostic!>
+Systemic.Content.ContentPackException.FieldPath.get -> string?
+Systemic.Content.ContentPackLoader
+Systemic.Content.ContentReferenceCatalog
+Systemic.Content.ContentReferenceCatalog.Add(string! category, string! id, string! sourcePath) -> void
+Systemic.Content.ContentReferenceCatalog.Contains(string! category, string! id) -> bool
+Systemic.Content.ContentReferenceCatalog.ContentReferenceCatalog() -> void
+Systemic.Content.ContentReferenceCatalog.Require(string! category, string! id, string! sourcePath, string! fieldPath) -> void
+Systemic.Content.ContentReferenceCatalog.TryGetSourcePath(string! category, string! id, out string! sourcePath) -> bool
+Systemic.Content.ContentReload
+Systemic.Content.ContentReloadCandidate
+Systemic.Content.ContentReloadCandidate.Content.get -> Systemic.Content.ContentPack!
+Systemic.Content.ContentReloadCandidate.IsBasedOn(Systemic.Content.ContentPack! active) -> bool
+Systemic.Content.ContentReloadCandidate.SourceFingerprint.get -> string!
+Systemic.Content.ContentReloadResult
+Systemic.Content.ContentReloadResult.Candidate.get -> Systemic.Content.ContentReloadCandidate?
+Systemic.Content.ContentReloadResult.Diagnostics.get -> System.Collections.Immutable.ImmutableArray<Systemic.Content.ContentDiagnostic!>
+Systemic.Content.ContentReloadResult.Succeeded.get -> bool
+Systemic.Content.ContentTuningDiagnostic
+Systemic.Content.ContentTuningDiagnostic.<Clone>$() -> Systemic.Content.ContentTuningDiagnostic!
+Systemic.Content.ContentTuningDiagnostic.Code.get -> string!
+Systemic.Content.ContentTuningDiagnostic.Code.init -> void
+Systemic.Content.ContentTuningDiagnostic.Column.get -> int
+Systemic.Content.ContentTuningDiagnostic.Column.init -> void
+Systemic.Content.ContentTuningDiagnostic.ContentTuningDiagnostic(string! Code, string! File, string! Path, int Line, int Column, string! Message) -> void
+Systemic.Content.ContentTuningDiagnostic.Deconstruct(out string! Code, out string! File, out string! Path, out int Line, out int Column, out string! Message) -> void
+Systemic.Content.ContentTuningDiagnostic.Equals(Systemic.Content.ContentTuningDiagnostic? other) -> bool
+Systemic.Content.ContentTuningDiagnostic.File.get -> string!
+Systemic.Content.ContentTuningDiagnostic.File.init -> void
+Systemic.Content.ContentTuningDiagnostic.Line.get -> int
+Systemic.Content.ContentTuningDiagnostic.Line.init -> void
+Systemic.Content.ContentTuningDiagnostic.Message.get -> string!
+Systemic.Content.ContentTuningDiagnostic.Message.init -> void
+Systemic.Content.ContentTuningDiagnostic.Path.get -> string!
+Systemic.Content.ContentTuningDiagnostic.Path.init -> void
+Systemic.Content.ContentTuningException
+Systemic.Content.ContentTuningException.Diagnostics.get -> System.Collections.Immutable.ImmutableArray<Systemic.Content.ContentTuningDiagnostic!>
+Systemic.Content.ContentTuningSchema
+Systemic.Content.ContentTuningSchema.ContentTuningSchema(System.Collections.Generic.IEnumerable<Systemic.Content.TuningProperty!>! properties, System.Collections.Generic.IEnumerable<string!>? requiredTags = null) -> void
+Systemic.Content.ContentTuningSchema.Parse(string! json, string! sourceFile) -> Systemic.Content.TuningDocument!
+Systemic.Content.ContentTuningSchema.Parse(System.ReadOnlyMemory<byte> json, string! sourceFile) -> Systemic.Content.TuningDocument!
+Systemic.Content.ContentTuningSchema.ParseEntity(System.ReadOnlyMemory<byte> entitiesJson, string! sourceFile, string! entityId) -> Systemic.Content.TuningDocument!
+Systemic.Content.EntityDefinition
+Systemic.Content.EntityDefinition.<Clone>$() -> Systemic.Content.EntityDefinition!
+Systemic.Content.EntityDefinition.Capabilities.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Content.EntityDefinition.Capabilities.init -> void
+Systemic.Content.EntityDefinition.Deconstruct(out string! Id, out string! Kind, out System.Collections.Immutable.ImmutableArray<string!> Tags, out System.Collections.Immutable.ImmutableArray<string!> Capabilities, out System.Collections.Immutable.ImmutableDictionary<string!, double>! Properties, out System.Collections.Immutable.ImmutableDictionary<string!, string!>! Links, out string? VisualRecipeId, out Systemic.Kernel.Bounds2? SpatialBounds) -> void
+Systemic.Content.EntityDefinition.EntityDefinition(string! Id, string! Kind, System.Collections.Immutable.ImmutableArray<string!> Tags, System.Collections.Immutable.ImmutableArray<string!> Capabilities, System.Collections.Immutable.ImmutableDictionary<string!, double>! Properties, System.Collections.Immutable.ImmutableDictionary<string!, string!>! Links, string? VisualRecipeId, Systemic.Kernel.Bounds2? SpatialBounds) -> void
+Systemic.Content.EntityDefinition.Equals(Systemic.Content.EntityDefinition? other) -> bool
+Systemic.Content.EntityDefinition.FieldSources.get -> System.Collections.Immutable.ImmutableDictionary<string!, Systemic.Content.ContentFieldSource!>!
+Systemic.Content.EntityDefinition.FieldSources.init -> void
+Systemic.Content.EntityDefinition.Id.get -> string!
+Systemic.Content.EntityDefinition.Id.init -> void
+Systemic.Content.EntityDefinition.Kind.get -> string!
+Systemic.Content.EntityDefinition.Kind.init -> void
+Systemic.Content.EntityDefinition.Links.get -> System.Collections.Immutable.ImmutableDictionary<string!, string!>!
+Systemic.Content.EntityDefinition.Links.init -> void
+Systemic.Content.EntityDefinition.Properties.get -> System.Collections.Immutable.ImmutableDictionary<string!, double>!
+Systemic.Content.EntityDefinition.Properties.init -> void
+Systemic.Content.EntityDefinition.SpatialBounds.get -> Systemic.Kernel.Bounds2?
+Systemic.Content.EntityDefinition.SpatialBounds.init -> void
+Systemic.Content.EntityDefinition.Tags.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Content.EntityDefinition.Tags.init -> void
+Systemic.Content.EntityDefinition.VisualRecipeId.get -> string?
+Systemic.Content.EntityDefinition.VisualRecipeId.init -> void
+Systemic.Content.GameManifest
+Systemic.Content.GameManifest.<Clone>$() -> Systemic.Content.GameManifest!
+Systemic.Content.GameManifest.Deconstruct(out string! Id, out string! Name, out int TickRateHz, out int MaxCatchUpSteps) -> void
+Systemic.Content.GameManifest.Equals(Systemic.Content.GameManifest? other) -> bool
+Systemic.Content.GameManifest.GameManifest(string! Id, string! Name, int TickRateHz, int MaxCatchUpSteps) -> void
+Systemic.Content.GameManifest.Id.get -> string!
+Systemic.Content.GameManifest.Id.init -> void
+Systemic.Content.GameManifest.MaxCatchUpSteps.get -> int
+Systemic.Content.GameManifest.MaxCatchUpSteps.init -> void
+Systemic.Content.GameManifest.Name.get -> string!
+Systemic.Content.GameManifest.Name.init -> void
+Systemic.Content.GameManifest.TickRateHz.get -> int
+Systemic.Content.GameManifest.TickRateHz.init -> void
+Systemic.Content.ISystemicContentModule
+Systemic.Content.ISystemicContentModule.Compile(Systemic.Content.ContentModuleContext! context, System.Text.Json.JsonElement declaration) -> Systemic.Content.ISystemicModuleContent!
+Systemic.Content.ISystemicContentModule.Configure(Systemic.Host.SystemicGameBuilder! builder, Systemic.Content.ISystemicModuleContent! content) -> void
+Systemic.Content.ISystemicContentModule.Id.get -> string!
+Systemic.Content.ISystemicModuleContent
+Systemic.Content.MaterializedContentWorld
+Systemic.Content.MaterializedContentWorld.<Clone>$() -> Systemic.Content.MaterializedContentWorld!
+Systemic.Content.MaterializedContentWorld.Deconstruct(out Systemic.Kernel.World! World, out System.Collections.Immutable.ImmutableDictionary<string!, int>! EntityIds, out System.Collections.Immutable.ImmutableDictionary<string!, System.Text.Json.JsonElement>? ExtensionStates) -> void
+Systemic.Content.MaterializedContentWorld.EntityIds.get -> System.Collections.Immutable.ImmutableDictionary<string!, int>!
+Systemic.Content.MaterializedContentWorld.EntityIds.init -> void
+Systemic.Content.MaterializedContentWorld.Equals(Systemic.Content.MaterializedContentWorld? other) -> bool
+Systemic.Content.MaterializedContentWorld.ExtensionStates.get -> System.Collections.Immutable.ImmutableDictionary<string!, System.Text.Json.JsonElement>?
+Systemic.Content.MaterializedContentWorld.ExtensionStates.init -> void
+Systemic.Content.MaterializedContentWorld.MaterializedContentWorld(Systemic.Kernel.World! World, System.Collections.Immutable.ImmutableDictionary<string!, int>! EntityIds, System.Collections.Immutable.ImmutableDictionary<string!, System.Text.Json.JsonElement>? ExtensionStates = null) -> void
+Systemic.Content.MaterializedContentWorld.World.get -> Systemic.Kernel.World!
+Systemic.Content.MaterializedContentWorld.World.init -> void
+Systemic.Content.TuningDocument
+Systemic.Content.TuningDocument.GetBoolean(string! name) -> bool
+Systemic.Content.TuningDocument.GetInteger(string! name) -> long
+Systemic.Content.TuningDocument.GetNumber(string! name) -> double
+Systemic.Content.TuningDocument.GetText(string! name) -> string!
+Systemic.Content.TuningDocument.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Systemic.Content.TuningDocument.TryGetValue(string! name, out Systemic.Content.TuningValue value) -> bool
+Systemic.Content.TuningDocument.Values.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Systemic.Content.TuningValue>!
+Systemic.Content.TuningProperty
+Systemic.Content.TuningProperty.DefaultValue.get -> Systemic.Content.TuningValue?
+Systemic.Content.TuningProperty.IntegerMaximum.get -> long?
+Systemic.Content.TuningProperty.IntegerMinimum.get -> long?
+Systemic.Content.TuningProperty.Kind.get -> Systemic.Content.TuningValueKind
+Systemic.Content.TuningProperty.MaxLength.get -> int
+Systemic.Content.TuningProperty.Name.get -> string!
+Systemic.Content.TuningProperty.NumberMaximum.get -> double?
+Systemic.Content.TuningProperty.NumberMinimum.get -> double?
+Systemic.Content.TuningProperty.Required.get -> bool
+Systemic.Content.TuningValue
+Systemic.Content.TuningValue.Boolean.get -> bool
+Systemic.Content.TuningValue.Equals(Systemic.Content.TuningValue other) -> bool
+Systemic.Content.TuningValue.Integer.get -> long
+Systemic.Content.TuningValue.Kind.get -> Systemic.Content.TuningValueKind
+Systemic.Content.TuningValue.Number.get -> double
+Systemic.Content.TuningValue.Text.get -> string!
+Systemic.Content.TuningValue.TuningValue() -> void
+Systemic.Content.TuningValueKind
+Systemic.Content.TuningValueKind.Boolean = 3 -> Systemic.Content.TuningValueKind
+Systemic.Content.TuningValueKind.Integer = 2 -> Systemic.Content.TuningValueKind
+Systemic.Content.TuningValueKind.None = 0 -> Systemic.Content.TuningValueKind
+Systemic.Content.TuningValueKind.Number = 1 -> Systemic.Content.TuningValueKind
+Systemic.Content.TuningValueKind.Text = 4 -> Systemic.Content.TuningValueKind
+Systemic.Extensions.ExtensionModuleCatalog
+Systemic.Extensions.ExtensionModuleCatalog.Add(Systemic.Extensions.ISystemicExtensionModule! module) -> Systemic.Extensions.ExtensionModuleCatalog!
+Systemic.Extensions.ExtensionModuleCatalog.ExtensionModuleCatalog() -> void
+Systemic.Extensions.ExtensionModuleCatalog.ModuleIds.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+Systemic.Extensions.ExtensionModuleCatalog.Modules.get -> System.Collections.Generic.IReadOnlyCollection<Systemic.Extensions.ISystemicExtensionModule!>!
+Systemic.Extensions.ISystemicExtensionModule
+Systemic.Extensions.ISystemicExtensionModule.Id.get -> string!
+Systemic.Host.FixedStepClock
+Systemic.Host.FixedStepClock.Advance(System.TimeSpan elapsed, System.Action! step) -> Systemic.Host.FixedStepResult
+Systemic.Host.FixedStepClock.CaptureState() -> Systemic.Host.FixedStepClockState
+Systemic.Host.FixedStepClock.FixedStepClock(int tickRateHz, int maxCatchUpSteps) -> void
+Systemic.Host.FixedStepClock.MaxCatchUpSteps.get -> int
+Systemic.Host.FixedStepClock.RestoreState(Systemic.Host.FixedStepClockState state) -> void
+Systemic.Host.FixedStepClock.TickRateHz.get -> int
+Systemic.Host.FixedStepClockState
+Systemic.Host.FixedStepClockState.Deconstruct(out int TickRateHz, out int MaxCatchUpSteps, out System.Int128 PhaseUnits) -> void
+Systemic.Host.FixedStepClockState.Equals(Systemic.Host.FixedStepClockState other) -> bool
+Systemic.Host.FixedStepClockState.FixedStepClockState() -> void
+Systemic.Host.FixedStepClockState.FixedStepClockState(int TickRateHz, int MaxCatchUpSteps, System.Int128 PhaseUnits) -> void
+Systemic.Host.FixedStepClockState.MaxCatchUpSteps.get -> int
+Systemic.Host.FixedStepClockState.MaxCatchUpSteps.init -> void
+Systemic.Host.FixedStepClockState.PhaseUnits.get -> System.Int128
+Systemic.Host.FixedStepClockState.PhaseUnits.init -> void
+Systemic.Host.FixedStepClockState.TickRateHz.get -> int
+Systemic.Host.FixedStepClockState.TickRateHz.init -> void
+Systemic.Host.FixedStepResult
+Systemic.Host.FixedStepResult.Deconstruct(out int Steps, out System.TimeSpan DroppedTime, out System.TimeSpan RemainingTime) -> void
+Systemic.Host.FixedStepResult.DroppedTime.get -> System.TimeSpan
+Systemic.Host.FixedStepResult.DroppedTime.init -> void
+Systemic.Host.FixedStepResult.Equals(Systemic.Host.FixedStepResult other) -> bool
+Systemic.Host.FixedStepResult.FixedStepResult() -> void
+Systemic.Host.FixedStepResult.FixedStepResult(int Steps, System.TimeSpan DroppedTime, System.TimeSpan RemainingTime) -> void
+Systemic.Host.FixedStepResult.RemainingTime.get -> System.TimeSpan
+Systemic.Host.FixedStepResult.RemainingTime.init -> void
+Systemic.Host.FixedStepResult.Steps.get -> int
+Systemic.Host.FixedStepResult.Steps.init -> void
+Systemic.Host.HeadlessSystemicHost
+Systemic.Host.HeadlessSystemicHost.Advance(System.TimeSpan elapsed) -> Systemic.Host.FixedStepResult
+Systemic.Host.HeadlessSystemicHost.Game.get -> Systemic.Host.SystemicGame!
+Systemic.Host.HeadlessSystemicHost.HeadlessSystemicHost(Systemic.Host.SystemicGame! game, Systemic.Save.SystemicSaveCodec? saveCodec = null) -> void
+Systemic.Host.HeadlessSystemicHost.Publish(Systemic.Rules.SimulationFact fact) -> Systemic.Rules.RuleDispatchResult
+Systemic.Host.HeadlessSystemicHost.RunTicks(int count) -> void
+Systemic.Host.HeadlessSystemicHost.Save() -> string!
+Systemic.Host.HeadlessSystemicHost.Step() -> void
+Systemic.Host.HeadlessSystemicHost.Trace(Systemic.Rules.SimulationFact fact) -> Systemic.Rules.RuleDispatchTrace!
+Systemic.Host.ISaveOnlyStateExtension
+Systemic.Host.ISystemicHostAdapter
+Systemic.Host.ISystemicHostAdapter.Advance(System.TimeSpan elapsed) -> Systemic.Host.FixedStepResult
+Systemic.Host.ISystemicHostAdapter.Game.get -> Systemic.Host.SystemicGame!
+Systemic.Host.ISystemicHostAdapter.Publish(Systemic.Rules.SimulationFact fact) -> Systemic.Rules.RuleDispatchResult
+Systemic.Host.ISystemicHostAdapter.Save() -> string!
+Systemic.Host.ISystemicHostAdapter.Step() -> void
+Systemic.Host.ISystemicHostAdapter.Trace(Systemic.Rules.SimulationFact fact) -> Systemic.Rules.RuleDispatchTrace!
+Systemic.Host.ISystemicReusableTransactionalState
+Systemic.Host.ISystemicReusableTransactionalState.CaptureTransactionSnapshot() -> Systemic.Host.ISystemicTransactionSnapshot!
+Systemic.Host.ISystemicStatefulExtension
+Systemic.Host.ISystemicStatefulExtension.CaptureState() -> System.Text.Json.JsonElement
+Systemic.Host.ISystemicStatefulExtension.Id.get -> string!
+Systemic.Host.ISystemicStatefulExtension.RestoreState(System.Text.Json.JsonElement state) -> void
+Systemic.Host.ISystemicSystem
+Systemic.Host.ISystemicSystem.Access.get -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.SystemAccess>!
+Systemic.Host.ISystemicSystem.Id.get -> string!
+Systemic.Host.ISystemicSystem.Order.get -> int
+Systemic.Host.ISystemicSystem.Step(Systemic.Host.SystemicSystemContext! context) -> void
+Systemic.Host.ISystemicTransactionalState
+Systemic.Host.ISystemicTransactionalState.CaptureTransactionState() -> object!
+Systemic.Host.ISystemicTransactionalState.RestoreTransactionState(object! state) -> void
+Systemic.Host.ISystemicTransactionSnapshot
+Systemic.Host.ISystemicTransactionSnapshot.OnCommit.get -> System.Action!
+Systemic.Host.ISystemicTransactionSnapshot.OnRollback.get -> System.Action!
+Systemic.Host.SystemicGame
+Systemic.Host.SystemicGame.Advance(System.TimeSpan elapsed) -> Systemic.Host.FixedStepResult
+Systemic.Host.SystemicGame.Clock.get -> Systemic.Host.FixedStepClock!
+Systemic.Host.SystemicGame.Content.get -> Systemic.Content.ContentPack!
+Systemic.Host.SystemicGame.Dispose() -> void
+Systemic.Host.SystemicGame.EntityId(string! contentId) -> int
+Systemic.Host.SystemicGame.EntityIds.get -> System.Collections.Immutable.ImmutableDictionary<string!, int>!
+Systemic.Host.SystemicGame.GetService<TService>() -> TService
+Systemic.Host.SystemicGame.Publish(Systemic.Rules.SimulationFact fact) -> Systemic.Rules.RuleDispatchResult
+Systemic.Host.SystemicGame.SchedulerWaves.get -> System.Collections.Immutable.ImmutableArray<System.Collections.Immutable.ImmutableArray<string!>>
+Systemic.Host.SystemicGame.SchedulerWorkerCount.get -> int
+Systemic.Host.SystemicGame.StatefulExtensions.get -> System.Collections.Generic.IReadOnlyList<Systemic.Host.ISystemicStatefulExtension!>!
+Systemic.Host.SystemicGame.Step() -> void
+Systemic.Host.SystemicGame.TickStats.get -> Systemic.Host.SystemicTickStats!
+Systemic.Host.SystemicGame.Trace(Systemic.Rules.SimulationFact fact) -> Systemic.Rules.RuleDispatchTrace!
+Systemic.Host.SystemicGame.TryStep() -> Systemic.Host.SystemicTickResult
+Systemic.Host.SystemicGame.UiBindingProviders.get -> System.Collections.Generic.IReadOnlyList<Systemic.Ui.ISystemicUiBindingProvider!>!
+Systemic.Host.SystemicGame.World.get -> Systemic.Kernel.World!
+Systemic.Host.SystemicGameBuilder
+Systemic.Host.SystemicGameBuilder.AddExtension(Systemic.Extensions.ISystemicExtensionModule! module) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.AddFactObserver(int order, Systemic.Rules.SimulationFactObserver! observer) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.AddService<TService>(TService service) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.AddSystem(Systemic.Host.ISystemicSystem! system) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.AddUiBindingProvider(Systemic.Ui.ISystemicUiBindingProvider! provider) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.Build() -> Systemic.Host.SystemicGame!
+Systemic.Host.SystemicGameBuilder.Content.get -> Systemic.Content.ContentPack!
+Systemic.Host.SystemicGameBuilder.EntityIds.get -> System.Collections.Immutable.ImmutableDictionary<string!, int>!
+Systemic.Host.SystemicGameBuilder.GetService<TService>() -> TService
+Systemic.Host.SystemicGameBuilder.IsRestoringWorld.get -> bool
+Systemic.Host.SystemicGameBuilder.RegisterStatefulExtension(Systemic.Host.ISystemicStatefulExtension! extension) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.SystemicGameBuilder(Systemic.Content.ContentPack! content, Systemic.Content.MaterializedContentWorld! materialized) -> void
+Systemic.Host.SystemicGameBuilder.SystemicGameBuilder(Systemic.Content.ContentPack! content, Systemic.Kernel.World! world, System.Collections.Generic.IReadOnlyDictionary<string!, int>? entityIds = null, System.Collections.Immutable.ImmutableDictionary<string!, System.Text.Json.JsonElement>? extensionStates = null) -> void
+Systemic.Host.SystemicGameBuilder.Use<TModule>() -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.WithScheduledWorkerCount(int workerCount) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.World.get -> Systemic.Kernel.World!
+Systemic.Host.SystemicSystemContext
+Systemic.Host.SystemicSystemContext.ApplyDeferredCommands() -> void
+Systemic.Host.SystemicSystemContext.BorrowPopulation<TKind>(Systemic.Kernel.Population<TKind>! population) -> Systemic.Kernel.PopulationLease<TKind>!
+Systemic.Host.SystemicSystemContext.Commands.get -> Systemic.Kernel.WorldCommandBuffer
+Systemic.Host.SystemicSystemContext.DeferFact(Systemic.Rules.SimulationFact fact) -> void
+Systemic.Host.SystemicSystemContext.DeferPopulationCommands<TKind>(Systemic.Kernel.Population<TKind>! population, int partitionCount) -> Systemic.Kernel.PopulationCommandBuffer<TKind>![]!
+Systemic.Host.SystemicSystemContext.ForEachPopulationRange<TKind, TState>(Systemic.Kernel.Population<TKind>! population, TState state, Systemic.Kernel.PopulationRangeAction<TKind, TState>! executeRange) -> void
+Systemic.Host.SystemicSystemContext.ForEachPopulationRange<TKind, TState>(Systemic.Kernel.PopulationLease<TKind>! lease, TState state, Systemic.Kernel.PopulationRangeAction<TKind, TState>! executeRange) -> void
+Systemic.Host.SystemicSystemContext.ForEachRange<TState>(TState state, int rowCount, System.Action<TState, int, Systemic.Kernel.PopulationRange>! executeRange) -> void
+Systemic.Host.SystemicSystemContext.GetService<TService>() -> TService
+Systemic.Host.SystemicSystemContext.GetWritableWorld() -> Systemic.Kernel.World!
+Systemic.Host.SystemicSystemContext.IsForWorld(Systemic.Kernel.World! world) -> bool
+Systemic.Host.SystemicSystemContext.IsScheduledExecution.get -> bool
+Systemic.Host.SystemicSystemContext.OnRollback(System.Action! restoreExternalState) -> void
+Systemic.Host.SystemicSystemContext.Publish(Systemic.Rules.SimulationFact fact) -> Systemic.Rules.RuleDispatchResult
+Systemic.Host.SystemicSystemContext.ReduceRanges<TState, TResult>(TState state, int rowCount, int partitionCount, TResult identity, System.Func<TState, int, Systemic.Kernel.PopulationRange, TResult>! map, System.Func<TResult, TResult, TResult>! merge) -> TResult
+Systemic.Host.SystemicSystemContext.SetProperty(Systemic.Kernel.Entity! entity, string! property, double value) -> void
+Systemic.Host.SystemicSystemContext.SystemicSystemContext(Systemic.Kernel.World! world, Systemic.Rules.RuleEngine! contentRules, int tick) -> void
+Systemic.Host.SystemicSystemContext.Tick.get -> int
+Systemic.Host.SystemicSystemContext.WorkerCount.get -> int
+Systemic.Host.SystemicSystemContext.World.get -> Systemic.Kernel.ReadOnlyWorldView
+Systemic.Host.SystemicTickFailure
+Systemic.Host.SystemicTickFailure.<Clone>$() -> Systemic.Host.SystemicTickFailure!
+Systemic.Host.SystemicTickFailure.Committed.get -> bool
+Systemic.Host.SystemicTickFailure.Committed.init -> void
+Systemic.Host.SystemicTickFailure.Deconstruct(out string? SystemId, out int Tick, out bool Committed, out System.Exception! Exception) -> void
+Systemic.Host.SystemicTickFailure.Equals(Systemic.Host.SystemicTickFailure? other) -> bool
+Systemic.Host.SystemicTickFailure.Exception.get -> System.Exception!
+Systemic.Host.SystemicTickFailure.Exception.init -> void
+Systemic.Host.SystemicTickFailure.SystemicTickFailure(string? SystemId, int Tick, bool Committed, System.Exception! Exception) -> void
+Systemic.Host.SystemicTickFailure.SystemId.get -> string?
+Systemic.Host.SystemicTickFailure.SystemId.init -> void
+Systemic.Host.SystemicTickFailure.Tick.get -> int
+Systemic.Host.SystemicTickFailure.Tick.init -> void
+Systemic.Host.SystemicTickResult
+Systemic.Host.SystemicTickResult.Deconstruct(out bool Succeeded, out Systemic.Host.SystemicTickFailure? Failure) -> void
+Systemic.Host.SystemicTickResult.Equals(Systemic.Host.SystemicTickResult other) -> bool
+Systemic.Host.SystemicTickResult.Failure.get -> Systemic.Host.SystemicTickFailure?
+Systemic.Host.SystemicTickResult.Failure.init -> void
+Systemic.Host.SystemicTickResult.Succeeded.get -> bool
+Systemic.Host.SystemicTickResult.Succeeded.init -> void
+Systemic.Host.SystemicTickResult.SystemicTickResult() -> void
+Systemic.Host.SystemicTickResult.SystemicTickResult(bool Succeeded, Systemic.Host.SystemicTickFailure? Failure) -> void
+Systemic.Host.SystemicTickStats
+Systemic.Host.SystemicTickStats.SetBudget(string! systemId, System.TimeSpan? budget) -> void
+Systemic.Host.SystemicTickStats.Snapshot() -> System.Collections.Generic.IReadOnlyList<Systemic.Host.SystemTickStats>!
+Systemic.Host.SystemTickStats
+Systemic.Host.SystemTickStats.AllocatedBytes.get -> long
+Systemic.Host.SystemTickStats.AllocatedBytes.init -> void
+Systemic.Host.SystemTickStats.BudgetExceededCount.get -> long
+Systemic.Host.SystemTickStats.BudgetExceededCount.init -> void
+Systemic.Host.SystemTickStats.Count.get -> long
+Systemic.Host.SystemTickStats.Count.init -> void
+Systemic.Host.SystemTickStats.Deconstruct(out string! SystemId, out long Count, out System.TimeSpan Last, out System.TimeSpan Mean, out System.TimeSpan P95, out System.TimeSpan Max, out long AllocatedBytes, out long BudgetExceededCount) -> void
+Systemic.Host.SystemTickStats.Equals(Systemic.Host.SystemTickStats other) -> bool
+Systemic.Host.SystemTickStats.Last.get -> System.TimeSpan
+Systemic.Host.SystemTickStats.Last.init -> void
+Systemic.Host.SystemTickStats.Max.get -> System.TimeSpan
+Systemic.Host.SystemTickStats.Max.init -> void
+Systemic.Host.SystemTickStats.Mean.get -> System.TimeSpan
+Systemic.Host.SystemTickStats.Mean.init -> void
+Systemic.Host.SystemTickStats.P95.get -> System.TimeSpan
+Systemic.Host.SystemTickStats.P95.init -> void
+Systemic.Host.SystemTickStats.SystemId.get -> string!
+Systemic.Host.SystemTickStats.SystemId.init -> void
+Systemic.Host.SystemTickStats.SystemTickStats() -> void
+Systemic.Host.SystemTickStats.SystemTickStats(string! SystemId, long Count, System.TimeSpan Last, System.TimeSpan Mean, System.TimeSpan P95, System.TimeSpan Max, long AllocatedBytes, long BudgetExceededCount) -> void
+Systemic.Replay.HostReplayTarget
+Systemic.Replay.HostReplayTarget.ApplyInput(Systemic.Replay.ReplayInput! input) -> void
+Systemic.Replay.HostReplayTarget.CaptureState() -> System.ReadOnlyMemory<byte>
+Systemic.Replay.HostReplayTarget.ContentFingerprint.get -> string!
+Systemic.Replay.HostReplayTarget.HostReplayTarget(Systemic.Host.ISystemicHostAdapter! host, System.Action<Systemic.Host.SystemicGame!, Systemic.Replay.ReplayInput!>! applyInput, System.Collections.Generic.IEnumerable<string!>? transientExtensions = null) -> void
+Systemic.Replay.HostReplayTarget.Seed.get -> int
+Systemic.Replay.HostReplayTarget.Step() -> void
+Systemic.Replay.HostReplayTarget.Tick.get -> int
+Systemic.Replay.IReplayTarget
+Systemic.Replay.IReplayTarget.ApplyInput(Systemic.Replay.ReplayInput! input) -> void
+Systemic.Replay.IReplayTarget.CaptureState() -> System.ReadOnlyMemory<byte>
+Systemic.Replay.IReplayTarget.ContentFingerprint.get -> string!
+Systemic.Replay.IReplayTarget.Seed.get -> int
+Systemic.Replay.IReplayTarget.Step() -> void
+Systemic.Replay.IReplayTarget.Tick.get -> int
+Systemic.Replay.ReplayArtifact
+Systemic.Replay.ReplayArtifact.<Clone>$() -> Systemic.Replay.ReplayArtifact!
+Systemic.Replay.ReplayArtifact.ContentFingerprint.get -> string!
+Systemic.Replay.ReplayArtifact.ContentFingerprint.init -> void
+Systemic.Replay.ReplayArtifact.Deconstruct(out int Version, out int Seed, out string! ContentFingerprint, out int InitialTick, out string! InitialStateHash, out System.Collections.Immutable.ImmutableArray<Systemic.Replay.ReplayTick!> Ticks) -> void
+Systemic.Replay.ReplayArtifact.Equals(Systemic.Replay.ReplayArtifact? other) -> bool
+Systemic.Replay.ReplayArtifact.InitialStateHash.get -> string!
+Systemic.Replay.ReplayArtifact.InitialStateHash.init -> void
+Systemic.Replay.ReplayArtifact.InitialTick.get -> int
+Systemic.Replay.ReplayArtifact.InitialTick.init -> void
+Systemic.Replay.ReplayArtifact.ReplayArtifact(int Version, int Seed, string! ContentFingerprint, int InitialTick, string! InitialStateHash, System.Collections.Immutable.ImmutableArray<Systemic.Replay.ReplayTick!> Ticks) -> void
+Systemic.Replay.ReplayArtifact.Seed.get -> int
+Systemic.Replay.ReplayArtifact.Seed.init -> void
+Systemic.Replay.ReplayArtifact.Ticks.get -> System.Collections.Immutable.ImmutableArray<Systemic.Replay.ReplayTick!>
+Systemic.Replay.ReplayArtifact.Ticks.init -> void
+Systemic.Replay.ReplayArtifact.Version.get -> int
+Systemic.Replay.ReplayArtifact.Version.init -> void
+Systemic.Replay.ReplayCodec
+Systemic.Replay.ReplayDiff
+Systemic.Replay.ReplayInput
+Systemic.Replay.ReplayInput.<Clone>$() -> Systemic.Replay.ReplayInput!
+Systemic.Replay.ReplayInput.CanonicalJson.get -> string!
+Systemic.Replay.ReplayInput.Equals(Systemic.Replay.ReplayInput? other) -> bool
+Systemic.Replay.ReplayInput.ReplayInput(string! type, string! json) -> void
+Systemic.Replay.ReplayInput.Type.get -> string!
+Systemic.Replay.ReplayMismatch
+Systemic.Replay.ReplayMismatch.<Clone>$() -> Systemic.Replay.ReplayMismatch!
+Systemic.Replay.ReplayMismatch.Actual.get -> string?
+Systemic.Replay.ReplayMismatch.Actual.init -> void
+Systemic.Replay.ReplayMismatch.Code.get -> string!
+Systemic.Replay.ReplayMismatch.Code.init -> void
+Systemic.Replay.ReplayMismatch.Deconstruct(out string! Code, out int Tick, out string? Expected, out string? Actual, out int? InputIndex) -> void
+Systemic.Replay.ReplayMismatch.Equals(Systemic.Replay.ReplayMismatch? other) -> bool
+Systemic.Replay.ReplayMismatch.Expected.get -> string?
+Systemic.Replay.ReplayMismatch.Expected.init -> void
+Systemic.Replay.ReplayMismatch.InputIndex.get -> int?
+Systemic.Replay.ReplayMismatch.InputIndex.init -> void
+Systemic.Replay.ReplayMismatch.ReplayMismatch(string! Code, int Tick, string? Expected, string? Actual, int? InputIndex = null) -> void
+Systemic.Replay.ReplayMismatch.Tick.get -> int
+Systemic.Replay.ReplayMismatch.Tick.init -> void
+Systemic.Replay.ReplayRecorder
+Systemic.Replay.ReplayRecorder.Finish() -> Systemic.Replay.ReplayArtifact!
+Systemic.Replay.ReplayRecorder.RecordTick(System.Collections.Generic.IEnumerable<Systemic.Replay.ReplayInput!>! inputs) -> void
+Systemic.Replay.ReplayRecorder.ReplayRecorder(Systemic.Replay.IReplayTarget! target) -> void
+Systemic.Replay.ReplayRunner
+Systemic.Replay.ReplayStateHash
+Systemic.Replay.ReplayTick
+Systemic.Replay.ReplayTick.<Clone>$() -> Systemic.Replay.ReplayTick!
+Systemic.Replay.ReplayTick.Deconstruct(out int Tick, out System.Collections.Immutable.ImmutableArray<Systemic.Replay.ReplayInput!> Inputs, out string! StateHash) -> void
+Systemic.Replay.ReplayTick.Equals(Systemic.Replay.ReplayTick? other) -> bool
+Systemic.Replay.ReplayTick.Inputs.get -> System.Collections.Immutable.ImmutableArray<Systemic.Replay.ReplayInput!>
+Systemic.Replay.ReplayTick.Inputs.init -> void
+Systemic.Replay.ReplayTick.ReplayTick(int Tick, System.Collections.Immutable.ImmutableArray<Systemic.Replay.ReplayInput!> Inputs, string! StateHash) -> void
+Systemic.Replay.ReplayTick.StateHash.get -> string!
+Systemic.Replay.ReplayTick.StateHash.init -> void
+Systemic.Replay.ReplayTick.Tick.get -> int
+Systemic.Replay.ReplayTick.Tick.init -> void
+Systemic.Replay.ReplayVerificationResult
+Systemic.Replay.ReplayVerificationResult.<Clone>$() -> Systemic.Replay.ReplayVerificationResult!
+Systemic.Replay.ReplayVerificationResult.Deconstruct(out bool Success, out Systemic.Replay.ReplayMismatch? Mismatch) -> void
+Systemic.Replay.ReplayVerificationResult.Equals(Systemic.Replay.ReplayVerificationResult? other) -> bool
+Systemic.Replay.ReplayVerificationResult.Mismatch.get -> Systemic.Replay.ReplayMismatch?
+Systemic.Replay.ReplayVerificationResult.Mismatch.init -> void
+Systemic.Replay.ReplayVerificationResult.ReplayVerificationResult(bool Success, Systemic.Replay.ReplayMismatch? Mismatch) -> void
+Systemic.Replay.ReplayVerificationResult.Success.get -> bool
+Systemic.Replay.ReplayVerificationResult.Success.init -> void
+Systemic.Rules.CompiledExpression
+Systemic.Rules.CompiledExpression.EvaluateBoolean(Systemic.Rules.IExpressionScope! scope) -> bool
+Systemic.Rules.CompiledExpression.EvaluateBoolean<TScope>(in TScope scope) -> bool
+Systemic.Rules.CompiledExpression.EvaluateNumber(Systemic.Rules.IExpressionScope! scope) -> double
+Systemic.Rules.CompiledExpression.ResultKind.get -> Systemic.Rules.ExpressionResultKind
+Systemic.Rules.CompiledRule
+Systemic.Rules.CompiledRule.<Clone>$() -> Systemic.Rules.CompiledRule!
+Systemic.Rules.CompiledRule.CompiledRule(string! Id, string! EventType, int Priority, System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleCondition> Conditions, System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleEffect> Effects) -> void
+Systemic.Rules.CompiledRule.Conditions.get -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleCondition>
+Systemic.Rules.CompiledRule.Conditions.init -> void
+Systemic.Rules.CompiledRule.Deconstruct(out string! Id, out string! EventType, out int Priority, out System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleCondition> Conditions, out System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleEffect> Effects) -> void
+Systemic.Rules.CompiledRule.Effects.get -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleEffect>
+Systemic.Rules.CompiledRule.Effects.init -> void
+Systemic.Rules.CompiledRule.Equals(Systemic.Rules.CompiledRule? other) -> bool
+Systemic.Rules.CompiledRule.EventType.get -> string!
+Systemic.Rules.CompiledRule.EventType.init -> void
+Systemic.Rules.CompiledRule.Id.get -> string!
+Systemic.Rules.CompiledRule.Id.init -> void
+Systemic.Rules.CompiledRule.Priority.get -> int
+Systemic.Rules.CompiledRule.Priority.init -> void
+Systemic.Rules.CompiledRuleSet
+Systemic.Rules.CompiledRuleSet.CompiledRuleSet(System.Collections.Generic.IEnumerable<Systemic.Rules.CompiledRule!>! rules, System.Collections.Generic.IEnumerable<Systemic.Rules.RuleScheduleDefinition!>? schedules = null) -> void
+Systemic.Rules.CompiledRuleSet.EventTypes.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Rules.CompiledRuleSet.ForEvent(string! eventType) -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.CompiledRule!>
+Systemic.Rules.CompiledRuleSet.MaximumEventWindowTicks.get -> int
+Systemic.Rules.CompiledRuleSet.Rules.get -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.CompiledRule!>
+Systemic.Rules.CompiledRuleSet.Schedules.get -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleScheduleDefinition!>
+Systemic.Rules.ExpressionCompileException
+Systemic.Rules.ExpressionCompileException.ExpressionCompileException(string! message, int position) -> void
+Systemic.Rules.ExpressionCompileException.Position.get -> int
+Systemic.Rules.ExpressionCompiler
+Systemic.Rules.ExpressionEvaluationException
+Systemic.Rules.ExpressionEvaluationException.ExpressionEvaluationException(string! message) -> void
+Systemic.Rules.ExpressionResultKind
+Systemic.Rules.ExpressionResultKind.Boolean = 1 -> Systemic.Rules.ExpressionResultKind
+Systemic.Rules.ExpressionResultKind.Number = 0 -> Systemic.Rules.ExpressionResultKind
+Systemic.Rules.FactTypeId
+Systemic.Rules.FactTypeId.Equals(Systemic.Rules.FactTypeId other) -> bool
+Systemic.Rules.FactTypeId.FactTypeId() -> void
+Systemic.Rules.FactTypeId.FactTypeId(string! value) -> void
+Systemic.Rules.FactTypeId.IsValid.get -> bool
+Systemic.Rules.FactTypeId.Value.get -> string!
+Systemic.Rules.IExpressionScope
+Systemic.Rules.IExpressionScope.Count(string! selector) -> double
+Systemic.Rules.IExpressionScope.EventCount(string! eventType, int windowTicks) -> double
+Systemic.Rules.IExpressionScope.Rate(string! selector, int windowTicks) -> double
+Systemic.Rules.IExpressionScope.ReadNumber(string! name) -> double
+Systemic.Rules.PopulationSink
+Systemic.Rules.PopulationSink.Anchor.get -> Systemic.Kernel.PopulationRowReference
+Systemic.Rules.PopulationSink.Collect(System.Collections.Generic.List<Systemic.Rules.SimulationFact>! facts) -> int
+Systemic.Rules.PopulationSink.Count.get -> int
+Systemic.Rules.PopulationSink.EventType.get -> string!
+Systemic.Rules.PopulationSink.PopulationId.get -> string!
+Systemic.Rules.PopulationSink.PopulationSink(Systemic.Kernel.World! world, string! populationId, string! columnId, double threshold, string! eventType, Systemic.Kernel.PopulationRowReference anchor, string? tag = null) -> void
+Systemic.Rules.PopulationSink.Sample() -> int
+Systemic.Rules.RuleCondition
+Systemic.Rules.RuleCondition.Deconstruct(out Systemic.Rules.RuleConditionKind Kind, out Systemic.Rules.RuleSubject Subject, out string! Name, out double Threshold, out Systemic.Rules.CompiledExpression? Formula) -> void
+Systemic.Rules.RuleCondition.Equals(Systemic.Rules.RuleCondition other) -> bool
+Systemic.Rules.RuleCondition.Formula.get -> Systemic.Rules.CompiledExpression?
+Systemic.Rules.RuleCondition.Formula.init -> void
+Systemic.Rules.RuleCondition.Kind.get -> Systemic.Rules.RuleConditionKind
+Systemic.Rules.RuleCondition.Kind.init -> void
+Systemic.Rules.RuleCondition.Name.get -> string!
+Systemic.Rules.RuleCondition.Name.init -> void
+Systemic.Rules.RuleCondition.RuleCondition() -> void
+Systemic.Rules.RuleCondition.RuleCondition(Systemic.Rules.RuleConditionKind Kind, Systemic.Rules.RuleSubject Subject, string! Name, double Threshold, Systemic.Rules.CompiledExpression? Formula = null) -> void
+Systemic.Rules.RuleCondition.Subject.get -> Systemic.Rules.RuleSubject
+Systemic.Rules.RuleCondition.Subject.init -> void
+Systemic.Rules.RuleCondition.Threshold.get -> double
+Systemic.Rules.RuleCondition.Threshold.init -> void
+Systemic.Rules.RuleConditionKind
+Systemic.Rules.RuleConditionKind.Chance = 3 -> Systemic.Rules.RuleConditionKind
+Systemic.Rules.RuleConditionKind.Expression = 2 -> Systemic.Rules.RuleConditionKind
+Systemic.Rules.RuleConditionKind.HasTag = 0 -> Systemic.Rules.RuleConditionKind
+Systemic.Rules.RuleConditionKind.PropertyAtLeast = 1 -> Systemic.Rules.RuleConditionKind
+Systemic.Rules.RuleDispatchResult
+Systemic.Rules.RuleDispatchResult.CutOff.get -> bool
+Systemic.Rules.RuleDispatchResult.CutOff.init -> void
+Systemic.Rules.RuleDispatchResult.CutoffReason.get -> string?
+Systemic.Rules.RuleDispatchResult.CutoffReason.init -> void
+Systemic.Rules.RuleDispatchResult.Deconstruct(out int FactsProcessed, out int RulesMatched, out int EffectsApplied, out bool CutOff, out string? CutoffReason, out bool RolledBack) -> void
+Systemic.Rules.RuleDispatchResult.EffectsApplied.get -> int
+Systemic.Rules.RuleDispatchResult.EffectsApplied.init -> void
+Systemic.Rules.RuleDispatchResult.Equals(Systemic.Rules.RuleDispatchResult other) -> bool
+Systemic.Rules.RuleDispatchResult.FactsProcessed.get -> int
+Systemic.Rules.RuleDispatchResult.FactsProcessed.init -> void
+Systemic.Rules.RuleDispatchResult.RolledBack.get -> bool
+Systemic.Rules.RuleDispatchResult.RolledBack.init -> void
+Systemic.Rules.RuleDispatchResult.RuleDispatchResult() -> void
+Systemic.Rules.RuleDispatchResult.RuleDispatchResult(int FactsProcessed, int RulesMatched, int EffectsApplied, bool CutOff, string? CutoffReason = null, bool RolledBack = false) -> void
+Systemic.Rules.RuleDispatchResult.RulesMatched.get -> int
+Systemic.Rules.RuleDispatchResult.RulesMatched.init -> void
+Systemic.Rules.RuleDispatchTrace
+Systemic.Rules.RuleDispatchTrace.<Clone>$() -> Systemic.Rules.RuleDispatchTrace!
+Systemic.Rules.RuleDispatchTrace.Deconstruct(out Systemic.Rules.RuleDispatchResult Result, out System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleTraceFact!> Facts) -> void
+Systemic.Rules.RuleDispatchTrace.Equals(Systemic.Rules.RuleDispatchTrace? other) -> bool
+Systemic.Rules.RuleDispatchTrace.Facts.get -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleTraceFact!>
+Systemic.Rules.RuleDispatchTrace.Facts.init -> void
+Systemic.Rules.RuleDispatchTrace.Result.get -> Systemic.Rules.RuleDispatchResult
+Systemic.Rules.RuleDispatchTrace.Result.init -> void
+Systemic.Rules.RuleDispatchTrace.RuleDispatchTrace(Systemic.Rules.RuleDispatchResult Result, System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleTraceFact!> Facts) -> void
+Systemic.Rules.RuleEffect
+Systemic.Rules.RuleEffect.Deconstruct(out Systemic.Rules.RuleEffectKind Kind, out Systemic.Rules.RuleSubject Subject, out string! Name, out double Value, out Systemic.Kernel.ModifierOperation Operation, out Systemic.Kernel.ModifierStage Stage, out int DurationTicks) -> void
+Systemic.Rules.RuleEffect.DurationTicks.get -> int
+Systemic.Rules.RuleEffect.DurationTicks.init -> void
+Systemic.Rules.RuleEffect.Equals(Systemic.Rules.RuleEffect other) -> bool
+Systemic.Rules.RuleEffect.Kind.get -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffect.Kind.init -> void
+Systemic.Rules.RuleEffect.Name.get -> string!
+Systemic.Rules.RuleEffect.Name.init -> void
+Systemic.Rules.RuleEffect.Operation.get -> Systemic.Kernel.ModifierOperation
+Systemic.Rules.RuleEffect.Operation.init -> void
+Systemic.Rules.RuleEffect.RuleEffect() -> void
+Systemic.Rules.RuleEffect.RuleEffect(Systemic.Rules.RuleEffectKind Kind, Systemic.Rules.RuleSubject Subject, string! Name, double Value, Systemic.Kernel.ModifierOperation Operation = Systemic.Kernel.ModifierOperation.Add, Systemic.Kernel.ModifierStage Stage = Systemic.Kernel.ModifierStage.Standard, int DurationTicks = -1) -> void
+Systemic.Rules.RuleEffect.Stage.get -> Systemic.Kernel.ModifierStage
+Systemic.Rules.RuleEffect.Stage.init -> void
+Systemic.Rules.RuleEffect.Subject.get -> Systemic.Rules.RuleSubject
+Systemic.Rules.RuleEffect.Subject.init -> void
+Systemic.Rules.RuleEffect.Value.get -> double
+Systemic.Rules.RuleEffect.Value.init -> void
+Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffectKind.AddTag = 2 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffectKind.AdjustProperty = 0 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffectKind.EmitEvent = 3 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffectKind.SetModifier = 1 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEngine
+Systemic.Rules.RuleEngine.Bind(Systemic.Kernel.World! world) -> void
+Systemic.Rules.RuleEngine.CaptureEventHistory() -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.RuleEventHistorySample>
+Systemic.Rules.RuleEngine.Dispatch(Systemic.Kernel.World! world, Systemic.Rules.SimulationFact initialFact, Systemic.Rules.SimulationFactObserver? beforeEachFact = null) -> Systemic.Rules.RuleDispatchResult
+Systemic.Rules.RuleEngine.DispatchBatch(Systemic.Kernel.World! world, System.ReadOnlySpan<Systemic.Rules.SimulationFact> facts, Systemic.Rules.SimulationFactObserver? beforeEachFact = null) -> Systemic.Rules.RuleDispatchResult
+Systemic.Rules.RuleEngine.DispatchWithTrace(Systemic.Kernel.World! world, Systemic.Rules.SimulationFact initialFact, Systemic.Rules.SimulationFactObserver? beforeEachFact = null) -> Systemic.Rules.RuleDispatchTrace!
+Systemic.Rules.RuleEngine.EvaluateRowEvent(Systemic.Kernel.World! world, string! eventType, string! populationId, Systemic.Kernel.PopulationRange range) -> Systemic.Rules.RuleRowScanResult
+Systemic.Rules.RuleEngine.RestoreEventHistory(System.Collections.Generic.IEnumerable<Systemic.Rules.RuleEventHistorySample>! samples, int currentTick) -> void
+Systemic.Rules.RuleEngine.RuleEngine(Systemic.Rules.CompiledRuleSet! rules, int maxEffects = 1024, int maxDepth = 8, int? maxFacts = null, int tickRateHz = 60) -> void
+Systemic.Rules.RuleEventHistorySample
+Systemic.Rules.RuleEventHistorySample.Amount.get -> double
+Systemic.Rules.RuleEventHistorySample.Amount.init -> void
+Systemic.Rules.RuleEventHistorySample.Deconstruct(out int Tick, out string! EventType, out double Amount) -> void
+Systemic.Rules.RuleEventHistorySample.Equals(Systemic.Rules.RuleEventHistorySample other) -> bool
+Systemic.Rules.RuleEventHistorySample.EventType.get -> string!
+Systemic.Rules.RuleEventHistorySample.EventType.init -> void
+Systemic.Rules.RuleEventHistorySample.RuleEventHistorySample() -> void
+Systemic.Rules.RuleEventHistorySample.RuleEventHistorySample(int Tick, string! EventType, double Amount) -> void
+Systemic.Rules.RuleEventHistorySample.Tick.get -> int
+Systemic.Rules.RuleEventHistorySample.Tick.init -> void
+Systemic.Rules.RuleRowScanResult
+Systemic.Rules.RuleRowScanResult.CutoffReason.get -> string?
+Systemic.Rules.RuleRowScanResult.CutoffReason.init -> void
+Systemic.Rules.RuleRowScanResult.Deconstruct(out int RowsEvaluated, out int RulesMatched, out int EffectsApplied, out bool RolledBack, out string? CutoffReason) -> void
+Systemic.Rules.RuleRowScanResult.EffectsApplied.get -> int
+Systemic.Rules.RuleRowScanResult.EffectsApplied.init -> void
+Systemic.Rules.RuleRowScanResult.Equals(Systemic.Rules.RuleRowScanResult other) -> bool
+Systemic.Rules.RuleRowScanResult.RolledBack.get -> bool
+Systemic.Rules.RuleRowScanResult.RolledBack.init -> void
+Systemic.Rules.RuleRowScanResult.RowsEvaluated.get -> int
+Systemic.Rules.RuleRowScanResult.RowsEvaluated.init -> void
+Systemic.Rules.RuleRowScanResult.RuleRowScanResult() -> void
+Systemic.Rules.RuleRowScanResult.RuleRowScanResult(int RowsEvaluated, int RulesMatched, int EffectsApplied, bool RolledBack = false, string? CutoffReason = null) -> void
+Systemic.Rules.RuleRowScanResult.RulesMatched.get -> int
+Systemic.Rules.RuleRowScanResult.RulesMatched.init -> void
+Systemic.Rules.RuleScheduleDefinition
+Systemic.Rules.RuleScheduleDefinition.<Clone>$() -> Systemic.Rules.RuleScheduleDefinition!
+Systemic.Rules.RuleScheduleDefinition.Amount.get -> double
+Systemic.Rules.RuleScheduleDefinition.Amount.init -> void
+Systemic.Rules.RuleScheduleDefinition.Deconstruct(out string! Id, out string! EventType, out int EveryTicks, out int OffsetTicks, out string? SourceEntityId, out string? TargetEntityId, out double Amount) -> void
+Systemic.Rules.RuleScheduleDefinition.Equals(Systemic.Rules.RuleScheduleDefinition? other) -> bool
+Systemic.Rules.RuleScheduleDefinition.EventType.get -> string!
+Systemic.Rules.RuleScheduleDefinition.EventType.init -> void
+Systemic.Rules.RuleScheduleDefinition.EveryTicks.get -> int
+Systemic.Rules.RuleScheduleDefinition.EveryTicks.init -> void
+Systemic.Rules.RuleScheduleDefinition.Id.get -> string!
+Systemic.Rules.RuleScheduleDefinition.Id.init -> void
+Systemic.Rules.RuleScheduleDefinition.OffsetTicks.get -> int
+Systemic.Rules.RuleScheduleDefinition.OffsetTicks.init -> void
+Systemic.Rules.RuleScheduleDefinition.RuleScheduleDefinition(string! Id, string! EventType, int EveryTicks, int OffsetTicks, string? SourceEntityId, string? TargetEntityId, double Amount) -> void
+Systemic.Rules.RuleScheduleDefinition.SourceEntityId.get -> string?
+Systemic.Rules.RuleScheduleDefinition.SourceEntityId.init -> void
+Systemic.Rules.RuleScheduleDefinition.TargetEntityId.get -> string?
+Systemic.Rules.RuleScheduleDefinition.TargetEntityId.init -> void
+Systemic.Rules.RuleSubject
+Systemic.Rules.RuleSubject.AddressesRow.get -> bool
+Systemic.Rules.RuleSubject.Equals(Systemic.Rules.RuleSubject other) -> bool
+Systemic.Rules.RuleSubject.IsFactRow.get -> bool
+Systemic.Rules.RuleSubject.IsRow.get -> bool
+Systemic.Rules.RuleSubject.Kind.get -> Systemic.Rules.RuleSubjectKind
+Systemic.Rules.RuleSubject.PopulationId.get -> string!
+Systemic.Rules.RuleSubject.RuleSubject() -> void
+Systemic.Rules.RuleSubject.Slot.get -> int
+Systemic.Rules.RuleSubjectKind
+Systemic.Rules.RuleSubjectKind.Entity = 2 -> Systemic.Rules.RuleSubjectKind
+Systemic.Rules.RuleSubjectKind.FactRow = 4 -> Systemic.Rules.RuleSubjectKind
+Systemic.Rules.RuleSubjectKind.Row = 3 -> Systemic.Rules.RuleSubjectKind
+Systemic.Rules.RuleSubjectKind.Source = 0 -> Systemic.Rules.RuleSubjectKind
+Systemic.Rules.RuleSubjectKind.Target = 1 -> Systemic.Rules.RuleSubjectKind
+Systemic.Rules.RuleTraceFact
+Systemic.Rules.RuleTraceFact.<Clone>$() -> Systemic.Rules.RuleTraceFact!
+Systemic.Rules.RuleTraceFact.Deconstruct(out int Sequence, out Systemic.Rules.SimulationFact Fact, out System.Collections.Immutable.ImmutableArray<string!> MatchedRules) -> void
+Systemic.Rules.RuleTraceFact.Equals(Systemic.Rules.RuleTraceFact? other) -> bool
+Systemic.Rules.RuleTraceFact.Fact.get -> Systemic.Rules.SimulationFact
+Systemic.Rules.RuleTraceFact.Fact.init -> void
+Systemic.Rules.RuleTraceFact.MatchedRules.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Rules.RuleTraceFact.MatchedRules.init -> void
+Systemic.Rules.RuleTraceFact.RuleTraceFact(int Sequence, Systemic.Rules.SimulationFact Fact, System.Collections.Immutable.ImmutableArray<string!> MatchedRules) -> void
+Systemic.Rules.RuleTraceFact.Sequence.get -> int
+Systemic.Rules.RuleTraceFact.Sequence.init -> void
+Systemic.Rules.SimulationFact
+Systemic.Rules.SimulationFact.Amount.get -> double
+Systemic.Rules.SimulationFact.Amount.init -> void
+Systemic.Rules.SimulationFact.Deconstruct(out string! Type, out int SourceId, out int TargetId, out int Depth, out double Amount) -> void
+Systemic.Rules.SimulationFact.Deconstruct(out string! Type, out int SourceId, out int TargetId, out int Depth, out double Amount, out Systemic.Rules.SimulationFactPosition? Position, out Systemic.Rules.SimulationFactPayload? Payload, out Systemic.Kernel.PopulationRowReference? Row) -> void
+Systemic.Rules.SimulationFact.Depth.get -> int
+Systemic.Rules.SimulationFact.Depth.init -> void
+Systemic.Rules.SimulationFact.Equals(Systemic.Rules.SimulationFact other) -> bool
+Systemic.Rules.SimulationFact.Payload.get -> Systemic.Rules.SimulationFactPayload?
+Systemic.Rules.SimulationFact.Payload.init -> void
+Systemic.Rules.SimulationFact.Position.get -> Systemic.Rules.SimulationFactPosition?
+Systemic.Rules.SimulationFact.Position.init -> void
+Systemic.Rules.SimulationFact.Row.get -> Systemic.Kernel.PopulationRowReference?
+Systemic.Rules.SimulationFact.Row.init -> void
+Systemic.Rules.SimulationFact.SimulationFact() -> void
+Systemic.Rules.SimulationFact.SimulationFact(string! Type, int SourceId, int TargetId, int Depth = 0, double Amount = 0, Systemic.Rules.SimulationFactPosition? Position = null, Systemic.Rules.SimulationFactPayload? Payload = null, Systemic.Kernel.PopulationRowReference? Row = null) -> void
+Systemic.Rules.SimulationFact.SimulationFact(Systemic.Rules.FactTypeId Type, int SourceId, int TargetId, int Depth = 0, double Amount = 0, Systemic.Rules.SimulationFactPosition? Position = null, Systemic.Rules.SimulationFactPayload? Payload = null) -> void
+Systemic.Rules.SimulationFact.SourceId.get -> int
+Systemic.Rules.SimulationFact.SourceId.init -> void
+Systemic.Rules.SimulationFact.TargetId.get -> int
+Systemic.Rules.SimulationFact.TargetId.init -> void
+Systemic.Rules.SimulationFact.Type.get -> string!
+Systemic.Rules.SimulationFact.Type.init -> void
+Systemic.Rules.SimulationFact.TypeId.get -> Systemic.Rules.FactTypeId
+Systemic.Rules.SimulationFactEmitter
+Systemic.Rules.SimulationFactEmitter.Enqueue(Systemic.Rules.SimulationFact fact) -> bool
+Systemic.Rules.SimulationFactEmitter.OnCommit(System.Action! action) -> bool
+Systemic.Rules.SimulationFactEmitter.SimulationFactEmitter() -> void
+Systemic.Rules.SimulationFactObserver
+Systemic.Rules.SimulationFactPayload
+Systemic.Rules.SimulationFactPayload.Entries.get -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.SimulationFactPayloadEntry>
+Systemic.Rules.SimulationFactPayload.SimulationFactPayload(System.Collections.Generic.IEnumerable<Systemic.Rules.SimulationFactPayloadEntry>! entries) -> void
+Systemic.Rules.SimulationFactPayload.TryGetValue(string! key, out Systemic.Rules.SimulationFactValue value) -> bool
+Systemic.Rules.SimulationFactPayloadEntry
+Systemic.Rules.SimulationFactPayloadEntry.Deconstruct(out string! Key, out Systemic.Rules.SimulationFactValue Value) -> void
+Systemic.Rules.SimulationFactPayloadEntry.Equals(Systemic.Rules.SimulationFactPayloadEntry other) -> bool
+Systemic.Rules.SimulationFactPayloadEntry.Key.get -> string!
+Systemic.Rules.SimulationFactPayloadEntry.Key.init -> void
+Systemic.Rules.SimulationFactPayloadEntry.SimulationFactPayloadEntry() -> void
+Systemic.Rules.SimulationFactPayloadEntry.SimulationFactPayloadEntry(string! Key, Systemic.Rules.SimulationFactValue Value) -> void
+Systemic.Rules.SimulationFactPayloadEntry.Value.get -> Systemic.Rules.SimulationFactValue
+Systemic.Rules.SimulationFactPayloadEntry.Value.init -> void
+Systemic.Rules.SimulationFactPosition
+Systemic.Rules.SimulationFactPosition.Deconstruct(out long X, out long Y) -> void
+Systemic.Rules.SimulationFactPosition.Equals(Systemic.Rules.SimulationFactPosition other) -> bool
+Systemic.Rules.SimulationFactPosition.SimulationFactPosition() -> void
+Systemic.Rules.SimulationFactPosition.SimulationFactPosition(long X, long Y) -> void
+Systemic.Rules.SimulationFactPosition.X.get -> long
+Systemic.Rules.SimulationFactPosition.X.init -> void
+Systemic.Rules.SimulationFactPosition.Y.get -> long
+Systemic.Rules.SimulationFactPosition.Y.init -> void
+Systemic.Rules.SimulationFactValue
+Systemic.Rules.SimulationFactValue.Boolean.get -> bool
+Systemic.Rules.SimulationFactValue.Equals(Systemic.Rules.SimulationFactValue other) -> bool
+Systemic.Rules.SimulationFactValue.Integer.get -> long
+Systemic.Rules.SimulationFactValue.Kind.get -> Systemic.Rules.SimulationFactValueKind
+Systemic.Rules.SimulationFactValue.Number.get -> double
+Systemic.Rules.SimulationFactValue.SimulationFactValue() -> void
+Systemic.Rules.SimulationFactValue.Text.get -> string!
+Systemic.Rules.SimulationFactValueKind
+Systemic.Rules.SimulationFactValueKind.Boolean = 4 -> Systemic.Rules.SimulationFactValueKind
+Systemic.Rules.SimulationFactValueKind.Integer = 1 -> Systemic.Rules.SimulationFactValueKind
+Systemic.Rules.SimulationFactValueKind.None = 0 -> Systemic.Rules.SimulationFactValueKind
+Systemic.Rules.SimulationFactValueKind.Number = 2 -> Systemic.Rules.SimulationFactValueKind
+Systemic.Rules.SimulationFactValueKind.Text = 3 -> Systemic.Rules.SimulationFactValueKind
+Systemic.Save.IEntityStateCodec
+Systemic.Save.IEntityStateCodec.CanEncode(Systemic.Kernel.Entity! entity) -> bool
+Systemic.Save.IEntityStateCodec.Decode(System.Text.Json.JsonElement payload) -> Systemic.Kernel.Entity!
+Systemic.Save.IEntityStateCodec.Encode(Systemic.Kernel.Entity! entity) -> System.Text.Json.JsonElement
+Systemic.Save.IEntityStateCodec.Id.get -> string!
+Systemic.Save.ISaveMigration
+Systemic.Save.ISaveMigration.Apply(System.Text.Json.Nodes.JsonObject! document) -> void
+Systemic.Save.ISaveMigration.FromVersion.get -> int
+Systemic.Save.SystemicSaveCodec
+Systemic.Save.SystemicSaveCodec.Load(Systemic.Content.ContentPack! content, string! json) -> Systemic.Content.MaterializedContentWorld!
+Systemic.Save.SystemicSaveCodec.LoadFromFile(Systemic.Content.ContentPack! content, string! path) -> Systemic.Content.MaterializedContentWorld!
+Systemic.Save.SystemicSaveCodec.Save(Systemic.Host.SystemicGame! game) -> string!
+Systemic.Save.SystemicSaveCodec.SaveToFile(Systemic.Host.SystemicGame! game, string! path) -> void
+Systemic.Save.SystemicSaveCodec.SystemicSaveCodec(System.Collections.Generic.IEnumerable<Systemic.Save.IEntityStateCodec!>? entityCodecs = null, System.Collections.Generic.IEnumerable<Systemic.Save.ISaveMigration!>? migrations = null) -> void
+Systemic.Save.SystemicSaveException
+Systemic.Save.SystemicSaveException.SystemicSaveException(string! message, System.Exception? innerException = null) -> void
+Systemic.Save.SystemicSaveMigration
+Systemic.Ui.ISystemicUiBindingProvider
+Systemic.Ui.ISystemicUiBindingProvider.ResolveVisualState(string! binding, Systemic.Ui.SystemicUiBindingContext! context) -> string?
+Systemic.Ui.ISystemicUiBindingProvider.TryResolve(string! binding, Systemic.Ui.SystemicUiBindingContext! context, out Systemic.Ui.SystemicUiBindingValue value) -> bool
+Systemic.Ui.SystemicUiBindingContext
+Systemic.Ui.SystemicUiBindingContext.<Clone>$() -> Systemic.Ui.SystemicUiBindingContext!
+Systemic.Ui.SystemicUiBindingContext.Deconstruct(out Systemic.Kernel.World! World, out System.Collections.Immutable.ImmutableDictionary<string!, int>! EntityIds, out System.Collections.Immutable.ImmutableDictionary<string!, double>! Selection, out Systemic.Rules.SimulationFact? EventFact, out int? OwnerEntityId) -> void
+Systemic.Ui.SystemicUiBindingContext.EntityIds.get -> System.Collections.Immutable.ImmutableDictionary<string!, int>!
+Systemic.Ui.SystemicUiBindingContext.EntityIds.init -> void
+Systemic.Ui.SystemicUiBindingContext.Equals(Systemic.Ui.SystemicUiBindingContext? other) -> bool
+Systemic.Ui.SystemicUiBindingContext.EventFact.get -> Systemic.Rules.SimulationFact?
+Systemic.Ui.SystemicUiBindingContext.EventFact.init -> void
+Systemic.Ui.SystemicUiBindingContext.OwnerEntityId.get -> int?
+Systemic.Ui.SystemicUiBindingContext.OwnerEntityId.init -> void
+Systemic.Ui.SystemicUiBindingContext.Selection.get -> System.Collections.Immutable.ImmutableDictionary<string!, double>!
+Systemic.Ui.SystemicUiBindingContext.Selection.init -> void
+Systemic.Ui.SystemicUiBindingContext.SystemicUiBindingContext(Systemic.Kernel.World! World, System.Collections.Immutable.ImmutableDictionary<string!, int>! EntityIds, System.Collections.Immutable.ImmutableDictionary<string!, double>! Selection, Systemic.Rules.SimulationFact? EventFact, int? OwnerEntityId) -> void
+Systemic.Ui.SystemicUiBindingContext.World.get -> Systemic.Kernel.World!
+Systemic.Ui.SystemicUiBindingContext.World.init -> void
+Systemic.Ui.SystemicUiBindingValue
+Systemic.Ui.SystemicUiBindingValue.Deconstruct(out bool HasValue, out double? Number, out string? Text) -> void
+Systemic.Ui.SystemicUiBindingValue.Equals(Systemic.Ui.SystemicUiBindingValue other) -> bool
+Systemic.Ui.SystemicUiBindingValue.HasValue.get -> bool
+Systemic.Ui.SystemicUiBindingValue.HasValue.init -> void
+Systemic.Ui.SystemicUiBindingValue.Number.get -> double?
+Systemic.Ui.SystemicUiBindingValue.Number.init -> void
+Systemic.Ui.SystemicUiBindingValue.SystemicUiBindingValue() -> void
+Systemic.Ui.SystemicUiBindingValue.SystemicUiBindingValue(bool HasValue, double? Number, string? Text) -> void
+Systemic.Ui.SystemicUiBindingValue.Text.get -> string?
+Systemic.Ui.SystemicUiBindingValue.Text.init -> void
+virtual Systemic.Rules.SimulationFactObserver.Invoke(Systemic.Rules.SimulationFact fact, Systemic.Rules.SimulationFactEmitter emitter) -> void
+~override Systemic.Content.TuningValue.Equals(object obj) -> bool
+~override Systemic.Content.TuningValue.ToString() -> string
+~override Systemic.Host.FixedStepClockState.Equals(object obj) -> bool
+~override Systemic.Host.FixedStepClockState.ToString() -> string
+~override Systemic.Host.FixedStepResult.Equals(object obj) -> bool
+~override Systemic.Host.FixedStepResult.ToString() -> string
+~override Systemic.Host.SystemicTickResult.Equals(object obj) -> bool
+~override Systemic.Host.SystemicTickResult.ToString() -> string
+~override Systemic.Host.SystemTickStats.Equals(object obj) -> bool
+~override Systemic.Host.SystemTickStats.ToString() -> string
+~override Systemic.Rules.FactTypeId.Equals(object obj) -> bool
+~override Systemic.Rules.RuleCondition.Equals(object obj) -> bool
+~override Systemic.Rules.RuleCondition.ToString() -> string
+~override Systemic.Rules.RuleDispatchResult.Equals(object obj) -> bool
+~override Systemic.Rules.RuleDispatchResult.ToString() -> string
+~override Systemic.Rules.RuleEffect.Equals(object obj) -> bool
+~override Systemic.Rules.RuleEffect.ToString() -> string
+~override Systemic.Rules.RuleEventHistorySample.Equals(object obj) -> bool
+~override Systemic.Rules.RuleEventHistorySample.ToString() -> string
+~override Systemic.Rules.RuleRowScanResult.Equals(object obj) -> bool
+~override Systemic.Rules.RuleRowScanResult.ToString() -> string
+~override Systemic.Rules.RuleSubject.Equals(object obj) -> bool
+~override Systemic.Rules.SimulationFact.Equals(object obj) -> bool
+~override Systemic.Rules.SimulationFact.ToString() -> string
+~override Systemic.Rules.SimulationFactPayloadEntry.Equals(object obj) -> bool
+~override Systemic.Rules.SimulationFactPayloadEntry.ToString() -> string
+~override Systemic.Rules.SimulationFactPosition.Equals(object obj) -> bool
+~override Systemic.Rules.SimulationFactPosition.ToString() -> string
+~override Systemic.Rules.SimulationFactValue.Equals(object obj) -> bool
+~override Systemic.Rules.SimulationFactValue.ToString() -> string
+~override Systemic.Ui.SystemicUiBindingValue.Equals(object obj) -> bool
+~override Systemic.Ui.SystemicUiBindingValue.ToString() -> string

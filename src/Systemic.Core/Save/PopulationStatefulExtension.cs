@@ -4,7 +4,7 @@ using Systemic.Host;
 
 namespace Systemic.Save;
 
-internal sealed class PopulationStatefulExtension(World world) : ISystemicStatefulExtension
+internal sealed class PopulationStatefulExtension(World world) : ISaveOnlyStateExtension
 {
     public const string ExtensionId = "systemic.populations";
 

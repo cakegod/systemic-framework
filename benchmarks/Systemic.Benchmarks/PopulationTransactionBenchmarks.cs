@@ -10,6 +10,7 @@ public class PopulationTransactionBenchmarks
     private static readonly PopulationColumnKey<int> s_valueKey =
         new("benchmark.transaction.values", 1, PopulationCodecs.Int32);
     private World _world = null!;
+    private Population<TransactionBenchKind> _population = null!;
     private DoubleBufferedPopulationColumn<int> _values = null!;
     private int _count;
 
@@ -20,11 +21,11 @@ public class PopulationTransactionBenchmarks
     public void Setup()
     {
         _world = new World(seed: 1, valueScale: 1);
-        var population = _world.DefinePopulation<TransactionBenchKind>();
-        _values = population.DoubleBufferedColumn(s_valueKey);
-        population.Reserve(Population);
-        population.AddRange(Population);
-        _count = population.Count;
+        _population = _world.DefinePopulation<TransactionBenchKind>();
+        _values = _population.DoubleBufferedColumn(s_valueKey);
+        _population.Reserve(Population);
+        _population.AddRange(Population);
+        _count = _population.Count;
         for (var iteration = 0; iteration < 10; iteration++)
         {
             CommitFullRange();
@@ -41,7 +42,9 @@ public class PopulationTransactionBenchmarks
     private void CommitFullRange()
     {
         using var transaction = _world.BeginTransaction();
-        _values.EditNext(0, _count).Fill(1);
+        _population.WithAccess(new PopulationRange(0, _count), _values,
+            static (DoubleBufferedPopulationColumn<int> values, scoped ref PopulationAccessScope<TransactionBenchKind> scope) =>
+                scope.EditNext(values).Fill(1));
         _values.Swap();
         transaction.Commit();
     }
@@ -49,7 +52,9 @@ public class PopulationTransactionBenchmarks
     private void CommitSparseRange()
     {
         using var transaction = _world.BeginTransaction();
-        _values.EditNext(0, 1)[0]++;
+        _population.WithAccess(new PopulationRange(0, 1), _values,
+            static (DoubleBufferedPopulationColumn<int> values, scoped ref PopulationAccessScope<TransactionBenchKind> scope) =>
+                scope.EditNext(values)[0]++);
         _values.Swap();
         transaction.Commit();
     }

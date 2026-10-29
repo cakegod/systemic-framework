@@ -61,7 +61,26 @@ public sealed class SystemicSaveCodecTests
     }
 
     [Fact]
-    public void Version_one_save_migrates_sequentially_and_adds_presentation_metadata()
+    public void Round_trip_at_tick_zero_preserves_absolute_modifier_and_grant_expiry()
+    {
+        var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
+        var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 21, valueScale: 1)).Build();
+        var ore = game.World.ById(game.EntityId("quarry.ore"))!;
+        game.World.SetModifier("test.bonus", ore, "balance", ModifierOperation.Add, 4, remainingTicks: 12);
+        game.World.Grant("test.grant", ore, GrantKind.Tag, "energized", remainingTicks: 5);
+        var expectedModifierExpiry = Assert.Single(game.World.Modifiers).ExpiryTick;
+        var expectedGrantExpiry = Assert.Single(game.World.Grants).ExpiryTick;
+
+        var codec = new SystemicSaveCodec();
+        var loaded = codec.Load(content, codec.Save(game));
+
+        Assert.Equal(0, loaded.World.LogicalTick);
+        Assert.Equal(expectedModifierExpiry, Assert.Single(loaded.World.Modifiers).ExpiryTick);
+        Assert.Equal(expectedGrantExpiry, Assert.Single(loaded.World.Grants).ExpiryTick);
+    }
+
+    [Fact]
+    public void Version_one_save_is_rejected_with_a_current_version_diagnostic()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 3, valueScale: 1)).Build();
@@ -71,11 +90,9 @@ public sealed class SystemicSaveCodecTests
         root.Remove("presentation");
         root.Remove("extensionStates");
 
-        var loaded = codec.Load(content, root.ToJsonString());
-
-        var migratedGame = new SystemicGameBuilder(content, loaded).Build();
-        Assert.Equal(0, migratedGame.PresentationIdentity().VisualRootSeed);
-        Assert.Equal(0, migratedGame.PresentationIdentity().NextActorVisualId);
+        var error = Assert.Throws<SystemicSaveException>(() => codec.Load(content, root.ToJsonString()));
+        Assert.Contains($"version {SystemicSaveCodec.CurrentSchemaVersion}", error.Message,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -122,7 +139,12 @@ public sealed class SystemicSaveCodecTests
                 [RuleCondition.FromExpression(ExpressionCompiler.Compile("event_count('history.observed', 10) > 0"))],
                 [RuleEffect.AdjustProperty(RuleSubject.Target, "balance", 1)])
         ]);
-        var content = sourceContent with { Rules = rules };
+        var content = sourceContent with
+        {
+            Rules = rules,
+            ContentFingerprint = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(sourceContent.ContentFingerprint + ":history.report-v1")))
+        };
         var host = HeadlessSystemicHost.Create(content, seed: 9);
         var oreId = host.Game.EntityId("quarry.ore");
         host.Publish(new SimulationFact("history.observed", oreId, oreId));
@@ -180,7 +202,6 @@ public sealed class SystemicSaveCodecTests
     {
         public string Id => "test.counter";
         public int Value { get; set; }
-        public void Register(EngineBuilder _) { }
         public JsonElement CaptureState() => JsonSerializer.SerializeToElement(Value);
         public void RestoreState(JsonElement state) => Value = state.GetInt32();
     }
@@ -190,8 +211,7 @@ public sealed class SystemicSaveCodecTests
         public string Id => "test.stateful-system";
         public int Order => 10;
         public int Value { get; set; }
-        public void Register(EngineBuilder _) { }
-        public void Step(SystemicStepContext context) => Value++;
+        public void Step(SystemicSystemContext context) => Value++;
         public JsonElement CaptureState() => JsonSerializer.SerializeToElement(Value);
         public void RestoreState(JsonElement state) => Value = state.GetInt32();
     }

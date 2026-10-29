@@ -69,6 +69,25 @@ public sealed class DeterministicSystemScheduleTests
     }
 
     [Fact]
+    public void Scheduled_world_commands_cannot_flush_manually_to_another_world()
+    {
+        var scheduledWorld = new World(seed: 1, valueScale: 1);
+        var otherWorld = new World(seed: 2, valueScale: 1);
+        var entity = new DataEntity([], []);
+        var system = new TestSystem("manual-flush", [SystemAccess.DeferWorldWrites], context =>
+        {
+            context.Commands.Add(entity);
+            context.Commands.Flush(otherWorld);
+        });
+        using var schedule = new DeterministicSystemScheduleBuilder().Add(system).Build();
+
+        Assert.Throws<InvalidOperationException>(() => schedule.Execute(scheduledWorld, tick: 1));
+
+        Assert.Null(otherWorld.ById(1));
+        Assert.Null(scheduledWorld.ById(1));
+    }
+
+    [Fact]
     public void Failure_after_a_barrier_rolls_back_all_world_writes()
     {
         var world = new World(seed: 1, valueScale: 1);

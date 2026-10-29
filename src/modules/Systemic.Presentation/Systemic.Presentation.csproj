@@ -5,6 +5,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="4.154.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.154.0"
+                      Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../Systemic.Kernel/Systemic.Kernel.csproj" />
     <ProjectReference Include="../../Systemic.Core/Systemic.Core.csproj" />
   </ItemGroup>

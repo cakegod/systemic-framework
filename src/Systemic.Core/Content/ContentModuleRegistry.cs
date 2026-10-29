@@ -17,6 +17,11 @@ public interface ISystemicContentModule
     void Configure(SystemicGameBuilder builder, ISystemicModuleContent content);
 }
 
+/// <summary>
+/// Module compilation inputs. Use these readers for pack files so their exact bytes
+/// become part of the pack's content fingerprint. Other inputs require a caller-supplied
+/// fingerprint on the resulting <see cref="ContentPack"/>.
+/// </summary>
 public sealed class ContentModuleContext(
     string rootDirectory,
     GameManifest manifest,
@@ -43,10 +48,12 @@ public sealed class ContentModuleContext(
     public string? EntitiesSourceFile { get; } = entitiesSourceFile;
     public string? RulesSourceFile { get; } = rulesSourceFile;
 
+    internal ContentFingerprintBuilder? Fingerprint { get; init; }
+
     public JsonElement ReadJson(string relativePath)
     {
         var path = ResolveContentPath(relativePath);
-        var bytes = ContentFileReader.ReadBytes(path, relativePath);
+        var bytes = ContentFileReader.ReadBytes(path, relativePath, Fingerprint);
         try
         {
             return ParseJson(bytes);
@@ -123,8 +130,8 @@ public sealed class ContentModuleContext(
         {
             var path = ResolveContentPath(relativePath);
             var bytes = schema is { } contentSchema
-                ? ContentFileReader.ReadValidatedBytes(path, relativePath, contentSchema.Key, contentSchema.Text)
-                : ContentFileReader.ReadBytes(path, relativePath);
+                ? ContentFileReader.ReadValidatedBytes(path, relativePath, contentSchema.Key, contentSchema.Text, Fingerprint)
+                : ContentFileReader.ReadBytes(path, relativePath, Fingerprint);
             return JsonSerializer.Deserialize<T>(bytes, s_jsonOptions)
                 ?? throw new ContentPackException($"Module content file '{relativePath}' is empty.", fieldPath);
         }
@@ -156,7 +163,7 @@ public sealed class ContentModuleContext(
         try
         {
             var path = ResolveContentPath(relativePath);
-            var bytes = ContentFileReader.ReadValidatedBytes(path, relativePath, schemaKey, schemaText);
+            var bytes = ContentFileReader.ReadValidatedBytes(path, relativePath, schemaKey, schemaText, Fingerprint);
             return ParseJson(bytes);
         }
         catch (ContentPackException exception) when (exception.FieldPath is null && exception.Diagnostics.IsEmpty)
@@ -242,6 +249,7 @@ public sealed class ContentReferenceCatalog
 public sealed class ContentModuleRegistry
 {
     private readonly Dictionary<string, ISystemicContentModule> _modules = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ContentTuningSchema> _tuningSchemas = new(StringComparer.Ordinal);
 
     public ContentModuleRegistry Add(ISystemicContentModule module)
     {
@@ -254,6 +262,48 @@ public sealed class ContentModuleRegistry
 
         return this;
     }
+
+    /// <summary>Registers a strict tuning schema for one entity in the pack's entities file.</summary>
+    public ContentModuleRegistry AddTuningSchema(string entityId, ContentTuningSchema schema)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(entityId);
+        ArgumentNullException.ThrowIfNull(schema);
+        if (!_tuningSchemas.TryAdd(entityId, schema))
+        {
+            throw new InvalidOperationException($"A tuning schema for entity '{entityId}' is already registered.");
+        }
+
+        return this;
+    }
+
+    internal ImmutableDictionary<string, TuningDocument> CompileTunings(ReadOnlyMemory<byte> entitiesJson,
+        string sourceFile, CompiledEntities entities)
+    {
+        var documents = ImmutableDictionary.CreateBuilder<string, TuningDocument>(StringComparer.Ordinal);
+        var diagnostics = ImmutableArray.CreateBuilder<ContentTuningDiagnostic>();
+        var definitions = entities.Definitions.ToDictionary(definition => definition.Id, StringComparer.Ordinal);
+        foreach (var (entityId, schema) in _tuningSchemas.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            try
+            {
+                documents.Add(entityId, schema.ParseEntity(entitiesJson, sourceFile, entityId,
+                    definitions.GetValueOrDefault(entityId)));
+            }
+            catch (ContentTuningException exception)
+            {
+                diagnostics.AddRange(exception.Diagnostics);
+            }
+        }
+
+        if (diagnostics.Count > 0)
+        {
+            throw new ContentTuningException(diagnostics);
+        }
+
+        return documents.ToImmutable();
+    }
+
+    internal bool HasTuningSchemas => _tuningSchemas.Count != 0;
 
     internal ImmutableArray<CompiledSystemicModule> CompileDeclared(
         ContentModuleContext context,

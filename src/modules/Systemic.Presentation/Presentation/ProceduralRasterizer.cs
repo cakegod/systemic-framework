@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using SkiaSharp;
 using Systemic.Content;
 
 namespace Systemic.Presentation;
@@ -6,9 +7,11 @@ namespace Systemic.Presentation;
 /// <summary>Deterministic, engine-neutral pixel rasterization for declarative visual recipes.</summary>
 public static class ProceduralRasterizer
 {
-    public const int GeneratorVersion = 2;
+    public const int GeneratorVersion = 3;
     public const long MaximumPixelWork = 16_777_216;
     private const ulong LayerSeedStep = 0x9E3779B97F4A7C15UL;
+    private static readonly SKSamplingOptions NearestSampling =
+        new(SKFilterMode.Nearest, SKMipmapMode.None);
 
     public static PixelBuffer Rasterize(VisualRecipe recipe, ulong variantSeed = 0, string? visualState = null) =>
         RasterizeCore(recipe, variantSeed, visualState, assetProvider: null, missingAssets: null, usedAssets: null);
@@ -40,9 +43,21 @@ public static class ProceduralRasterizer
             return imported;
         }
 
-        var pixels = imported is not null && recipe.ImportedMode == ImportedAssetMode.Underlay
-            ? imported.Pixels.ToArray()
-            : new byte[checked(width * height * 4)];
+        using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Transparent);
+        if (imported is not null && recipe.ImportedMode == ImportedAssetMode.Underlay)
+        {
+            DrawImage(canvas, imported, 0, 0);
+        }
+
+        using var fill = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
+        using var stroke = new SKPaint
+        {
+            IsAntialias = false,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1,
+        };
 
         for (var layerIndex = 0; layerIndex < recipe.Layers.Length; layerIndex++)
         {
@@ -59,18 +74,22 @@ public static class ProceduralRasterizer
             var y = ToPixel(layer.Y) + jitterY;
             var layerWidth = ToPixel(layer.Width);
             var layerHeight = ToPixel(layer.Height);
-            var color = ParseColor(recipe.Palette[layer.Color]);
+            var color = ToSkColor(ParseColor(recipe.Palette[layer.Color]));
+            var bounds = SKRect.Create(x, y, layerWidth, layerHeight);
 
             switch (layer.Shape)
             {
                 case "rect":
-                    FillRectangle(pixels, width, height, x, y, layerWidth, layerHeight, color);
+                    fill.Color = color;
+                    canvas.DrawRect(bounds, fill);
                     break;
                 case "ellipse":
-                    FillEllipse(pixels, width, height, x, y, layerWidth, layerHeight, color);
+                    fill.Color = color;
+                    canvas.DrawOval(bounds, fill);
                     break;
                 case "line":
-                    DrawLine(pixels, width, height, x, y, x + layerWidth, y + layerHeight, color);
+                    stroke.Color = color;
+                    canvas.DrawLine(x, y, x + layerWidth, y + layerHeight, stroke);
                     break;
                 default:
                     throw new ArgumentException($"Unsupported visual shape '{layer.Shape}'.", nameof(recipe));
@@ -83,15 +102,24 @@ public static class ProceduralRasterizer
             var partPixels = RasterizeCore(part.Recipe,
                 Mix(variantSeed + ((ulong)partIndex * LayerSeedStep)), visualState,
                 assetProvider, missingAssets, usedAssets);
-            CompositePart(pixels, width, height, part, partPixels);
+            DrawImage(canvas, partPixels, part.X, part.Y, scale: part.Scale);
         }
 
         if (imported is not null && recipe.ImportedMode == ImportedAssetMode.Overlay)
         {
-            CompositeOver(pixels, width, imported);
+            DrawImage(canvas, imported, 0, 0);
         }
 
-        return new PixelBuffer(width, height, pixels, takeOwnership: true);
+        return new PixelBuffer(width, height, bitmap.Bytes, takeOwnership: true);
+    }
+
+    private static void DrawImage(SKCanvas canvas, PixelBuffer image, int x, int y, int scale = 1)
+    {
+        using var source = new SKBitmap(new SKImageInfo(image.Width, image.Height, SKColorType.Rgba8888,
+            SKAlphaType.Unpremul));
+        image.Pixels.Span.CopyTo(source.GetPixelSpan());
+        var destination = SKRect.Create(x, y, image.Width * scale, image.Height * scale);
+        canvas.DrawBitmap(source, destination, NearestSampling);
     }
 
     private static PixelBuffer? ResolveImportedAsset(
@@ -122,17 +150,6 @@ public static class ProceduralRasterizer
         }
 
         return null;
-    }
-
-    private static void CompositeOver(byte[] destination, int destinationWidth, PixelBuffer source)
-    {
-        for (var y = 0; y < source.Height; y++)
-        {
-            for (var x = 0; x < source.Width; x++)
-            {
-                BlendPixel(destination, destinationWidth, x, y, source.GetPixel(x, y));
-            }
-        }
     }
 
     private static void Validate(VisualRecipe recipe)
@@ -233,158 +250,9 @@ public static class ProceduralRasterizer
         return (int)(state % (uint)(jitterPixels * 2 + 1)) - jitterPixels;
     }
 
-    private static void FillRectangle(byte[] pixels, int width, int height, int x, int y, int shapeWidth, int shapeHeight, Rgba32 color)
-    {
-        var left = Math.Max(x, 0);
-        var top = Math.Max(y, 0);
-        var right = Math.Min(x + shapeWidth, width);
-        var bottom = Math.Min(y + shapeHeight, height);
-        for (var py = top; py < bottom; py++)
-        {
-            for (var px = left; px < right; px++)
-            {
-                BlendPixel(pixels, width, px, py, color);
-            }
-        }
-    }
-
-    private static void FillEllipse(byte[] pixels, int width, int height, int x, int y, int shapeWidth, int shapeHeight, Rgba32 color)
-    {
-        if (shapeWidth <= 0 || shapeHeight <= 0)
-        {
-            return;
-        }
-
-        var left = Math.Max(x, 0);
-        var top = Math.Max(y, 0);
-        var right = Math.Min(x + shapeWidth, width);
-        var bottom = Math.Min(y + shapeHeight, height);
-        var centerX = x + shapeWidth / 2.0;
-        var centerY = y + shapeHeight / 2.0;
-        var radiusX = Math.Max(shapeWidth / 2.0, 0.5);
-        var radiusY = Math.Max(shapeHeight / 2.0, 0.5);
-        for (var py = top; py < bottom; py++)
-        {
-            var dy = ((py + 0.5) - centerY) / radiusY;
-            for (var px = left; px < right; px++)
-            {
-                var dx = ((px + 0.5) - centerX) / radiusX;
-                if ((dx * dx) + (dy * dy) <= 1.0)
-                {
-                    BlendPixel(pixels, width, px, py, color);
-                }
-            }
-        }
-    }
-
-    private static void DrawLine(byte[] pixels, int width, int height, int x0, int y0, int x1, int y1, Rgba32 color)
-    {
-        var dx = Math.Abs(x1 - x0);
-        var sx = x0 < x1 ? 1 : -1;
-        var dy = -Math.Abs(y1 - y0);
-        var sy = y0 < y1 ? 1 : -1;
-        var error = dx + dy;
-        while (true)
-        {
-            if ((uint)x0 < (uint)width && (uint)y0 < (uint)height)
-            {
-                BlendPixel(pixels, width, x0, y0, color);
-            }
-
-            if (x0 == x1 && y0 == y1)
-            {
-                break;
-            }
-
-            var doubledError = 2 * error;
-            if (doubledError >= dy)
-            {
-                error += dy;
-                x0 += sx;
-            }
-
-            if (doubledError <= dx)
-            {
-                error += dx;
-                y0 += sy;
-            }
-        }
-    }
-
-    private static void CompositePart(byte[] destination, int destinationWidth, int destinationHeight,
-        VisualPart part, PixelBuffer source)
-    {
-        for (var sourceY = 0; sourceY < source.Height; sourceY++)
-        {
-            var targetY = part.Y + (sourceY * part.Scale);
-            if (targetY >= destinationHeight || targetY + part.Scale <= 0)
-            {
-                continue;
-            }
-
-            for (var sourceX = 0; sourceX < source.Width; sourceX++)
-            {
-                var targetX = part.X + (sourceX * part.Scale);
-                if (targetX >= destinationWidth || targetX + part.Scale <= 0)
-                {
-                    continue;
-                }
-
-                var sourcePixel = source.GetPixel(sourceX, sourceY);
-                for (var offsetY = 0; offsetY < part.Scale; offsetY++)
-                {
-                    var y = targetY + offsetY;
-                    if ((uint)y >= (uint)destinationHeight)
-                    {
-                        continue;
-                    }
-
-                    for (var offsetX = 0; offsetX < part.Scale; offsetX++)
-                    {
-                        var x = targetX + offsetX;
-                        if ((uint)x < (uint)destinationWidth)
-                        {
-                            BlendPixel(destination, destinationWidth, x, y, sourcePixel);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private static void BlendPixel(byte[] pixels, int width, int x, int y, Rgba32 source)
-    {
-        var index = ((y * width) + x) * 4;
-        if (source.A == byte.MaxValue)
-        {
-            pixels[index] = source.R;
-            pixels[index + 1] = source.G;
-            pixels[index + 2] = source.B;
-            pixels[index + 3] = source.A;
-            return;
-        }
-
-        if (source.A == 0)
-        {
-            return;
-        }
-
-        var destinationAlpha = pixels[index + 3];
-        var inverseAlpha = 255 - source.A;
-        var outputAlpha = source.A + ((destinationAlpha * inverseAlpha + 127) / 255);
-        pixels[index] = BlendChannel(source.R, pixels[index], source.A, destinationAlpha, inverseAlpha, outputAlpha);
-        pixels[index + 1] = BlendChannel(source.G, pixels[index + 1], source.A, destinationAlpha, inverseAlpha, outputAlpha);
-        pixels[index + 2] = BlendChannel(source.B, pixels[index + 2], source.A, destinationAlpha, inverseAlpha, outputAlpha);
-        pixels[index + 3] = (byte)outputAlpha;
-    }
-
-    private static byte BlendChannel(byte source, byte destination, int sourceAlpha, int destinationAlpha, int inverseAlpha, int outputAlpha)
-    {
-        var premultiplied = (source * sourceAlpha) + ((destination * destinationAlpha * inverseAlpha + 127) / 255);
-        return (byte)((premultiplied + outputAlpha / 2) / outputAlpha);
-    }
-
     private static int ToPixel(float value) => (int)MathF.Round(value, MidpointRounding.AwayFromZero);
+
+    private static SKColor ToSkColor(Rgba32 color) => new(color.R, color.G, color.B, color.A);
 
     private static Rgba32 ParseColor(string color)
     {

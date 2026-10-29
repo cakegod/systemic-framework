@@ -1,0 +1,64 @@
+# Glow Garden
+
+A single-screen incremental colony sample on a 1920×1280 garden. Noise-generated thickets break up the ground into organic shapes that workers must walk around, and pods grow scattered across the whole map rather than ringed around the colony. Pink Burstlings scout for ripe pods and burst them into physical Glow; blue Gatherers forage on foot, following the scent trails that bursts and pickups leave between food and home, carrying bounded loads back to the colony. Workers perceive only their local surroundings: with nothing in sight they walk their own heading, and only after a long fruitless search do they query for a distant target. The colony starts with 30 Glow; new Glow is added to the spendable balance when Gatherers return it. Yellow dots below a Gatherer show its actual carried load; shadows and leap height follow worker movement. Burst rings, Echo sparks, seed flashes and combo flashes are Presentation-module cues driven by authored fact timelines, not by renderer polling. Small green and purple dots still mark pending seeds and delayed Echo impacts.
+
+## Run
+
+Requires .NET 10; graphics require MonoGame DesktopGL's SDL/OpenGL native support and a display. Gum.MonoGame **2026.5.8.1** supplies packaged default fonts/visuals. All interface controls are built in C# Forms following the MonoGame Gum tutorial, without the Gum editor or a content compiler. Plants, workers, motes, thickets and scene art are generated procedurally. The fixed window is 1280×800; a reusable `PresentationViewport` maps the 1920×1280 world into the garden panel, with worker, pod and mote sprites sized for that zoom.
+
+```sh
+dotnet run --project samples/glow-garden -c Release
+dotnet run --project samples/glow-garden -c Release -- --headless --ticks 3600 --seed 42
+dotnet run --project samples/glow-garden -c Release -- --verify-render --seed 42 --screenshot /tmp/glow-garden.png
+dotnet test tests/Systemic.GlowGarden.Tests -c Release
+```
+
+`--headless` runs finite seeded autoplay on the actual host: it selects Seedstorm, Magnetism and Echo, hires alternating workers and buys growth using only available Glow. It reports real bursts, deposits, loose/carried Glow and counts, and exits nonzero if no production or deposit occurred. Short tick counts can intentionally fail this workflow. `--ticks` accepts 1..100000 and requires headless mode; `--seed` accepts any 32-bit integer. Unknown, duplicate, missing and conflicting arguments fail with usage text. The default seed is 42 and headless duration is 3600 ticks.
+
+`--verify-render` selects Echo, Seedstorm and Magnetism, runs 480 frames at 4×, checks actual production/deposits and color diversity in separate garden and UI regions, optionally saves the rendered frame as PNG, and exits. This detects blank rendering; manual screenshot and pointer checks remain necessary for readability and interaction. It is a finite graphics smoke, not a performance benchmark. In a Linux virtual display use e.g. `DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 SDL_AUDIODRIVER=dummy` with a provisioned display server.
+
+## Controls
+
+Every action has a labeled Gum button. Tab/Shift+Tab moves focus; Enter activates a focused button. Space is reserved for global pause.
+
+| Keys | Action |
+| --- | --- |
+| B / G | Hire Burstling / Gatherer at shown cost |
+| 1 / 2 / 3 | Burstling work rate / Gatherer speed / capacity |
+| 4 / 5 | Pod growth / yield |
+| X | Toggle single purchase / buy maximum affordable ranks |
+| C / M | Refund exactly the Creatures / Magic & Growth tree's investment |
+| Q / W / E | Toggle Echo / Seedstorm / Magnetism |
+| A / S / D | Toggle Chain Reaction / Living Projectile / Clone |
+| F3 | Toggle scheduler, timing, walkability and scent diagnostics |
+| Space / F | Pause or resume / cycle 1×, 2×, 4× speed |
+| R / Esc | Fresh restart with the same seed / quit |
+| F5 / F9 | Save / load the garden session |
+
+Hiring prices rise with worker count. Repeatable upgrades cap at rank 25. Work rate reduces Burstling cooldown from 30 ticks to at least 3; speed starts at 3 pixels/tick with +0.3 per rank; capacity starts at 3 Glow with +1 per rank. Growth starts at one pod per 240 ticks, increasing by 12% of base per rank; yield starts at 8 motes and increases by 2 per rank. Each upgrade displays its next price. Bulk buying stops at affordability or rank cap. Each refund returns that tree's exact accumulated costs once; workers, other-tree ranks, talents and carried loads survive. Refunds never reset the lifetime banked counter.
+
+All six talents are available immediately, with at most three active. Turn one off to free a slot. Echo schedules a nearby delayed burst; Seedstorm establishes new plants; Magnetism attracts loose Glow; Chain Reaction bursts nearby ripe pods; Living Projectile bounces a worker to another ripe pod; Clone creates temporary Burstling copies after successful combos. Talent buttons show descriptions, active state and how many reactions the authored rules have selected. The top balance is spendable Glow; lifetime banked counts actual deposits independently of purchases/refunds. The work upgrade shows the current rest between actions in seconds; yield shows Glow per pod. The lower garden panel separates cumulative pod production, loose Glow, carried loads and returned Glow. It also shows average pods/second and banked Glow/second since restart, using simulated game time (zero before time advances). Pausing freezes that time basis; speed changes how quickly it advances.
+
+## Architecture and limits
+
+`GardenGame` uses `GardenHost.Game.Advance(elapsed)` for Systemic fixed-step execution, while headless uses the same host's `Step`. `GardenSession.Restart` disposes and replaces the entire host, clock and World. UI callbacks always resolve the current host; restart neither recreates graphics resources nor retains old model commands. Gum is initialized with V3 default visuals and updated/drawn through `GumService.Default`. Explicit absolute control dimensions and a dark palette keep all controls visible at the fixed window size. F5/F9 use the Core save codec to persist and restore the sample session.
+
+Plants, creatures (including temporary-copy lifetime) and motes live in authoritative Kernel populations with generated typed columns. The public renderer views project those live columns, with stable IDs independent of dense rows. `World.Draws` drives initialization and serial domain randomness; parallel scouting uses the keyed counter-based factory. Actual bursts, collection and deposits publish facts; authored Core rules select talent reactions by active tags. Fact observers enqueue bounded domain intents, which drain at the end of the step outside rule dispatch. UI never forks this model or synthesizes talent effects.
+
+Per-worker work is a scheduled system. Each tick rebuilds `PopulationSpatialGrid2D` indexes for plants and motes, then decides worker movement over disjoint row ranges with `ForEachRange`; the pass reads shared grids and writes only row-indexed decision arrays, so it publishes nothing and changes no population structure. Bursts, mote pickups and deposits then resolve serially in row order, which keeps first-come collection and stable fact order regardless of worker count. Target selection remains a Garden-specific expanding-radius query, though the framework now also exposes nearest and k-nearest queries. Magnetism rebuilds one creature grid and queries it once per mote, so its cost grows with motes and nearby creatures.
+
+Terrain is generated once per seed: two octaves of value noise become an 8 px walkability field, and a flood fill from the colony carves a corridor into any pocket it cannot reach, so the free space is always one connected region and no pod is ever sealed off. Workers test the cell they step into and slide along the edge; when the direct line stays blocked they commit to one side of the thicket and follow the boundary, and after 90 ticks of that they change tack instead of pressing on. Rendering bakes the same field into a quarter-resolution texture with linear filtering, so the visual edge is smooth even though movement is cell-exact.
+
+Foraging is local, not omniscient. A worker perceives ripe pods or loose Glow only inside `garden.worker.scoutRadius`; with nothing in sight it follows a trail or walks its stored heading, turning on its own cadence. After `garden.worker.patience` fruitless ticks, it repeats a full-map nearest-target query each tick while no local target is visible; changing plants, motes or ripeness can change the selected target. Bursts and pickups stamp `GardenScent`, a coarse float grid whose trail tapers from the food end toward the colony, so climbing the gradient always means moving toward food. The grid decays by `garden.trail.decay` each tick and values below `garden.trail.threshold` are ignored, so a trail recruits workers onto fresh food and fades once the pod has been stripped. Scouting turns use the versioned counter-based random factory keyed by stable creature ID and tick, so worker counts and scheduler order do not change those draws.
+
+Talent and worker tuning is content, not code: delay, expiry, radius, offset, pull, burst limit, clone lifetime, talent slots and forage settings are declared in `GardenTuning.Schema`, validated against the `garden` entity in `entities.json`, and resolved once into an immutable typed snapshot. The schema supplies defaults and ranges; the simulation does not perform per-tick string property lookups. `garden.seedstorm.offset` is the minimum distance between a seed and its parent pod, because seeds otherwise land anywhere in the garden. Each talent rule owns its accounting through an `adjustProperty` effect on a `garden.talent.<name>.uses` property, so removing a rule removes its reaction and counter increment; the stored property can be removed separately. The per-tick `garden.tick` pulse is an authored schedule in `rules.json`, not a system publish. Spatial consequences (moving workers, bursting pods, spawning motes) still belong to the domain system because Core rules cannot address populations; content owns selection, parameters, accounting and cadence.
+
+Feedback comes from the optional Presentation module. `presentation.json` declares timelines and bindings for bursts, Echo, Seedstorm and combo reactions. Garden rounds impact coordinates to integer pixels when it publishes fact positions; the presentation runtime uses them as cue anchors, including for rule-emitted reactions. Local reaction context retains the original subpixel `Vector2` positions. The MonoGame host reads commit-gated cues through a bounded `PresentationCueWindow`, samples each timeline at the current age for position, scale, opacity and visual state, rasterizes the referenced recipe once per state and draws it with the timeline's particle count. Magnetism emits no cue because it reacts every tick; its feedback is the visible mote motion.
+
+Caps: 1000 hired workers, 128 temporary copies, 64 plants, 12000 motes, 256 delayed impacts and 8192 talent intents per tick; chain depth is three with at most 16 bursts per originating reaction. Excess creation stops at these bounds.
+
+On the current build, two local Release runs of `--headless --ticks 3600 --seed 42` produced the same result: 258 bursts, 448 banked Glow, 27 spendable Glow, 1,605 loose Glow, 11 carried Glow, 64 plants and 16 workers. This is a seeded observation on one x64 runtime, not a cross-platform replay guarantee. Nine founding workers and the authored growth/scouting settings keep production active; loose Glow accumulating faster than a small crew can carry it is the intended foraging tradeoff, and hiring or capacity upgrades address it.
+
+The shipped caps are 1,000 hired workers and 64 plants. Magnetism performs creature-grid work for each mote, so its cost rises with both populations. The older 50k-worker timings recorded during initial prototyping lack a reproducible environment and workload report and have not been remeasured on this build. The separate million-row benchmark in `docs/million-agent-benchmark.md` measures a single-threaded integer movement loop, not this game. No 60 Hz performance claim is made for extreme-density Garden simulations.
+
+The Core save codec persists world, entity and population data directly; registered extensions persist clock, rule-history and Garden domain state. The save file is versioned, bound to the content fingerprint and checksummed; F5 writes atomically and F9 restores the session. Progression commands also register Garden-state rollback when invoked inside a World transaction. Presentation cues are transient and are not part of the saved garden state. Prestige, Channelers, audio, networking and live content replacement remain deferred. The reusable content reload API can validate a candidate pack but does not swap the active host or migrate a running session.

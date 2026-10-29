@@ -113,6 +113,22 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
+    public void Explicit_fact_position_anchors_presentation_and_emitted_reactions()
+    {
+        var host = HeadlessSystemicHost.Create(ContentWithCueRules(), seed: 81);
+        var sourceId = host.Game.EntityId("quarry.ember-source");
+        var targetId = host.Game.EntityId("quarry.ore");
+        host.Game.World.SetSpatialBounds(host.Game.World.ById(targetId)!, new Bounds2(20, 30, 2, 2));
+
+        host.Publish(new SimulationFact("cue.start", sourceId, targetId, Position: new(123, -45)));
+
+        Assert.True(host.Game.PresentationCues().TryDequeue(out var start));
+        Assert.True(host.Game.PresentationCues().TryDequeue(out var chain));
+        Assert.Equal(new Point2(123, -45), start.AnchorPosition);
+        Assert.Equal(new Point2(123, -45), chain.AnchorPosition);
+    }
+
+    [Fact]
     public void Cue_publication_waits_for_the_enclosing_world_transaction()
     {
         var host = HeadlessSystemicHost.Create(ContentWithCueRules(), seed: 811);
@@ -202,6 +218,8 @@ public sealed class PresentationPipelineTests
         var stableContent = rollbackContent with
         {
             Rules = new CompiledRuleSet([]),
+            ContentFingerprint = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(sampleContent.ContentFingerprint + ":presentation-cue-test-v1"))),
         };
         var firstHost = HeadlessSystemicHost.Create(stableContent, seed: 84);
         var restoredHost = HeadlessSystemicHost.Restore(stableContent, firstHost.Save());

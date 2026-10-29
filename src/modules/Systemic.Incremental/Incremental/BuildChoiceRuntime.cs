@@ -6,8 +6,11 @@ using Systemic.Rules;
 
 namespace Systemic.Incremental;
 
-public sealed class BuildChoiceRuntime : ISystemicSystem, ISystemicStatefulExtension
+public sealed class BuildChoiceRuntime : ISystemicSystem, ISaveOnlyStateExtension
 {
+    // Free-choice selection writes immediately, so the runtime keeps the exclusive wave it would get by default.
+    private static readonly ImmutableArray<SystemAccess> s_access = [SystemAccess.WriteWorld];
+
     private const int MaximumAdditionalOwners = 1024;
     private const int MaximumAdditionalChoiceInstances = 65_536;
     private readonly BuildChoiceCatalog _catalog;
@@ -18,6 +21,8 @@ public sealed class BuildChoiceRuntime : ISystemicSystem, ISystemicStatefulExten
     private readonly Dictionary<string, int> _choiceEntityIds;
     private readonly Dictionary<string, int> _ownerEntityIds;
     private readonly Dictionary<string, int> _progressEntityIds;
+    // WHY: save-only state. Every owner added during a tick registers its removal on the World
+    // transaction, so a rolled-back tick restores these indexes without a per-tick snapshot.
     private readonly Dictionary<(string ChoiceId, int OwnerEntityId), int> _choiceInstanceEntityIds = [];
     private readonly Dictionary<(string GroupId, int OwnerEntityId), int> _progressEntityIdsByOwner = [];
     private readonly Dictionary<string, List<int>> _ownersByGroup;
@@ -93,6 +98,9 @@ public sealed class BuildChoiceRuntime : ISystemicSystem, ISystemicStatefulExten
 
     public string Id => "systemic.build-choices";
     public int Order { get; }
+
+    /// <summary>Free-choice selection mutates World state immediately, which requires exclusive access.</summary>
+    public IReadOnlyList<SystemAccess> Access => s_access;
 
     public bool TryGetState(string choiceId, out BuildChoiceState state)
     {
@@ -177,12 +185,21 @@ public sealed class BuildChoiceRuntime : ISystemicSystem, ISystemicStatefulExten
 
         var clonedInstances = new Dictionary<string, int>(groupChoices.Length, StringComparer.Ordinal);
         using var transaction = _world.BeginTransaction();
+        transaction.OnRollback(() =>
+        {
+            _ownersByGroup[groupId].Remove(ownerEntityId);
+            _ownerIdsByGroup[groupId].Remove(ownerEntityId);
+            _progressEntityIdsByOwner.Remove((groupId, ownerEntityId));
+            foreach (var choice in groupChoices)
+            {
+                _choiceInstanceEntityIds.Remove((choice.Id, ownerEntityId));
+            }
+        });
         foreach (var choice in groupChoices)
         {
             clonedInstances.Add(choice.Id, CloneChoiceEntity(choice));
         }
 
-        transaction.Commit();
         _ownersByGroup[groupId].Add(ownerEntityId);
         _ownerIdsByGroup[groupId].Add(ownerEntityId);
         _progressEntityIdsByOwner.Add((groupId, ownerEntityId), resolvedProgressId);
@@ -191,6 +208,7 @@ public sealed class BuildChoiceRuntime : ISystemicSystem, ISystemicStatefulExten
             _choiceInstanceEntityIds.Add((choiceId, ownerEntityId), entityId);
         }
 
+        transaction.Commit();
         return new(true);
     }
 
@@ -272,10 +290,29 @@ public sealed class BuildChoiceRuntime : ISystemicSystem, ISystemicStatefulExten
             }
         }
 
+        _progressEntityIdsByOwner.Clear();
+        _choiceInstanceEntityIds.Clear();
+        foreach (var group in _catalog.Groups)
+        {
+            var primaryOwner = _ownerEntityIds[group.Id];
+            var owners = _ownersByGroup[group.Id];
+            owners.RemoveAll(ownerId => ownerId != primaryOwner && !seenOwners.Contains((group.Id, ownerId)));
+            _ownerIdsByGroup[group.Id].Clear();
+            _ownerIdsByGroup[group.Id].UnionWith(owners);
+            _progressEntityIdsByOwner.Add((group.Id, primaryOwner), _progressEntityIds[group.Id]);
+        }
+
+        foreach (var choice in _catalog.Choices)
+        {
+            _choiceInstanceEntityIds.Add((choice.Id, _ownerEntityIds[choice.GroupId]), _choiceEntityIds[choice.Id]);
+        }
+
         foreach (var ownerState in restored.Owners)
         {
-            _ownersByGroup[ownerState.GroupId].Add(ownerState.OwnerEntityId);
-            _ownerIdsByGroup[ownerState.GroupId].Add(ownerState.OwnerEntityId);
+            if (_ownerIdsByGroup[ownerState.GroupId].Add(ownerState.OwnerEntityId))
+            {
+                _ownersByGroup[ownerState.GroupId].Add(ownerState.OwnerEntityId);
+            }
             _progressEntityIdsByOwner.Add((ownerState.GroupId, ownerState.OwnerEntityId), ownerState.ProgressEntityId);
             foreach (var instance in ownerState.Choices)
             {
@@ -382,10 +419,10 @@ public sealed class BuildChoiceRuntime : ISystemicSystem, ISystemicStatefulExten
         }
     }
 
-    public void Step(SystemicStepContext context)
+    public void Step(SystemicSystemContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (!ReferenceEquals(context.World, _world))
+        if (!context.IsForWorld(_world))
         {
             throw new InvalidOperationException("Build choice runtime cannot step a different world than the one it was initialized with.");
         }

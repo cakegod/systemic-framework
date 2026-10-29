@@ -1,0 +1,344 @@
+#nullable enable
+const Systemic.Incremental.IncrementalContentModule.ModuleId = "systemic.incremental" -> string!
+override Systemic.Incremental.ActorRoleDefinition.Equals(object? obj) -> bool
+override Systemic.Incremental.ActorRoleDefinition.GetHashCode() -> int
+override Systemic.Incremental.ActorRoleDefinition.ToString() -> string!
+override Systemic.Incremental.BuildChoiceCatalog.Equals(object? obj) -> bool
+override Systemic.Incremental.BuildChoiceCatalog.GetHashCode() -> int
+override Systemic.Incremental.BuildChoiceCatalog.ToString() -> string!
+override Systemic.Incremental.BuildChoiceDefinition.Equals(object? obj) -> bool
+override Systemic.Incremental.BuildChoiceDefinition.GetHashCode() -> int
+override Systemic.Incremental.BuildChoiceDefinition.ToString() -> string!
+override Systemic.Incremental.BuildChoiceEntityInstanceState.Equals(object? obj) -> bool
+override Systemic.Incremental.BuildChoiceEntityInstanceState.GetHashCode() -> int
+override Systemic.Incremental.BuildChoiceEntityInstanceState.ToString() -> string!
+override Systemic.Incremental.BuildChoiceGroupDefinition.Equals(object? obj) -> bool
+override Systemic.Incremental.BuildChoiceGroupDefinition.GetHashCode() -> int
+override Systemic.Incremental.BuildChoiceGroupDefinition.ToString() -> string!
+override Systemic.Incremental.BuildChoiceOwnerInstanceState.Equals(object? obj) -> bool
+override Systemic.Incremental.BuildChoiceOwnerInstanceState.GetHashCode() -> int
+override Systemic.Incremental.BuildChoiceOwnerInstanceState.ToString() -> string!
+override Systemic.Incremental.BuildChoiceRuntimeState.Equals(object? obj) -> bool
+override Systemic.Incremental.BuildChoiceRuntimeState.GetHashCode() -> int
+override Systemic.Incremental.BuildChoiceRuntimeState.ToString() -> string!
+override Systemic.Incremental.BuildChoiceState.GetHashCode() -> int
+override Systemic.Incremental.IncrementalCatalog.Equals(object? obj) -> bool
+override Systemic.Incremental.IncrementalCatalog.GetHashCode() -> int
+override Systemic.Incremental.IncrementalCatalog.ToString() -> string!
+override Systemic.Incremental.IncrementalCommandResult.GetHashCode() -> int
+override Systemic.Incremental.IncrementalModuleContent.Equals(object? obj) -> bool
+override Systemic.Incremental.IncrementalModuleContent.GetHashCode() -> int
+override Systemic.Incremental.IncrementalModuleContent.ToString() -> string!
+override Systemic.Incremental.ProducerDefinition.Equals(object? obj) -> bool
+override Systemic.Incremental.ProducerDefinition.GetHashCode() -> int
+override Systemic.Incremental.ProducerDefinition.ToString() -> string!
+override Systemic.Incremental.ResourceCost.Equals(object? obj) -> bool
+override Systemic.Incremental.ResourceCost.GetHashCode() -> int
+override Systemic.Incremental.ResourceCost.ToString() -> string!
+override Systemic.Incremental.ResourceDefinition.Equals(object? obj) -> bool
+override Systemic.Incremental.ResourceDefinition.GetHashCode() -> int
+override Systemic.Incremental.ResourceDefinition.ToString() -> string!
+override Systemic.Incremental.UpgradeDefinition.Equals(object? obj) -> bool
+override Systemic.Incremental.UpgradeDefinition.GetHashCode() -> int
+override Systemic.Incremental.UpgradeDefinition.ToString() -> string!
+static Systemic.Incremental.ActorRoleDefinition.operator !=(Systemic.Incremental.ActorRoleDefinition? left, Systemic.Incremental.ActorRoleDefinition? right) -> bool
+static Systemic.Incremental.ActorRoleDefinition.operator ==(Systemic.Incremental.ActorRoleDefinition? left, Systemic.Incremental.ActorRoleDefinition? right) -> bool
+static Systemic.Incremental.BuildChoiceCatalog.operator !=(Systemic.Incremental.BuildChoiceCatalog? left, Systemic.Incremental.BuildChoiceCatalog? right) -> bool
+static Systemic.Incremental.BuildChoiceCatalog.operator ==(Systemic.Incremental.BuildChoiceCatalog? left, Systemic.Incremental.BuildChoiceCatalog? right) -> bool
+static Systemic.Incremental.BuildChoiceDefinition.operator !=(Systemic.Incremental.BuildChoiceDefinition? left, Systemic.Incremental.BuildChoiceDefinition? right) -> bool
+static Systemic.Incremental.BuildChoiceDefinition.operator ==(Systemic.Incremental.BuildChoiceDefinition? left, Systemic.Incremental.BuildChoiceDefinition? right) -> bool
+static Systemic.Incremental.BuildChoiceEntityInstanceState.operator !=(Systemic.Incremental.BuildChoiceEntityInstanceState? left, Systemic.Incremental.BuildChoiceEntityInstanceState? right) -> bool
+static Systemic.Incremental.BuildChoiceEntityInstanceState.operator ==(Systemic.Incremental.BuildChoiceEntityInstanceState? left, Systemic.Incremental.BuildChoiceEntityInstanceState? right) -> bool
+static Systemic.Incremental.BuildChoiceGroupDefinition.operator !=(Systemic.Incremental.BuildChoiceGroupDefinition? left, Systemic.Incremental.BuildChoiceGroupDefinition? right) -> bool
+static Systemic.Incremental.BuildChoiceGroupDefinition.operator ==(Systemic.Incremental.BuildChoiceGroupDefinition? left, Systemic.Incremental.BuildChoiceGroupDefinition? right) -> bool
+static Systemic.Incremental.BuildChoiceOwnerInstanceState.operator !=(Systemic.Incremental.BuildChoiceOwnerInstanceState? left, Systemic.Incremental.BuildChoiceOwnerInstanceState? right) -> bool
+static Systemic.Incremental.BuildChoiceOwnerInstanceState.operator ==(Systemic.Incremental.BuildChoiceOwnerInstanceState? left, Systemic.Incremental.BuildChoiceOwnerInstanceState? right) -> bool
+static Systemic.Incremental.BuildChoiceRuntimeState.operator !=(Systemic.Incremental.BuildChoiceRuntimeState? left, Systemic.Incremental.BuildChoiceRuntimeState? right) -> bool
+static Systemic.Incremental.BuildChoiceRuntimeState.operator ==(Systemic.Incremental.BuildChoiceRuntimeState? left, Systemic.Incremental.BuildChoiceRuntimeState? right) -> bool
+static Systemic.Incremental.BuildChoiceState.operator !=(Systemic.Incremental.BuildChoiceState left, Systemic.Incremental.BuildChoiceState right) -> bool
+static Systemic.Incremental.BuildChoiceState.operator ==(Systemic.Incremental.BuildChoiceState left, Systemic.Incremental.BuildChoiceState right) -> bool
+static Systemic.Incremental.IncrementalCatalog.operator !=(Systemic.Incremental.IncrementalCatalog? left, Systemic.Incremental.IncrementalCatalog? right) -> bool
+static Systemic.Incremental.IncrementalCatalog.operator ==(Systemic.Incremental.IncrementalCatalog? left, Systemic.Incremental.IncrementalCatalog? right) -> bool
+static Systemic.Incremental.IncrementalCommandResult.operator !=(Systemic.Incremental.IncrementalCommandResult left, Systemic.Incremental.IncrementalCommandResult right) -> bool
+static Systemic.Incremental.IncrementalCommandResult.operator ==(Systemic.Incremental.IncrementalCommandResult left, Systemic.Incremental.IncrementalCommandResult right) -> bool
+static Systemic.Incremental.IncrementalGameExtensions.ActivateChoice(this Systemic.Host.SystemicGame! game, string! choiceId, int actorId) -> Systemic.Incremental.IncrementalCommandResult
+static Systemic.Incremental.IncrementalGameExtensions.AssignRole(this Systemic.Host.SystemicGame! game, int entityId, string! roleId) -> Systemic.Incremental.IncrementalCommandResult
+static Systemic.Incremental.IncrementalGameExtensions.BuildChoices(this Systemic.Host.SystemicGame! game) -> Systemic.Incremental.BuildChoiceRuntime!
+static Systemic.Incremental.IncrementalGameExtensions.Incremental(this Systemic.Host.SystemicGame! game) -> Systemic.Incremental.IncrementalRuntime!
+static Systemic.Incremental.IncrementalGameExtensions.PurchaseUpgrade(this Systemic.Host.SystemicGame! game, string! upgradeId, int purchaserId) -> Systemic.Incremental.IncrementalCommandResult
+static Systemic.Incremental.IncrementalGameExtensions.RegisterChoiceOwner(this Systemic.Host.SystemicGame! game, string! groupId, int ownerEntityId, int? progressEntityId = null) -> Systemic.Incremental.IncrementalCommandResult
+static Systemic.Incremental.IncrementalGameExtensions.SelectChoice(this Systemic.Host.SystemicGame! game, string! choiceId, int purchaserId) -> Systemic.Incremental.IncrementalCommandResult
+static Systemic.Incremental.IncrementalModuleContent.operator !=(Systemic.Incremental.IncrementalModuleContent? left, Systemic.Incremental.IncrementalModuleContent? right) -> bool
+static Systemic.Incremental.IncrementalModuleContent.operator ==(Systemic.Incremental.IncrementalModuleContent? left, Systemic.Incremental.IncrementalModuleContent? right) -> bool
+static Systemic.Incremental.ProducerDefinition.operator !=(Systemic.Incremental.ProducerDefinition? left, Systemic.Incremental.ProducerDefinition? right) -> bool
+static Systemic.Incremental.ProducerDefinition.operator ==(Systemic.Incremental.ProducerDefinition? left, Systemic.Incremental.ProducerDefinition? right) -> bool
+static Systemic.Incremental.ResourceCost.operator !=(Systemic.Incremental.ResourceCost? left, Systemic.Incremental.ResourceCost? right) -> bool
+static Systemic.Incremental.ResourceCost.operator ==(Systemic.Incremental.ResourceCost? left, Systemic.Incremental.ResourceCost? right) -> bool
+static Systemic.Incremental.ResourceDefinition.operator !=(Systemic.Incremental.ResourceDefinition? left, Systemic.Incremental.ResourceDefinition? right) -> bool
+static Systemic.Incremental.ResourceDefinition.operator ==(Systemic.Incremental.ResourceDefinition? left, Systemic.Incremental.ResourceDefinition? right) -> bool
+static Systemic.Incremental.UpgradeDefinition.operator !=(Systemic.Incremental.UpgradeDefinition? left, Systemic.Incremental.UpgradeDefinition? right) -> bool
+static Systemic.Incremental.UpgradeDefinition.operator ==(Systemic.Incremental.UpgradeDefinition? left, Systemic.Incremental.UpgradeDefinition? right) -> bool
+Systemic.Incremental.ActorRoleDefinition
+Systemic.Incremental.ActorRoleDefinition.<Clone>$() -> Systemic.Incremental.ActorRoleDefinition!
+Systemic.Incremental.ActorRoleDefinition.ActorRoleDefinition(string! Id, System.Collections.Immutable.ImmutableArray<string!> Tags, System.Collections.Immutable.ImmutableArray<string!> Capabilities) -> void
+Systemic.Incremental.ActorRoleDefinition.Capabilities.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Incremental.ActorRoleDefinition.Capabilities.init -> void
+Systemic.Incremental.ActorRoleDefinition.Deconstruct(out string! Id, out System.Collections.Immutable.ImmutableArray<string!> Tags, out System.Collections.Immutable.ImmutableArray<string!> Capabilities) -> void
+Systemic.Incremental.ActorRoleDefinition.Equals(Systemic.Incremental.ActorRoleDefinition? other) -> bool
+Systemic.Incremental.ActorRoleDefinition.Id.get -> string!
+Systemic.Incremental.ActorRoleDefinition.Id.init -> void
+Systemic.Incremental.ActorRoleDefinition.Tags.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Incremental.ActorRoleDefinition.Tags.init -> void
+Systemic.Incremental.BuildChoiceCatalog
+Systemic.Incremental.BuildChoiceCatalog.<Clone>$() -> Systemic.Incremental.BuildChoiceCatalog!
+Systemic.Incremental.BuildChoiceCatalog.BuildChoiceCatalog(System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceGroupDefinition!> Groups, System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceDefinition!> Choices) -> void
+Systemic.Incremental.BuildChoiceCatalog.Choices.get -> System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceDefinition!>
+Systemic.Incremental.BuildChoiceCatalog.Choices.init -> void
+Systemic.Incremental.BuildChoiceCatalog.Deconstruct(out System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceGroupDefinition!> Groups, out System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceDefinition!> Choices) -> void
+Systemic.Incremental.BuildChoiceCatalog.Equals(Systemic.Incremental.BuildChoiceCatalog? other) -> bool
+Systemic.Incremental.BuildChoiceCatalog.Groups.get -> System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceGroupDefinition!>
+Systemic.Incremental.BuildChoiceCatalog.Groups.init -> void
+Systemic.Incremental.BuildChoiceDefinition
+Systemic.Incremental.BuildChoiceDefinition.<Clone>$() -> Systemic.Incremental.BuildChoiceDefinition!
+Systemic.Incremental.BuildChoiceDefinition.ActivationEvent.get -> string?
+Systemic.Incremental.BuildChoiceDefinition.ActivationEvent.init -> void
+Systemic.Incremental.BuildChoiceDefinition.ActivationMode.get -> Systemic.Incremental.ChoiceActivationMode
+Systemic.Incremental.BuildChoiceDefinition.ActivationMode.init -> void
+Systemic.Incremental.BuildChoiceDefinition.ActiveTicks.get -> int
+Systemic.Incremental.BuildChoiceDefinition.ActiveTicks.init -> void
+Systemic.Incremental.BuildChoiceDefinition.ActiveUntilProperty.get -> string!
+Systemic.Incremental.BuildChoiceDefinition.ActiveUntilProperty.init -> void
+Systemic.Incremental.BuildChoiceDefinition.BuildChoiceDefinition(string! Id, string! GroupId, string! EntityId, Systemic.Incremental.ChoiceActivationMode ActivationMode, string! ChoiceTag, string! SelectedProperty, string! ActiveUntilProperty, string! CooldownUntilProperty, string? CostResourceId, double CostAmount, int ActiveTicks, int CooldownTicks, string? TriggerEvent, string? ActivationEvent, bool IsFree, System.Collections.Immutable.ImmutableArray<string!> Requires = default(System.Collections.Immutable.ImmutableArray<string!>), System.Collections.Immutable.ImmutableArray<string!> RequiresAny = default(System.Collections.Immutable.ImmutableArray<string!>), System.Collections.Immutable.ImmutableArray<string!> Excludes = default(System.Collections.Immutable.ImmutableArray<string!>)) -> void
+Systemic.Incremental.BuildChoiceDefinition.ChoiceTag.get -> string!
+Systemic.Incremental.BuildChoiceDefinition.ChoiceTag.init -> void
+Systemic.Incremental.BuildChoiceDefinition.CooldownTicks.get -> int
+Systemic.Incremental.BuildChoiceDefinition.CooldownTicks.init -> void
+Systemic.Incremental.BuildChoiceDefinition.CooldownUntilProperty.get -> string!
+Systemic.Incremental.BuildChoiceDefinition.CooldownUntilProperty.init -> void
+Systemic.Incremental.BuildChoiceDefinition.CostAmount.get -> double
+Systemic.Incremental.BuildChoiceDefinition.CostAmount.init -> void
+Systemic.Incremental.BuildChoiceDefinition.CostResourceId.get -> string?
+Systemic.Incremental.BuildChoiceDefinition.CostResourceId.init -> void
+Systemic.Incremental.BuildChoiceDefinition.Deconstruct(out string! Id, out string! GroupId, out string! EntityId, out Systemic.Incremental.ChoiceActivationMode ActivationMode, out string! ChoiceTag, out string! SelectedProperty, out string! ActiveUntilProperty, out string! CooldownUntilProperty, out string? CostResourceId, out double CostAmount, out int ActiveTicks, out int CooldownTicks, out string? TriggerEvent, out string? ActivationEvent, out bool IsFree, out System.Collections.Immutable.ImmutableArray<string!> Requires, out System.Collections.Immutable.ImmutableArray<string!> RequiresAny, out System.Collections.Immutable.ImmutableArray<string!> Excludes) -> void
+Systemic.Incremental.BuildChoiceDefinition.EntityId.get -> string!
+Systemic.Incremental.BuildChoiceDefinition.EntityId.init -> void
+Systemic.Incremental.BuildChoiceDefinition.Equals(Systemic.Incremental.BuildChoiceDefinition? other) -> bool
+Systemic.Incremental.BuildChoiceDefinition.Excludes.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Incremental.BuildChoiceDefinition.Excludes.init -> void
+Systemic.Incremental.BuildChoiceDefinition.GroupId.get -> string!
+Systemic.Incremental.BuildChoiceDefinition.GroupId.init -> void
+Systemic.Incremental.BuildChoiceDefinition.Id.get -> string!
+Systemic.Incremental.BuildChoiceDefinition.Id.init -> void
+Systemic.Incremental.BuildChoiceDefinition.IsFree.get -> bool
+Systemic.Incremental.BuildChoiceDefinition.IsFree.init -> void
+Systemic.Incremental.BuildChoiceDefinition.Requires.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Incremental.BuildChoiceDefinition.Requires.init -> void
+Systemic.Incremental.BuildChoiceDefinition.RequiresAny.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Incremental.BuildChoiceDefinition.RequiresAny.init -> void
+Systemic.Incremental.BuildChoiceDefinition.SelectedProperty.get -> string!
+Systemic.Incremental.BuildChoiceDefinition.SelectedProperty.init -> void
+Systemic.Incremental.BuildChoiceDefinition.TriggerEvent.get -> string?
+Systemic.Incremental.BuildChoiceDefinition.TriggerEvent.init -> void
+Systemic.Incremental.BuildChoiceEntityInstanceState
+Systemic.Incremental.BuildChoiceEntityInstanceState.<Clone>$() -> Systemic.Incremental.BuildChoiceEntityInstanceState!
+Systemic.Incremental.BuildChoiceEntityInstanceState.BuildChoiceEntityInstanceState(string! ChoiceId, int EntityId) -> void
+Systemic.Incremental.BuildChoiceEntityInstanceState.ChoiceId.get -> string!
+Systemic.Incremental.BuildChoiceEntityInstanceState.ChoiceId.init -> void
+Systemic.Incremental.BuildChoiceEntityInstanceState.Deconstruct(out string! ChoiceId, out int EntityId) -> void
+Systemic.Incremental.BuildChoiceEntityInstanceState.EntityId.get -> int
+Systemic.Incremental.BuildChoiceEntityInstanceState.EntityId.init -> void
+Systemic.Incremental.BuildChoiceEntityInstanceState.Equals(Systemic.Incremental.BuildChoiceEntityInstanceState? other) -> bool
+Systemic.Incremental.BuildChoiceGroupDefinition
+Systemic.Incremental.BuildChoiceGroupDefinition.<Clone>$() -> Systemic.Incremental.BuildChoiceGroupDefinition!
+Systemic.Incremental.BuildChoiceGroupDefinition.BuildChoiceGroupDefinition(string! Id, string! OwnerEntityId, string! ProgressEntityId, string! ProgressProperty, double UnlockAt, int SelectionLimit, string? FreeChoiceId) -> void
+Systemic.Incremental.BuildChoiceGroupDefinition.Deconstruct(out string! Id, out string! OwnerEntityId, out string! ProgressEntityId, out string! ProgressProperty, out double UnlockAt, out int SelectionLimit, out string? FreeChoiceId) -> void
+Systemic.Incremental.BuildChoiceGroupDefinition.Equals(Systemic.Incremental.BuildChoiceGroupDefinition? other) -> bool
+Systemic.Incremental.BuildChoiceGroupDefinition.FreeChoiceId.get -> string?
+Systemic.Incremental.BuildChoiceGroupDefinition.FreeChoiceId.init -> void
+Systemic.Incremental.BuildChoiceGroupDefinition.Id.get -> string!
+Systemic.Incremental.BuildChoiceGroupDefinition.Id.init -> void
+Systemic.Incremental.BuildChoiceGroupDefinition.OwnerEntityId.get -> string!
+Systemic.Incremental.BuildChoiceGroupDefinition.OwnerEntityId.init -> void
+Systemic.Incremental.BuildChoiceGroupDefinition.ProgressEntityId.get -> string!
+Systemic.Incremental.BuildChoiceGroupDefinition.ProgressEntityId.init -> void
+Systemic.Incremental.BuildChoiceGroupDefinition.ProgressProperty.get -> string!
+Systemic.Incremental.BuildChoiceGroupDefinition.ProgressProperty.init -> void
+Systemic.Incremental.BuildChoiceGroupDefinition.SelectionLimit.get -> int
+Systemic.Incremental.BuildChoiceGroupDefinition.SelectionLimit.init -> void
+Systemic.Incremental.BuildChoiceGroupDefinition.UnlockAt.get -> double
+Systemic.Incremental.BuildChoiceGroupDefinition.UnlockAt.init -> void
+Systemic.Incremental.BuildChoiceOwnerInstanceState
+Systemic.Incremental.BuildChoiceOwnerInstanceState.<Clone>$() -> Systemic.Incremental.BuildChoiceOwnerInstanceState!
+Systemic.Incremental.BuildChoiceOwnerInstanceState.BuildChoiceOwnerInstanceState(string! GroupId, int OwnerEntityId, int ProgressEntityId, System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceEntityInstanceState!> Choices) -> void
+Systemic.Incremental.BuildChoiceOwnerInstanceState.Choices.get -> System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceEntityInstanceState!>
+Systemic.Incremental.BuildChoiceOwnerInstanceState.Choices.init -> void
+Systemic.Incremental.BuildChoiceOwnerInstanceState.Deconstruct(out string! GroupId, out int OwnerEntityId, out int ProgressEntityId, out System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceEntityInstanceState!> Choices) -> void
+Systemic.Incremental.BuildChoiceOwnerInstanceState.Equals(Systemic.Incremental.BuildChoiceOwnerInstanceState? other) -> bool
+Systemic.Incremental.BuildChoiceOwnerInstanceState.GroupId.get -> string!
+Systemic.Incremental.BuildChoiceOwnerInstanceState.GroupId.init -> void
+Systemic.Incremental.BuildChoiceOwnerInstanceState.OwnerEntityId.get -> int
+Systemic.Incremental.BuildChoiceOwnerInstanceState.OwnerEntityId.init -> void
+Systemic.Incremental.BuildChoiceOwnerInstanceState.ProgressEntityId.get -> int
+Systemic.Incremental.BuildChoiceOwnerInstanceState.ProgressEntityId.init -> void
+Systemic.Incremental.BuildChoiceRuntime
+Systemic.Incremental.BuildChoiceRuntime.Access.get -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.SystemAccess>!
+Systemic.Incremental.BuildChoiceRuntime.ActivateChoice(string! choiceId, int actorId, System.Func<Systemic.Rules.SimulationFact, Systemic.Rules.RuleDispatchResult>! publish) -> Systemic.Incremental.IncrementalCommandResult
+Systemic.Incremental.BuildChoiceRuntime.BuildChoiceRuntime(Systemic.Incremental.BuildChoiceCatalog! catalog, Systemic.Incremental.IncrementalCatalog? incremental, Systemic.Kernel.World! world, System.Collections.Generic.IReadOnlyDictionary<string!, int>! entityIds, int order = 90, bool initialize = true) -> void
+Systemic.Incremental.BuildChoiceRuntime.CaptureState() -> System.Text.Json.JsonElement
+Systemic.Incremental.BuildChoiceRuntime.Id.get -> string!
+Systemic.Incremental.BuildChoiceRuntime.ObserveFact(Systemic.Rules.SimulationFact fact, Systemic.Rules.SimulationFactEmitter emitter) -> void
+Systemic.Incremental.BuildChoiceRuntime.Order.get -> int
+Systemic.Incremental.BuildChoiceRuntime.RegisterOwner(string! groupId, int ownerEntityId, int? progressEntityId = null) -> Systemic.Incremental.IncrementalCommandResult
+Systemic.Incremental.BuildChoiceRuntime.RestoreState(System.Text.Json.JsonElement state) -> void
+Systemic.Incremental.BuildChoiceRuntime.SelectChoice(string! choiceId, int purchaserId, System.Func<Systemic.Rules.SimulationFact, Systemic.Rules.RuleDispatchResult>! publish) -> Systemic.Incremental.IncrementalCommandResult
+Systemic.Incremental.BuildChoiceRuntime.Step(Systemic.Host.SystemicSystemContext! context) -> void
+Systemic.Incremental.BuildChoiceRuntime.TryGetState(string! choiceId, int ownerEntityId, out Systemic.Incremental.BuildChoiceState state) -> bool
+Systemic.Incremental.BuildChoiceRuntime.TryGetState(string! choiceId, out Systemic.Incremental.BuildChoiceState state) -> bool
+Systemic.Incremental.BuildChoiceRuntimeState
+Systemic.Incremental.BuildChoiceRuntimeState.<Clone>$() -> Systemic.Incremental.BuildChoiceRuntimeState!
+Systemic.Incremental.BuildChoiceRuntimeState.BuildChoiceRuntimeState(System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceOwnerInstanceState!> Owners) -> void
+Systemic.Incremental.BuildChoiceRuntimeState.Deconstruct(out System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceOwnerInstanceState!> Owners) -> void
+Systemic.Incremental.BuildChoiceRuntimeState.Equals(Systemic.Incremental.BuildChoiceRuntimeState? other) -> bool
+Systemic.Incremental.BuildChoiceRuntimeState.Owners.get -> System.Collections.Immutable.ImmutableArray<Systemic.Incremental.BuildChoiceOwnerInstanceState!>
+Systemic.Incremental.BuildChoiceRuntimeState.Owners.init -> void
+Systemic.Incremental.BuildChoiceState
+Systemic.Incremental.BuildChoiceState.ActiveTicksRemaining.get -> int
+Systemic.Incremental.BuildChoiceState.ActiveTicksRemaining.init -> void
+Systemic.Incremental.BuildChoiceState.BuildChoiceState() -> void
+Systemic.Incremental.BuildChoiceState.BuildChoiceState(bool IsSelected, bool IsActive, int ActiveTicksRemaining, int CooldownTicksRemaining, double CooldownProgress, bool IsLocked = false, bool IsAvailable = false) -> void
+Systemic.Incremental.BuildChoiceState.CooldownProgress.get -> double
+Systemic.Incremental.BuildChoiceState.CooldownProgress.init -> void
+Systemic.Incremental.BuildChoiceState.CooldownTicksRemaining.get -> int
+Systemic.Incremental.BuildChoiceState.CooldownTicksRemaining.init -> void
+Systemic.Incremental.BuildChoiceState.Deconstruct(out bool IsSelected, out bool IsActive, out int ActiveTicksRemaining, out int CooldownTicksRemaining, out double CooldownProgress, out bool IsLocked, out bool IsAvailable) -> void
+Systemic.Incremental.BuildChoiceState.Equals(Systemic.Incremental.BuildChoiceState other) -> bool
+Systemic.Incremental.BuildChoiceState.IsActive.get -> bool
+Systemic.Incremental.BuildChoiceState.IsActive.init -> void
+Systemic.Incremental.BuildChoiceState.IsAvailable.get -> bool
+Systemic.Incremental.BuildChoiceState.IsAvailable.init -> void
+Systemic.Incremental.BuildChoiceState.IsLocked.get -> bool
+Systemic.Incremental.BuildChoiceState.IsLocked.init -> void
+Systemic.Incremental.BuildChoiceState.IsSelected.get -> bool
+Systemic.Incremental.BuildChoiceState.IsSelected.init -> void
+Systemic.Incremental.ChoiceActivationMode
+Systemic.Incremental.ChoiceActivationMode.Passive = 0 -> Systemic.Incremental.ChoiceActivationMode
+Systemic.Incremental.ChoiceActivationMode.Timed = 2 -> Systemic.Incremental.ChoiceActivationMode
+Systemic.Incremental.ChoiceActivationMode.Triggered = 1 -> Systemic.Incremental.ChoiceActivationMode
+Systemic.Incremental.IncrementalCatalog
+Systemic.Incremental.IncrementalCatalog.<Clone>$() -> Systemic.Incremental.IncrementalCatalog!
+Systemic.Incremental.IncrementalCatalog.Deconstruct(out System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ResourceDefinition!> Resources, out System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ProducerDefinition!> Producers, out System.Collections.Immutable.ImmutableArray<Systemic.Incremental.UpgradeDefinition!> Upgrades, out System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ActorRoleDefinition!> Roles) -> void
+Systemic.Incremental.IncrementalCatalog.Equals(Systemic.Incremental.IncrementalCatalog? other) -> bool
+Systemic.Incremental.IncrementalCatalog.IncrementalCatalog(System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ResourceDefinition!> Resources, System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ProducerDefinition!> Producers, System.Collections.Immutable.ImmutableArray<Systemic.Incremental.UpgradeDefinition!> Upgrades, System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ActorRoleDefinition!> Roles) -> void
+Systemic.Incremental.IncrementalCatalog.Producers.get -> System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ProducerDefinition!>
+Systemic.Incremental.IncrementalCatalog.Producers.init -> void
+Systemic.Incremental.IncrementalCatalog.Resources.get -> System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ResourceDefinition!>
+Systemic.Incremental.IncrementalCatalog.Resources.init -> void
+Systemic.Incremental.IncrementalCatalog.Roles.get -> System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ActorRoleDefinition!>
+Systemic.Incremental.IncrementalCatalog.Roles.init -> void
+Systemic.Incremental.IncrementalCatalog.Upgrades.get -> System.Collections.Immutable.ImmutableArray<Systemic.Incremental.UpgradeDefinition!>
+Systemic.Incremental.IncrementalCatalog.Upgrades.init -> void
+Systemic.Incremental.IncrementalCatalogBuilder
+Systemic.Incremental.IncrementalCatalogBuilder.Build() -> Systemic.Incremental.IncrementalCatalog!
+Systemic.Incremental.IncrementalCatalogBuilder.IncrementalCatalogBuilder() -> void
+Systemic.Incremental.IncrementalCatalogBuilder.Producer(string! id, string! entityId, string! resourceId, double baseRate, int intervalTicks = 1, string! rateProperty = "rate", string! eventType = "incremental.production") -> Systemic.Incremental.IncrementalCatalogBuilder!
+Systemic.Incremental.IncrementalCatalogBuilder.Resource(string! id, string! entityId, double initialValue = 0, double? capacity = null, string! balanceProperty = "balance") -> Systemic.Incremental.IncrementalCatalogBuilder!
+Systemic.Incremental.IncrementalCatalogBuilder.Role(string! id, System.Collections.Generic.IEnumerable<string!>? tags = null, System.Collections.Generic.IEnumerable<string!>? capabilities = null) -> Systemic.Incremental.IncrementalCatalogBuilder!
+Systemic.Incremental.IncrementalCatalogBuilder.Upgrade(string! id, string! entityId, System.Collections.Generic.IEnumerable<Systemic.Incremental.ResourceCost!>! costs, int maxPurchases = 1, string! purchaseCountProperty = "purchases", string! purchasedEvent = "incremental.upgrade.purchased") -> Systemic.Incremental.IncrementalCatalogBuilder!
+Systemic.Incremental.IncrementalCommandResult
+Systemic.Incremental.IncrementalCommandResult.Accepted.get -> bool
+Systemic.Incremental.IncrementalCommandResult.Accepted.init -> void
+Systemic.Incremental.IncrementalCommandResult.Deconstruct(out bool Accepted, out string? Reason, out Systemic.Rules.RuleDispatchResult? Reactions) -> void
+Systemic.Incremental.IncrementalCommandResult.Equals(Systemic.Incremental.IncrementalCommandResult other) -> bool
+Systemic.Incremental.IncrementalCommandResult.IncrementalCommandResult() -> void
+Systemic.Incremental.IncrementalCommandResult.IncrementalCommandResult(bool Accepted, string? Reason = null, Systemic.Rules.RuleDispatchResult? Reactions = null) -> void
+Systemic.Incremental.IncrementalCommandResult.Reactions.get -> Systemic.Rules.RuleDispatchResult?
+Systemic.Incremental.IncrementalCommandResult.Reactions.init -> void
+Systemic.Incremental.IncrementalCommandResult.Reason.get -> string?
+Systemic.Incremental.IncrementalCommandResult.Reason.init -> void
+Systemic.Incremental.IncrementalContentModule
+Systemic.Incremental.IncrementalContentModule.Compile(Systemic.Content.ContentModuleContext! context, System.Text.Json.JsonElement declaration) -> Systemic.Content.ISystemicModuleContent!
+Systemic.Incremental.IncrementalContentModule.Configure(Systemic.Host.SystemicGameBuilder! builder, Systemic.Content.ISystemicModuleContent! content) -> void
+Systemic.Incremental.IncrementalContentModule.Id.get -> string!
+Systemic.Incremental.IncrementalContentModule.IncrementalContentModule() -> void
+Systemic.Incremental.IncrementalGameExtensions
+Systemic.Incremental.IncrementalModuleContent
+Systemic.Incremental.IncrementalModuleContent.<Clone>$() -> Systemic.Incremental.IncrementalModuleContent!
+Systemic.Incremental.IncrementalModuleContent.Catalog.get -> Systemic.Incremental.IncrementalCatalog!
+Systemic.Incremental.IncrementalModuleContent.Catalog.init -> void
+Systemic.Incremental.IncrementalModuleContent.Choices.get -> Systemic.Incremental.BuildChoiceCatalog!
+Systemic.Incremental.IncrementalModuleContent.Choices.init -> void
+Systemic.Incremental.IncrementalModuleContent.Deconstruct(out Systemic.Incremental.IncrementalCatalog! Catalog, out Systemic.Incremental.BuildChoiceCatalog! Choices) -> void
+Systemic.Incremental.IncrementalModuleContent.Equals(Systemic.Incremental.IncrementalModuleContent? other) -> bool
+Systemic.Incremental.IncrementalModuleContent.IncrementalModuleContent(Systemic.Incremental.IncrementalCatalog! Catalog, Systemic.Incremental.BuildChoiceCatalog! Choices) -> void
+Systemic.Incremental.IncrementalRuntime
+Systemic.Incremental.IncrementalRuntime.Access.get -> System.Collections.Generic.IReadOnlyList<Systemic.Kernel.SystemAccess>!
+Systemic.Incremental.IncrementalRuntime.AssignRole(int entityId, string! roleId) -> Systemic.Incremental.IncrementalCommandResult
+Systemic.Incremental.IncrementalRuntime.Id.get -> string!
+Systemic.Incremental.IncrementalRuntime.IncrementalRuntime(Systemic.Incremental.IncrementalCatalog! catalog, Systemic.Kernel.World! world, System.Collections.Generic.IReadOnlyDictionary<string!, int>! entityIds, int order = 100, bool initialize = true) -> void
+Systemic.Incremental.IncrementalRuntime.Order.get -> int
+Systemic.Incremental.IncrementalRuntime.PurchaseUpgrade(string! upgradeId, int purchaserId, System.Func<Systemic.Rules.SimulationFact, Systemic.Rules.RuleDispatchResult>! publish) -> Systemic.Incremental.IncrementalCommandResult
+Systemic.Incremental.IncrementalRuntime.Step(Systemic.Host.SystemicSystemContext! context) -> void
+Systemic.Incremental.ProducerDefinition
+Systemic.Incremental.ProducerDefinition.<Clone>$() -> Systemic.Incremental.ProducerDefinition!
+Systemic.Incremental.ProducerDefinition.BaseRate.get -> double
+Systemic.Incremental.ProducerDefinition.BaseRate.init -> void
+Systemic.Incremental.ProducerDefinition.Deconstruct(out string! Id, out string! EntityId, out string! ResourceId, out string! RateProperty, out double BaseRate, out int IntervalTicks, out string! EventType) -> void
+Systemic.Incremental.ProducerDefinition.EntityId.get -> string!
+Systemic.Incremental.ProducerDefinition.EntityId.init -> void
+Systemic.Incremental.ProducerDefinition.Equals(Systemic.Incremental.ProducerDefinition? other) -> bool
+Systemic.Incremental.ProducerDefinition.EventType.get -> string!
+Systemic.Incremental.ProducerDefinition.EventType.init -> void
+Systemic.Incremental.ProducerDefinition.Id.get -> string!
+Systemic.Incremental.ProducerDefinition.Id.init -> void
+Systemic.Incremental.ProducerDefinition.IntervalTicks.get -> int
+Systemic.Incremental.ProducerDefinition.IntervalTicks.init -> void
+Systemic.Incremental.ProducerDefinition.ProducerDefinition(string! Id, string! EntityId, string! ResourceId, string! RateProperty, double BaseRate, int IntervalTicks, string! EventType) -> void
+Systemic.Incremental.ProducerDefinition.RateProperty.get -> string!
+Systemic.Incremental.ProducerDefinition.RateProperty.init -> void
+Systemic.Incremental.ProducerDefinition.ResourceId.get -> string!
+Systemic.Incremental.ProducerDefinition.ResourceId.init -> void
+Systemic.Incremental.ResourceCost
+Systemic.Incremental.ResourceCost.<Clone>$() -> Systemic.Incremental.ResourceCost!
+Systemic.Incremental.ResourceCost.Amount.get -> double
+Systemic.Incremental.ResourceCost.Amount.init -> void
+Systemic.Incremental.ResourceCost.Deconstruct(out string! ResourceId, out double Amount) -> void
+Systemic.Incremental.ResourceCost.Equals(Systemic.Incremental.ResourceCost? other) -> bool
+Systemic.Incremental.ResourceCost.ResourceCost(string! ResourceId, double Amount) -> void
+Systemic.Incremental.ResourceCost.ResourceId.get -> string!
+Systemic.Incremental.ResourceCost.ResourceId.init -> void
+Systemic.Incremental.ResourceDefinition
+Systemic.Incremental.ResourceDefinition.<Clone>$() -> Systemic.Incremental.ResourceDefinition!
+Systemic.Incremental.ResourceDefinition.BalanceProperty.get -> string!
+Systemic.Incremental.ResourceDefinition.BalanceProperty.init -> void
+Systemic.Incremental.ResourceDefinition.Capacity.get -> double?
+Systemic.Incremental.ResourceDefinition.Capacity.init -> void
+Systemic.Incremental.ResourceDefinition.Deconstruct(out string! Id, out string! EntityId, out string! BalanceProperty, out double InitialValue, out double? Capacity) -> void
+Systemic.Incremental.ResourceDefinition.EntityId.get -> string!
+Systemic.Incremental.ResourceDefinition.EntityId.init -> void
+Systemic.Incremental.ResourceDefinition.Equals(Systemic.Incremental.ResourceDefinition? other) -> bool
+Systemic.Incremental.ResourceDefinition.Id.get -> string!
+Systemic.Incremental.ResourceDefinition.Id.init -> void
+Systemic.Incremental.ResourceDefinition.InitialValue.get -> double
+Systemic.Incremental.ResourceDefinition.InitialValue.init -> void
+Systemic.Incremental.ResourceDefinition.ResourceDefinition(string! Id, string! EntityId, string! BalanceProperty, double InitialValue, double? Capacity) -> void
+Systemic.Incremental.UpgradeDefinition
+Systemic.Incremental.UpgradeDefinition.<Clone>$() -> Systemic.Incremental.UpgradeDefinition!
+Systemic.Incremental.UpgradeDefinition.Costs.get -> System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ResourceCost!>
+Systemic.Incremental.UpgradeDefinition.Costs.init -> void
+Systemic.Incremental.UpgradeDefinition.Deconstruct(out string! Id, out string! EntityId, out System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ResourceCost!> Costs, out int MaxPurchases, out string! PurchaseCountProperty, out string! PurchasedEvent) -> void
+Systemic.Incremental.UpgradeDefinition.EntityId.get -> string!
+Systemic.Incremental.UpgradeDefinition.EntityId.init -> void
+Systemic.Incremental.UpgradeDefinition.Equals(Systemic.Incremental.UpgradeDefinition? other) -> bool
+Systemic.Incremental.UpgradeDefinition.Id.get -> string!
+Systemic.Incremental.UpgradeDefinition.Id.init -> void
+Systemic.Incremental.UpgradeDefinition.MaxPurchases.get -> int
+Systemic.Incremental.UpgradeDefinition.MaxPurchases.init -> void
+Systemic.Incremental.UpgradeDefinition.PurchaseCountProperty.get -> string!
+Systemic.Incremental.UpgradeDefinition.PurchaseCountProperty.init -> void
+Systemic.Incremental.UpgradeDefinition.PurchasedEvent.get -> string!
+Systemic.Incremental.UpgradeDefinition.PurchasedEvent.init -> void
+Systemic.Incremental.UpgradeDefinition.UpgradeDefinition(string! Id, string! EntityId, System.Collections.Immutable.ImmutableArray<Systemic.Incremental.ResourceCost!> Costs, int MaxPurchases, string! PurchaseCountProperty, string! PurchasedEvent) -> void
+~override Systemic.Incremental.BuildChoiceState.Equals(object obj) -> bool
+~override Systemic.Incremental.BuildChoiceState.ToString() -> string
+~override Systemic.Incremental.IncrementalCommandResult.Equals(object obj) -> bool
+~override Systemic.Incremental.IncrementalCommandResult.ToString() -> string

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Text.Json;
 using Systemic.Kernel;
@@ -6,7 +7,7 @@ using Systemic.Rules;
 
 namespace Boids.MonoGame;
 
-public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem, ISystemicStatefulExtension, IDisposable
+public sealed class BoidFlockSystem : ISystemicSystem, ISystemicReusableTransactionalState, IDisposable
 {
     private const int MaximumNeighborsPerBoid = 3;
     private const int MaximumCandidatesPerBoid = 12;
@@ -16,7 +17,7 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
     private const float HungryEnergy = 0.65f;
     private const float FoodSteeringWeight = 1.4f;
     private const float SatedDragPerSecond = 0.6f;
-    private static readonly SystemAccess[] s_access =
+    private static readonly ImmutableArray<SystemAccess> s_access =
     [
         SystemAccess.WriteWorld,
         BoidPopulation.WritePosition,
@@ -41,20 +42,13 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
     private readonly float _energyDrainPerSecond;
     private readonly Action _restorePredatorTarget;
     private readonly Population<Boid> _boids;
-    private readonly DoubleBufferedPopulationColumn<Vector2> _positions;
-    private readonly DoubleBufferedPopulationColumn<Vector2> _velocities;
-    private readonly DoubleBufferedPopulationColumn<float> _energies;
-    private readonly PopulationColumn<int> _speciesByBoid;
+    private readonly BoidPopulation.Columns _columns;
+    private readonly Vector2[] _positionSnapshot;
+    private readonly Vector2[] _velocitySnapshot;
+    private readonly float[] _energySnapshot;
+    private readonly int[] _speciesSnapshot;
+    private bool _populationSnapshotsDirty = true;
     private readonly PopulationSpatialGrid2D _spatialGrid;
-    private ScheduledSystemContext? _activeScheduleContext;
-    private ReadOnlyMemory<Vector2> _stepPositions;
-    private ReadOnlyMemory<Vector2> _stepVelocities;
-    private ReadOnlyMemory<float> _stepEnergies;
-    private ReadOnlyMemory<int> _stepSpecies;
-    private Memory<Vector2> _nextPositions;
-    private Memory<Vector2> _nextVelocities;
-    private Memory<float> _nextEnergies;
-    private int _stepTick;
     private int _predatorTargetBeforeStep = -1;
     private readonly float[] _speciesFleeWeights;
     private readonly float _predatorConsumeRadiusSquared;
@@ -76,9 +70,28 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
     private int _predatorTargetFoodIndex = -1;
     private PredatorView _predatorView;
     private bool _disposed;
+    private readonly Stack<RollbackSnapshot> _availableSnapshots = new();
 
-    private static readonly Action<BoidFlockSystem, int, PopulationRange> s_advanceRange =
-        static (system, _, range) => system.AdvanceRange(range.Start, range.End);
+    private static readonly PopulationAccessAction<Boid, PopulationStepState> s_rebuildSpatialGrid =
+        static (PopulationStepState state, scoped ref PopulationAccessScope<Boid> access) =>
+        {
+            var positions = access.ReadCurrent(state.Columns.Position);
+            state.System._spatialGrid.Rebuild(positions);
+        };
+
+    private static readonly PopulationRangeAction<Boid, PopulationStepState> s_advanceRange =
+        static (PopulationStepState state, int partition, scoped ref PopulationAccessScope<Boid> access) =>
+            state.System.AdvanceRange(state.Tick, state.Columns, ref access);
+
+    private static readonly PopulationAccessAction<Boid, PopulationUpdateState> s_aggregateFeeding =
+        static (PopulationUpdateState state, scoped ref PopulationAccessScope<Boid> access) =>
+            state.System.AggregateFeeding(
+                state.World,
+                state.Context,
+                access.EditNext(state.Columns.Position),
+                access.EditNext(state.Columns.Velocity),
+                access.EditNext(state.Columns.Energy),
+                access.ReadAll(state.Columns.Species));
 
     public BoidFlockSystem(World world, int flockEntityId, int seed, int tickRateHz)
     {
@@ -132,11 +145,11 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
         _foodPatches = ReadFoodPatches(world, _worldWidth, _worldHeight);
         _predator = ReadPredator(world, _worldWidth, _worldHeight);
         _boids = BoidPopulation.Define(world);
-        var columns = BoidPopulation.Bind(_boids);
-        _positions = columns.Position;
-        _velocities = columns.Velocity;
-        _energies = columns.Energy;
-        _speciesByBoid = columns.Species;
+        _columns = BoidPopulation.Bind(_boids);
+        _positionSnapshot = new Vector2[_population];
+        _velocitySnapshot = new Vector2[_population];
+        _energySnapshot = new float[_population];
+        _speciesSnapshot = new int[_population];
         _boids.Reserve(_population);
         if (_boids.AddRange(_population).Start != 0)
         {
@@ -168,17 +181,45 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
 
     public float ParticleRadius => _particleRadius;
 
-    public ReadOnlySpan<float> Energies => _energies.Current;
+    public ReadOnlySpan<float> Energies
+    {
+        get
+        {
+            RefreshPopulationSnapshots();
+            return _energySnapshot;
+        }
+    }
 
     public float HungryFraction => _hungryFraction;
 
     public float StarvedSpeedFactor => _starvedSpeedFactor;
 
-    public ReadOnlySpan<Vector2> Positions => _positions.Current;
+    public ReadOnlySpan<Vector2> Positions
+    {
+        get
+        {
+            RefreshPopulationSnapshots();
+            return _positionSnapshot;
+        }
+    }
 
-    public ReadOnlySpan<Vector2> Velocities => _velocities.Current;
+    public ReadOnlySpan<Vector2> Velocities
+    {
+        get
+        {
+            RefreshPopulationSnapshots();
+            return _velocitySnapshot;
+        }
+    }
 
-    public ReadOnlySpan<int> SpeciesByBoid => _speciesByBoid.ReadOnlySpan;
+    public ReadOnlySpan<int> SpeciesByBoid
+    {
+        get
+        {
+            RefreshPopulationSnapshots();
+            return _speciesSnapshot;
+        }
+    }
 
     public ReadOnlySpan<ParticleSpeciesView> Species => _speciesViews;
 
@@ -195,6 +236,82 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
                 : (int?)null
     });
 
+    public ISystemicTransactionSnapshot CaptureTransactionSnapshot()
+    {
+        var snapshot = _availableSnapshots.Count == 0 ? new RollbackSnapshot(this) : _availableSnapshots.Pop();
+        snapshot.Capture();
+        return snapshot;
+    }
+
+    private sealed class RollbackSnapshot
+        : ISystemicTransactionSnapshot
+    {
+        private readonly BoidFlockSystem _owner;
+        private readonly FoodPatchView[] _food;
+        private int _target;
+        private float _hungry, _fleeRadius;
+        private bool _sated;
+        private Vector2 _position, _velocity;
+        private PredatorView _predator;
+
+        public RollbackSnapshot(BoidFlockSystem owner)
+        {
+            _owner = owner;
+            _food = new FoodPatchView[owner._foodViews.Length];
+            OnCommit = Commit;
+            OnRollback = Rollback;
+        }
+
+        public Action OnCommit { get; }
+        public Action OnRollback { get; }
+
+        public void Capture()
+        {
+            _target = _owner._predatorTargetFoodIndex;
+            _hungry = _owner._hungryFraction;
+            _position = _owner._predatorPosition;
+            _velocity = _owner._predatorVelocity;
+            _fleeRadius = _owner._predatorFleeRadius;
+            _sated = _owner._predatorSated;
+            _predator = _owner._predatorView;
+            _owner._foodViews.CopyTo(_food, 0);
+        }
+
+        private void Commit() => _owner._availableSnapshots.Push(this);
+
+        private void Rollback()
+        {
+            _owner._predatorTargetFoodIndex = _target;
+            _owner._hungryFraction = _hungry;
+            _owner._predatorPosition = _position;
+            _owner._predatorVelocity = _velocity;
+            _owner._predatorFleeRadius = _fleeRadius;
+            _owner._predatorSated = _sated;
+            _owner._predatorView = _predator;
+            _food.CopyTo(_owner._foodViews, 0);
+            _owner._populationSnapshotsDirty = true;
+            _owner._availableSnapshots.Push(this);
+        }
+    }
+
+    private readonly record struct PopulationStepState(
+        BoidFlockSystem System,
+        BoidPopulation.Columns Columns,
+        int Tick);
+
+    private readonly record struct PopulationUpdateState(
+        BoidFlockSystem System,
+        BoidPopulation.Columns Columns,
+        ReadOnlyWorldView World,
+        SystemicSystemContext Context);
+
+    private readonly record struct PopulationSnapshotState(
+        BoidPopulation.Columns Columns,
+        Vector2[] Positions,
+        Vector2[] Velocities,
+        float[] Energies,
+        int[] Species);
+
     public void RestoreState(JsonElement state)
     {
         if (state.ValueKind != JsonValueKind.Object
@@ -209,6 +326,7 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
         if (targetElement.ValueKind == JsonValueKind.Null)
         {
             _predatorTargetFoodIndex = -1;
+            _populationSnapshotsDirty = true;
             return;
         }
 
@@ -225,7 +343,35 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
         }
 
         _predatorTargetFoodIndex = targetIndex;
+        _populationSnapshotsDirty = true;
     }
+
+    private void RefreshPopulationSnapshots()
+    {
+        if (!_populationSnapshotsDirty)
+        {
+            return;
+        }
+
+        var state = new PopulationSnapshotState(
+            _columns, _positionSnapshot, _velocitySnapshot, _energySnapshot, _speciesSnapshot);
+        _boids.WithAccess(new PopulationRange(0, _boids.Count), state,
+            static (PopulationSnapshotState snapshot, scoped ref PopulationAccessScope<Boid> access) =>
+            {
+                access.ReadCurrent(snapshot.Columns.Position).CopyTo(snapshot.Positions);
+                access.ReadCurrent(snapshot.Columns.Velocity).CopyTo(snapshot.Velocities);
+                access.ReadCurrent(snapshot.Columns.Energy).CopyTo(snapshot.Energies);
+                access.ReadAll(snapshot.Columns.Species).CopyTo(snapshot.Species);
+            });
+        _populationSnapshotsDirty = false;
+    }
+
+    internal BoidPopulation.Columns Columns => _columns;
+
+    internal void WithPopulationAccess<TState>(
+        TState state,
+        PopulationAccessAction<Boid, TState> callback) =>
+        _boids.WithAccess(new PopulationRange(0, _population), state, callback);
 
     public static bool WantsFood(float energy) => energy < HungryEnergy;
 
@@ -235,69 +381,41 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
     public static float HungerFactor(float energy, float restFactor) =>
         restFactor + (1.0f - restFactor) * (1.0f - Math.Clamp(energy, 0.0f, 1.0f));
 
-    public void Step(SystemicStepContext context)
+    public void Step(SystemicSystemContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         ObjectDisposedException.ThrowIf(_disposed, this);
-        StepCore(new ReadOnlyWorldView(context.World), context.Tick, context, scheduledContext: null);
+        _predatorTargetBeforeStep = _predatorTargetFoodIndex;
+        if (context.IsScheduledExecution)
+            context.OnRollback(_restorePredatorTarget);
+        StepCore(context.World, context);
     }
 
-    private void StepCore(
-        ReadOnlyWorldView world,
-        int tick,
-        SystemicStepContext? legacyContext,
-        SystemicScheduledContext? scheduledContext)
+    private void StepCore(ReadOnlyWorldView world, SystemicSystemContext context)
     {
         if (!world.ContainsEntity(_flockEntityId))
         {
             return;
         }
 
-        _stepTick = tick;
-        _stepPositions = _positions.CurrentMemory;
-        _stepVelocities = _velocities.CurrentMemory;
-        _stepEnergies = _energies.CurrentMemory;
-        _stepSpecies = _speciesByBoid.ReadOnlyMemory;
-        _nextPositions = _positions.EditNextMemory(0, _population);
-        _nextVelocities = _velocities.EditNextMemory(0, _population);
-        _nextEnergies = _energies.EditNextMemory(0, _population);
+        _populationSnapshotsDirty = true;
         RegenerateFood(world);
-        UpdatePredator(world, legacyContext, scheduledContext);
-        _spatialGrid.Rebuild(_stepPositions.Span);
-        AdvancePopulation();
-        AggregateFeeding(world, legacyContext, scheduledContext);
+        UpdatePredator(world, context);
+        var stepState = new PopulationStepState(this, _columns, context.Tick);
+        _boids.WithAccess(new PopulationRange(0, _population), stepState, s_rebuildSpatialGrid);
+        context.ForEachPopulationRange(_boids, stepState, s_advanceRange);
+        _boids.WithAccess(
+            new PopulationRange(0, _population),
+            new PopulationUpdateState(this, _columns, world, context),
+            s_aggregateFeeding);
 
-        _positions.Swap();
-        _velocities.Swap();
-        _energies.Swap();
+        // Swapping is a structural population operation, so complete every scoped view first.
+        _columns.Position.Swap();
+        _columns.Velocity.Swap();
+        _columns.Energy.Swap();
 
         var fact = new SimulationFact("boids.flock.updated", _flockEntityId, _flockEntityId, Amount: _population);
-        if (scheduledContext is not null)
-        {
-            scheduledContext.Publish(fact);
-        }
-        else
-        {
-            legacyContext!.Publish(fact);
-        }
-    }
-
-    public void Step(ScheduledSystemContext kernelContext, SystemicScheduledContext gameContext)
-    {
-        ArgumentNullException.ThrowIfNull(kernelContext);
-        ArgumentNullException.ThrowIfNull(gameContext);
-        _activeScheduleContext = kernelContext;
-        try
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            _predatorTargetBeforeStep = _predatorTargetFoodIndex;
-            gameContext.OnRollback(_restorePredatorTarget);
-            StepCore(gameContext.World, gameContext.Tick, legacyContext: null, gameContext);
-        }
-        finally
-        {
-            _activeScheduleContext = null;
-        }
+        context.Publish(fact);
     }
 
     public void Dispose()
@@ -552,13 +670,14 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
             var position = new Vector2(random.NextSingle() * _worldWidth, random.NextSingle() * _worldHeight);
             var angle = random.NextSingle() * MathF.Tau;
             var speed = _maximumSpeed * (0.3f + random.NextSingle() * 0.7f);
-            values[boid] = new Boid
+            var value = new Boid
             {
                 Position = position,
                 Velocity = new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * speed,
                 Energy = 0.4f + random.NextSingle() * 0.6f,
                 Species = random.Next(_species.Length)
             };
+            values[boid] = value;
         }
 
         Boid.InitializeRange(_boids, new PopulationRange(0, _population), values);
@@ -587,8 +706,7 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
 
     private void UpdatePredator(
         ReadOnlyWorldView world,
-        SystemicStepContext? legacyContext,
-        SystemicScheduledContext? scheduledContext)
+        SystemicSystemContext context)
     {
         if (!world.ContainsEntity(_predator.EntityId))
         {
@@ -648,32 +766,30 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
         energy = Math.Max(0.0f, energy - _predator.EnergyDrainPerSecond * _deltaTime);
         _predatorFleeRadius = _predator.FleeRadius * HungerFactor(energy, _predator.RestSpeedFactor);
 
-        SetProperty(legacyContext, scheduledContext, _predator.EntityId, "predator.energy", energy);
-        SetProperty(legacyContext, scheduledContext, _predator.EntityId, "predator.positionX", _predatorPosition.X);
-        SetProperty(legacyContext, scheduledContext, _predator.EntityId, "predator.positionY", _predatorPosition.Y);
-        SetProperty(legacyContext, scheduledContext, _predator.EntityId, "predator.velocityX", _predatorVelocity.X);
-        SetProperty(legacyContext, scheduledContext, _predator.EntityId, "predator.velocityY", _predatorVelocity.Y);
+        SetProperty(context, _predator.EntityId, "predator.energy", energy);
+        SetProperty(context, _predator.EntityId, "predator.positionX", _predatorPosition.X);
+        SetProperty(context, _predator.EntityId, "predator.positionY", _predatorPosition.Y);
+        SetProperty(context, _predator.EntityId, "predator.velocityX", _predatorVelocity.X);
+        SetProperty(context, _predator.EntityId, "predator.velocityY", _predatorVelocity.Y);
         _predatorView = new PredatorView(_predatorPosition, _predatorFleeRadius, energy, _predatorSated);
     }
 
     private static void SetProperty(
-        SystemicStepContext? legacyContext,
-        SystemicScheduledContext? scheduledContext,
+        SystemicSystemContext context,
         int entityId,
         string property,
         double value)
     {
-        if (scheduledContext is not null)
+        if (context.IsScheduledExecution)
         {
-            scheduledContext.Commands.SetProperty(entityId, property, value);
+            context.Commands.SetProperty(entityId, property, value);
             return;
         }
 
-        var world = legacyContext?.World
-            ?? throw new InvalidOperationException("A world command requires an active simulation context.");
+        var world = context.GetWritableWorld();
         var entity = world.ById(entityId)
             ?? throw new InvalidOperationException($"Entity {entityId} no longer exists.");
-        legacyContext!.SetProperty(entity, property, value);
+        context.SetProperty(entity, property, value);
     }
 
     private int FindRichestStockedFoodPatch()
@@ -723,30 +839,23 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
         _predatorView = new PredatorView(_predatorPosition, _predatorFleeRadius, energy, _predatorSated);
     }
 
-    private void AdvancePopulation()
+    private void AdvanceRange(
+        int tick,
+        BoidPopulation.Columns columns,
+        scoped ref PopulationAccessScope<Boid> access)
     {
-        if (_activeScheduleContext is not { } context)
+        var positions = access.ReadCurrent(columns.Position);
+        var velocities = access.ReadCurrent(columns.Velocity);
+        var energies = access.ReadCurrent(columns.Energy);
+        var speciesByBoid = access.ReadAll(columns.Species);
+        var nextPositions = access.EditNext(columns.Position);
+        var nextVelocities = access.EditNext(columns.Velocity);
+        var nextEnergies = access.EditNext(columns.Energy);
+        var range = access.Range;
+        for (var offset = 0; offset < range.Length; offset++)
         {
-            AdvanceRange(0, _population);
-            return;
-        }
-
-        context.ForEachRange(this, _population, s_advanceRange);
-    }
-
-    private void AdvanceRange(int start, int end)
-    {
-        var positions = _stepPositions.Span;
-        var velocities = _stepVelocities.Span;
-        var energies = _stepEnergies.Span;
-        var speciesByBoid = _stepSpecies.Span;
-        var nextPositions = _nextPositions.Span;
-        var nextVelocities = _nextVelocities.Span;
-        var nextEnergies = _nextEnergies.Span;
-        for (var boid = start; boid < end; boid++)
-        {
-            AdvanceBoid(boid, _stepTick, positions, velocities, energies, speciesByBoid,
-                nextPositions, nextVelocities, nextEnergies);
+            AdvanceBoid(range.Start + offset, tick, positions, velocities, energies, speciesByBoid,
+                nextPositions, nextVelocities, nextEnergies, offset);
         }
     }
 
@@ -759,7 +868,8 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
         ReadOnlySpan<int> speciesByBoid,
         Span<Vector2> nextPositions,
         Span<Vector2> nextVelocities,
-        Span<float> nextEnergies)
+        Span<float> nextEnergies,
+        int outputOffset)
     {
         var position = positions[boid];
         var velocity = velocities[boid];
@@ -834,8 +944,8 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
         position += velocity * _deltaTime;
         position.X = WrapPosition(position.X, _worldWidth);
         position.Y = WrapPosition(position.Y, _worldHeight);
-        nextPositions[boid] = position;
-        nextVelocities[boid] = velocity;
+        nextPositions[outputOffset] = position;
+        nextVelocities[outputOffset] = velocity;
 
         if (!_predatorSated && predatorDistanceSquared <= _predatorConsumeRadiusSquared)
         {
@@ -843,7 +953,7 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
         }
 
         energy = Math.Max(0.0f, energy - _energyDrainPerSecond * _deltaTime);
-        nextEnergies[boid] = energy;
+        nextEnergies[outputOffset] = energy;
         _feedingPatchByBoid[boid] = -1;
         if (hungry && nearestFoodPatch >= 0)
         {
@@ -884,11 +994,13 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
 
     private void AggregateFeeding(
         ReadOnlyWorldView world,
-        SystemicStepContext? legacyContext,
-        SystemicScheduledContext? scheduledContext)
+        SystemicSystemContext context,
+        Span<Vector2> nextPositions,
+        Span<Vector2> nextVelocities,
+        Span<float> nextEnergies,
+        ReadOnlySpan<int> speciesByBoid)
     {
         Array.Clear(_foodRequestCounts);
-        var nextEnergies = _nextEnergies.Span;
         var hungry = 0;
         for (var boid = 0; boid < _population; boid++)
         {
@@ -938,12 +1050,13 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicScheduledSystem,
             var entityId = _foodPatches[index].EntityId;
             if (world.ContainsEntity(entityId))
             {
-                SetProperty(legacyContext, scheduledContext, entityId, "food.stock", _foodStocks[index]);
+                SetProperty(context, entityId, "food.stock", _foodStocks[index]);
             }
 
             _foodViews[index] = new FoodPatchView(
                 _foodPatches[index].Position, _foodStocks[index], _foodPatches[index].Capacity);
         }
+
     }
 
     private Vector2 Steer(Vector2 direction, Vector2 velocity, float maximumSpeed)

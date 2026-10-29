@@ -99,7 +99,7 @@ public sealed class PopulationCloneTests
     }
 
     [Fact]
-    public void SiblingClonesAllocateDistinctReusedHandleGenerations()
+    public void SiblingClonesIssueTheSameReusedHandleGenerations()
     {
         var source = new World(seed: 10, valueScale: 1);
         var sourcePopulation = source.DefinePopulation<CloneParticleKind>(enableHandles: true);
@@ -120,21 +120,23 @@ public sealed class PopulationCloneTests
 
         Assert.Equal(inheritedHandle.Slot, leftHandle.Slot);
         Assert.Equal(inheritedHandle.Slot, rightHandle.Slot);
-        Assert.NotEqual(leftHandle.Generation, rightHandle.Generation);
-        Assert.True(left.TryResolve(leftHandle, out _));
-        Assert.False(right.TryResolve(leftHandle, out _));
-        Assert.True(right.TryResolve(rightHandle, out _));
-        Assert.False(left.TryResolve(rightHandle, out _));
+        Assert.Equal(leftHandle.Generation, rightHandle.Generation);
+        Assert.True(left.TryResolve(leftHandle, out var leftResolved));
+        Assert.True(right.TryResolve(rightHandle, out var rightResolved));
+        Assert.Equal(leftResolved, rightResolved);
+        Assert.False(left.TryResolve(inheritedHandle, out _));
+        Assert.False(right.TryResolve(inheritedHandle, out _));
     }
 
     [Fact]
-    public void SiblingClonesAllocateDistinctGenerationsForSlotsFreedBeforeClone()
+    public void SiblingClonesIssueTheSameGenerationsForSlotsFreedBeforeClone()
     {
         var source = new World(seed: 12, valueScale: 1);
         var sourcePopulation = source.DefinePopulation<CloneParticleKind>(enableHandles: true);
         sourcePopulation.AddRange(2);
         var inheritedHandle = sourcePopulation.GetHandle(1);
-        Assert.True(sourcePopulation.TryRemove(sourcePopulation.GetHandle(0)));
+        var removedHandle = sourcePopulation.GetHandle(0);
+        Assert.True(sourcePopulation.TryRemove(removedHandle));
 
         var left = source.Clone().GetPopulation<CloneParticleKind>();
         var right = source.Clone().GetPopulation<CloneParticleKind>();
@@ -148,9 +150,11 @@ public sealed class PopulationCloneTests
 
         Assert.Equal(0, leftHandle.Slot);
         Assert.Equal(leftHandle.Slot, rightHandle.Slot);
-        Assert.NotEqual(leftHandle.Generation, rightHandle.Generation);
-        Assert.False(right.TryResolve(leftHandle, out _));
-        Assert.False(left.TryResolve(rightHandle, out _));
+        Assert.Equal(leftHandle.Generation, rightHandle.Generation);
+        Assert.True(left.TryResolve(leftHandle, out _));
+        Assert.True(right.TryResolve(rightHandle, out _));
+        Assert.False(left.TryResolve(removedHandle, out _));
+        Assert.False(right.TryResolve(removedHandle, out _));
     }
 
     [Fact]
@@ -174,45 +178,6 @@ public sealed class PopulationCloneTests
         Assert.Throws<InvalidOperationException>(() => _ = staleEnergy.ReadOnlySpan.Length);
         Assert.Throws<InvalidOperationException>(() => _ = stalePhase.Count);
         Assert.Throws<InvalidOperationException>(() => _ = stalePhase.Current.Length);
-    }
-
-    [Fact]
-    public void TryExecutePreservesPopulationStateInCommittedActionWorld()
-    {
-        var world = new World(seed: 8, valueScale: 1);
-        var population = world.DefinePopulation<CloneParticleKind>(enableHandles: true);
-        var energy = population.Column(s_energyKey);
-        var rows = population.AddRange(2);
-        energy.EditRange(rows.Start, rows.Length)[0] = 10;
-        energy.EditRange(rows.Start, rows.Length)[1] = 20;
-        var rowOne = population.GetHandle(1);
-        var untouchedBranch = world.Clone();
-
-        var engine = new EngineBuilder()
-            .On<PopulationMutationEvent>("edit-population", context =>
-            {
-                context.World.GetPopulation<CloneParticleKind>()
-                    .Column(s_energyKey).EditRange(0, 1)[0] = 99;
-            })
-            .Build();
-
-        Assert.True(engine.TryExecute(world, new PopulationMutationEvent(0), out var actionWorld));
-
-        Assert.Equal(10, population.Column(s_energyKey).ReadOnlySpan[0]);
-        Assert.Equal(99, actionWorld.GetPopulation<CloneParticleKind>().Column(s_energyKey).ReadOnlySpan[0]);
-        Assert.True(actionWorld.GetPopulation<CloneParticleKind>().TryResolve(rowOne, out var actionRow));
-        Assert.Equal(1, actionRow);
-
-        Adopt(world, actionWorld);
-
-        var adoptedPopulation = world.GetPopulation<CloneParticleKind>();
-        Assert.Equal(2, adoptedPopulation.Count);
-        Assert.Equal(99, adoptedPopulation.Column(s_energyKey).ReadOnlySpan[0]);
-        Assert.Equal(20, adoptedPopulation.Column(s_energyKey).ReadOnlySpan[1]);
-        Assert.True(adoptedPopulation.TryResolve(rowOne, out var adoptedRow));
-        Assert.Equal(1, adoptedRow);
-        Assert.Equal(10, untouchedBranch.GetPopulation<CloneParticleKind>().Column(s_energyKey).ReadOnlySpan[0]);
-        Assert.Throws<InvalidOperationException>(() => actionWorld.GetPopulation<CloneParticleKind>());
     }
 
     private static void Adopt(World destination, World actionWorld)
@@ -246,6 +211,4 @@ public sealed class PopulationCloneTests
 
         public static int Version => 1;
     }
-
-    private sealed record PopulationMutationEvent(int SourceId) : KernelEvent(SourceId);
 }

@@ -1,13 +1,20 @@
+using Systemic.Kernel;
+
 namespace Systemic.Host;
 
 public readonly record struct FixedStepResult(int Steps, TimeSpan DroppedTime, TimeSpan RemainingTime);
 
+/// <summary>A portable fixed-step clock configuration and exact pending phase.</summary>
+/// <param name="TickRateHz">Fixed simulation steps per second.</param>
+/// <param name="MaxCatchUpSteps">Maximum number of steps performed for one elapsed-time update.</param>
+/// <param name="PhaseUnits">Pending TimeSpan ticks multiplied by the tick rate.</param>
+public readonly record struct FixedStepClockState(int TickRateHz, int MaxCatchUpSteps, Int128 PhaseUnits);
+
 /// <summary>Engine-neutral fixed-step accumulator with an explicit catch-up bound.</summary>
 public sealed class FixedStepClock
 {
-    private readonly double _stepSeconds;
     private readonly int _maxCatchUpSteps;
-    private double _accumulatorSeconds;
+    private Int128 _phaseUnits;
 
     public FixedStepClock(int tickRateHz, int maxCatchUpSteps)
     {
@@ -23,34 +30,90 @@ public sealed class FixedStepClock
 
         TickRateHz = tickRateHz;
         _maxCatchUpSteps = maxCatchUpSteps;
-        _stepSeconds = 1.0 / tickRateHz;
     }
 
     public int TickRateHz { get; }
+
+    public int MaxCatchUpSteps => _maxCatchUpSteps;
+
+    /// <summary>Captures the exact phase, including pending work after a failed step.</summary>
+    public FixedStepClockState CaptureState() => new(TickRateHz, _maxCatchUpSteps, _phaseUnits);
+
+    /// <summary>Restores a state created for the same fixed-step configuration.</summary>
+    public void RestoreState(FixedStepClockState state)
+    {
+        if (state.TickRateHz != TickRateHz || state.MaxCatchUpSteps != _maxCatchUpSteps)
+        {
+            throw new ArgumentException("Clock state does not match the fixed-step configuration.", nameof(state));
+        }
+
+        if (state.PhaseUnits < 0 || state.PhaseUnits > MaximumPhaseUnits)
+        {
+            throw new ArgumentOutOfRangeException(nameof(state), "Clock phase is outside the supported time range.");
+        }
+
+        _phaseUnits = state.PhaseUnits;
+    }
+
+    private Int128 MaximumPhaseUnits => (Int128)TimeSpan.MaxValue.Ticks * TickRateHz;
 
     public FixedStepResult Advance(TimeSpan elapsed, Action step)
     {
         ArgumentNullException.ThrowIfNull(step);
         ArgumentOutOfRangeException.ThrowIfLessThan(elapsed, TimeSpan.Zero);
 
-        _accumulatorSeconds += elapsed.TotalSeconds;
-        var steps = 0;
-        while (_accumulatorSeconds >= _stepSeconds && steps < _maxCatchUpSteps)
+        // Multiply elapsed ticks by the rate so rates that do not divide one second
+        // retain their exact fractional phase without floating-point drift.
+        var nextPhase = _phaseUnits + ((Int128)elapsed.Ticks * TickRateHz);
+        if (nextPhase > MaximumPhaseUnits)
         {
-            step();
-            _accumulatorSeconds -= _stepSeconds;
+            throw new ArgumentOutOfRangeException(nameof(elapsed), "Pending time exceeds the supported clock range.");
+        }
+
+        _phaseUnits = nextPhase;
+        var steps = 0;
+        while (_phaseUnits >= TimeSpan.TicksPerSecond && steps < _maxCatchUpSteps)
+        {
+            // Consume the tick's phase before running it so a save taken from a commit callback
+            // captures the committed time rather than the time the tick just used.
+            _phaseUnits -= TimeSpan.TicksPerSecond;
+            try
+            {
+                step();
+            }
+            catch (WorldCommitCallbackException exception)
+                when (!SystemicTickCommitState.IsNestedCommit(exception))
+            {
+                // The world is already committed; retrying this tick would run it twice.
+                throw;
+            }
+            catch
+            {
+                // The tick rolled back; keep its pending time so a retry can run it.
+                _phaseUnits += TimeSpan.TicksPerSecond;
+                throw;
+            }
+
             steps++;
         }
 
-        var droppedSeconds = 0.0;
-        if (_accumulatorSeconds >= _stepSeconds)
+        var droppedUnits = (_phaseUnits / TimeSpan.TicksPerSecond) * TimeSpan.TicksPerSecond;
+        _phaseUnits -= droppedUnits;
+
+        return new FixedStepResult(steps, TimeSpan.FromTicks(ToTimeSpanTicks(droppedUnits)),
+            TimeSpan.FromTicks(ToTimeSpanTicks(_phaseUnits)));
+    }
+
+    private long ToTimeSpanTicks(Int128 units)
+    {
+        var whole = units / TickRateHz;
+        var remainder = units % TickRateHz;
+        // Match TimeSpan's nearest-tick representation while retaining the exact phase internally.
+        if ((remainder * 2) > TickRateHz || ((remainder * 2) == TickRateHz && (whole & 1) != 0))
         {
-            var skippedSteps = Math.Floor(_accumulatorSeconds / _stepSeconds);
-            droppedSeconds = skippedSteps * _stepSeconds;
-            _accumulatorSeconds -= droppedSeconds;
+            whole++;
         }
 
-        return new FixedStepResult(steps, TimeSpan.FromSeconds(droppedSeconds),
-            TimeSpan.FromSeconds(_accumulatorSeconds));
+        return checked((long)whole);
     }
 }

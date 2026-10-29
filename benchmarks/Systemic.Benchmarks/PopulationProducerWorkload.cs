@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Systemic.Kernel;
 
 namespace Systemic.Benchmarks;
@@ -19,9 +20,10 @@ internal sealed class PopulationProducerWorkload : IDisposable
         _population = _world.DefinePopulation<ProducerKind>();
         _produced = _population.Column(s_producedKey);
         var rows = _population.AddRange(ProducerCount);
-        _produced.EditRange(rows.Start, rows.Length).Clear();
+        _population.WithAccess(rows, _produced, static (PopulationColumn<double> produced, scoped ref PopulationAccessScope<ProducerKind> scope) =>
+            scope.EditRange(produced).Clear());
         _schedule = new DeterministicSystemScheduleBuilder(workerCount)
-            .Add(new IncrementProducerSystem(_produced, ProducerCount))
+            .Add(new IncrementProducerSystem(_population, _produced))
             .Build();
     }
 
@@ -29,20 +31,23 @@ internal sealed class PopulationProducerWorkload : IDisposable
 
     public void Validate(int expectedTicks)
     {
-        var values = _produced.ReadOnlySpan;
-        if (values.Length != ProducerCount)
+        _population.WithAccess(new PopulationRange(0, _population.Count), (_produced, expectedTicks), static ((PopulationColumn<double> Produced, int ExpectedTicks) state, scoped ref PopulationAccessScope<ProducerKind> scope) =>
         {
-            throw new InvalidOperationException($"Expected {ProducerCount} producers, found {values.Length}.");
-        }
-
-        for (var index = 0; index < values.Length; index++)
-        {
-            if (values[index] != expectedTicks)
+            var values = scope.ReadAll(state.Produced);
+            if (values.Length != ProducerCount)
             {
-                throw new InvalidOperationException(
-                    $"Producer {index} advanced to {values[index]} instead of {expectedTicks}.");
+                throw new InvalidOperationException($"Expected {ProducerCount} producers, found {values.Length}.");
             }
-        }
+
+            for (var index = 0; index < values.Length; index++)
+            {
+                if (values[index] != state.ExpectedTicks)
+                {
+                    throw new InvalidOperationException(
+                        $"Producer {index} advanced to {values[index]} instead of {state.ExpectedTicks}.");
+                }
+            }
+        });
     }
 
     public void Dispose() => _schedule.Dispose();
@@ -55,12 +60,12 @@ internal sealed class PopulationProducerWorkload : IDisposable
     }
 
     private sealed class IncrementProducerSystem(
-        PopulationColumn<double> produced,
-        int producerCount) : IScheduledKernelSystem
+        Population<ProducerKind> population,
+        PopulationColumn<double> produced) : IScheduledKernelSystem
     {
-        private static readonly SystemAccess[] s_access =
+        private static readonly ImmutableArray<SystemAccess> s_access =
             [SystemAccess.WriteColumn<ProducerKind, double>(s_producedKey)];
-        private static readonly Action<Memory<double>, int, PopulationRange> s_incrementRange = IncrementRange;
+        private static readonly PopulationRangeAction<ProducerKind, PopulationColumn<double>> s_incrementRange = IncrementRange;
 
         public string Id => "benchmark.increment_producers";
 
@@ -68,13 +73,12 @@ internal sealed class PopulationProducerWorkload : IDisposable
 
         public void Execute(ScheduledSystemContext context)
         {
-            var values = produced.EditMemory(0, producerCount);
-            context.ForEachRange(values, producerCount, s_incrementRange);
+            context.ForEachPopulationRange(population, produced, s_incrementRange);
         }
 
-        private static void IncrementRange(Memory<double> values, int _, PopulationRange range)
+        private static void IncrementRange(PopulationColumn<double> values, int _, scoped ref PopulationAccessScope<ProducerKind> scope)
         {
-            var rows = values.Span.Slice(range.Start, range.Length);
+            var rows = scope.EditRange(values);
             for (var index = 0; index < rows.Length; index++)
             {
                 rows[index] += 1;

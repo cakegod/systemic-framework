@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "entities": [
+    {
+      "id": "garden",
+      "kind": "actor",
+      "tags": ["garden"],
+      "capabilities": [],
+      "properties": {
+        "garden.talents.slots": 3,
+        "garden.worker.scoutRadius": 260,
+        "garden.worker.patience": 120,
+        "garden.trail.decay": 0.995,
+        "garden.trail.threshold": 0.4,
+        "garden.trail.strength": 10,
+        "garden.echo.delay": 12,
+        "garden.echo.expiry": 60,
+        "garden.echo.radius": 180,
+        "garden.seedstorm.delay": 18,
+        "garden.seedstorm.expiry": 60,
+        "garden.seedstorm.offset": 50,
+        "garden.magnetism.radius": 90,
+        "garden.magnetism.pull": 4,
+        "garden.chain.radius": 100,
+        "garden.chain.bursts": 16,
+        "garden.projectile.radius": 240,
+        "garden.clone.lifetime": 180,
+        "garden.talent.echo.uses": 0,
+        "garden.talent.seedstorm.uses": 0,
+        "garden.talent.magnetism.uses": 0,
+        "garden.talent.chain.uses": 0,
+        "garden.talent.projectile.uses": 0,
+        "garden.talent.clone.uses": 0
+      },
+      "bounds": { "x": 480, "y": 320, "halfWidth": 0, "halfHeight": 0 }
+    }
+  ]
+}

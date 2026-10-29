@@ -3,10 +3,102 @@ using Systemic.Kernel;
 
 namespace Systemic.Rules;
 
-public enum RuleSubject
+/// <summary>How a <see cref="RuleSubject"/> is addressed.</summary>
+public enum RuleSubjectKind
 {
+    /// <summary>The fact's source entity.</summary>
     Source,
+
+    /// <summary>The fact's target entity.</summary>
     Target,
+
+    /// <summary>One entity named by ID, independent of the fact.</summary>
+    Entity,
+
+    /// <summary>A row of a named population schema, independent of the fact.</summary>
+    Row,
+
+    /// <summary>The population row the fact is about, resolved by generation at dispatch.</summary>
+    FactRow,
+}
+
+/// <summary>Addresses the entity or population row a condition or effect applies to.</summary>
+public readonly record struct RuleSubject
+{
+    private RuleSubject(RuleSubjectKind kind, string populationId, int slot)
+    {
+        Kind = kind;
+        PopulationId = populationId;
+        Slot = slot;
+    }
+
+    /// <summary>Gets the fact's source entity.</summary>
+    public static RuleSubject Source { get; } = new(RuleSubjectKind.Source, string.Empty, 0);
+
+    /// <summary>Gets the fact's target entity.</summary>
+    public static RuleSubject Target { get; } = new(RuleSubjectKind.Target, string.Empty, 0);
+
+    /// <summary>Addresses one entity by ID, independent of the fact being dispatched.</summary>
+    /// <param name="entityId">The entity's ID.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="entityId"/> is negative.</exception>
+    public static RuleSubject Entity(int entityId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(entityId);
+        return new RuleSubject(RuleSubjectKind.Entity, string.Empty, entityId);
+    }
+
+    /// <summary>Addresses one row of the population schema with the given stable ID.</summary>
+    /// <param name="populationId">The population schema ID, for example <c>IPopulationKind.Id</c>.</param>
+    /// <param name="slot">The row slot within that population.</param>
+    /// <exception cref="ArgumentException"><paramref name="populationId"/> is blank.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="slot"/> is negative.</exception>
+    public static RuleSubject Row(string populationId, int slot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(populationId);
+        ArgumentOutOfRangeException.ThrowIfNegative(slot);
+        return new RuleSubject(RuleSubjectKind.Row, populationId, slot);
+    }
+
+    /// <summary>Addresses the population row the dispatched fact is about.</summary>
+    /// <param name="populationId">The population schema the fact's row must belong to.</param>
+    /// <exception cref="ArgumentException"><paramref name="populationId"/> is blank.</exception>
+    /// <remarks>
+    /// The row is resolved from the fact's generation-checked reference at dispatch, so a row that
+    /// despawns before the fact is handled no longer matches: the reference does not fall back to
+    /// whichever row now occupies the slot.
+    /// </remarks>
+    public static RuleSubject FactRow(string populationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(populationId);
+        return new RuleSubject(RuleSubjectKind.FactRow, populationId, 0);
+    }
+
+    /// <summary>Gets how this subject is addressed.</summary>
+    public RuleSubjectKind Kind { get; }
+
+    /// <summary>Gets the population schema ID for a row subject, or an empty string otherwise.</summary>
+    /// <remarks>A row rule's property name is the column's stable key ID.</remarks>
+    public string PopulationId { get; }
+
+    /// <summary>Gets the row slot for a row subject.</summary>
+    public int Slot { get; }
+
+    /// <summary>Gets whether this subject addresses one fixed population row.</summary>
+    public bool IsRow => Kind == RuleSubjectKind.Row;
+
+    /// <summary>Gets whether this subject addresses the row the fact is about.</summary>
+    public bool IsFactRow => Kind == RuleSubjectKind.FactRow;
+
+    /// <summary>Gets whether this subject addresses a population row, fixed or fact-carried.</summary>
+    public bool AddressesRow => Kind is RuleSubjectKind.Row or RuleSubjectKind.FactRow;
+
+    public override string ToString() => Kind switch
+    {
+        RuleSubjectKind.Row => $"Row({PopulationId}, {Slot})",
+        RuleSubjectKind.FactRow => $"FactRow({PopulationId})",
+        RuleSubjectKind.Entity => $"Entity({Slot})",
+        _ => Kind.ToString(),
+    };
 }
 
 public enum RuleConditionKind

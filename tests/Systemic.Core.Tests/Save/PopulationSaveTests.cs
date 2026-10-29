@@ -83,6 +83,26 @@ public sealed class PopulationSaveTests
     }
 
     [Fact]
+    public void Save_includes_populations_defined_after_the_host_was_built()
+    {
+        using var pack = CoreOnlyPack.Create();
+        var content = ContentPackLoader.Load(pack.Root);
+        using var game = new SystemicGameBuilder(content, content.CreateWorld(77, 1)).Build();
+        var source = new PopulationSetupSystem(game.World);
+        source.Particles.AddRange(1);
+        source.Energy.EditRange(0, 1)[0] = 41;
+        var codec = new SystemicSaveCodec();
+
+        var saved = codec.Save(game);
+        var materialized = codec.Load(content, saved);
+        var restored = new PopulationSetupSystem(materialized.World);
+        using var restoredGame = new SystemicGameBuilder(content, materialized).AddSystem(restored).Build();
+
+        Assert.Equal(1, restored.Particles.Count);
+        Assert.Equal(41, restored.Energy.ReadOnlySpan[0]);
+    }
+
+    [Fact]
     public void SaveRestoresDoubleBufferCurrentAndReinitializesNext()
     {
         using var pack = CoreOnlyPack.Create();
@@ -120,21 +140,21 @@ public sealed class PopulationSaveTests
         var unknownPopulation = JsonNode.Parse(save)!.AsObject();
         Assert.NotNull(unknownPopulation["extensionStates"]?[PopulationExtensionId]);
         unknownPopulation["extensionStates"]![PopulationExtensionId]!["populations"]![0]!["id"] = "unknown.population";
-        AssertPopulationRestoreFails(content, codec, unknownPopulation.ToJsonString());
+        AssertPopulationRestoreFails(content, codec, SaveTestDocument.Seal(unknownPopulation));
 
         var unknownColumnVersion = JsonNode.Parse(save)!.AsObject();
         unknownColumnVersion["extensionStates"]![PopulationExtensionId]!["populations"]![0]!["columns"]![0]!["version"] = 2;
-        AssertPopulationRestoreFails(content, codec, unknownColumnVersion.ToJsonString());
+        AssertPopulationRestoreFails(content, codec, SaveTestDocument.Seal(unknownColumnVersion));
 
         var unknownPopulationVersion = JsonNode.Parse(save)!.AsObject();
         unknownPopulationVersion["extensionStates"]![PopulationExtensionId]!["populations"]![0]!["version"] = 2;
-        AssertPopulationRestoreFails(content, codec, unknownPopulationVersion.ToJsonString());
+        AssertPopulationRestoreFails(content, codec, SaveTestDocument.Seal(unknownPopulationVersion));
 
         var unknownColumnId = JsonNode.Parse(save)!.AsObject();
         unknownColumnId["extensionStates"]![PopulationExtensionId]!["populations"]![0]!["columns"]![0]!["id"] = "unknown.column";
-        AssertPopulationRestoreFails(content, codec, unknownColumnId.ToJsonString());
+        AssertPopulationRestoreFails(content, codec, SaveTestDocument.Seal(unknownColumnId));
 
-        var noDefinitions = codec.Load(content, unknownPopulation.ToJsonString());
+        var noDefinitions = codec.Load(content, SaveTestDocument.Seal(unknownPopulation));
         var noPopulationException = Assert.Throws<SystemicSaveException>(() =>
             new SystemicGameBuilder(content, noDefinitions).Build());
         Assert.Contains("population", noPopulationException.Message, StringComparison.OrdinalIgnoreCase);
@@ -154,7 +174,7 @@ public sealed class PopulationSaveTests
         root["extensionStates"]![PopulationExtensionId]!["populations"]![1]!["columns"]![0]!["data"] =
             Convert.ToBase64String([0x01, 0x02]);
 
-        var materialized = codec.Load(content, root.ToJsonString());
+        var materialized = codec.Load(content, SaveTestDocument.Seal(root));
         var targetSetup = new PopulationSetupSystem(materialized.World, includeSecondary: true);
         var exception = Assert.Throws<SystemicSaveException>(() =>
             new SystemicGameBuilder(content, materialized).AddSystem(targetSetup).Build());
@@ -173,7 +193,7 @@ public sealed class PopulationSaveTests
         var root = JsonNode.Parse(CreatePopulatedSave(content, codec, includeSecondary: true))!.AsObject();
         root["extensionStates"]![PopulationExtensionId]!["populations"]!.AsArray().RemoveAt(1);
 
-        var materialized = codec.Load(content, root.ToJsonString());
+        var materialized = codec.Load(content, SaveTestDocument.Seal(root));
         var targetSetup = new PopulationSetupSystem(materialized.World, includeSecondary: true);
         var exception = Assert.Throws<SystemicSaveException>(() =>
             new SystemicGameBuilder(content, materialized).AddSystem(targetSetup).Build());
@@ -192,7 +212,7 @@ public sealed class PopulationSaveTests
         var root = JsonNode.Parse(CreatePopulatedSave(content, codec, includeSecondary: true))!.AsObject();
         root["extensionStates"]![PopulationExtensionId]!["populations"]![0]!["rowToHandleSlot"]![0] = 12;
 
-        var materialized = codec.Load(content, root.ToJsonString());
+        var materialized = codec.Load(content, SaveTestDocument.Seal(root));
         var targetSetup = new PopulationSetupSystem(materialized.World, includeSecondary: true);
         var exception = Assert.Throws<SystemicSaveException>(() =>
             new SystemicGameBuilder(content, materialized).AddSystem(targetSetup).Build());
@@ -220,7 +240,7 @@ public sealed class PopulationSaveTests
         root["extensionStates"]![PopulationExtensionId]!["populations"]![1]!["columns"]![0]!["data"] =
             Convert.ToBase64String([0x02]);
 
-        var materialized = codec.Load(content, root.ToJsonString());
+        var materialized = codec.Load(content, SaveTestDocument.Seal(root));
         var targetSetup = new BooleanPopulationSetupSystem(materialized.World);
         var exception = Assert.Throws<SystemicSaveException>(() =>
             new SystemicGameBuilder(content, materialized).AddSystem(targetSetup).Build());
@@ -327,7 +347,7 @@ public sealed class PopulationSaveTests
 
         public PopulationColumn<int>? SecondaryEnergy { get; }
 
-        public void Step(SystemicStepContext context)
+        public void Step(SystemicSystemContext context)
         {
         }
     }
@@ -346,7 +366,7 @@ public sealed class PopulationSaveTests
 
         public int Order => 0;
 
-        public void Step(SystemicStepContext context)
+        public void Step(SystemicSystemContext context)
         {
         }
     }

@@ -5,17 +5,22 @@ using Systemic.Rules;
 
 namespace Systemic.Presentation;
 
-public sealed class PresentationRuntime : ISystemicStatefulExtension
+public sealed class PresentationRuntime : ISystemicTransactionalState
 {
     private readonly World _world;
     private readonly Dictionary<string, PresentationTimeline> _timelines;
     private readonly Dictionary<string, PresentationCueBinding[]> _bindings;
 
-    public PresentationRuntime(World world, PresentationCatalog catalog)
+    public PresentationRuntime(World world, PresentationCatalog catalog) : this(world, catalog, null)
+    {
+    }
+
+    public PresentationRuntime(World world, PresentationCatalog catalog, PresentationCueStreamOptions? cueOptions = null)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(catalog);
         _world = world;
+        Cues = cueOptions is null ? new PresentationCueStream() : new PresentationCueStream(cueOptions);
         _timelines = catalog.Timelines.ToDictionary(timeline => timeline.Id, StringComparer.Ordinal);
         _bindings = catalog.Bindings.GroupBy(binding => binding.EventType, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.OrderBy(binding => binding.TimelineId, StringComparer.Ordinal)
@@ -27,7 +32,7 @@ public sealed class PresentationRuntime : ISystemicStatefulExtension
 
     public PresentationIdentityState Identity { get; private set; }
 
-    public PresentationCueStream Cues { get; } = new();
+    public PresentationCueStream Cues { get; }
 
     public bool TryGetTimeline(string timelineId, out PresentationTimeline timeline) =>
         _timelines.TryGetValue(timelineId, out timeline!);
@@ -53,14 +58,37 @@ public sealed class PresentationRuntime : ISystemicStatefulExtension
 
         var tick = _world.LogicalTick;
         var source = CapturePosition(fact.SourceId);
-        var target = CapturePosition(fact.TargetId);
+        // Fact positions use the application's integer world-coordinate units. Presentation may
+        // convert them to floats because this anchor does not affect authoritative simulation.
+        var explicitPosition = fact.Position is { } position
+            ? new Point2(position.X, position.Y)
+            : (Point2?)null;
+        var target = explicitPosition ?? CapturePosition(fact.TargetId);
         foreach (var binding in bindings)
         {
-            _ = emitter.OnCommit(() => PublishCue(fact, tick, binding, source, target));
+            var anchor = explicitPosition ?? ResolveAnchor(binding.Anchor, source, target);
+            _ = emitter.OnCommit(() => PublishCue(fact, tick, binding, source, target, anchor));
         }
     }
 
     public JsonElement CaptureState() => JsonSerializer.SerializeToElement(Identity);
+
+    /// <summary>Captures the identity sequence for a tick without serializing it.</summary>
+    /// <returns>The current identity state.</returns>
+    public object CaptureTransactionState() => Identity;
+
+    /// <summary>Restores the identity sequence captured at the start of a rolled-back tick.</summary>
+    /// <param name="state">State returned by <see cref="CaptureTransactionState"/>.</param>
+    public void RestoreTransactionState(object state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (state is not PresentationIdentityState identity)
+        {
+            throw new ArgumentException("Presentation identity snapshot has an unexpected type.", nameof(state));
+        }
+
+        Identity = identity;
+    }
 
     public void RestoreState(JsonElement state)
     {
@@ -83,7 +111,8 @@ public sealed class PresentationRuntime : ISystemicStatefulExtension
         int tick,
         PresentationCueBinding binding,
         Point2? source,
-        Point2? target)
+        Point2? target,
+        Point2? anchor)
     {
         var timeline = _timelines[binding.TimelineId];
         var ordinal = Identity.NextCueSeedOrdinal;
@@ -102,7 +131,7 @@ public sealed class PresentationRuntime : ISystemicStatefulExtension
             ^ unchecked((ulong)fact.Depth));
         var cue = new PresentationCue(0, tick, fact.Type, binding.TimelineId,
             fact.SourceId, fact.TargetId, source, target,
-            ResolveAnchor(binding.Anchor, source, target), seed, timeline.ParticleCount, fact.Depth, fact.Amount);
+            anchor, seed, timeline.ParticleCount, fact.Depth, fact.Amount);
         _ = Cues.TryEnqueue(cue, out _);
     }
 

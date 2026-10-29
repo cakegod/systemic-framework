@@ -1,0 +1,63 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "..",
+          "files": [
+            "src/Systemic.Kernel/bin/Release/net10.0/Systemic.Kernel.dll",
+            "src/Systemic.Core/bin/Release/net10.0/Systemic.Core.dll",
+            "src/Systemic.Kernel.Generator/bin/Release/netstandard2.0/Systemic.Kernel.Generator.dll",
+            "src/modules/Systemic.Rendering/bin/Release/net10.0/Systemic.Rendering.dll",
+            "src/modules/Systemic.Incremental/bin/Release/net10.0/Systemic.Incremental.dll",
+            "src/modules/Systemic.Presentation/bin/Release/net10.0/Systemic.Presentation.dll",
+            "src/modules/Systemic.Gameplay2D/bin/Release/net10.0/Systemic.Gameplay2D.dll"
+          ]
+        }
+      ],
+      "references": [
+        {
+          "src": "..",
+          "files": [
+            "src/Systemic.Kernel/bin/Release/net10.0/Systemic.Kernel.dll",
+            "src/Systemic.Core/bin/Release/net10.0/Systemic.Core.dll",
+            "src/modules/Systemic.Rendering/bin/Release/net10.0/Systemic.Rendering.dll",
+            "src/modules/Systemic.Incremental/bin/Release/net10.0/Systemic.Incremental.dll",
+            "src/modules/Systemic.Presentation/bin/Release/net10.0/Systemic.Presentation.dll",
+            "src/modules/Systemic.Gameplay2D/bin/Release/net10.0/Systemic.Gameplay2D.dll"
+          ]
+        }
+      ],
+      "dest": "reference"
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "index.md",
+          "toc.yml",
+          "api/**/*.md",
+          "api/**/*.yml",
+          "api/**/*.json",
+          "contributing/**/*.md"
+        ]
+      },
+      {
+        "files": [
+          "reference/**/*.yml"
+        ]
+      }
+    ],
+    "dest": "_site",
+    "globalMetadata": {
+      "_appTitle": "Systemic Framework",
+      "_appName": "Systemic Framework",
+      "_enableSearch": true,
+      "_disableContribution": true
+    },
+    "template": [
+      "default"
+    ]
+  }
+}

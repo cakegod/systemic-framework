@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "rules": [
+    {
+      "id": "pixel.golden-pixel-wins",
+      "on": "pixel.golden.found",
+      "priority": 10,
+      "when": [{ "kind": "hasTag", "subject": "source", "tag": "mine" }],
+      "effects": [
+        { "kind": "addTag", "subject": "source", "tag": "golden-won" },
+        { "kind": "adjustProperty", "subject": "source", "property": "wins", "amount": 1 }
+      ]
+    }
+  ]
+}

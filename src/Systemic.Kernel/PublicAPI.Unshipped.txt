@@ -1,0 +1,5 @@
+#nullable enable
+const Systemic.Kernel.PopulationWorldState.CurrentVersion = 2 -> int
+const Systemic.Kernel.PopulationWorldState.OldestSupportedVersion = 1 -> int
+Systemic.Kernel.PopulationWorldState.HandleGeneration.get -> long
+Systemic.Kernel.PopulationWorldState.HandleGeneration.init -> void
