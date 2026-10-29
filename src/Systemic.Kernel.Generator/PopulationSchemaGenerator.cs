@@ -298,7 +298,7 @@ public sealed class PopulationSchemaGenerator : IIncrementalGenerator
         // Detect collisions here so a schema error points to the declaration, rather than leaving
         // consumers with compiler errors in generated code.
         var columnMembers = new HashSet<string>(StringComparer.Ordinal)
-            { "Columns", "ReadRow", "WriteRow", "WriteRange", "ValidateRow", "_population" };
+            { "Columns", "ReadRow", "WriteRow", "WriteRange", "ValidateOffset", "_population" };
         var rowMembers = new HashSet<string>(StringComparer.Ordinal) { "Row" };
         var companionMembers = new HashSet<string>(StringComparer.Ordinal)
             { companionName, "Define", "Bind", "Columns", "Row", "RangeWriter" };

@@ -469,6 +469,7 @@ public sealed class PopulationSchemaGeneratorTests
     [InlineData("[PopulationColumn(\"x\")] public int ReadRow;", "ReadRow")]
     [InlineData("[PopulationColumn(\"x\")] public int Row;", "Row")]
     [InlineData("[PopulationColumn(\"x\")] public int Columns;", "Columns")]
+    [InlineData("[PopulationColumn(\"x\")] public int ValidateOffset;", "ValidateOffset")]
     [InlineData("[PopulationColumn(\"x\")] public int FooKey; [PopulationColumn(\"y\")] public int ReadFoo;", "ReadFooKey")]
     public void Reports_generated_member_name_conflicts(string fields, string conflictingName)
     {
