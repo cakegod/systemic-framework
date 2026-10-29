@@ -11,6 +11,7 @@ internal sealed class GroundPass
     private readonly int _viewportLocation;
     private readonly int _cameraLocation;
     private uint _texture;
+    private Terrain? _uploadedTerrain;
 
     public GroundPass()
     {
@@ -51,11 +52,17 @@ internal sealed class GroundPass
 
     public void Draw(Terrain terrain, Camera camera)
     {
-        if (_texture == 0)
+        // WHY: restart builds a new Sim, so the arena image changes while this renderer stays alive.
+        if (_texture == 0 || !ReferenceEquals(_uploadedTerrain, terrain))
         {
+            _uploadedTerrain = terrain;
             var image = terrain.Image;
-            Gl.glGenTextures(1, _textureName);
-            _texture = _textureName[0];
+            if (_texture == 0)
+            {
+                Gl.glGenTextures(1, _textureName);
+                _texture = _textureName[0];
+            }
+
             Gl.glBindTexture(Gl.Texture2D, _texture);
             Gl.glTexParameteri(Gl.Texture2D, Gl.TextureMinFilter, Gl.Nearest);
             Gl.glTexParameteri(Gl.Texture2D, Gl.TextureMagFilter, Gl.Nearest);

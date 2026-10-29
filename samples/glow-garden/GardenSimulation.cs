@@ -347,6 +347,13 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
         _tickTrailThreshold = _tuning.TrailThreshold;
         _tickTrailStrength = _tuning.TrailStrength;
         _scent.Decay(_tuning.TrailDecay);
+        // WHY: a loaded save starts with an empty plant grid, and a due Echo impact queries it
+        // before this tick's rebuild. A matching count means the grid already mirrors the rows.
+        if (_plantGrid.Count != _plants.Count)
+        {
+            RebuildPlantGrid();
+        }
+
         StepTalents();
         RebuildPlantGrid();
         GrowPlants();
