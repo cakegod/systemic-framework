@@ -276,15 +276,18 @@ public sealed class ContentModuleRegistry
         return this;
     }
 
-    internal ImmutableDictionary<string, TuningDocument> CompileTunings(ReadOnlyMemory<byte> entitiesJson, string sourceFile)
+    internal ImmutableDictionary<string, TuningDocument> CompileTunings(ReadOnlyMemory<byte> entitiesJson,
+        string sourceFile, CompiledEntities entities)
     {
         var documents = ImmutableDictionary.CreateBuilder<string, TuningDocument>(StringComparer.Ordinal);
         var diagnostics = ImmutableArray.CreateBuilder<ContentTuningDiagnostic>();
+        var definitions = entities.Definitions.ToDictionary(definition => definition.Id, StringComparer.Ordinal);
         foreach (var (entityId, schema) in _tuningSchemas.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             try
             {
-                documents.Add(entityId, schema.ParseEntity(entitiesJson, sourceFile, entityId));
+                documents.Add(entityId, schema.ParseEntity(entitiesJson, sourceFile, entityId,
+                    definitions.GetValueOrDefault(entityId)));
             }
             catch (ContentTuningException exception)
             {

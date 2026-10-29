@@ -83,14 +83,18 @@ public static partial class ContentPackLoader
         var entitiesFile = TryCompileAt(root, gameEntities, "$.entities", diagnostics,
             () =>
             {
-                var file = Read<EntitiesFile>(ResolveContentPath(root, gameEntities), gameEntities,
+                return Read<EntitiesFile>(ResolveContentPath(root, gameEntities), gameEntities,
                     EntitiesSchemaId, s_entitiesSchema, fingerprint, out entitiesBytes);
-                tuningDocuments = moduleRegistry.CompileTunings(entitiesBytes, gameEntities);
-                return file;
             });
         var entities = entitiesFile is null
             ? null
             : TryCompileAt(root, gameEntities, "$.entities", diagnostics, () => CompileEntities(entitiesFile, gameEntities));
+        // Tunings validate the merged entity, so a value or tag inherited from an archetype counts.
+        if (entitiesFile is not null && entities is not null && moduleRegistry.HasTuningSchemas)
+        {
+            TryCompile(root, gameEntities, "$.entities", diagnostics,
+                () => tuningDocuments = moduleRegistry.CompileTunings(entitiesBytes, gameEntities, entities));
+        }
         var rules = rulesFile is null
             ? null
             : TryCompileAt(root, gameRules, "$.rules", diagnostics, () => CompileRules(rulesFile.Value, entities));

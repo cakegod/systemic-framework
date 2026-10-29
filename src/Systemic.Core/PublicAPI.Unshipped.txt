@@ -1,1 +1,3 @@
 #nullable enable
+
+Systemic.Content.ContentTuningSchema.ParseEntity(System.ReadOnlyMemory<byte> entitiesJson, string! sourceFile, string! entityId, Systemic.Content.EntityDefinition? merged) -> Systemic.Content.TuningDocument!

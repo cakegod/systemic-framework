@@ -71,6 +71,18 @@ public sealed class ContentTuningSchema
     /// original file line/column and are qualified with the entity array path.
     /// </summary>
     public TuningDocument ParseEntity(ReadOnlyMemory<byte> entitiesJson, string sourceFile, string entityId)
+        => ParseEntity(entitiesJson, sourceFile, entityId, merged: null);
+
+    /// <summary>Validates one entity after archetype inheritance.</summary>
+    /// <param name="entitiesJson">The complete entities JSON the entity is embedded in.</param>
+    /// <param name="sourceFile">The file name reported in diagnostics.</param>
+    /// <param name="entityId">The entity to validate.</param>
+    /// <param name="merged">
+    /// The compiled entity after archetype inheritance. Properties and tags it inherits satisfy a
+    /// required declaration even though the entity's own JSON does not spell them out.
+    /// </param>
+    public TuningDocument ParseEntity(ReadOnlyMemory<byte> entitiesJson, string sourceFile, string entityId,
+        EntityDefinition? merged)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceFile);
         ArgumentException.ThrowIfNullOrWhiteSpace(entityId);
@@ -139,7 +151,8 @@ public sealed class ContentTuningSchema
             var basePosition = SourceLocations.FromOffset(entitiesJson.Span, start);
             try
             {
-                return ParseCore(entityBytes, sourceFile, $"$.entities[{matchIndex}]", allowEntityMetadata: true);
+                return ParseCore(entityBytes, sourceFile, $"$.entities[{matchIndex}]",
+                    allowEntityMetadata: true, merged);
             }
             catch (ContentTuningException exception)
             {
@@ -155,7 +168,7 @@ public sealed class ContentTuningSchema
     }
 
     private TuningDocument ParseCore(ReadOnlyMemory<byte> json, string sourceFile, string pathPrefix,
-        bool allowEntityMetadata)
+        bool allowEntityMetadata, EntityDefinition? merged = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceFile);
         if (json.Length > MaximumDocumentBytes)
@@ -227,7 +240,11 @@ public sealed class ContentTuningSchema
                     continue;
                 }
 
-                if (declaration.DefaultValue is { } fallback)
+                if (TryReadInheritedValue(declaration, merged, out var inherited))
+                {
+                    values.Add(declaration.Name, inherited);
+                }
+                else if (declaration.DefaultValue is { } fallback)
                 {
                     values.Add(declaration.Name, fallback);
                 }
@@ -241,6 +258,11 @@ public sealed class ContentTuningSchema
 
             foreach (var required in _requiredTags)
             {
+                if (merged is not null && merged.Tags.Contains(required, StringComparer.Ordinal))
+                {
+                    tags.Add(required);
+                }
+
                 if (!tags.Contains(required))
                 {
                     Add("tuning.required_tag", Qualify(pathPrefix, "$.tags"),
@@ -337,6 +359,42 @@ public sealed class ContentTuningSchema
 
     private static string Qualify(string prefix, string path) =>
         prefix == "$" ? path : prefix + path[1..];
+
+    // Archetype-inherited properties are merged before they reach here, and every entity property is
+    // a double, so only the numeric and integer declarations can match them.
+    private static bool TryReadInheritedValue(TuningProperty property, EntityDefinition? merged,
+        out TuningValue value)
+    {
+        value = default;
+        if (merged is null || !merged.Properties.TryGetValue(property.Name, out var number))
+        {
+            return false;
+        }
+
+        switch (property.Kind)
+        {
+            case TuningValueKind.Number:
+                if (!double.IsFinite(number)
+                    || number < property.NumberMinimum || number > property.NumberMaximum)
+                {
+                    return false;
+                }
+
+                value = TuningValue.FromNumber(number);
+                return true;
+            case TuningValueKind.Integer:
+                if (number != Math.Truncate(number)
+                    || number < property.IntegerMinimum || number > property.IntegerMaximum)
+                {
+                    return false;
+                }
+
+                value = TuningValue.FromInteger((long)number);
+                return true;
+            default:
+                return false;
+        }
+    }
 
     private static bool TryReadValue(TuningProperty property, JsonElement input, out TuningValue value, out string failure)
     {

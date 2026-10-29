@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Systemic.Content;
 
 namespace Systemic.Tests.Content;
@@ -29,6 +30,55 @@ public sealed class ContentTuningSchemaTests
         Assert.False(document.TryGetValue("optional", out _));
         Assert.Throws<InvalidOperationException>(() => document.GetInteger("speed"));
         Assert.Throws<KeyNotFoundException>(() => document.GetNumber("missing"));
+    }
+
+    [Fact]
+    public void An_inherited_value_satisfies_a_required_declaration_and_beats_the_default()
+    {
+        const string json = """
+            {
+              "schemaVersion": 2,
+              "entities": [{ "id": "garden", "kind": "actor", "archetype": "actor.base" }]
+            }
+            """;
+        var schema = new ContentTuningSchema(
+            [TuningProperty.Number("speed", minimum: 0, maximum: 10, defaultValue: 1, required: true)],
+            requiredTags: ["hostile"]);
+        var merged = new EntityDefinition("garden", "actor", ["hostile"], [],
+            new Dictionary<string, double> { ["speed"] = 3 }.ToImmutableDictionary(),
+            ImmutableDictionary<string, string>.Empty, null, null);
+
+        var document = schema.ParseEntity(
+            System.Text.Encoding.UTF8.GetBytes(json), "entities.json", "garden", merged);
+
+        Assert.Equal(3, document.GetNumber("speed"));
+        Assert.Contains("hostile", document.Tags);
+    }
+
+    [Fact]
+    public void Loader_validates_tunings_against_values_inherited_from_an_archetype()
+    {
+        using var pack = CoreOnlyPack.Create();
+        File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
+            {
+              "schemaVersion": 2,
+              "archetypes": [
+                { "id": "actor.base", "kind": "actor", "tags": ["hostile"], "properties": { "health": 5 } }
+              ],
+              "entities": [
+                { "id": "actor.target", "archetype": "actor.base" }
+              ]
+            }
+            """);
+        var schema = new ContentTuningSchema(
+            [TuningProperty.Number("health", minimum: 0, maximum: 10, required: true)],
+            requiredTags: ["hostile"]);
+
+        var content = ContentPackLoader.Load(pack.Root,
+            new ContentModuleRegistry().AddTuningSchema("actor.target", schema));
+
+        Assert.Equal(5, content.Tuning("actor.target").GetNumber("health"));
+        Assert.Contains("hostile", content.Tuning("actor.target").Tags);
     }
 
     [Fact]
