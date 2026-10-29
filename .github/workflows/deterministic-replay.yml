@@ -15,8 +15,6 @@ jobs:
             architecture: X64
           - os: windows-latest
             architecture: X64
-          - os: macos-14-xlarge
-            architecture: Arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
