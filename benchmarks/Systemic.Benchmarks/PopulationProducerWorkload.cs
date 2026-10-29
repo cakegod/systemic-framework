@@ -73,8 +73,7 @@ internal sealed class PopulationProducerWorkload : IDisposable
 
         public void Execute(ScheduledSystemContext context)
         {
-            var lease = context.BorrowPopulation(population);
-            context.ForEachPopulationRange(lease, produced, s_incrementRange);
+            context.ForEachPopulationRange(population, produced, s_incrementRange);
         }
 
         private static void IncrementRange(PopulationColumn<double> values, int _, scoped ref PopulationAccessScope<ProducerKind> scope)
