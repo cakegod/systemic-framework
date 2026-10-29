@@ -1,0 +1,40 @@
+name: Quality gates
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.403
+      - name: Restore
+        run: dotnet restore Systemic.sln
+      # Includes the rollback, clone and concurrency properties; a race or a stale cache fails here.
+      - name: Test
+        run: dotnet test Systemic.sln --configuration Release --no-restore
+
+  allocation-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.403
+      - name: Restore
+        run: dotnet restore benchmarks/Systemic.Benchmarks/Systemic.Benchmarks.csproj
+      # The enforced contract here is zero allocated bytes per tick, which is portable. Wall clock is
+      # not: the documented 5 ms budget on the reactive tier is tuned to developer hardware, so CI uses
+      # a loose ceiling that still catches an order-of-magnitude regression on a shared runner.
+      - name: Producer and reactive allocation budgets
+        run: >
+          dotnet run --configuration Release
+          --project benchmarks/Systemic.Benchmarks
+          --no-restore
+          --
+          --gate --scenario all --warmup-ticks 200 --ticks 200 --repeat 1 --max-tick-ms 50
