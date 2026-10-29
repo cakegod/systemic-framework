@@ -7,17 +7,17 @@
 
 </div>
 
-Systemic is a .NET framework for games that need a deterministic simulation and content designers can edit without recompiling. The simulation, rules, saves and replays live in the framework. Presentation, progression and engine adapters are optional modules.
+Systemic is a .NET framework for games that need a deterministic simulation and content that designers can edit without recompiling. The simulation, rules, saves and replays live in the framework. Presentation, progression and engine adapters are optional.
 
 A Core-only game can load a JSON content pack, tick a fixed-step host, save the world and replay the run. Games that need more opt into modules for incremental progression, presentation cues or 2D gameplay. The same seed and inputs produce the same world state, save document and replay hash.
 
 ## Highlights
 
-- 🎯 **Deterministic by default.** Seeded random, fixed-point math and a fixed-step host make a run reproducible across machines, saves and replays.
-- 🧩 **Optional modules.** Kernel and Core have no engine dependency. Incremental, Presentation, Gameplay2D and Rendering are separate assemblies that a game registers only when it uses them.
-- 📦 **Content as data.** Entities, rules, tuning, visuals and UI layouts live in JSON, validated at load with file and line diagnostics.
-- 🚀 **Built for large populations.** Generated column schemas and row-addressed rules carry a million simulated rows inside a 30 Hz frame with no per-tick allocation.
-- 🛟 **Recoverable state.** Transactions roll back structural edits, modifiers, population rows and rule effects, and saves migrate forward between schema versions.
+- Runs are deterministic. Seeded random, fixed-point math and a fixed-step host reproduce a run on another machine, after a save, or during replay.
+- Modules are optional. Kernel and Core have no engine dependency, and Incremental, Presentation, Gameplay2D and Rendering are separate assemblies registered only when a game uses them.
+- Content stays in JSON. Entities, rules, tuning, visuals and UI layouts are validated at load, and every error reports its file and line.
+- Populations scale to a million rows. Generated column schemas and row-addressed rules process them inside a 30 Hz frame with no per-tick allocation.
+- State recovers from failure. Transactions roll back structural edits, modifiers, population rows and rule effects, and saves migrate forward between schema versions.
 
 ## Features
 
@@ -31,7 +31,7 @@ A Core-only game can load a JSON content pack, tick a fixed-step host, save the 
 - [x] Source-generated population schemas with typed column access
 - [x] Population tags as bit masks, inline modifiers and fixed-point columns
 - [x] Rebuilt and incremental spatial grids with radius and nearest queries
-- [x] Scheduled systems with explicit data access and parallel range work
+- [x] Scheduled systems with declared data access and parallel range work
 - [x] Versioned, checksummed saves with explicit migrations
 - [x] Deterministic replays with hash comparison
 - [x] Typed tuning schemas and prepared content reloads
@@ -43,7 +43,7 @@ A Core-only game can load a JSON content pack, tick a fixed-step host, save the 
 
 ## Installation
 
-The framework is not published as a NuGet package. Clone the repository and build it from source:
+There is no NuGet package. Clone the repository and build it from source:
 
 ```sh
 git clone https://github.com/cakegod/systemic-framework.git
@@ -74,7 +74,7 @@ dotnet run --project src/tools/Systemic.Cli -- trace samples/incremental-quarry 
 Facts: 2; rules: 2; effects: 3; cutoff: none; rolled back: False
 ```
 
-The CLI also serves a read-only preview with `preview <directory>`, revalidates on file changes with `watch <directory>`, and accepts `--port` for the preview server.
+The CLI can also serve a read-only preview (`preview <directory>`), revalidate a pack when its files change (`watch <directory>`), and change the preview port with `--port`.
 
 ## Examples
 
@@ -132,7 +132,7 @@ The [system context guide](docs/api/system-context.md) shows a host system built
 | [`molecule-swarm`](samples/molecule-swarm/README.md) | A tower defense against a growing swarm with SDL/OpenGL | `dotnet run -c Release --project samples/molecule-swarm -- --autoplay` |
 | [`crowd-million`](samples/crowd-million/README.md) | A content-only pack for the crowd benchmark tier | `dotnet run -c Release --project benchmarks/Systemic.Benchmarks -- --gate --scenario crowd` |
 
-The first two rows use the CLI from the Quick start, for example `dotnet run --project src/tools/Systemic.Cli -- validate samples/systemic-sandbox`.
+The first two rows run through the CLI from the Quick start, for example `dotnet run --project src/tools/Systemic.Cli -- validate samples/systemic-sandbox`.
 
 ## Benchmarks
 
@@ -148,7 +148,7 @@ dotnet run -c Release --project benchmarks/Systemic.Benchmarks -- --gate --scena
 | Content | 2,000 actors through the entity and rule path | 5 ms and 4 KiB per tick | passes on the gate runner |
 | Kernel | 50,000 producers and a reactive actor workload | zero allocated bytes per tick | passes on the gate runner |
 
-`--scenario crowd`, `--scenario content`, `--agents`, `--content-root` and `--workers` select a tier and its shape. `--spatial` measures the three spatial grids and cross-checks every query against a brute-force oracle. The numbers come from the available runner, an AMD EPYC 9V74 capped at two CPUs; the documented target is a 2015-era low-power laptop, which the runner cannot certify.
+`--scenario crowd`, `--scenario content`, `--agents`, `--content-root` and `--workers` select a tier and its shape. `--spatial` measures the three spatial grids and cross-checks every query against a brute-force oracle. These numbers come from the available runner, an AMD EPYC 9V74 capped at two CPUs. The documented target is a 2015-era low-power laptop, and this runner cannot certify it.
 
 ## Documentation
 
@@ -159,7 +159,7 @@ dotnet run -c Release --project benchmarks/Systemic.Benchmarks -- --gate --scena
 
 ## Verify
 
-Run the test suite, formatting check and API documentation check from the repository root:
+Run the test suite, the formatting check and the API documentation check from the repository root:
 
 ```sh
 dotnet test Systemic.sln --configuration Release
@@ -167,7 +167,7 @@ dotnet format Systemic.sln --verify-no-changes
 python3 docs/check_api_xml_docs.py --configuration Release
 ```
 
-CI also runs the two format severity passes, docfx, the replay fixture on Linux and Windows, and the allocation gates.
+CI runs the two stricter format passes, docfx, the replay fixture on Linux and Windows, and the allocation gates.
 
 ## License
 
