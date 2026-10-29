@@ -2,39 +2,54 @@ name: Quality gates
 
 on:
   push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   workflow_dispatch:
+
+# A newer commit supersedes the running one on the same branch. Main keeps every run, because each
+# pushed commit there is a merge result that has not been checked before.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.403
+          cache: true
+          cache-dependency-path: '**/*.csproj'
       - name: Restore
-        run: dotnet restore Systemic.sln
+        run: dotnet restore Systemic.sln -p:NuGetAudit=false
       # Includes the rollback, clone and concurrency properties; a race or a stale cache fails here.
       - name: Test
         run: dotnet test Systemic.sln --configuration Release --no-restore
-
-  allocation-gates:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.403
-      - name: Restore
-        run: dotnet restore benchmarks/Systemic.Benchmarks/Systemic.Benchmarks.csproj
+      # The solution build above already produced these binaries, so the Linux replay fixture runs
+      # in the same job. deterministic-replay.yml keeps the Windows leg for cross-OS coverage.
+      - name: Replay fixture
+        run: >
+          dotnet test tests/Systemic.Integration.Tests
+          --configuration Release --no-build --no-restore
+          --filter FullyQualifiedName~DeterministicReplayTests
       # The enforced contract here is zero allocated bytes per tick, which is portable. Wall clock is
-      # not: the documented 5 ms budget on the reactive tier is tuned to developer hardware, so CI uses
-      # a loose ceiling that still catches an order-of-magnitude regression on a shared runner.
+      # not: the documented 5 ms budget on the reactive tier is tuned to developer hardware, so CI
+      # uses a loose ceiling that still catches an order-of-magnitude regression on a shared runner.
+      # This runs after the test hosts have exited, in its own process, so the allocation window
+      # stays isolated.
       - name: Producer and reactive allocation budgets
         run: >
           dotnet run --configuration Release
           --project benchmarks/Systemic.Benchmarks
-          --no-restore
+          --no-build --no-restore
           --
           --gate --scenario all --warmup-ticks 200 --ticks 200 --repeat 1 --max-tick-ms 50

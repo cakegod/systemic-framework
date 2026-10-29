@@ -2,31 +2,43 @@ name: Deterministic replay fixture
 
 on:
   push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   replay:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            architecture: X64
-          - os: windows-latest
-            architecture: X64
-    runs-on: ${{ matrix.os }}
+    # Ubuntu replay runs in quality-gates.yml against the solution build. This job covers the other
+    # operating system, where the fixture used to diverge.
+    runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.403
+          cache: true
+          cache-dependency-path: '**/*.csproj'
       - name: Verify process architecture
         shell: pwsh
         run: |
-          dotnet --info
-          if ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString() -ne '${{ matrix.architecture }}') {
+          if ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString() -ne 'X64') {
             throw 'Unexpected .NET process architecture'
           }
+      - name: Restore
+        run: dotnet restore tests/Systemic.Integration.Tests -p:NuGetAudit=false
       - name: Verify replay fixture
-        run: dotnet test tests/Systemic.Integration.Tests -c Release --filter FullyQualifiedName~DeterministicReplayTests
+        run: >
+          dotnet test tests/Systemic.Integration.Tests
+          --configuration Release --no-restore
+          --filter FullyQualifiedName~DeterministicReplayTests

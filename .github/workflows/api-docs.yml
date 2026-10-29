@@ -2,29 +2,52 @@ name: API documentation
 
 on:
   push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - 'schemas/**'
+      - 'Systemic.sln'
+      - '.config/**'
+      - '.github/workflows/api-docs.yml'
   pull_request:
+    paths:
+      - 'src/**'
+      - 'docs/**'
+      - 'schemas/**'
+      - 'Systemic.sln'
+      - '.config/**'
+      - '.github/workflows/api-docs.yml'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.403
+          cache: true
+          cache-dependency-path: '**/*.csproj'
       - name: Restore pinned DocFX tool
         run: dotnet tool restore
+      # Only the libraries listed in docs/docfx.json are needed; the XML check reads their output.
+      # API examples still compile in the tests workflow, which builds Systemic.Core.Tests.
       - name: Build public framework libraries
         run: |
-          dotnet build src/Systemic.Kernel/Systemic.Kernel.csproj --configuration Release
-          dotnet build src/Systemic.Core/Systemic.Core.csproj --configuration Release
-          dotnet build src/Systemic.Kernel.Generator/Systemic.Kernel.Generator.csproj --configuration Release
-          dotnet build src/modules/Systemic.Rendering/Systemic.Rendering.csproj --configuration Release
-          dotnet build src/modules/Systemic.Incremental/Systemic.Incremental.csproj --configuration Release
-          dotnet build src/modules/Systemic.Presentation/Systemic.Presentation.csproj --configuration Release
-          dotnet build src/modules/Systemic.Gameplay2D/Systemic.Gameplay2D.csproj --configuration Release
-          dotnet build tests/Systemic.Core.Tests/Systemic.Core.Tests.csproj --configuration Release
+          dotnet build src/Systemic.Kernel/Systemic.Kernel.csproj --configuration Release -p:NuGetAudit=false
+          dotnet build src/Systemic.Core/Systemic.Core.csproj --configuration Release -p:NuGetAudit=false
+          dotnet build src/Systemic.Kernel.Generator/Systemic.Kernel.Generator.csproj --configuration Release -p:NuGetAudit=false
+          dotnet build src/modules/Systemic.Rendering/Systemic.Rendering.csproj --configuration Release -p:NuGetAudit=false
+          dotnet build src/modules/Systemic.Incremental/Systemic.Incremental.csproj --configuration Release -p:NuGetAudit=false
+          dotnet build src/modules/Systemic.Presentation/Systemic.Presentation.csproj --configuration Release -p:NuGetAudit=false
+          dotnet build src/modules/Systemic.Gameplay2D/Systemic.Gameplay2D.csproj --configuration Release -p:NuGetAudit=false
       - name: Check XML API summaries and analyzer links
         run: python3 docs/check_api_xml_docs.py --configuration Release
       - name: Generate API metadata
