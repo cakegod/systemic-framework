@@ -82,6 +82,47 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
+    public void Inherited_integers_outside_the_exact_double_range_are_not_rounded()
+    {
+        const string json = """
+            {
+              "schemaVersion": 2,
+              "entities": [{ "id": "garden", "kind": "actor" }]
+            }
+            """;
+        var schema = new ContentTuningSchema([TuningProperty.Integer("count", required: true)]);
+        var merged = new EntityDefinition("garden", "actor", [], [],
+            new Dictionary<string, double> { ["count"] = 9007199254740992 }.ToImmutableDictionary(),
+            ImmutableDictionary<string, string>.Empty, null, null);
+
+        var error = Assert.Throws<ContentTuningException>(() =>
+            schema.ParseEntity(System.Text.Encoding.UTF8.GetBytes(json), "entities.json", "garden", merged));
+
+        Assert.Contains(error.Diagnostics, d => d.Code == "tuning.required"
+            && d.Path == "$.entities[0].properties.count");
+    }
+
+    [Fact]
+    public void Inherited_integers_inside_the_exact_double_range_still_inherit()
+    {
+        const string json = """
+            {
+              "schemaVersion": 2,
+              "entities": [{ "id": "garden", "kind": "actor" }]
+            }
+            """;
+        var schema = new ContentTuningSchema([TuningProperty.Integer("count", required: true)]);
+        var merged = new EntityDefinition("garden", "actor", [], [],
+            new Dictionary<string, double> { ["count"] = 9007199254740991 }.ToImmutableDictionary(),
+            ImmutableDictionary<string, string>.Empty, null, null);
+
+        var document = schema.ParseEntity(
+            System.Text.Encoding.UTF8.GetBytes(json), "entities.json", "garden", merged);
+
+        Assert.Equal(9007199254740991, document.GetInteger("count"));
+    }
+
+    [Fact]
     public void Entity_tuning_keeps_full_file_paths_and_original_source_locations()
     {
         const string json = """

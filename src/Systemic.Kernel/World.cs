@@ -467,6 +467,10 @@ public sealed class World
     /// </remarks>
     internal long StateRevision { get; private set; }
 
+    /// <summary>Gets the number of cached first-tagged answers, including ones from older revisions.</summary>
+    /// <remarks>Diagnostic: it guards the cache against retaining tags the world has since dropped.</remarks>
+    internal int FirstTaggedCacheCount => _firstTagged.Count;
+
     public void MarkPopulationDirty() => InvalidateDerivedLookups();
 
     /// <summary>Gets the number of population bytes copied into undo batches since the process started.</summary>
@@ -753,8 +757,10 @@ public sealed class World
         var populations = _populationsById.Values.OrderBy(population => population.Id, StringComparer.Ordinal)
             .Select(population => population.CaptureSaveState())
             .ToArray();
-        return new PopulationWorldState(PopulationWorldState.CurrentVersion, populations,
-            _nextPopulationHandleGeneration);
+        return new PopulationWorldState(PopulationWorldState.CurrentVersion, populations)
+        {
+            HandleGeneration = _nextPopulationHandleGeneration,
+        };
     }
 
     /// <summary>Validates a complete population save before applying any population data.</summary>
@@ -1266,7 +1272,15 @@ public sealed class World
 
     internal void MarkFirstTaggedDirty() => InvalidateDerivedLookups();
 
-    private void InvalidateDerivedLookups() => StateRevision++;
+    private void InvalidateDerivedLookups()
+    {
+        StateRevision++;
+        // WHY: entries are keyed by whatever tags a world happened to query, so keeping stale ones
+        // would retain temporary tags and their entities for the world's whole lifetime. Every
+        // invalidation bumps the revision here, so clearing here cannot be skipped the way a
+        // per-writer clear could.
+        _firstTagged.Clear();
+    }
 
     internal void UpdateMembershipIndex(Entity entity, GrantKind kind, string name, bool present)
     {

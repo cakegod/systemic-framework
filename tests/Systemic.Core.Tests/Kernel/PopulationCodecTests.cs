@@ -80,6 +80,23 @@ public sealed class PopulationCodecTests
     }
 
     [Fact]
+    public void Population_state_keeps_the_two_argument_shape_existing_callers_use()
+    {
+        var world = new World(seed: 79, valueScale: 1);
+        var population = world.DefinePopulation<HandledKind>(enableHandles: true);
+        population.AddRange(1);
+
+        var captured = world.CapturePopulationState();
+        var (version, populations) = captured;
+        var rebuilt = new PopulationWorldState(version, populations) { HandleGeneration = 7 };
+
+        Assert.Equal(PopulationWorldState.CurrentVersion, version);
+        Assert.Same(captured.Populations, populations);
+        Assert.True(captured.HandleGeneration > 0);
+        Assert.Equal(7, rebuilt.HandleGeneration);
+    }
+
+    [Fact]
     public void A_rolled_back_spawn_does_not_change_the_next_generation_a_load_issues()
     {
         var world = new World(seed: 78, valueScale: 1);

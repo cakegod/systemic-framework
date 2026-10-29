@@ -9,7 +9,6 @@ const Systemic.Kernel.EntityCapabilities.BeSpent = "be_spent" -> string!
 const Systemic.Kernel.EntityProperties.Amount = "amount" -> string!
 const Systemic.Kernel.EntityTags.Resource = "resource" -> string!
 const Systemic.Kernel.Population<TKind>.MaximumTags = 64 -> int
-const Systemic.Kernel.PopulationWorldState.CurrentVersion = 1 -> int
 const Systemic.Kernel.RowModifiers.SlotsPerRow = 8 -> int
 const Systemic.Kernel.RowModifierSlot.EmptyKey = 0 -> ushort
 const Systemic.Kernel.World.DefaultSpatialCellSize = 32 -> float

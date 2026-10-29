@@ -14,6 +14,11 @@ public sealed class ContentTuningSchema
     public const int MaximumProperties = 256;
     public const int MaximumTags = 128;
     public const int MaximumDocumentBytes = 1_048_576;
+
+    // Archetype properties are merged as doubles before they reach this schema, so an inherited
+    // integer is only trustworthy while a double still names every integer it can hold. At 2^53
+    // consecutive integers collapse, and an authored value above that could silently change.
+    private const double MaximumExactInteger = 9_007_199_254_740_992d;
     private static readonly UTF8Encoding s_utf8 = new(false, true);
     private readonly ImmutableDictionary<string, TuningProperty> _properties;
     private readonly ImmutableArray<string> _requiredTags;
@@ -383,8 +388,10 @@ public sealed class ContentTuningSchema
                 value = TuningValue.FromNumber(number);
                 return true;
             case TuningValueKind.Integer:
-                if (number != Math.Truncate(number)
-                    || number < property.IntegerMinimum || number > property.IntegerMaximum)
+                if (!double.IsFinite(number) || number != Math.Truncate(number)
+                    || number <= -MaximumExactInteger || number >= MaximumExactInteger
+                    || (property.IntegerMinimum is { } minimum && number < minimum)
+                    || (property.IntegerMaximum is { } maximum && number > maximum))
                 {
                     return false;
                 }

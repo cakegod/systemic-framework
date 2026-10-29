@@ -91,6 +91,24 @@ public sealed class TagQueryTests
     }
 
     [Fact]
+    public void Cached_tag_queries_do_not_accumulate_across_world_changes()
+    {
+        var world = new World(seed: 1, valueScale: 1);
+        for (var index = 0; index < 32; index++)
+        {
+            var tag = $"group-{index}";
+            var entity = world.Add(new DataEntity([tag], []));
+            Assert.Equal(entity.Id, world.FirstTagged(tag, string.Empty));
+        }
+
+        Assert.Equal(1, world.FirstTaggedCacheCount);
+
+        world.Add(new DataEntity([], []));
+
+        Assert.Equal(0, world.FirstTaggedCacheCount);
+    }
+
+    [Fact]
     public void Repeated_queries_do_not_allocate()
     {
         var world = new World(seed: 1, valueScale: 1);
