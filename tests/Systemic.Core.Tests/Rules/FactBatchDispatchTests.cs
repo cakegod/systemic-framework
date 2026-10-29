@@ -57,6 +57,40 @@ public sealed class FactBatchDispatchTests
         Assert.False(result.RolledBack);
     }
 
+    [Fact]
+    public void A_batch_that_cannot_begin_a_transaction_does_not_poison_the_engine()
+    {
+        var world = new World(seed: 2, valueScale: 1);
+        var target = world.Add(new DataEntity([], [], ("value", 0.0)));
+        var rules = new RuleEngine(new CompiledRuleSet([AddRule()]));
+        var population = world.DefinePopulation<BatchKind>(enableHandles: true);
+        SimulationFact[] facts = [new("add", 0, target.Id), new("add", 0, target.Id)];
+
+        var lease = population.Borrow();
+        try
+        {
+            // An active population lease rejects the batch transaction before the scan starts.
+            Assert.Throws<InvalidOperationException>(() => rules.DispatchBatch(world, facts));
+        }
+        finally
+        {
+            lease.Dispose();
+        }
+
+        var result = rules.DispatchBatch(world, facts);
+
+        Assert.False(result.RolledBack);
+        Assert.True(target.TryGetProperty(world, "value", out var value));
+        Assert.Equal(2, value);
+    }
+
     private static CompiledRule AddRule() =>
         new("test.add", "add", 0, [], [RuleEffect.AdjustProperty(RuleSubject.Target, "value", 1)]);
+
+    private readonly struct BatchKind : IPopulationKind
+    {
+        public static string Id => "test.batch-kind";
+
+        public static int Version => 1;
+    }
 }

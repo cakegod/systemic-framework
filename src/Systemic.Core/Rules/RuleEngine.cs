@@ -891,16 +891,16 @@ public sealed class RuleEngine
         }
 
         _dispatchActive = true;
-        using var transaction = world.BeginTransaction();
-        _batchTransaction = transaction;
-        var factsProcessed = 0;
-        var rulesMatched = 0;
-        var effectsApplied = 0;
-        var cutOff = false;
-        string? cutoffReason = null;
-        var rolledBack = false;
         try
         {
+            using var transaction = world.BeginTransaction();
+            _batchTransaction = transaction;
+            var factsProcessed = 0;
+            var rulesMatched = 0;
+            var effectsApplied = 0;
+            var cutOff = false;
+            string? cutoffReason = null;
+            var rolledBack = false;
             for (var index = 0; index < facts.Length; index++)
             {
                 // Emitters are single-dispatch, so each fact gets its own generation.
@@ -933,6 +933,8 @@ public sealed class RuleEngine
             {
                 transaction.Commit();
             }
+
+            return new RuleDispatchResult(factsProcessed, rulesMatched, effectsApplied, cutOff, cutoffReason, rolledBack);
         }
         finally
         {
@@ -940,8 +942,6 @@ public sealed class RuleEngine
             _activeTransaction = null;
             _dispatchActive = false;
         }
-
-        return new RuleDispatchResult(factsProcessed, rulesMatched, effectsApplied, cutOff, cutoffReason, rolledBack);
     }
 
     private RuleDispatchResult DispatchCore(
