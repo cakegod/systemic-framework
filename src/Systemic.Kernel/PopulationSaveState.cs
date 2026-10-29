@@ -1,9 +1,18 @@
 namespace Systemic.Kernel;
 
 /// <summary>Portable, versioned state for all dense populations registered in one world.</summary>
-public sealed record PopulationWorldState(int Version, PopulationSaveState[] Populations)
+/// <remarks>
+/// <paramref name="HandleGeneration"/> is the world's next handle generation. It is saved because
+/// generations consumed by rolled-back spawns leave no slot behind, so a load cannot derive it
+/// from the saved slots alone. Version 1 saves omit it and fall back to the largest saved slot.
+/// </remarks>
+public sealed record PopulationWorldState(
+    int Version,
+    PopulationSaveState[] Populations,
+    long HandleGeneration = 0)
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
+    public const int OldestSupportedVersion = 1;
 }
 
 /// <summary>Portable row, handle, and column data for one registered population kind.</summary>

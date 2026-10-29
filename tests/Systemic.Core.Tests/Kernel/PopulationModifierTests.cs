@@ -50,7 +50,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void A_modifier_expires_at_its_absolute_tick()
+    public void A_modifier_stays_active_through_its_absolute_expiry_tick()
     {
         var world = new World(seed: 64, valueScale: 1);
         var population = Create(world, 1);
@@ -58,8 +58,42 @@ public sealed class PopulationModifierTests
         population.SetModifier(0, "test.modifier.health", 10, remainingTicks: 1);
         Assert.Equal(110, population.EffectiveValue(0, "test.modifier.health"));
 
+        // The expiry tick is the last active tick, as for entity modifiers.
         world.LogicalTick = 1;
+        Assert.Equal(110, population.EffectiveValue(0, "test.modifier.health"));
 
+        world.LogicalTick = 2;
+        Assert.Equal(100, population.EffectiveValue(0, "test.modifier.health"));
+    }
+
+    [Fact]
+    public void A_one_tick_modifier_created_during_a_tick_applies_on_that_tick()
+    {
+        var world = new World(seed: 73, valueScale: 1);
+        world.LogicalTick = 5;
+        var population = Create(world, 1);
+
+        population.SetModifier(0, "test.modifier.health", 10, remainingTicks: 1);
+        Assert.Equal(110, population.EffectiveValue(0, "test.modifier.health"));
+
+        world.LogicalTick = 6;
+        Assert.Equal(100, population.EffectiveValue(0, "test.modifier.health"));
+    }
+
+    [Fact]
+    public void A_two_tick_modifier_created_during_a_tick_applies_for_two_ticks()
+    {
+        var world = new World(seed: 74, valueScale: 1);
+        world.LogicalTick = 5;
+        var population = Create(world, 1);
+
+        population.SetModifier(0, "test.modifier.health", 10, remainingTicks: 2);
+        Assert.Equal(110, population.EffectiveValue(0, "test.modifier.health"));
+
+        world.LogicalTick = 6;
+        Assert.Equal(110, population.EffectiveValue(0, "test.modifier.health"));
+
+        world.LogicalTick = 7;
         Assert.Equal(100, population.EffectiveValue(0, "test.modifier.health"));
     }
 
@@ -74,7 +108,8 @@ public sealed class PopulationModifierTests
             population.SetModifier(0, $"test.modifier.p{index}", 1, remainingTicks: 1);
         }
 
-        world.LogicalTick = 1;
+        // The slots expire at tick 1 and stay live through that tick, so they free up at tick 2.
+        world.LogicalTick = 2;
         Assert.True(population.SetModifier(0, "test.modifier.health", 7));
 
         Assert.Equal(107, population.EffectiveValue(0, "test.modifier.health"));

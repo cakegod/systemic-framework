@@ -79,6 +79,29 @@ public sealed class PopulationCodecTests
         Assert.Equal(Generations(), Generations());
     }
 
+    [Fact]
+    public void A_rolled_back_spawn_does_not_change_the_next_generation_a_load_issues()
+    {
+        var world = new World(seed: 78, valueScale: 1);
+        var population = world.DefinePopulation<HandledKind>(enableHandles: true);
+        population.AddRange(1);
+        using (var transaction = world.BeginTransaction())
+        {
+            population.AddRange(1);
+            transaction.Rollback();
+        }
+
+        var loadedWorld = new World(seed: 78, valueScale: 1);
+        var loaded = loadedWorld.DefinePopulation<HandledKind>(enableHandles: true);
+        loadedWorld.RestorePopulationState(world.CapturePopulationState());
+
+        var continued = population.AddRange(1);
+        var restored = loaded.AddRange(1);
+
+        Assert.Equal(population.GetHandle(continued.Start).Generation,
+            loaded.GetHandle(restored.Start).Generation);
+    }
+
     private static void AssertBytes<T>(IPopulationCodec<T> codec, T[] values, byte[] expected)
         where T : unmanaged
     {

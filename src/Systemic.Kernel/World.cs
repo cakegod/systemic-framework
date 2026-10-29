@@ -735,7 +735,8 @@ public sealed class World
         var populations = _populationsById.Values.OrderBy(population => population.Id, StringComparer.Ordinal)
             .Select(population => population.CaptureSaveState())
             .ToArray();
-        return new PopulationWorldState(PopulationWorldState.CurrentVersion, populations);
+        return new PopulationWorldState(PopulationWorldState.CurrentVersion, populations,
+            _nextPopulationHandleGeneration);
     }
 
     /// <summary>Validates a complete population save before applying any population data.</summary>
@@ -746,7 +747,8 @@ public sealed class World
             EnsureActive();
             EnsureNoPopulationLeases();
             ArgumentNullException.ThrowIfNull(state);
-            if (state.Version != PopulationWorldState.CurrentVersion || state.Populations is null)
+            if (state.Version is < PopulationWorldState.OldestSupportedVersion
+                or > PopulationWorldState.CurrentVersion || state.Populations is null)
             {
                 throw new InvalidDataException("Population state has an unsupported schema version or missing populations.");
             }
@@ -778,6 +780,9 @@ public sealed class World
             {
                 restore();
             }
+
+            // Version 1 saves carry no counter; PrepareRestore raises it to the largest saved slot.
+            ObservePopulationHandleGeneration(state.HandleGeneration);
         }
     }
 
@@ -1243,6 +1248,7 @@ public sealed class World
         entity.MarkStructureChanged();
         MarkStructureChanged();
         MarkFirstTaggedDirty();
+        MarkPopulationDirty();
         if (_tagIndexDirty)
         {
             return;

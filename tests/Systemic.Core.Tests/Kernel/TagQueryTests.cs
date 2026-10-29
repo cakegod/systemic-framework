@@ -39,6 +39,31 @@ public sealed class TagQueryTests
     }
 
     [Fact]
+    public void Live_count_follows_a_tag_added_after_the_count_was_queried()
+    {
+        var world = new World(seed: 3, valueScale: 1);
+        var entity = world.Add(new DataEntity([], []));
+        Assert.Equal(0, world.LiveCount("bolt"));
+
+        entity.AddTag("bolt");
+
+        Assert.Equal(1, world.LiveCount("bolt"));
+        Assert.Equal(1, world.LiveCount("bolt"));
+    }
+
+    [Fact]
+    public void Live_count_follows_a_tag_grant_after_the_count_was_queried()
+    {
+        var world = new World(seed: 4, valueScale: 1);
+        var entity = world.Add(new DataEntity([], []));
+        Assert.Equal(0, world.LiveCount("powered"));
+
+        world.Grant("test", entity, GrantKind.Tag, "powered");
+
+        Assert.Equal(1, world.LiveCount("powered"));
+    }
+
+    [Fact]
     public void A_rollback_drops_every_cached_tag_bitset_not_only_the_one_read_next()
     {
         var world = new World(seed: 2, valueScale: 1);

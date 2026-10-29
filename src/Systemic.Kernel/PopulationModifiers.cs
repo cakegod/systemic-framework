@@ -31,8 +31,9 @@ public struct RowModifierSlot
     }
 
     /// <summary>Gets whether the slot holds a live modifier at the given logical tick.</summary>
+    /// <remarks>The expiry tick is the last active tick, matching entity modifiers.</remarks>
     public readonly bool IsActive(int currentTick) =>
-        Key != EmptyKey && (ExpiryTick < 0 || ExpiryTick > currentTick);
+        Key != EmptyKey && (ExpiryTick < 0 || ExpiryTick >= currentTick);
 
     public override readonly string ToString() => $"{Key}:{Value}@{ExpiryTick}";
 }
