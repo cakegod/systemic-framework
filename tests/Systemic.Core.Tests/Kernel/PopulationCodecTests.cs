@@ -64,12 +64,34 @@ public sealed class PopulationCodecTests
         RoundTrip(PopulationCodecs.Vector4, Vector4s);
     }
 
+    [Fact]
+    public void Handle_generations_are_deterministic_per_world()
+    {
+        static ulong[] Generations()
+        {
+            var world = new World(seed: 77, valueScale: 1);
+            var population = world.DefinePopulation<HandledKind>(enableHandles: true);
+            population.AddRange(4);
+            population.AddRange(2);
+            return [.. world.CapturePopulationState().Populations[0].HandleSlots.Select(slot => slot.Generation)];
+        }
+
+        Assert.Equal(Generations(), Generations());
+    }
+
     private static void AssertBytes<T>(IPopulationCodec<T> codec, T[] values, byte[] expected)
         where T : unmanaged
     {
         var data = new byte[codec.GetEncodedLength(values.Length)];
         codec.Encode(values, data);
         Assert.Equal(expected, data);
+    }
+
+    private readonly struct HandledKind : IPopulationKind
+    {
+        public static string Id => "test.codec-handles";
+
+        public static int Version => 1;
     }
 
     private static void RoundTrip<T>(IPopulationCodec<T> codec, T[] values) where T : unmanaged

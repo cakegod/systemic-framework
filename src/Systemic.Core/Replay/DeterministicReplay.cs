@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Systemic.Content;
 using Systemic.Host;
 
 namespace Systemic.Replay;
@@ -173,6 +174,8 @@ public sealed class HostReplayTarget(ISystemicHostAdapter host, Action<SystemicG
         document.Remove("checksum");
         if (document["extensionStates"] is JsonObject extensions)
             foreach (var name in _transient) extensions.Remove(name);
-        return Encoding.UTF8.GetBytes(CanonicalReplayJson.Normalize(document.ToJsonString()));
+        // WHY: host state is bounded by the save limit, not the smaller limit for authored replay inputs.
+        return Encoding.UTF8.GetBytes(CanonicalReplayJson.Normalize(document.ToJsonString(),
+            checked((int)ContentFileReader.MaximumFileBytes)));
     }
 }

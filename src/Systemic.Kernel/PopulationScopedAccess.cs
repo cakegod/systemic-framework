@@ -291,7 +291,7 @@ internal sealed class PopulationScopeLifetime
             {
                 var dependency = _dependencies[index];
                 lock (dependency.World.TransactionGate)
-                    dependency.ExitScope(IsParallel);
+                    dependency.ExitScope(IsParallel, _group);
                 _dependencies[index] = null!;
             }
 
@@ -319,7 +319,7 @@ internal sealed class PopulationScopeLifetime
 
         lock (storage.World.TransactionGate)
         {
-            storage.EnterScope(IsParallel, _group);
+            storage.EnterScope(IsParallel, _group, _access);
             try
             {
                 if (_dependencyCount == _dependencies.Length)
@@ -328,7 +328,7 @@ internal sealed class PopulationScopeLifetime
             }
             catch
             {
-                storage.ExitScope(IsParallel);
+                storage.ExitScope(IsParallel, _group);
                 throw;
             }
         }

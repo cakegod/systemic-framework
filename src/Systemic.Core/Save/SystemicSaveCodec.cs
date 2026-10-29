@@ -211,6 +211,10 @@ public sealed class SystemicSaveCodec
                 spatialCellSize: worldState.SpatialCellSize);
             world.Draws.RestoreState(worldState.Draws);
             world.LogicalTick = worldState.LogicalTick;
+            // WHY: a tick-zero load does not enter the in-progress phase through the setter, and
+            // RemainingFromExpiry is paired with the in-progress formula below, so set it explicitly
+            // before any absolute expiry is converted back to a remaining duration.
+            world.RestoreModifierTickPhase(inProgress: true);
             foreach (var savedEntity in worldState.Entities.OrderBy(entity => entity.Id))
             {
                 var codec = _codecs[savedEntity.Codec];
@@ -241,6 +245,11 @@ public sealed class SystemicSaveCodec
                 world.Grant(grant.Source, world.ById(grant.EntityId)!, grant.Kind, grant.Name,
                     RemainingFromExpiry(grant.ExpiryTick, world.LogicalTick));
             }
+
+            // Absolute expiries are restored above through the in-progress formula, so the phase must
+            // only end here: a completed save is between ticks, and effects created after the load
+            // start at the next tick.
+            world.RestoreModifierTickPhase(inProgress: false);
 
             foreach (var (role, entityId) in worldState.BoundRoles.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {

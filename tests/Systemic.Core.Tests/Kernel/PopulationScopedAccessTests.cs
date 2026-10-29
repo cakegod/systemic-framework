@@ -8,6 +8,9 @@ public sealed class PopulationScopedAccessTests
     private static readonly PopulationColumnKey<int> s_valueKey =
         new("scoped-value", 1, PopulationCodecs.Int32);
 
+    private static readonly PopulationColumnKey<int> s_otherValueKey =
+        new("scoped-other-value", 1, PopulationCodecs.Int32);
+
     [Fact]
     public void Serial_access_exposes_the_whole_read_and_only_the_assigned_write_range()
     {
@@ -181,7 +184,7 @@ public sealed class PopulationScopedAccessTests
         }
         finally
         {
-            population.EndScheduledRangeScope(lifetime, generation);
+            population.EndScheduledRangeScope(lifetime, generation, group);
         }
 
         population.WithAccess(new PopulationRange(0, 1), values,
@@ -214,7 +217,7 @@ public sealed class PopulationScopedAccessTests
         }
         finally
         {
-            lease.EndScopedAccess(lifetime, generation, parallel: false);
+            lease.EndScopedAccess(lifetime, generation, parallel: false, group: null);
         }
 
         lease.WithAccess(new PopulationRange(0, 1), values,
@@ -257,6 +260,104 @@ public sealed class PopulationScopedAccessTests
         Assert.Null(typeof(DoubleBufferedPopulationColumn<int>).GetMethod("EditNextMemory"));
         Assert.Null(typeof(PopulationLease<ScopedKind>).GetMethod("Read"));
         Assert.Null(typeof(PopulationLease<ScopedKind>).GetMethod("Edit"));
+    }
+
+    [Fact]
+    public void Parallel_scopes_admit_disjoint_declared_columns_of_one_population()
+    {
+        var world = new World(seed: 814, valueScale: 1);
+        var population = world.DefinePopulation<ScopedKind>();
+        population.AddRange(4);
+        var storage = population.StorageIdentity;
+        var firstGroup = new object();
+        var secondGroup = new object();
+        ImmutableArray<SystemAccess> first = [SystemAccess.WriteColumn<ScopedKind, int>(s_valueKey)];
+        ImmutableArray<SystemAccess> second = [SystemAccess.WriteColumn<ScopedKind, int>(s_otherValueKey)];
+
+        storage.EnterScope(parallel: true, firstGroup, first);
+        try
+        {
+            storage.EnterScope(parallel: true, secondGroup, second);
+            try
+            {
+                Assert.Equal(4, storage.Count);
+            }
+            finally
+            {
+                storage.ExitScope(parallel: true, secondGroup);
+            }
+        }
+        finally
+        {
+            storage.ExitScope(parallel: true, firstGroup);
+        }
+
+        Assert.False(storage.HasActiveScopes);
+    }
+
+    [Fact]
+    public void Parallel_scopes_still_reject_two_writers_of_one_column()
+    {
+        var world = new World(seed: 815, valueScale: 1);
+        var population = world.DefinePopulation<ScopedKind>();
+        population.AddRange(2);
+        var storage = population.StorageIdentity;
+        ImmutableArray<SystemAccess> write = [SystemAccess.WriteColumn<ScopedKind, int>(s_valueKey)];
+
+        storage.EnterScope(parallel: true, new object(), write);
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                storage.EnterScope(parallel: true, new object(), write));
+            Assert.Throws<InvalidOperationException>(() =>
+                storage.EnterScope(parallel: true, new object(), access: null));
+            Assert.Throws<InvalidOperationException>(() =>
+                storage.EnterScope(parallel: false, group: null));
+        }
+        finally
+        {
+            storage.ExitScope(parallel: true);
+        }
+    }
+
+    [Fact]
+    public void Parallel_scopes_of_one_partition_group_may_still_overlap()
+    {
+        var world = new World(seed: 816, valueScale: 1);
+        var population = world.DefinePopulation<ScopedKind>();
+        population.AddRange(2);
+        var storage = population.StorageIdentity;
+        var group = new object();
+        ImmutableArray<SystemAccess> write = [SystemAccess.WriteColumn<ScopedKind, int>(s_valueKey)];
+
+        storage.EnterScope(parallel: true, group, write);
+        try
+        {
+            storage.EnterScope(parallel: true, group, write);
+            storage.ExitScope(parallel: true, group);
+        }
+        finally
+        {
+            storage.ExitScope(parallel: true, group);
+        }
+
+        Assert.False(storage.HasActiveScopes);
+    }
+
+    [Fact]
+    public void The_schedule_and_population_scopes_share_one_access_conflict_rule()
+    {
+        ImmutableArray<SystemAccess> read = [SystemAccess.ReadColumn<ScopedKind, int>(s_valueKey)];
+        ImmutableArray<SystemAccess> write = [SystemAccess.WriteColumn<ScopedKind, int>(s_valueKey)];
+        ImmutableArray<SystemAccess> otherWrite = [SystemAccess.WriteColumn<ScopedKind, int>(s_otherValueKey)];
+
+        Assert.False(SystemAccess.Conflicts(read, read));
+        Assert.True(SystemAccess.Conflicts(read, write));
+        Assert.True(SystemAccess.Conflicts(write, write));
+        Assert.False(SystemAccess.Conflicts(write, otherWrite));
+        Assert.False(SystemAccess.Conflicts([SystemAccess.DeferWorldWrites], [SystemAccess.DeferWorldWrites]));
+        Assert.False(SystemAccess.Conflicts([SystemAccess.ReadWorld], [SystemAccess.DeferWorldWrites]));
+        Assert.True(SystemAccess.Conflicts([SystemAccess.WriteWorld], read));
     }
 
     private readonly struct ScopedKind : IPopulationKind

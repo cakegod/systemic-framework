@@ -6,9 +6,14 @@ namespace Systemic.Replay;
 
 internal static class CanonicalReplayJson
 {
-    public static string Normalize(string json)
+    internal const int MaximumInputLength = 1_048_576;
+
+    public static string Normalize(string json) => Normalize(json, MaximumInputLength);
+
+    public static string Normalize(string json, int maximumLength)
     {
-        if (json.Length > 1_048_576) throw new ArgumentException("Replay JSON exceeds the input limit.", nameof(json));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumLength);
+        if (json.Length > maximumLength) throw new ArgumentException("Replay JSON exceeds the input limit.", nameof(json));
         try
         {
             using var document = JsonDocument.Parse(json);

@@ -599,8 +599,9 @@ public sealed class RuleEngine
         try
         {
             // A scope, not a WorldTransaction: the scan runs every tick and a transaction object per
-            // tick would be the only allocation in an otherwise allocation-free pass.
-            var scope = world.BeginScope();
+            // tick would be the only allocation in an otherwise allocation-free pass. `using` rolls
+            // the scope back when an effect throws mid-scan, so no partial writes survive.
+            using var scope = world.BeginScope();
             var evaluated = 0;
             var matched = 0;
             var applied = 0;
@@ -703,20 +704,13 @@ public sealed class RuleEngine
             }
 
             var rolledBack = cutoffReason is "non_finite_property" or "invalid_fact";
-            try
+            if (rolledBack)
             {
-                if (rolledBack)
-                {
-                    scope.Rollback();
-                }
-                else
-                {
-                    scope.Commit();
-                }
+                scope.Rollback();
             }
-            finally
+            else
             {
-                scope.Dispose();
+                scope.Commit();
             }
 
             return new RuleRowScanResult(evaluated, matched, applied, rolledBack, cutoffReason);

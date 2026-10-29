@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -246,9 +247,7 @@ internal sealed class PopulationStorage(World world)
 {
     private World? _world = world;
     private int _activeLeases;
-    private int _activeScopes;
-    private bool _exclusiveScope;
-    private object? _parallelScopeGroup;
+    private readonly List<PopulationScopeEntry> _scopes = [];
     private readonly PopulationScopeLifetime _serialScopeLifetime = new();
 
     public int Count { get; set; }
@@ -284,31 +283,62 @@ internal sealed class PopulationStorage(World world)
         World.ReleasePopulationLease();
     }
 
-    public bool HasActiveScopes => _activeScopes != 0;
+    public bool HasActiveScopes => _scopes.Count != 0;
 
     public PopulationScopeLifetime SerialScopeLifetime => _serialScopeLifetime;
 
-    public void EnterScope(bool parallel, object? group)
+    /// <summary>Enters one access scope over this population's rows.</summary>
+    /// <remarks>
+    /// Serial scopes stay exclusive. Parallel scopes may overlap only when they belong to the same
+    /// scheduler partition group, or when their declared column access sets do not conflict — the
+    /// same rule the schedule uses to put two systems in one wave. An undeclared access set is
+    /// treated as incompatible, so an unscheduled caller cannot widen what the schedule permits.
+    /// </remarks>
+    public void EnterScope(bool parallel, object? group, ImmutableArray<SystemAccess>? access = null)
     {
-        if (parallel
-            ? _exclusiveScope || (_activeScopes != 0 && !ReferenceEquals(_parallelScopeGroup, group))
-            : _activeScopes != 0)
-            throw new InvalidOperationException("Population access scopes must not overlap serial access or another serial scope.");
-
-        checked { _activeScopes++; }
+        var declared = access ?? ImmutableArray<SystemAccess>.Empty;
         if (!parallel)
-            _exclusiveScope = true;
+        {
+            if (_scopes.Count != 0)
+                throw new InvalidOperationException("Population access scopes must not overlap serial access or another serial scope.");
+        }
         else
-            _parallelScopeGroup = group;
+        {
+            foreach (var active in _scopes)
+            {
+                if (!active.Parallel)
+                    throw new InvalidOperationException("Population access scopes must not overlap serial access or another serial scope.");
+
+                if (ReferenceEquals(active.Group, group))
+                    continue;
+
+                if (declared.IsDefaultOrEmpty
+                    || active.Access.IsDefaultOrEmpty
+                    || SystemAccess.Conflicts(active.Access, declared))
+                    throw new InvalidOperationException(
+                        "Parallel population access scopes must declare non-conflicting column access.");
+            }
+        }
+
+        _scopes.Add(new PopulationScopeEntry(parallel, group, declared));
     }
 
-    public void ExitScope(bool parallel)
+    /// <summary>Exits one access scope over this population's rows.</summary>
+    /// <param name="parallel">Whether the exiting scope was entered as parallel.</param>
+    /// <param name="group">The scheduler partition group, when the caller knows it.</param>
+    public void ExitScope(bool parallel, object? group = null)
     {
-        _activeScopes--;
-        if (!parallel)
-            _exclusiveScope = false;
-        else if (_activeScopes == 0)
-            _parallelScopeGroup = null;
+        for (var index = _scopes.Count - 1; index >= 0; index--)
+        {
+            var entry = _scopes[index];
+            if (entry.Parallel != parallel || (group is not null && !ReferenceEquals(entry.Group, group)))
+                continue;
+
+            _scopes.RemoveAt(index);
+            return;
+        }
+
+        throw new InvalidOperationException("Population access scopes must exit in the order they were entered.");
     }
 
     public void EnsureNoLeases()
@@ -320,6 +350,11 @@ internal sealed class PopulationStorage(World world)
     public void Rebind(World world) => _world = world;
 
     public void Detach() => _world = null;
+
+    private readonly record struct PopulationScopeEntry(
+        bool Parallel,
+        object? Group,
+        ImmutableArray<SystemAccess> Access);
 }
 
 internal sealed class SharedPopulationBuffer<T>(T[] values) where T : unmanaged

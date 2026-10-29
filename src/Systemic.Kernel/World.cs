@@ -72,6 +72,7 @@ public sealed class World
 
     private int _logicalTick;
     private bool _modifierTickInProgress;
+    private long _nextPopulationHandleGeneration;
     private readonly Dictionary<(int EntityId, string Property), List<PropertyModifier>> _modifiersByKey = [];
     private readonly Dictionary<(int EntityId, string Property), long> _modifierVersions = [];
     private readonly Dictionary<(int EntityId, string Property), CachedModifierApplication> _modifierCache = [];
@@ -201,6 +202,40 @@ public sealed class World
     /// <summary>Gets how many scopes this world has rolled back.</summary>
     /// <remarks>Derived indexes that undo restores behind their back compare this to detect a rollback.</remarks>
     internal int RollbackEpoch { get; private set; }
+
+    /// <summary>Gets whether the current logical tick has not finished advancing modifiers.</summary>
+    internal bool ModifierTickInProgress => _modifierTickInProgress;
+
+    /// <summary>Sets the tick phase after restoring, cloning or adopting a world.</summary>
+    internal void RestoreModifierTickPhase(bool inProgress) => _modifierTickInProgress = inProgress;
+
+    /// <summary>Gets the next population handle generation this world will issue.</summary>
+    internal long PopulationHandleGeneration => _nextPopulationHandleGeneration;
+
+    /// <summary>Issues a population handle generation that is unique within this world.</summary>
+    /// <remarks>
+    /// The counter is per world, not per process: handle generations are saved and replay-visible, so
+    /// an identical world must issue the same generations regardless of other worlds in the process.
+    /// </remarks>
+    internal ulong NextPopulationHandleGeneration()
+    {
+        var next = checked(++_nextPopulationHandleGeneration);
+        if (next <= 0)
+        {
+            throw new InvalidOperationException("The population handle generation space is exhausted.");
+        }
+
+        return (ulong)next;
+    }
+
+    /// <summary>Raises the handle generation counter past a generation restored from a save or clone.</summary>
+    internal void ObservePopulationHandleGeneration(long generation)
+    {
+        if (generation > _nextPopulationHandleGeneration)
+        {
+            _nextPopulationHandleGeneration = generation;
+        }
+    }
 
     public World(int seed, double valueScale, float spatialCellSize = DefaultSpatialCellSize)
     {
@@ -599,6 +634,7 @@ public sealed class World
             scope.Mark = _journal.Count;
             scope.Draws = Draws.Capture();
             scope.LogicalTick = LogicalTick;
+            scope.ModifierTickInProgress = _modifierTickInProgress;
             scope.NextId = _nextId;
             scope.Generation = unchecked(scope.Generation + 1);
             scope.Closed = false;
@@ -2110,7 +2146,9 @@ public sealed class World
             var clone = new World(Seed, ValueScale, Draws.Clone(), _entities.Count, SpatialCellSize)
             {
                 LogicalTick = LogicalTick,
+                _modifierTickInProgress = _modifierTickInProgress,
                 _nextId = _nextId,
+                _nextPopulationHandleGeneration = _nextPopulationHandleGeneration,
             };
 
             foreach (var entity in _entities)
@@ -2226,7 +2264,9 @@ public sealed class World
                     _required.UnionWith(next._required);
                     Draws = draws;
                     LogicalTick = next.LogicalTick;
+                    _modifierTickInProgress = next._modifierTickInProgress;
                     _nextId = next._nextId;
+                    _nextPopulationHandleGeneration = next._nextPopulationHandleGeneration;
                     CopyEffectsTo(this, next);
                     MarkPopulationDirty();
                     MarkTagIndexDirty();
@@ -2394,6 +2434,7 @@ public sealed class World
 
                 Draws.Restore(scope.Draws);
                 LogicalTick = scope.LogicalTick;
+                _modifierTickInProgress = scope.ModifierTickInProgress;
                 _nextId = scope.NextId;
                 // Undo restores column payloads directly, so derived per-population tag indexes
                 // cannot observe the write and must rebuild on next read.
@@ -2511,6 +2552,7 @@ public sealed class World
         public int Mark { get; set; }
         public DrawStreamSnapshot Draws { get; set; }
         public int LogicalTick { get; set; }
+        public bool ModifierTickInProgress { get; set; }
         public int NextId { get; set; }
         // ScopeState instances are pooled. Handles from a previous use must stay closed
         // even if this instance is already serving a different nested transaction.

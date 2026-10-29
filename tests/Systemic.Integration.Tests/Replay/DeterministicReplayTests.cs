@@ -172,6 +172,20 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
+    public void Host_capture_accepts_save_state_above_the_replay_input_limit()
+    {
+        var setup = CreateHost(seed: 5, transient: 0);
+        var target = new HostReplayTarget(new LargeSaveHost(setup.Host), (game, input) => { });
+
+        Assert.True(target.CaptureState().Length > 1_048_576);
+
+        var recorder = new ReplayRecorder(target);
+        recorder.RecordTick([]);
+
+        Assert.Single(recorder.Finish().Ticks);
+    }
+
+    [Fact]
     public void Host_fixture_matches_checked_in_replay_and_reports_mismatches()
     {
         var setup = CreateHost(seed: 41, transient: 7);
@@ -234,6 +248,16 @@ public sealed class DeterministicReplayTests
             BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(4), Value);
             return bytes;
         }
+    }
+
+    private sealed class LargeSaveHost(HeadlessSystemicHost inner) : ISystemicHostAdapter
+    {
+        public SystemicGame Game => inner.Game;
+        public FixedStepResult Advance(TimeSpan elapsed) => inner.Advance(elapsed);
+        public void Step() => inner.Step();
+        public RuleDispatchResult Publish(SimulationFact fact) => inner.Publish(fact);
+        public RuleDispatchTrace Trace(SimulationFact fact) => inner.Trace(fact);
+        public string Save() => "{\"payload\":\"" + new string('a', 1_200_000) + "\"}";
     }
 
     private sealed class CounterSystem : ISystemicSystem, ISystemicStatefulExtension

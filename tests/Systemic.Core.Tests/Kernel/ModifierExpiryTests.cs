@@ -67,6 +67,39 @@ public sealed class ModifierExpiryTests
     }
 
     [Fact]
+    public void A_clone_between_ticks_starts_new_modifiers_at_the_next_tick()
+    {
+        var world = new World(seed: 2, valueScale: 1);
+        world.LogicalTick = 5;
+        world.AdvanceModifiers();
+
+        var clone = world.Clone();
+        var entity = clone.Add(new DataEntity([], [], ("value", 0.0)));
+        clone.SetModifier("source", entity, "value", ModifierOperation.Add, 1, remainingTicks: 1);
+
+        Assert.Equal(6, Assert.Single(clone.Modifiers).ExpiryTick);
+    }
+
+    [Fact]
+    public void A_rolled_back_tick_restores_the_between_ticks_phase()
+    {
+        var world = new World(seed: 3, valueScale: 1);
+        world.LogicalTick = 5;
+        world.AdvanceModifiers();
+        var entity = world.Add(new DataEntity([], [], ("value", 0.0)));
+
+        using (var transaction = world.BeginTransaction())
+        {
+            world.LogicalTick = 6;
+            transaction.Rollback();
+        }
+
+        world.SetModifier("source", entity, "value", ModifierOperation.Add, 1, remainingTicks: 1);
+
+        Assert.Equal(6, Assert.Single(world.Modifiers).ExpiryTick);
+    }
+
+    [Fact]
     public void Timed_grant_stops_matching_when_it_expires()
     {
         var world = new World(seed: 1, valueScale: 1);

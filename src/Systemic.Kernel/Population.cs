@@ -76,7 +76,6 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         new("systemic.modifiers", 1, PopulationModifierCodec.Instance);
 
     private static long s_nextOwnerToken;
-    private static long s_nextHandleGeneration;
 
     private readonly PopulationStorage _storage;
     private readonly Dictionary<string, PopulationColumnBase> _columns = new(StringComparer.Ordinal);
@@ -318,25 +317,25 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         {
             EnsureActive();
             _storage.ValidateRange(range.Start, range.Length);
-            _storage.EnterScope(parallel: true, group);
+            _storage.EnterScope(parallel: true, group, access);
             try
             {
                 return lifetime.Activate(_storage, range, access, parallel: true, group);
             }
             catch
             {
-                _storage.ExitScope(parallel: true);
+                _storage.ExitScope(parallel: true, group);
                 throw;
             }
         }
     }
 
-    internal void EndScheduledRangeScope(PopulationScopeLifetime lifetime, long generation)
+    internal void EndScheduledRangeScope(PopulationScopeLifetime lifetime, long generation, object group)
     {
         lock (World.TransactionGate)
         {
             lifetime.Deactivate(generation);
-            _storage.ExitScope(parallel: true);
+            _storage.ExitScope(parallel: true, group);
         }
     }
 
@@ -816,12 +815,20 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     {
         EnsureActive();
         ValidateTagBit(bit);
-        var all = _tagRowBits ??= new ulong[]?[_tagNames.Length];
+        if (_tagRowBits is not { } all || all.Length != _tagNames.Length
+            || _tagRowBitsEpoch != World.RollbackEpoch)
+        {
+            // The epoch is shared by every cached tag, so a rollback must drop all of them: rebuilding
+            // one tag and advancing the epoch would let every other tag keep its pre-rollback bitset.
+            all = new ulong[]?[_tagNames.Length];
+            _tagRowBits = all;
+            _tagRowBitsEpoch = World.RollbackEpoch;
+        }
+
         var wordCount = (Count + 63) >> 6;
         var packed = all[bit];
-        if (packed is null || packed.Length < wordCount || _tagRowBitsEpoch != World.RollbackEpoch)
+        if (packed is null || packed.Length < wordCount)
         {
-            _tagRowBitsEpoch = World.RollbackEpoch;
             packed = new ulong[wordCount];
             var masks = _tagMask!.ReadOnlySpan;
             var tag = 1UL << bit;
@@ -999,7 +1006,7 @@ public sealed class Population<TKind> where TKind : IPopulationKind
                     _freeHandleSlots.Push(freeHandleSlots[index]);
                 }
 
-                ObserveHandleGeneration(maximumGeneration);
+                World.ObservePopulationHandleGeneration(checked((long)maximumGeneration));
             }
         };
     }
@@ -1074,20 +1081,6 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         return maximumGeneration;
     }
 
-    private static void ObserveHandleGeneration(ulong generation)
-    {
-        var target = checked((long)generation);
-        while (target > 0)
-        {
-            var current = Volatile.Read(ref s_nextHandleGeneration);
-            if (current >= target
-                || Interlocked.CompareExchange(ref s_nextHandleGeneration, target, current) == current)
-            {
-                return;
-            }
-        }
-    }
-
     internal Population<TKind> CloneTo(World world)
     {
         var clone = new Population<TKind>(world, _handlesEnabled, _ownerToken)
@@ -1116,6 +1109,8 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             {
                 clone._freeHandleSlots.Push(slot);
             }
+
+            world.ObservePopulationHandleGeneration(World.PopulationHandleGeneration);
         }
 
         return clone;
@@ -1150,13 +1145,13 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             slotIndex = _freeHandleSlots.Pop();
             slot = _handleSlots[slotIndex];
             slot.Row = row;
-            slot.Generation = NextHandleGeneration();
+            slot.Generation = World.NextPopulationHandleGeneration();
             _handleSlots[slotIndex] = slot;
         }
         else
         {
             slotIndex = _handleSlots.Count;
-            slot = new HandleSlot(row, NextHandleGeneration());
+            slot = new HandleSlot(row, World.NextPopulationHandleGeneration());
             _handleSlots.Add(slot);
         }
 
@@ -1169,17 +1164,6 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         slot.Row = -1;
         _handleSlots[slotIndex] = slot;
         _freeHandleSlots.Push(slotIndex);
-    }
-
-    private static ulong NextHandleGeneration()
-    {
-        var next = Interlocked.Increment(ref s_nextHandleGeneration);
-        if (next <= 0)
-        {
-            throw new InvalidOperationException("The population handle generation space is exhausted.");
-        }
-
-        return (ulong)next;
     }
 
     private void CaptureStructureUndo()
@@ -1395,7 +1379,7 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
         }
         finally
         {
-            EndScopedAccess(lifetime, generation, parallel: false);
+            EndScopedAccess(lifetime, generation, parallel: false, group: null);
         }
     }
 
@@ -1426,7 +1410,7 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
         }
         finally
         {
-            EndScopedAccess(lifetime, generation, parallel: false);
+            EndScopedAccess(lifetime, generation, parallel: false, group: null);
         }
     }
 
@@ -1470,25 +1454,25 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
             ObjectDisposedException.ThrowIf(_disposed, this);
             ArgumentNullException.ThrowIfNull(lifetime);
             _storage.ValidateRange(range.Start, range.Length);
-            _storage.EnterScope(parallel, group);
+            _storage.EnterScope(parallel, group, access);
             try
             {
                 return lifetime.Activate(_storage, range, access, parallel, group);
             }
             catch
             {
-                _storage.ExitScope(parallel);
+                _storage.ExitScope(parallel, group);
                 throw;
             }
         }
     }
 
-    internal void EndScopedAccess(PopulationScopeLifetime lifetime, long generation, bool parallel)
+    internal void EndScopedAccess(PopulationScopeLifetime lifetime, long generation, bool parallel, object? group)
     {
         lock (_world.TransactionGate)
         {
             lifetime.Deactivate(generation);
-            _storage.ExitScope(parallel);
+            _storage.ExitScope(parallel, group);
         }
     }
 

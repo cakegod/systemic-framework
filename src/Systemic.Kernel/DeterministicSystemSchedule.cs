@@ -58,6 +58,56 @@ public readonly record struct SystemAccess(string Resource, SystemAccessMode Mod
         ArgumentException.ThrowIfNullOrWhiteSpace(resource);
         return new SystemAccess(resource, mode);
     }
+
+    /// <summary>Reports whether two declared access sets cannot run at the same time.</summary>
+    /// <remarks>
+    /// The schedule uses this to build waves, and a population storage uses it to admit overlapping
+    /// scopes of the same population, so both agree on what "compatible" means.
+    /// </remarks>
+    internal static bool Conflicts(ImmutableArray<SystemAccess> left, ImmutableArray<SystemAccess> right)
+    {
+        // An immediate World writer excludes every other system, including systems that
+        // declare no World access (or no resources at all).
+        if (left.Contains(WriteWorld) || right.Contains(WriteWorld))
+        {
+            return true;
+        }
+
+        foreach (var first in left)
+        {
+            foreach (var second in right)
+            {
+                if (!string.Equals(first.Resource, second.Resource, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (first.Mode == SystemAccessMode.Read && second.Mode == SystemAccessMode.Read)
+                {
+                    continue;
+                }
+
+                // Buffered World commands are private to each system until an ordered barrier.
+                if (first.Mode == SystemAccessMode.DeferredWorldWrite
+                    && second.Mode == SystemAccessMode.DeferredWorldWrite)
+                {
+                    continue;
+                }
+
+                // A reader only observes pre-barrier state, so a buffered writer in the same wave
+                // cannot race it: the buffered commands land at the barrier, after every reader.
+                if ((first.Mode == SystemAccessMode.Read && second.Mode == SystemAccessMode.DeferredWorldWrite)
+                    || (first.Mode == SystemAccessMode.DeferredWorldWrite && second.Mode == SystemAccessMode.Read))
+                {
+                    continue;
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
 
 /// <summary>Opt-in simulation work. Direct population writes must match the declared access set.</summary>
@@ -149,50 +199,8 @@ public sealed class DeterministicSystemScheduleBuilder
         return new DeterministicSystemSchedule(waves, _workerCount);
     }
 
-    private static bool Conflicts(ImmutableArray<SystemAccess> left, ImmutableArray<SystemAccess> right)
-    {
-        // An immediate World writer excludes every other system, including systems that
-        // declare no World access (or no resources at all).
-        if (left.Contains(SystemAccess.WriteWorld) || right.Contains(SystemAccess.WriteWorld))
-        {
-            return true;
-        }
-
-        foreach (var first in left)
-        {
-            foreach (var second in right)
-            {
-                if (!string.Equals(first.Resource, second.Resource, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                if (first.Mode == SystemAccessMode.Read && second.Mode == SystemAccessMode.Read)
-                {
-                    continue;
-                }
-
-                // Buffered World commands are private to each system until an ordered barrier.
-                if (first.Mode == SystemAccessMode.DeferredWorldWrite
-                    && second.Mode == SystemAccessMode.DeferredWorldWrite)
-                {
-                    continue;
-                }
-
-                // A reader only observes pre-barrier state, so a buffered writer in the same wave
-                // cannot race it: the buffered commands land at the barrier, after every reader.
-                if ((first.Mode == SystemAccessMode.Read && second.Mode == SystemAccessMode.DeferredWorldWrite)
-                    || (first.Mode == SystemAccessMode.DeferredWorldWrite && second.Mode == SystemAccessMode.Read))
-                {
-                    continue;
-                }
-
-                return true;
-            }
-        }
-
-        return false;
-    }
+    private static bool Conflicts(ImmutableArray<SystemAccess> left, ImmutableArray<SystemAccess> right) =>
+        SystemAccess.Conflicts(left, right);
 
     internal sealed record SystemNode(IScheduledKernelSystem System, ImmutableArray<SystemAccess> Access, int Order);
 }
@@ -1141,9 +1149,9 @@ public sealed class ScheduledSystemContext
                 if (scopeStarted)
                 {
                     if (_population is { } population)
-                        population.EndScheduledRangeScope(lifetime, generation);
+                        population.EndScheduledRangeScope(lifetime, generation, _group);
                     else
-                        _lease!.EndScopedAccess(lifetime, generation, parallel: true);
+                        _lease!.EndScopedAccess(lifetime, generation, parallel: true, _group);
                 }
             }
         }

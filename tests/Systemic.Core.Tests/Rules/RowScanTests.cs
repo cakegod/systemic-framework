@@ -12,6 +12,9 @@ public sealed class RowScanTests
     private static readonly PopulationColumnKey<int> s_energyKey =
         new("test.scan.energy", 1, PopulationCodecs.Int32);
 
+    private static readonly PopulationColumnKey<float> s_pressureKey =
+        new("test.scan.pressure", 1, PopulationCodecs.Single);
+
     [Fact]
     public void A_scan_evaluates_the_rule_for_every_row_and_applies_conditional_effects()
     {
@@ -171,6 +174,24 @@ public sealed class RowScanTests
         Assert.Equal(1, engine.EvaluateRowEvent(world, "test.think", Crowd.Id, new PopulationRange(0, 2)).RulesMatched);
     }
 
+    // An effect that throws must unwind the scan's own scope: an unclosed scope would keep the
+    // rows before the failure in the journal and block the next transaction.
+    [Fact]
+    public void A_scan_that_overflows_during_an_effect_rolls_back_and_closes_its_scope()
+    {
+        var world = new World(seed: 131, valueScale: 1);
+        var population = CreatePressure(world, [0f, 3e38f]);
+        var engine = Bind(world,
+            new CompiledRule("test.pressure", "test.think", 0, [],
+                [RuleEffect.AdjustProperty(RuleSubject.FactRow(Crowd.Id), s_pressureKey.Id, 3e38)]));
+
+        Assert.Throws<OverflowException>(() =>
+            engine.EvaluateRowEvent(world, "test.think", Crowd.Id, new PopulationRange(0, 2)));
+
+        Assert.False(world.HasActiveScope);
+        Assert.Equal(new float[] { 0f, 3e38f }, ReadPressure(population));
+    }
+
     // A swap-back removal moves a row's mask word, which the incremental bit update never sees.
     [Fact]
     public void A_scan_prefilter_follows_a_tag_when_a_removed_row_is_swapped_back()
@@ -218,6 +239,39 @@ public sealed class RowScanTests
                 state.Values.AsSpan().CopyTo(values);
             });
         return population;
+    }
+
+    private static Population<Crowd> CreatePressure(World world, float[] pressure)
+    {
+        var population = world.DefinePopulation<Crowd>(enableHandles: true);
+        var column = population.Column(s_pressureKey);
+        population.Reserve(pressure.Length);
+        population.AddRange(pressure.Length);
+        population.WithAccess(new PopulationRange(0, pressure.Length), (Column: column, Values: pressure),
+            static ((PopulationColumn<float> Column, float[] Values) state,
+                scoped ref PopulationAccessScope<Crowd> scope) =>
+            {
+                var values = scope.EditRange(state.Column);
+                state.Values.AsSpan().CopyTo(values);
+            });
+        return population;
+    }
+
+    private static float[] ReadPressure(Population<Crowd> population)
+    {
+        var values = new float[population.Count];
+        population.WithAccess(new PopulationRange(0, values.Length),
+            (Column: population.Column(s_pressureKey), Values: values),
+            static ((PopulationColumn<float> Column, float[] Values) state,
+                scoped ref PopulationAccessScope<Crowd> scope) =>
+            {
+                var pressure = scope.ReadAll(state.Column);
+                for (var row = 0; row < state.Values.Length; row++)
+                {
+                    state.Values[row] = pressure[row];
+                }
+            });
+        return values;
     }
 
     private static int[] ReadEnergy(Population<Crowd> population)

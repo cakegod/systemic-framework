@@ -61,6 +61,25 @@ public sealed class SystemicSaveCodecTests
     }
 
     [Fact]
+    public void Round_trip_at_tick_zero_preserves_absolute_modifier_and_grant_expiry()
+    {
+        var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
+        var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 21, valueScale: 1)).Build();
+        var ore = game.World.ById(game.EntityId("quarry.ore"))!;
+        game.World.SetModifier("test.bonus", ore, "balance", ModifierOperation.Add, 4, remainingTicks: 12);
+        game.World.Grant("test.grant", ore, GrantKind.Tag, "energized", remainingTicks: 5);
+        var expectedModifierExpiry = Assert.Single(game.World.Modifiers).ExpiryTick;
+        var expectedGrantExpiry = Assert.Single(game.World.Grants).ExpiryTick;
+
+        var codec = new SystemicSaveCodec();
+        var loaded = codec.Load(content, codec.Save(game));
+
+        Assert.Equal(0, loaded.World.LogicalTick);
+        Assert.Equal(expectedModifierExpiry, Assert.Single(loaded.World.Modifiers).ExpiryTick);
+        Assert.Equal(expectedGrantExpiry, Assert.Single(loaded.World.Grants).ExpiryTick);
+    }
+
+    [Fact]
     public void Version_one_save_is_rejected_with_a_current_version_diagnostic()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
