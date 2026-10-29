@@ -29,6 +29,9 @@ public sealed class PopulationSink
     private readonly PopulationRowReference _anchor;
     private int _lastCount = -1;
     private bool _sampled;
+    private int _rollbackCount;
+    private bool _rollbackSampled;
+    private readonly Action _restoreBaseline;
 
     /// <summary>Creates a sink over one numeric column of one population.</summary>
     /// <param name="world">The world whose population the sink reads.</param>
@@ -113,6 +116,7 @@ public sealed class PopulationSink
         _tagBit = tagBit;
         _threshold = threshold;
         _anchor = anchor;
+        _restoreBaseline = RestoreBaseline;
     }
 
     /// <summary>Gets the population schema this sink aggregates.</summary>
@@ -130,6 +134,7 @@ public sealed class PopulationSink
     /// <summary>Counts the matching rows now, without raising a fact, and makes that the baseline.</summary>
     public int Sample()
     {
+        RestoreBaselineOnRollback();
         _lastCount = CountMatches();
         _sampled = true;
         return _lastCount;
@@ -156,10 +161,31 @@ public sealed class PopulationSink
             return 0;
         }
 
+        RestoreBaselineOnRollback();
         _sampled = true;
         _lastCount = count;
         facts.Add(SimulationFact.ForRow(_eventType, _anchor, amount: count));
         return 1;
+    }
+
+    // WHY: the baseline lives outside the world's row undo, so a rolled-back tick would otherwise
+    // keep the count it reported and the retry of the same change would raise no fact.
+    private void RestoreBaselineOnRollback()
+    {
+        if (!_world.HasActiveScope)
+        {
+            return;
+        }
+
+        _rollbackCount = _lastCount;
+        _rollbackSampled = _sampled;
+        _world.TryRegisterRollbackAction(_restoreBaseline);
+    }
+
+    private void RestoreBaseline()
+    {
+        _lastCount = _rollbackCount;
+        _sampled = _rollbackSampled;
     }
 
     private int CountMatches()

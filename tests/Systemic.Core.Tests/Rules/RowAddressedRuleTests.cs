@@ -300,6 +300,65 @@ public sealed class RowAddressedRuleTests
         Assert.Contains(Prey.Id, error.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void A_negative_adjustment_decreases_an_unsigned_column()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var population = world.DefinePopulation<UnsignedPrey>();
+        var key = new PopulationColumnKey<uint>("test.unsigned.health", 1, PopulationCodecs.UInt32);
+        var health = population.Column(key);
+        population.AddRange(1);
+        health.EditRange(0, 1).Fill(5);
+        var engine = Bind(world,
+            new CompiledRule("prey.burn", "prey.burn", 0, [],
+                [RuleEffect.AdjustProperty(RuleSubject.Row(UnsignedPrey.Id, 0), key.Id, -1)]));
+
+        var result = engine.Dispatch(world, new SimulationFact("prey.burn", 0, 0));
+
+        Assert.Equal(1, result.EffectsApplied);
+        Assert.Equal(4u, health.ReadOnlySpan[0]);
+    }
+
+    [Fact]
+    public void A_double_buffered_column_cannot_be_bound_by_a_row_rule()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var population = world.DefinePopulation<Prey>();
+        population.AddRange(1);
+        population.DoubleBufferedColumn(s_healthKey);
+        var engine = new RuleEngine(new CompiledRuleSet([
+            new CompiledRule("prey.smooth", "prey.smooth", 0, [],
+                [RuleEffect.AdjustProperty(RuleSubject.Row(Prey.Id, 0), "test.prey.health", -1)])]));
+
+        var error = Assert.Throws<InvalidOperationException>(() => engine.Bind(world));
+
+        Assert.Contains("double-buffered", error.Message, StringComparison.Ordinal);
+        Assert.Contains("test.prey.health", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_rolled_back_population_definition_does_not_leave_stale_bindings()
+    {
+        var world = new World(seed: 7, valueScale: 1);
+        var engine = new RuleEngine(new CompiledRuleSet([
+            new CompiledRule("prey.bite", "prey.bite", 0, [],
+                [RuleEffect.AdjustProperty(RuleSubject.Row(Prey.Id, 0), "test.prey.health", -5)])]));
+
+        using (var transaction = world.BeginTransaction())
+        {
+            CreatePrey(world, 1);
+            engine.Bind(world);
+            transaction.Rollback();
+        }
+
+        var prey = CreatePrey(world, 1);
+        var result = engine.Dispatch(world, new SimulationFact("prey.bite", 0, 0));
+
+        Assert.Equal(1, result.EffectsApplied);
+        Assert.False(result.RolledBack);
+        Assert.Equal([95], ReadHealth(prey));
+    }
+
     private static RuleEngine Bind(World world, CompiledRule rule) =>
         Bind(world, [rule]);
 
@@ -670,5 +729,12 @@ public sealed class RowAddressedRuleTests
         public static int Version => 1;
 
         public static string[] Tags => ["poisoned", "feral"];
+    }
+
+    private readonly struct UnsignedPrey : IPopulationKind
+    {
+        public static string Id => "test.unsigned-prey";
+
+        public static int Version => 1;
     }
 }

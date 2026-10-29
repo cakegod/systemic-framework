@@ -82,6 +82,34 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
+    public void A_rolled_back_tick_restores_the_baseline_so_the_retry_reports_the_change()
+    {
+        var world = new World(seed: 111, valueScale: 1);
+        var population = Create(world, 4, crossedHalf: 2);
+        var sink = new PopulationSink(world, Crowd.Id, s_healthKey.Id, 0, "crowd.downed",
+            population.ReferenceOf(0));
+        var facts = new List<SimulationFact>();
+        sink.Collect(facts);
+
+        using (var transaction = world.BeginTransaction())
+        {
+            SetHealth(population, 2, 5);
+            Assert.Equal(1, sink.Collect(facts));
+            Assert.Equal(3, sink.Count);
+            transaction.Rollback();
+        }
+
+        Assert.Equal(-1, Read(population.Column(s_healthKey), population, 2));
+        Assert.Equal(2, sink.Count);
+        // The caller's list keeps the fact from the failed pass, so only the retry's fact is new.
+        var appended = facts.Count;
+        SetHealth(population, 2, 5);
+        Assert.Equal(1, sink.Collect(facts));
+        Assert.Equal(appended + 1, facts.Count);
+        Assert.Equal(3, facts[^1].Amount);
+    }
+
+    [Fact]
     public void A_despawned_anchor_stops_emitting()
     {
         var world = new World(seed: 106, valueScale: 1);

@@ -131,6 +131,8 @@ public sealed class RuleEngine
     private readonly Dictionary<(World World, string EventType, string PopulationId), ResolvedRowRule[]>
         _rowScanPlans = [];
 
+    private readonly Dictionary<World, long> _boundRevisions = [];
+
     private WorldTransaction? _activeTransaction;
     private WorldTransaction? _batchTransaction;
 
@@ -287,10 +289,12 @@ public sealed class RuleEngine
         if (_rowBindings.Count >= 8)
         {
             _rowBindings.Clear();
+            _boundRevisions.Clear();
             _rowScanPlans.Clear();
         }
 
         _rowBindings[world] = rowBindings;
+        _boundRevisions[world] = world.PopulationDefinitionRevision;
         _rowScanPlans.Clear();
     }
 
@@ -332,6 +336,15 @@ public sealed class RuleEngine
             throw new InvalidOperationException(
                 $"Rule '{rule.Id}' references column '{columnId}' of population '{subject.PopulationId}', "
                 + $"which holds '{column.ValueType.Name}'; row rules need a numeric column.");
+        }
+
+        // WHY: a double-buffered column's row value bridge declines every read and write, so a rule
+        // bound to it would report applied effects that never change the simulated column.
+        if (column.IsDoubleBuffered)
+        {
+            throw new InvalidOperationException(
+                $"Rule '{rule.Id}' references double-buffered column '{columnId}' of population "
+                + $"'{subject.PopulationId}'; row rules address the simulated (unbuffered) column.");
         }
 
         return column;
@@ -416,10 +429,16 @@ public sealed class RuleEngine
     // assumption. A missing column still fails before any effect applies.
     private void EnsureBound(World world)
     {
-        if (!_rowBindings.ContainsKey(world))
+        // A definition created or discarded inside a transaction changes which columns the world
+        // owns, and cached bindings would keep pointing at detached ones. The revision is one read.
+        if (_rowBindings.ContainsKey(world)
+            && _boundRevisions.TryGetValue(world, out var revision)
+            && revision == world.PopulationDefinitionRevision)
         {
-            Bind(world);
+            return;
         }
+
+        Bind(world);
     }
 
     // A fixed row subject names its slot directly; a fact row subject resolves the fact's reference,
