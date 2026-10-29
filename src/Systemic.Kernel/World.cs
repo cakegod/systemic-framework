@@ -32,7 +32,13 @@ public sealed record PropertyModifier(
     ModifierStage Stage = ModifierStage.Standard)
 {
     /// <summary>Whether this modifier is permanent or still applies at the supplied tick.</summary>
-    public bool IsActiveAt(int tick) => ExpiryTick < 0 || ExpiryTick >= tick;
+    public bool IsActiveAt(int tick) => TickExpiry.IsActive(ExpiryTick, tick);
+}
+
+/// <summary>One rule for every timed effect: the expiry tick is the last active tick, negative is permanent.</summary>
+internal static class TickExpiry
+{
+    public static bool IsActive(int expiryTick, int tick) => expiryTick < 0 || expiryTick >= tick;
 }
 
 public enum GrantKind
@@ -49,7 +55,7 @@ public sealed record PropertyGrant(
     int ExpiryTick = -1)
 {
     /// <summary>Whether this grant is permanent or still applies at the supplied tick.</summary>
-    public bool IsActiveAt(int tick) => ExpiryTick < 0 || ExpiryTick >= tick;
+    public bool IsActiveAt(int tick) => TickExpiry.IsActive(ExpiryTick, tick);
 }
 
 /// <summary>Reports failures in callbacks invoked after a world transaction has committed.</summary>
@@ -115,11 +121,11 @@ public sealed class World
     private long _fullEntitySnapshotCount;
     private readonly Dictionary<Type, long> _fullEntitySnapshotCountsByType = [];
 
-    private bool _populationDirty = true;
+    private long _liveRevision;
     private readonly Dictionary<string, int> _liveCounts = [];
     private readonly Dictionary<(string Tag, int EntityId), int> _liveRanks = [];
     private readonly HashSet<string> _indexedTags = [];
-    private readonly Dictionary<(string Tag, string Capability), int> _firstTagged = [];
+    private readonly Dictionary<(string Tag, string Capability), FirstTaggedEntry> _firstTagged = [];
     private readonly Dictionary<string, CandidateBucket> _entityIdsByTag = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CandidateBucket> _entityIdsByCapability = new(StringComparer.Ordinal);
     private CandidateBucket _allEntityIds = new();
@@ -454,7 +460,14 @@ public sealed class World
         int EntityId,
         string? Property);
 
-    public void MarkPopulationDirty() => _populationDirty = true;
+    /// <summary>Gets a counter that changes whenever a derived lookup may be stale.</summary>
+    /// <remarks>
+    /// Caches store the revision they were computed at and compare instead of relying on every writer
+    /// to clear them, so a missed invalidation call cannot survive a rollback or an incremental index update.
+    /// </remarks>
+    internal long StateRevision { get; private set; }
+
+    public void MarkPopulationDirty() => InvalidateDerivedLookups();
 
     /// <summary>Gets the number of population bytes copied into undo batches since the process started.</summary>
     /// <remarks>Diagnostic: it separates the cost of a sparse row write from a page or buffer capture.</remarks>
@@ -1248,10 +1261,12 @@ public sealed class World
     {
         MarkStructureChanged();
         _tagIndexDirty = true;
-        _firstTagged.Clear();
+        InvalidateDerivedLookups();
     }
 
-    internal void MarkFirstTaggedDirty() => _firstTagged.Clear();
+    internal void MarkFirstTaggedDirty() => InvalidateDerivedLookups();
+
+    private void InvalidateDerivedLookups() => StateRevision++;
 
     internal void UpdateMembershipIndex(Entity entity, GrantKind kind, string name, bool present)
     {
@@ -1392,16 +1407,16 @@ public sealed class World
     public int FirstTagged(string tag, string capability)
     {
         EnsureTagIndex();
-        if (_firstTagged.TryGetValue((tag, capability), out var cached))
+        if (_firstTagged.TryGetValue((tag, capability), out var cached) && cached.Revision == StateRevision)
         {
-            return cached;
+            return cached.EntityId;
         }
 
         var found = 0;
         var tagCandidates = _entityIdsByTag.GetValueOrDefault(tag);
         if (tagCandidates is null)
         {
-            _firstTagged[(tag, capability)] = 0;
+            _firstTagged[(tag, capability)] = new FirstTaggedEntry(StateRevision, 0);
             return 0;
         }
 
@@ -1411,7 +1426,7 @@ public sealed class World
             var capabilityCandidates = _entityIdsByCapability.GetValueOrDefault(capability);
             if (capabilityCandidates is null)
             {
-                _firstTagged[(tag, capability)] = 0;
+                _firstTagged[(tag, capability)] = new FirstTaggedEntry(StateRevision, 0);
                 return 0;
             }
 
@@ -1432,7 +1447,7 @@ public sealed class World
             }
         }
 
-        _firstTagged[(tag, capability)] = found;
+        _firstTagged[(tag, capability)] = new FirstTaggedEntry(StateRevision, found);
 
         return found;
     }
@@ -1519,6 +1534,8 @@ public sealed class World
 
         _tagIndexDirty = false;
     }
+
+    private readonly record struct FirstTaggedEntry(long Revision, int EntityId);
 
     private static void AddCandidate(Dictionary<string, CandidateBucket> buckets, string name, int entityId)
     {
@@ -2391,9 +2408,9 @@ public sealed class World
 
     private void EnsurePopulation(string tag)
     {
-        if (_populationDirty)
+        if (_liveRevision != StateRevision)
         {
-            _populationDirty = false;
+            _liveRevision = StateRevision;
             _liveCounts.Clear();
             _liveRanks.Clear();
             _indexedTags.Clear();
