@@ -65,15 +65,27 @@ public sealed class PresentationCueWindow
     {
         ArgumentOutOfRangeException.ThrowIfNegative(currentTick);
         var expired = 0;
-        for (var index = _cues.Count - 1; index >= 0; index--)
+        var write = 0;
+        for (var read = 0; read < _cues.Count; read++)
         {
-            if ((long)currentTick - _cues[index].Tick < MaxAgeTicks)
+            var cue = _cues[read];
+            if ((long)currentTick - cue.Tick >= MaxAgeTicks)
             {
+                expired++;
                 continue;
             }
 
-            _cues.RemoveAt(index);
-            expired++;
+            if (write != read)
+            {
+                _cues[write] = cue;
+            }
+
+            write++;
+        }
+
+        if (write != _cues.Count)
+        {
+            _cues.RemoveRange(write, _cues.Count - write);
         }
 
         ExpiredCount += expired;
