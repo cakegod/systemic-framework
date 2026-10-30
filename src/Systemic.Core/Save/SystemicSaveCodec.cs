@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Systemic.Kernel;
 using Systemic.Content;
 using Systemic.Host;
@@ -582,4 +583,9 @@ internal sealed record SavedEntity(
     bool ToRemove,
     Bounds2? SpatialBounds);
 
-internal sealed record RuleHistoryState(RuleEventHistorySample[] Samples);
+internal sealed record RuleHistoryState(
+    RuleEventHistorySample[] Samples,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    RuleEngine.RuleScheduledFactState[]? Scheduled = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    RuleEngine.RuleCooldownState[]? Cooldowns = null);

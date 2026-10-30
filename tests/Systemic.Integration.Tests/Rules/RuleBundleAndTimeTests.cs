@@ -150,6 +150,48 @@ public sealed class RuleBundleAndTimeTests
         Assert.Equal(expectedSteps, fastForward.World.EffectiveProperty(fastForward.Score, "score"));
     }
 
+    [Fact]
+    public void A_fact_without_a_live_target_can_schedule_delayed_work()
+    {
+        var world = new World(seed: 5, valueScale: 1);
+        var actor = world.Add(new DataEntity([], [], ("score", 0)));
+        var engine = new RuleEngine(new CompiledRuleSet([
+            new CompiledRule("start", "start", 0, [], [RuleEffect.Schedule("step", 2)]),
+            new CompiledRule("step", "step", 0, [],
+                [RuleEffect.AdjustProperty(RuleSubject.Source, "score", 1)])
+        ]), maxEffects: 8, maxFacts: 8);
+
+        // The fact names a live source and no live target, which is how a global event looks.
+        engine.Dispatch(world, new SimulationFact("start", actor.Id, actor.Id + 1000));
+        world.LogicalTick = 2;
+
+        Assert.Equal(1, engine.DispatchDue(world));
+        Assert.Equal(1, world.EffectiveProperty(actor, "score"));
+    }
+
+    [Fact]
+    public void Fast_forward_expires_a_timed_bonus_before_a_later_due_fact()
+    {
+        var world = new World(seed: 6, valueScale: 1);
+        var actor = world.Add(new DataEntity([], [], ("score", 0), ("speed", 0)));
+        var engine = new RuleEngine(new CompiledRuleSet([
+            new CompiledRule("start", "start", 0, [], [RuleEffect.Schedule("step", 10)]),
+            new CompiledRule("step", "step", 0,
+                [RuleCondition.FromExpression(ExpressionCompiler.Compile("target.speed >= 2"))],
+                [RuleEffect.AdjustProperty(RuleSubject.Target, "score", 1)])
+        ]), maxEffects: 8, maxFacts: 8);
+
+        world.LogicalTick = 1;
+        world.SetModifier("bonus", actor, "speed", ModifierOperation.Add, 2, remainingTicks: 3);
+        engine.Dispatch(world, new SimulationFact("start", actor.Id, actor.Id));
+
+        // Stepping every tick would have removed the bonus at tick 4, long before the fact due at 11.
+        world.LogicalTick = 11;
+        engine.DispatchDue(world);
+
+        Assert.Equal(0, world.EffectiveProperty(actor, "score"));
+    }
+
     private static (World World, RuleEngine Engine, Entity Score) CreateDelayedChain()
     {
         var world = new World(seed: 4, valueScale: 1);

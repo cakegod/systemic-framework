@@ -123,6 +123,11 @@ public sealed class RuleEngine
     private const int MaximumCooldownEntries = 100_000;
     private readonly List<ScheduledFactEntry> _scheduled = [];
     private long _scheduledSequence;
+    // The world and due tick the engine last expired timed state for, so a fast-forward expires state
+    // that online stepping would have removed before the fact ran. The world is part of the cache key
+    // because rollback netcode dispatches the same engine into cloned worlds.
+    private World? _modifierExpiredWorld;
+    private int _modifierExpiredTick = int.MinValue;
     private readonly Dictionary<(string Rule, int Source, int Target), int> _lastRuleFire = [];
     private readonly List<CooldownChange> _cooldownChanges = [];
     private bool _factBudgetExceeded;
@@ -1664,6 +1669,14 @@ public sealed class RuleEngine
             return;
         }
 
+        // A scheduled fact copies the fact's subjects and addresses no entity, so it must run before
+        // the entity lookup: a global fact has no live target to resolve.
+        if (effect.Kind == RuleEffectKind.Schedule)
+        {
+            ApplySchedule(world, fact, effect);
+            return;
+        }
+
         if (effect.Subject.AddressesRow)
         {
             int slot;
@@ -1736,9 +1749,6 @@ public sealed class RuleEngine
                 break;
             case RuleEffectKind.Spawn:
                 ApplySpawn(world, fact, entity, effect);
-                break;
-            case RuleEffectKind.Schedule:
-                ApplySchedule(world, fact, effect);
                 break;
             case RuleEffectKind.InvokeAction:
                 var actor = resolvedEntities.Resolve(world, fact, effect.Subject);
@@ -1902,6 +1912,7 @@ public sealed class RuleEngine
 
     /// <summary>Dispatches the scheduled facts whose delay has elapsed at the world's logical tick.</summary>
     /// <param name="world">World whose logical tick decides which facts are due.</param>
+    /// <param name="beforeEachFact">Observer invoked before each due fact, as for a single dispatch.</param>
     /// <returns>The number of facts dispatched.</returns>
     /// <remarks>
     /// Facts run oldest due tick first, then in the order they were scheduled, so a save that replays
@@ -1916,6 +1927,9 @@ public sealed class RuleEngine
         }
 
         var dispatched = 0;
+        // Expire once per distinct due tick in this call. A local keeps a rolled-back call from
+        // claiming it already expired state that the rollback restored.
+        var expiredTick = int.MinValue;
         while (dispatched < MaximumDueFactsPerCall)
         {
             var index = -1;
@@ -1946,9 +1960,24 @@ public sealed class RuleEngine
             // Run every fact at its own due tick: expressions, event windows and modifier expiry read
             // World.LogicalTick, so a fast-forward must rewind the clock to each fact's tick.
             var previousTick = world.LogicalTick;
-            world.LogicalTick = (int)Math.Min(due.DueTick, int.MaxValue);
+            var dueTick = (int)Math.Min(due.DueTick, int.MaxValue);
+            world.LogicalTick = dueTick;
             try
             {
+                // A fast-forward jump crosses ticks that online stepping would have advanced through.
+                // Expire timed state as of the tick before the fact, so an effect stays active through
+                // its last tick exactly as it does when the clock advances one tick at a time. The
+                // clock is already at the later tick, so the due tick decides, not the previous one.
+                if (dueTick > 0 && (dueTick != _modifierExpiredTick
+                    || !ReferenceEquals(world, _modifierExpiredWorld)))
+                {
+                    world.LogicalTick = dueTick - 1;
+                    world.AdvanceModifiers();
+                    world.LogicalTick = dueTick;
+                    _modifierExpiredWorld = world;
+                    _modifierExpiredTick = dueTick;
+                }
+
                 Dispatch(world, due.Fact, beforeEachFact);
             }
             finally
@@ -1961,6 +1990,153 @@ public sealed class RuleEngine
     }
 
     private readonly record struct ScheduledFactEntry(long DueTick, long Sequence, SimulationFact Fact);
+
+    /// <summary>One pending delayed fact, in the shape a save stores.</summary>
+    internal readonly record struct RuleScheduledFactState(
+        long DueTick,
+        long Sequence,
+        string Type,
+        int SourceId,
+        int TargetId,
+        int Depth,
+        double Amount,
+        SimulationFactPosition? Position,
+        RulePayloadValueState[]? Payload,
+        PopulationRowReference? Row);
+
+    /// <summary>One typed payload value, in the shape a save stores.</summary>
+    internal readonly record struct RulePayloadValueState(
+        string Key, SimulationFactValueKind Kind, long Integer, double Number, string? Text, bool Boolean);
+
+    /// <summary>One rule cooldown expiry, in the shape a save stores.</summary>
+    internal readonly record struct RuleCooldownState(string Rule, int Source, int Target, int ExpiryTick);
+
+    /// <summary>Captures the delayed facts waiting to fire, so a save can restore them.</summary>
+    internal RuleScheduledFactState[] CaptureScheduledFacts()
+    {
+        if (_scheduled.Count == 0)
+        {
+            return [];
+        }
+
+        return [.. _scheduled
+            .OrderBy(entry => entry.DueTick)
+            .ThenBy(entry => entry.Sequence)
+            .Select(entry => new RuleScheduledFactState(entry.DueTick, entry.Sequence, entry.Fact.Type,
+                entry.Fact.SourceId, entry.Fact.TargetId, entry.Fact.Depth, entry.Fact.Amount,
+                entry.Fact.Position, CapturePayload(entry.Fact.Payload), entry.Fact.Row))];
+    }
+
+    /// <summary>Restores the delayed facts a save captured.</summary>
+    internal void RestoreScheduledFacts(IEnumerable<RuleScheduledFactState> facts)
+    {
+        ArgumentNullException.ThrowIfNull(facts);
+        if (_dispatchActive)
+        {
+            throw new InvalidOperationException("Rule state cannot be restored during dispatch.");
+        }
+
+        var restored = facts.ToArray();
+        if (restored.Length > MaximumScheduledFacts)
+        {
+            throw new ArgumentException("Saved delayed facts exceed their limit.", nameof(facts));
+        }
+
+        _scheduled.Clear();
+        _scheduledSequence = 0;
+        _modifierExpiredTick = int.MinValue;
+        foreach (var state in restored)
+        {
+            var fact = new SimulationFact(state.Type, state.SourceId, state.TargetId, state.Depth, state.Amount,
+                state.Position, RestorePayload(state.Payload), state.Row);
+            if (string.IsNullOrWhiteSpace(fact.Type) || !fact.HasValidAddress
+                || state.DueTick < 0 || state.Sequence < 0 || state.Sequence == long.MaxValue
+                || fact.Depth < 0 || fact.Depth > _maxDepth || !double.IsFinite(fact.Amount))
+            {
+                throw new ArgumentException("A saved delayed fact is invalid.", nameof(facts));
+            }
+
+            _scheduled.Add(new ScheduledFactEntry(state.DueTick, state.Sequence, fact));
+            _scheduledSequence = Math.Max(_scheduledSequence, state.Sequence + 1);
+        }
+    }
+
+    /// <summary>Captures the active rule cooldowns, so a save can restore them.</summary>
+    internal RuleCooldownState[] CaptureCooldowns()
+    {
+        if (_lastRuleFire.Count == 0)
+        {
+            return [];
+        }
+
+        return [.. _lastRuleFire
+            .OrderBy(pair => pair.Key.Rule, StringComparer.Ordinal)
+            .ThenBy(pair => pair.Key.Source)
+            .ThenBy(pair => pair.Key.Target)
+            .Select(pair => new RuleCooldownState(pair.Key.Rule, pair.Key.Source, pair.Key.Target, pair.Value))];
+    }
+
+    /// <summary>Restores the rule cooldowns a save captured.</summary>
+    internal void RestoreSavedCooldowns(IEnumerable<RuleCooldownState> cooldowns)
+    {
+        ArgumentNullException.ThrowIfNull(cooldowns);
+        if (_dispatchActive)
+        {
+            throw new InvalidOperationException("Rule state cannot be restored during dispatch.");
+        }
+
+        var restored = cooldowns.ToArray();
+        if (restored.Length > MaximumCooldownEntries)
+        {
+            throw new ArgumentException("Saved rule cooldowns exceed their limit.", nameof(cooldowns));
+        }
+
+        _lastRuleFire.Clear();
+        foreach (var state in restored)
+        {
+            if (string.IsNullOrWhiteSpace(state.Rule) || state.Source < 0 || state.Target < 0
+                || state.ExpiryTick < 0)
+            {
+                throw new ArgumentException("A saved rule cooldown is invalid.", nameof(cooldowns));
+            }
+
+            _lastRuleFire[(state.Rule, state.Source, state.Target)] = state.ExpiryTick;
+        }
+    }
+
+    private static RulePayloadValueState[]? CapturePayload(SimulationFactPayload? payload) =>
+        payload is null
+            ? null
+            : [.. payload.Entries.Select(entry => new RulePayloadValueState(entry.Key, entry.Value.Kind,
+                entry.Value.Kind == SimulationFactValueKind.Integer ? entry.Value.Integer : 0,
+                entry.Value.Kind == SimulationFactValueKind.Number ? entry.Value.Number : 0,
+                entry.Value.Kind == SimulationFactValueKind.Text ? entry.Value.Text : null,
+                entry.Value.Kind == SimulationFactValueKind.Boolean && entry.Value.Boolean))];
+
+    private static SimulationFactPayload? RestorePayload(RulePayloadValueState[]? entries)
+    {
+        if (entries is null)
+        {
+            return null;
+        }
+
+        var values = new SimulationFactPayloadEntry[entries.Length];
+        for (var index = 0; index < entries.Length; index++)
+        {
+            var entry = entries[index];
+            values[index] = new SimulationFactPayloadEntry(entry.Key, entry.Kind switch
+            {
+                SimulationFactValueKind.Integer => SimulationFactValue.FromInteger(entry.Integer),
+                SimulationFactValueKind.Number => SimulationFactValue.FromNumber(entry.Number),
+                SimulationFactValueKind.Text => SimulationFactValue.FromText(
+                    entry.Text ?? throw new ArgumentException("A saved payload text value is missing.")),
+                SimulationFactValueKind.Boolean => SimulationFactValue.FromBoolean(entry.Boolean),
+                _ => throw new ArgumentException("A saved payload value has no kind."),
+            });
+        }
+
+        return new SimulationFactPayload(values);
+    }
 
     private readonly record struct CooldownChange((string Rule, int Source, int Target) Key, int Previous,
         bool HadPrevious);
