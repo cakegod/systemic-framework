@@ -116,9 +116,16 @@ real zero sum.
 
 ## Effects
 
-- `adjustProperty`: add to a numeric property.
+- `adjustProperty`: change a numeric property. `quantity` picks how: `add` (default), `set`, `multiply`, `min`, or `max`.
 - `setModifier`: typed, staged, optionally timed modifier.
-- `addTag`: add a tag to an entity.
-- `emitEvent`: dispatch another fact.
+- `addTag`, `removeTag`: change an entity's tags.
+- `emitEvent`: dispatch another fact immediately.
+- `schedule`: dispatch a fact after `delayTicks`. `DispatchDue` on the rule engine runs the facts whose tick has arrived.
+- `spawn`: create an entity from an authored template at the fact position, or where the subject stands.
+- `despawn`: mark the subject for removal, applied when the world prunes removed entities.
+- `transfer`: move up to `amount` of `property` from the subject into the fact target's `targetProperty`. A source that holds less moves what it has.
+- `action`: invoke a game action the game registered by name. Actions are domain verbs such as strike or deposit, and every rule can share one.
+
+Row subjects accept property adjustments, tags, and modifiers. Spawn, despawn, transfer, schedule, and actions address entities, because a population row has no world position, no removal lifetime, and no entity to hand an action.
 
 If a mechanic cannot be expressed, add a general primitive or a game action. Do not add a genre noun to the framework.

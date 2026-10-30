@@ -168,6 +168,30 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
+    public void Rolled_back_dispatch_does_not_leave_a_spawned_entity()
+    {
+        var world = new World(seed: 8, valueScale: 1);
+        var source = world.Add(new DataEntity([], [], ("heat", double.MaxValue)));
+        var template = new SpawnTemplate("seed.spark", ["spark"], [],
+            ImmutableDictionary<string, double>.Empty);
+        var rules = new CompiledRuleSet([
+            new CompiledRule("grow", "grow", 0, [],
+            [
+                RuleEffect.Spawn(RuleSubject.Source, template),
+                RuleEffect.AdjustProperty(RuleSubject.Source, "heat", double.MaxValue),
+            ])
+        ])
+        { Templates = new Dictionary<string, SpawnTemplate> { [template.Id] = template }.ToImmutableDictionary() };
+
+        var result = new RuleEngine(rules).Dispatch(world, new SimulationFact("grow", source.Id, source.Id));
+
+        Assert.True(result.RolledBack);
+        Assert.Equal("non_finite_property", result.CutoffReason);
+        Assert.Same(source, Assert.Single(world.Entities));
+        Assert.Equal(double.MaxValue, world.EffectiveProperty(source, "heat"));
+    }
+
+    [Fact]
     public void Content_rejects_a_spawn_that_names_an_unknown_template()
     {
         using var pack = new EffectPack(rules: """
