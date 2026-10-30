@@ -97,7 +97,8 @@ Systemic.Rules.RuleEffect.TargetProperty.get -> string?
 Systemic.Rules.RuleEffect.TargetProperty.init -> void
 Systemic.Rules.RuleEffect.Template.get -> Systemic.Rules.SpawnTemplate?
 Systemic.Rules.RuleEffect.Template.init -> void
-Systemic.Rules.RuleEngine.DispatchDue(Systemic.Kernel.World! world) -> int
+Systemic.Rules.RuleEngine.DispatchDue(Systemic.Kernel.World! world, Systemic.Rules.SimulationFactObserver? beforeEachFact = null) -> int
+static Systemic.Rules.RuleEffect.InvokeAction(string! actionName, Systemic.Rules.RuleSubject subject, double amount, Systemic.Rules.SimulationFactPayload? payload) -> Systemic.Rules.RuleEffect
 Systemic.Rules.SpawnTemplate
 Systemic.Rules.SpawnTemplate.Capabilities.get -> System.Collections.Immutable.ImmutableArray<string!>
 Systemic.Rules.SpawnTemplate.Capabilities.init -> void

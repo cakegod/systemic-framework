@@ -897,6 +897,9 @@ public sealed class SystemicGame : IDisposable
         World.LogicalTick = checked(World.LogicalTick + 1);
         _schedule?.Execute(World, World.LogicalTick);
         DispatchDeferredFacts();
+        // Delayed facts belong to the tick that reached their due tick, with the same observers and
+        // the same enclosing transaction as any other fact this tick dispatches.
+        _contentRules.DispatchDue(World, CombineFactObservers(null));
 
         World.AdvanceModifiers();
     }

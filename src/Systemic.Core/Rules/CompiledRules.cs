@@ -297,12 +297,18 @@ public readonly record struct RuleEffect(
         };
     }
 
-    public static RuleEffect InvokeAction(string actionName, RuleSubject subject)
+    public static RuleEffect InvokeAction(string actionName, RuleSubject subject) =>
+        InvokeAction(actionName, subject, 0, null);
+
+    /// <summary>Creates an action invocation that carries the authored amount and payload.</summary>
+    public static RuleEffect InvokeAction(string actionName, RuleSubject subject, double amount,
+        SimulationFactPayload? payload)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actionName);
-        return new RuleEffect(RuleEffectKind.InvokeAction, subject, actionName, 0)
+        return new RuleEffect(RuleEffectKind.InvokeAction, subject, actionName, amount)
         {
             ActionName = actionName,
+            Payload = payload,
         };
     }
 

@@ -548,11 +548,19 @@ public static partial class ContentPackLoader
                         break;
                     case "action":
                         var actionName = effect.Action?.GetString();
+                        var actionAmount = effect.Amount is { } actionAmountValue
+                            ? (double)actionAmountValue
+                            : 0;
                         var actionSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
                             effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
                         Require(!string.IsNullOrWhiteSpace(actionName),
                             $"Rule '{ruleId}' action requires a name.", $"{effectPath}.action");
-                        effects.Add(RuleEffect.InvokeAction(actionName!, actionSubject));
+                        Require(double.IsFinite(actionAmount),
+                            $"Rule '{ruleId}' action amount must be finite.", $"{effectPath}.amount");
+                        var actionPayload = effect.Payload is { } actionPayloadSource
+                            ? CompilePayload(actionPayloadSource, $"{effectPath}.payload", null)
+                            : null;
+                        effects.Add(RuleEffect.InvokeAction(actionName!, actionSubject, actionAmount, actionPayload));
                         break;
                     case "emitEvent":
                         var emittedEvent = effect.Event?.GetString();

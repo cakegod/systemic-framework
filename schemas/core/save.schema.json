@@ -69,7 +69,7 @@
     },
     "modifier": {
       "type": "object", "additionalProperties": false,
-      "required": ["source", "entityId", "property", "operation", "value", "expiryTick", "priority", "stage", "sourceProperty"],
+      "required": ["source", "entityId", "property", "operation", "value", "expiryTick", "priority", "stage"],
       "properties": {
         "source": { "type": "string", "minLength": 1 },
         "entityId": { "type": "integer", "minimum": 1 },

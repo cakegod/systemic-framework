@@ -118,11 +118,13 @@ public sealed class RuleEngine
     private readonly int _tickRateHz;
     private long _dispatchGeneration;
     private bool _dispatchActive;
+    private const int MaximumScheduledFacts = 65_536;
+    private const int MaximumDueFactsPerCall = 65_536;
+    private const int MaximumCooldownEntries = 100_000;
     private readonly List<ScheduledFactEntry> _scheduled = [];
     private long _scheduledSequence;
     private readonly Dictionary<(string Rule, int Source, int Target), int> _lastRuleFire = [];
     private readonly List<CooldownChange> _cooldownChanges = [];
-    private int _factTick = -1;
     private bool _factBudgetExceeded;
     private bool _invalidFact;
     private bool _eventHistoryIndexDirty;
@@ -236,6 +238,15 @@ public sealed class RuleEngine
         var rowBindings = new Dictionary<(string Population, string Name, RowTargetKind Kind), RowBinding>();
         foreach (var rule in _rules.Rules)
         {
+            if ((rule.BundleId is not null || rule.CooldownTicks > 0)
+                && (rule.Conditions.Any(condition => condition.Subject.AddressesRow)
+                    || rule.Effects.Any(effect => effect.Subject.AddressesRow)))
+            {
+                throw new InvalidOperationException(
+                    $"Rule '{rule.Id}' combines bundle or cooldown settings with a population row subject; "
+                    + "a row scan evaluates neither.");
+            }
+
             foreach (var condition in rule.Conditions)
             {
                 if (!condition.Subject.AddressesRow)
@@ -280,11 +291,26 @@ public sealed class RuleEngine
                                 + "a whole-number amount is required so the write stays exact.");
                         }
 
+                        if (effect.Quantity != QuantityOperation.Add)
+                        {
+                            throw new InvalidOperationException(
+                                $"Rule '{rule.Id}' applies quantity '{effect.Quantity}' to row '{effect.Subject}'; "
+                                + "a row scan supports add only, so declare the operation as content on an entity instead.");
+                        }
+
                         break;
                     case RuleEffectKind.AddTag:
+                    case RuleEffectKind.RemoveTag:
                         BindTag(world, rowBindings, rule, effect.Subject, effect.Name);
                         break;
                     case RuleEffectKind.SetModifier:
+                        if (effect.SourceProperty is { } sourceProperty)
+                        {
+                            throw new InvalidOperationException(
+                                $"Rule '{rule.Id}' reads rank property '{sourceProperty}' for row '{effect.Subject}'; "
+                                + "a row modifier stores a fixed amount.");
+                        }
+
                         BindModifier(world, rowBindings, rule, effect);
                         break;
                     default:
@@ -877,7 +903,8 @@ public sealed class RuleEngine
         switch (binding.Kind)
         {
             case RowTargetKind.Tag:
-                binding.Tags.TrySetTagBit(row, binding.TagBit, value: true);
+                binding.Tags.TrySetTagBit(row, binding.TagBit,
+                    value: effect.Kind == RuleEffectKind.AddTag);
                 break;
             case RowTargetKind.Modifier:
                 binding.Modifiers.TrySet(row, binding.ModifierKey, effect.Value, effect.DurationTicks);
@@ -949,6 +976,8 @@ public sealed class RuleEngine
             var cutOff = false;
             string? cutoffReason = null;
             var rolledBack = false;
+            var batchScheduledStart = _scheduled.Count;
+            _cooldownChanges.Clear();
             for (var index = 0; index < facts.Length; index++)
             {
                 // Emitters are single-dispatch, so each fact gets its own generation.
@@ -975,6 +1004,14 @@ public sealed class RuleEngine
 
             if (rolledBack)
             {
+                // The world transaction does not journal engine tables, so the whole batch has to
+                // drop the delayed work and cooldown records it added before the failure.
+                if (_scheduled.Count > batchScheduledStart)
+                {
+                    _scheduled.RemoveRange(batchScheduledStart, _scheduled.Count - batchScheduledStart);
+                }
+
+                RestoreCooldowns();
                 transaction.Rollback();
             }
             else
@@ -1063,7 +1100,10 @@ public sealed class RuleEngine
         _queue.Clear();
         _queue.Add(initialFact);
         var scheduledCount = _scheduled.Count;
-        _cooldownChanges.Clear();
+        if (_batchTransaction is null)
+        {
+            _cooldownChanges.Clear();
+        }
 
         var factsProcessed = 0;
         var rulesMatched = 0;
@@ -1765,9 +1805,16 @@ public sealed class RuleEngine
             return;
         }
 
-        if (source.TrySetProperty(world, effect.Name, remaining))
+        // Write the destination first. A resource entity exposes amount for reading but declines
+        // writes, so writing the source first would destroy quantity the transfer could not deliver.
+        if (!destination.TrySetProperty(world, targetProperty, received))
         {
-            destination.TrySetProperty(world, targetProperty, received);
+            return;
+        }
+
+        if (!source.TrySetProperty(world, effect.Name, remaining))
+        {
+            destination.TrySetProperty(world, targetProperty, held);
         }
     }
 
@@ -1816,7 +1863,13 @@ public sealed class RuleEngine
 
         // A delayed fact schedules from its own due tick, so a fast-forward that dispatches a chain in
         // one call lands every step at the same tick it would have reached online.
-        _scheduled.Add(new ScheduledFactEntry((long)FactTick(world) + effect.DelayTicks,
+        if (_scheduled.Count >= MaximumScheduledFacts)
+        {
+            // A rule that schedules more work than the queue holds must not grow it without bound.
+            return;
+        }
+
+        _scheduled.Add(new ScheduledFactEntry((long)world.LogicalTick + effect.DelayTicks,
             _scheduledSequence++, scheduled));
     }
 
@@ -1827,7 +1880,7 @@ public sealed class RuleEngine
     /// Facts run oldest due tick first, then in the order they were scheduled, so a save that replays
     /// the same ticks produces the same order. A due fact is a new root: its depth restarts at zero.
     /// </remarks>
-    public int DispatchDue(World world)
+    public int DispatchDue(World world, SimulationFactObserver? beforeEachFact = null)
     {
         ArgumentNullException.ThrowIfNull(world);
         if (_dispatchActive || _scheduled.Count == 0)
@@ -1836,7 +1889,7 @@ public sealed class RuleEngine
         }
 
         var dispatched = 0;
-        while (true)
+        while (dispatched < MaximumDueFactsPerCall)
         {
             var index = -1;
             for (var candidate = 0; candidate < _scheduled.Count; candidate++)
@@ -1863,25 +1916,27 @@ public sealed class RuleEngine
             var due = _scheduled[index];
             _scheduled.RemoveAt(index);
             dispatched++;
-            var previousTick = _factTick;
-            _factTick = (int)Math.Min(due.DueTick, int.MaxValue);
+            // Run every fact at its own due tick: expressions, event windows and modifier expiry read
+            // World.LogicalTick, so a fast-forward must rewind the clock to each fact's tick.
+            var previousTick = world.LogicalTick;
+            world.LogicalTick = (int)Math.Min(due.DueTick, int.MaxValue);
             try
             {
-                Dispatch(world, due.Fact);
+                Dispatch(world, due.Fact, beforeEachFact);
             }
             finally
             {
-                _factTick = previousTick;
+                world.LogicalTick = previousTick;
             }
         }
+
+        return dispatched;
     }
 
     private readonly record struct ScheduledFactEntry(long DueTick, long Sequence, SimulationFact Fact);
 
     private readonly record struct CooldownChange((string Rule, int Source, int Target) Key, int Previous,
         bool HadPrevious);
-
-    private int FactTick(World world) => _factTick >= 0 ? _factTick : world.LogicalTick;
 
     private bool TryEnterCooldown(World world, CompiledRule rule, SimulationFact fact)
     {
@@ -1891,29 +1946,55 @@ public sealed class RuleEngine
         }
 
         var key = (rule.Id, fact.SourceId, fact.TargetId);
-        var tick = FactTick(world);
-        if (_lastRuleFire.TryGetValue(key, out var previous))
+        var tick = world.LogicalTick;
+        if (_lastRuleFire.TryGetValue(key, out var expiry))
         {
-            _cooldownChanges.Add(new CooldownChange(key, previous, true));
-            if (tick - previous < rule.CooldownTicks)
+            _cooldownChanges.Add(new CooldownChange(key, expiry, true));
+            if (expiry > tick)
             {
                 return false;
             }
         }
         else
         {
-            // Cooldown memory is bounded like the other dispatch tables; a world that keeps inventing
-            // new rule and subject pairs must not grow the engine without limit.
-            if (_lastRuleFire.Count >= 100_000)
+            // At capacity, expire finished windows; if none can go, the rule still runs but this pair
+            // is not remembered. Clearing the table would let an active cooldown fire again.
+            if (_lastRuleFire.Count >= MaximumCooldownEntries)
             {
-                _lastRuleFire.Clear();
+                PruneExpiredCooldowns(tick);
+                if (_lastRuleFire.Count >= MaximumCooldownEntries)
+                {
+                    return true;
+                }
             }
 
             _cooldownChanges.Add(new CooldownChange(key, 0, false));
         }
 
-        _lastRuleFire[key] = tick;
+        _lastRuleFire[key] = (int)Math.Min((long)tick + rule.CooldownTicks, int.MaxValue);
         return true;
+    }
+
+    private void PruneExpiredCooldowns(int tick)
+    {
+        List<(string Rule, int Source, int Target)>? expired = null;
+        foreach (var (key, expiry) in _lastRuleFire)
+        {
+            if (expiry <= tick)
+            {
+                (expired ??= []).Add(key);
+            }
+        }
+
+        if (expired is null)
+        {
+            return;
+        }
+
+        foreach (var key in expired)
+        {
+            _lastRuleFire.Remove(key);
+        }
     }
 
     private void RestoreCooldowns()
