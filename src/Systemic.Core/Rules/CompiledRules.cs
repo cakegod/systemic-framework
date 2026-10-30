@@ -250,6 +250,9 @@ public readonly record struct RuleEffect(
     /// <summary>Gets the name of the registered game action an invocation effect runs.</summary>
     public string? ActionName { get; init; }
 
+    /// <summary>Gets the property a rank-aware modifier reads instead of a fixed amount.</summary>
+    public string? SourceProperty { get; init; }
+
     public static RuleEffect AdjustProperty(RuleSubject subject, string property, double amount) =>
         new(RuleEffectKind.AdjustProperty, subject, property, amount);
 
@@ -314,6 +317,24 @@ public readonly record struct RuleEffect(
         ModifierStage stage = ModifierStage.Standard,
         int durationTicks = -1) =>
         new(RuleEffectKind.SetModifier, subject, property, value, operation, stage, durationTicks);
+
+    /// <summary>Creates a modifier whose amount follows another property, such as an upgrade rank.</summary>
+    public static RuleEffect SetModifier(
+        RuleSubject subject,
+        string property,
+        ModifierOperation operation,
+        double value,
+        string sourceProperty,
+        ModifierStage stage = ModifierStage.Standard,
+        int durationTicks = -1)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceProperty);
+        return new RuleEffect(RuleEffectKind.SetModifier, subject, property, value, operation, stage,
+            durationTicks)
+        {
+            SourceProperty = sourceProperty,
+        };
+    }
 
     public static RuleEffect Emit(string eventType) => Emit(eventType, null);
 

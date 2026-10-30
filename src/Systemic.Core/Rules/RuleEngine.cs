@@ -1614,8 +1614,16 @@ public sealed class RuleEngine
                 ApplyQuantity(world, entity, effect, ref cutOff, ref cutoffReason);
                 break;
             case RuleEffectKind.SetModifier:
-                world.SetModifier(ruleId, entity, effect.Name, effect.Operation, effect.Value,
-                    effect.DurationTicks, stage: effect.Stage);
+                if (effect.SourceProperty is { } sourceProperty)
+                {
+                    world.SetModifier(ruleId, entity, effect.Name, effect.Operation, effect.Value,
+                        sourceProperty, effect.DurationTicks, stage: effect.Stage);
+                }
+                else
+                {
+                    world.SetModifier(ruleId, entity, effect.Name, effect.Operation, effect.Value,
+                        effect.DurationTicks, stage: effect.Stage);
+                }
                 if (!double.IsFinite(world.EffectiveProperty(entity, effect.Name)))
                 {
                     cutOff = true;

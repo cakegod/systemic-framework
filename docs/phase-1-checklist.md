@@ -6,7 +6,7 @@ Gate G1: 41/41 talents are general rules and tags, with zero framework genre typ
 pattern pack covers producer, upgrade, merge, prestige, and worker with tests.
 `Systemic.Incremental` stays frozen, and no new genre API is added.
 
-Status: 1.1 through 1.4 are complete. 1.5 is the next slice. Every unchecked item below
+Status: 1.1 through 1.5 are complete. 1.6 is the next slice. Every unchecked item below
 is a TDD slice: failing test first, smallest implementation to green, then refactor.
 
 ## Execution rules
@@ -27,7 +27,7 @@ is a TDD slice: failing test first, smallest implementation to green, then refac
 | 1.2 | Facts: named events, source and target, typed payload, deterministic dispatch | `facts` declarations, payload validation, emitted and scheduled payloads, three pipeline tests | 1.1 | done |
 | 1.3 | Queries: selectors by tag, property, range, nearest, aggregate, count, and formula | `QueryConditionTests` covers a tag count, a property filter, a spatial range, nearest selection, and an aggregate formula; the selector is a bounded content primitive, so Motivation and Extra Housing compile without a genre type | 1.2 | done |
 | 1.4 | Effects: quantity ops, spawn, despawn, transfer, emit, schedule, tag, and action invocation | `EffectPrimitiveTests` covers each primitive, spawn rollback, and action invocation; `EffectContentTests` runs merge and Hiking Buddy from JSON only | 1.3 | done |
-| 1.5 | Modifiers: add, multiply, set, min, max, stacking, duration, scope, and rank awareness | A timed status and a permanent upgrade use one modifier path; expiry, stacking, and rank-aware reads have tests | 1.3 | pending |
+| 1.5 | Modifiers: add, multiply, set, min, max, stacking, duration, scope, and rank awareness | `ModifierPrimitiveTests` covers clamping, source stacking, timed expiry, and rank-aware reads; `EffectContentTests` runs an upgrade whose modifier follows its rank from JSON | 1.3 | done |
 | 1.6 | Rules and rule bundles: guards, priority, while conditions, enable and disable, deterministic order | A talent tag toggles a named bundle; a status expires and disables its follow-up rule; order is asserted | 1.4, 1.5 | pending |
 | 1.7 | Time: tick, schedule, delay, cooldown, and deterministic fast-forward | Eight hours of fast-forward matches online within one percent; delay and cooldown have tests | 1.4, 1.5 | pending |
 | 1.8 | Generic UI binding: lists, toggles, costs, cooldowns, tooltips, buy amounts, actions | A choice list and an upgrade list use the same widgets and bindings; action results are tested | 1.5, 1.6 | pending |

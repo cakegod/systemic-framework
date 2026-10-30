@@ -418,6 +418,8 @@ public static partial class ContentPackLoader
                             "add" => ModifierOperation.Add,
                             "multiply" => ModifierOperation.Multiply,
                             "set" => ModifierOperation.Set,
+                            "min" => ModifierOperation.Min,
+                            "max" => ModifierOperation.Max,
                             _ => throw new ContentPackException(
                                 $"Rule '{ruleId}' has unknown modifier operation '{operationName}'.", $"{effectPath}.operation"),
                         };
@@ -435,8 +437,15 @@ public static partial class ContentPackLoader
                         Require(durationTicks is -1 or >= 1 and <= 1_000_000,
                             $"Rule '{ruleId}' modifier durationTicks must be between 1 and 1,000,000 when specified.",
                             $"{effectPath}.durationTicks");
-                        effects.Add(RuleEffect.SetModifier(modifierSubject, modifierProperty!, operation,
-                            modifierValue.GetValueOrDefault(), stage, durationTicks));
+                        var fromProperty = effect.FromProperty?.GetString();
+                        Require(fromProperty is null || !string.IsNullOrWhiteSpace(fromProperty),
+                            $"Rule '{ruleId}' setModifier fromProperty cannot be blank.",
+                            $"{effectPath}.fromProperty");
+                        effects.Add(fromProperty is null
+                            ? RuleEffect.SetModifier(modifierSubject, modifierProperty!, operation,
+                                modifierValue.GetValueOrDefault(), stage, durationTicks)
+                            : RuleEffect.SetModifier(modifierSubject, modifierProperty!, operation,
+                                modifierValue.GetValueOrDefault(), fromProperty, stage, durationTicks));
                         break;
                     case "addTag":
                         var addedTag = effect.Tag?.GetString();

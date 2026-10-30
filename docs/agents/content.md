@@ -117,7 +117,7 @@ real zero sum.
 ## Effects
 
 - `adjustProperty`: change a numeric property. `quantity` picks how: `add` (default), `set`, `multiply`, `min`, or `max`.
-- `setModifier`: typed, staged, optionally timed modifier.
+- `setModifier`: typed, staged, optionally timed modifier. `operation` is `add`, `multiply`, `set`, `min`, or `max`. Add `fromProperty` to make the amount follow another property at read time, which is how an upgrade rank drives its own effects.
 - `addTag`, `removeTag`: change an entity's tags.
 - `emitEvent`: dispatch another fact immediately.
 - `schedule`: dispatch a fact after `delayTicks`. `DispatchDue` on the rule engine runs the facts whose tick has arrived.

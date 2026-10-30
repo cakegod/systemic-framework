@@ -9,6 +9,8 @@ public enum ModifierOperation
     Add,
     Multiply,
     Set,
+    Min,
+    Max,
 }
 
 public enum ModifierStage
@@ -33,6 +35,14 @@ public sealed record PropertyModifier(
 {
     /// <summary>Whether this modifier is permanent or still applies at the supplied tick.</summary>
     public bool IsActiveAt(int tick) => TickExpiry.IsActive(ExpiryTick, tick);
+
+    /// <summary>Gets the property whose value scales this modifier at read time, when one is set.</summary>
+    /// <remarks>
+    /// A rank-aware modifier reads its amount instead of storing it: the subject's property value is
+    /// multiplied by <see cref="Value" />. An upgrade can therefore carry a rank and let every
+    /// modifier that reads it follow the rank without rewriting its own value.
+    /// </remarks>
+    public string? SourceProperty { get; init; }
 }
 
 /// <summary>One rule for every timed effect: the expiry tick is the last active tick, negative is permanent.</summary>
@@ -1652,7 +1662,42 @@ public sealed class World
         double value,
         int remainingTicks = -1,
         int priority = 0,
-        ModifierStage stage = ModifierStage.Standard)
+        ModifierStage stage = ModifierStage.Standard) =>
+        SetModifierCore(source, entity, property, operation, value, null, remainingTicks, priority, stage);
+
+    /// <summary>Adds a modifier whose amount is read from another property when it applies.</summary>
+    /// <param name="source">The identity that owns the modifier; setting it again replaces it.</param>
+    /// <param name="entity">The entity the modifier belongs to.</param>
+    /// <param name="property">The modified property.</param>
+    /// <param name="operation">How the resolved amount combines with the current value.</param>
+    /// <param name="value">A multiplier applied to the source property's value.</param>
+    /// <param name="sourceProperty">The property read on every evaluation, such as an upgrade rank.</param>
+    /// <param name="remainingTicks">Lifetime in ticks; a negative value never expires.</param>
+    /// <param name="priority">Order within the same stage.</param>
+    /// <param name="stage">When the modifier applies relative to other stages.</param>
+    /// <remarks>A modifier that names a missing property contributes zero rather than failing a read.</remarks>
+    public void SetModifier(
+        string source,
+        Entity entity,
+        string property,
+        ModifierOperation operation,
+        double value,
+        string sourceProperty,
+        int remainingTicks = -1,
+        int priority = 0,
+        ModifierStage stage = ModifierStage.Standard) =>
+        SetModifierCore(source, entity, property, operation, value, sourceProperty, remainingTicks, priority, stage);
+
+    private void SetModifierCore(
+        string source,
+        Entity entity,
+        string property,
+        ModifierOperation operation,
+        double value,
+        string? sourceProperty,
+        int remainingTicks,
+        int priority,
+        ModifierStage stage)
     {
         RemoveModifier(source, entity, property);
 
@@ -1665,7 +1710,10 @@ public sealed class World
         }
 
         items.Add(new PropertyModifier(
-            source, entity.Id, property, operation, value, ExpiryFromRemaining(remainingTicks), priority, stage));
+            source, entity.Id, property, operation, value, ExpiryFromRemaining(remainingTicks), priority, stage)
+        {
+            SourceProperty = sourceProperty,
+        });
         items.Sort(CompareModifiers);
         InvalidateModifiers(key);
     }
@@ -1741,8 +1789,21 @@ public sealed class World
             return value;
         }
 
+        // A rank-aware modifier reads another property, so its own key's version cannot tell us when
+        // its amount changed. Those lists skip the cache instead of reading a stale rank.
+        var readsSourceProperty = false;
+        foreach (var modifier in items)
+        {
+            if (modifier.SourceProperty is not null)
+            {
+                readsSourceProperty = true;
+                break;
+            }
+        }
+
         var version = _modifierVersions.GetValueOrDefault(key);
-        if (_modifierCache.TryGetValue(key, out var cached)
+        if (!readsSourceProperty
+            && _modifierCache.TryGetValue(key, out var cached)
             && cached.Version == version
             && BitConverter.DoubleToInt64Bits(cached.BaseValue) == BitConverter.DoubleToInt64Bits(value))
         {
@@ -1752,16 +1813,29 @@ public sealed class World
         var effective = value;
         foreach (var modifier in items)
         {
+            var amount = modifier.Value;
+            if (modifier.SourceProperty is { } sourceProperty)
+            {
+                amount = entity.TryGetProperty(this, sourceProperty, out var sourceValue)
+                    ? sourceValue * modifier.Value
+                    : 0;
+            }
+
             effective = modifier.Operation switch
             {
-                ModifierOperation.Add => effective + modifier.Value,
-                ModifierOperation.Multiply => effective * modifier.Value,
-                ModifierOperation.Set => modifier.Value,
+                ModifierOperation.Add => effective + amount,
+                ModifierOperation.Multiply => effective * amount,
+                ModifierOperation.Set => amount,
+                ModifierOperation.Min => Math.Min(effective, amount),
+                ModifierOperation.Max => Math.Max(effective, amount),
                 _ => effective,
             };
         }
 
-        _modifierCache[key] = new CachedModifierApplication(value, version, effective);
+        if (!readsSourceProperty)
+        {
+            _modifierCache[key] = new CachedModifierApplication(value, version, effective);
+        }
 
         return effective;
     }
@@ -1882,11 +1956,24 @@ public sealed class World
         }
 
         var byPriority = left.Priority.CompareTo(right.Priority);
+        if (byPriority != 0)
+        {
+            return byPriority;
+        }
 
-        return byPriority != 0
-            ? byPriority
-            : string.CompareOrdinal(left.Source, right.Source);
+        // Clamps run after the operations they bound, and a lower bound runs before an upper bound,
+        // so a range holds whatever order the sources happen to be named in.
+        var byClamp = ClampRank(left.Operation).CompareTo(ClampRank(right.Operation));
+
+        return byClamp != 0 ? byClamp : string.CompareOrdinal(left.Source, right.Source);
     }
+
+    private static int ClampRank(ModifierOperation operation) => operation switch
+    {
+        ModifierOperation.Max => 1,
+        ModifierOperation.Min => 2,
+        _ => 0,
+    };
 
     public void AdvanceModifiers()
     {

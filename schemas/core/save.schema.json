@@ -69,12 +69,13 @@
     },
     "modifier": {
       "type": "object", "additionalProperties": false,
-      "required": ["source", "entityId", "property", "operation", "value", "expiryTick", "priority", "stage"],
+      "required": ["source", "entityId", "property", "operation", "value", "expiryTick", "priority", "stage", "sourceProperty"],
       "properties": {
         "source": { "type": "string", "minLength": 1 },
         "entityId": { "type": "integer", "minimum": 1 },
         "property": { "type": "string", "minLength": 1 },
-        "operation": { "enum": ["Add", "Multiply", "Set"] },
+        "sourceProperty": { "anyOf": [{ "const": null }, { "type": "string", "minLength": 1 }] },
+        "operation": { "enum": ["Add", "Multiply", "Set", "Min", "Max"] },
         "value": { "type": "number" },
         "expiryTick": { "type": "integer", "minimum": -1 },
         "priority": { "type": "integer" },

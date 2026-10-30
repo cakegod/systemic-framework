@@ -114,5 +114,8 @@ Systemic.Rules.SpawnTemplate.SpawnTemplate(string! Id, System.Collections.Immuta
 Systemic.Rules.SpawnTemplate.Tags.get -> System.Collections.Immutable.ImmutableArray<string!>
 Systemic.Rules.SpawnTemplate.Tags.init -> void
 virtual Systemic.Rules.RuleActionHandler.Invoke(in Systemic.Rules.RuleActionContext context) -> void
+static Systemic.Rules.RuleEffect.SetModifier(Systemic.Rules.RuleSubject subject, string! property, Systemic.Kernel.ModifierOperation operation, double value, string! sourceProperty, Systemic.Kernel.ModifierStage stage = Systemic.Kernel.ModifierStage.Standard, int durationTicks = -1) -> Systemic.Rules.RuleEffect
+Systemic.Rules.RuleEffect.SourceProperty.get -> string?
+Systemic.Rules.RuleEffect.SourceProperty.init -> void
 Systemic.Rules.RuleConditionKind.Query = 4 -> Systemic.Rules.RuleConditionKind
 Systemic.Host.HeadlessSystemicHost.Dispose() -> void

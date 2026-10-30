@@ -42,6 +42,23 @@ public sealed class EffectContentTests
         Assert.Equal(3, world.EffectiveProperty(walker, "speed"));
         Assert.Single(world.Modifiers);
     }
+
+    [Fact]
+    public void An_upgrade_content_modifier_follows_its_rank_property()
+    {
+        using var workspace = new EffectContentWorkspace();
+        var content = workspace.Load();
+        var materialized = content.CreateWorld(seed: 13, valueScale: 1);
+        var world = materialized.World;
+        var engine = new RuleEngine(content.Rules);
+        var digger = world.ById(materialized.EntityIds["actor.digger"])!;
+
+        engine.Dispatch(world, new SimulationFact("upgrade.purchased", digger.Id, digger.Id));
+        Assert.Equal(7, world.EffectiveProperty(digger, "rate"));
+
+        Assert.True(digger.TrySetProperty(world, "rank", 4));
+        Assert.Equal(9, world.EffectiveProperty(digger, "rate"));
+    }
 }
 
 internal sealed class EffectContentWorkspace : IDisposable
@@ -72,7 +89,8 @@ internal sealed class EffectContentWorkspace : IDisposable
                   "properties": { "tier": 2 },
                   "bounds": { "x": 4, "y": 0, "halfWidth": 1, "halfHeight": 1 } },
                 { "id": "talent.hiking.buddy", "kind": "prop", "tags": ["talent.hiking"] },
-                { "id": "actor.walker", "kind": "actor", "properties": { "speed": 2 } }
+                { "id": "actor.walker", "kind": "actor", "properties": { "speed": 2 } },
+                { "id": "actor.digger", "kind": "actor", "properties": { "rate": 5, "rank": 2 } }
               ]
             }
             """);
@@ -88,6 +106,15 @@ internal sealed class EffectContentWorkspace : IDisposable
                     { "kind": "spawn", "subject": "source", "template": "fruit.tier2" },
                     { "kind": "despawn", "subject": "source" },
                     { "kind": "despawn", "subject": "target" }
+                  ]
+                },
+                {
+                  "id": "upgrade.miner.apply",
+                  "on": "upgrade.purchased",
+                  "priority": 0,
+                  "effects": [
+                    { "kind": "setModifier", "subject": "target", "property": "rate",
+                      "operation": "add", "value": 1, "fromProperty": "rank" }
                   ]
                 },
                 {
