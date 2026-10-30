@@ -25,6 +25,12 @@ public sealed class PresentationContentModule : ISystemicContentModule
     }
 }
 
+/// <summary>
+/// The outcome of invoking an authored UI action. <see cref="Handled"/> is true when the action
+/// was declared by the layout and published; <see cref="RolledBack"/> mirrors the dispatch result.
+/// </summary>
+public sealed record UiActionResult(string LayoutId, string ActionId, bool Handled, bool RolledBack);
+
 /// <summary>Typed presentation APIs for games that opt into the Presentation module.</summary>
 public static class PresentationGameExtensions
 {
@@ -50,6 +56,52 @@ public static class PresentationGameExtensions
         var context = new UiBindingContext(game.World, game.EntityIds, selection, eventFact,
             game.UiBindingProviders, choiceOwnerEntityId);
         return DeclarativeUiEvaluator.Evaluate(layout, context);
+    }
+
+    /// <summary>
+    /// Publishes a UI action as one fact, so a click travels the same deterministic dispatch path
+    /// as any other event. The action must be declared by the layout it is invoked on.
+    /// </summary>
+    public static UiActionResult InvokeUiAction(
+        this SystemicGame game,
+        string layoutId,
+        string actionId,
+        int? choiceOwnerEntityId = null)
+    {
+        ArgumentNullException.ThrowIfNull(game);
+        ArgumentNullException.ThrowIfNull(actionId);
+
+        var layout = game.PresentationContent().Ui.Layouts.FirstOrDefault(candidate => candidate.Id == layoutId)
+            ?? throw new KeyNotFoundException($"UI layout '{layoutId}' is not part of this content pack.");
+        if (!DeclaresAction(layout.Root, actionId))
+        {
+            throw new KeyNotFoundException(
+                $"UI layout '{layoutId}' does not declare the action '{actionId}'.");
+        }
+
+        // The action id is the fact type, and the owning choice entity is both source and target, so
+        // a rule authored as "on": "ui.buy" receives a well-formed subject without a new concept.
+        var ownerId = choiceOwnerEntityId ?? 0;
+        var dispatch = game.Publish(new SimulationFact(actionId, ownerId, ownerId));
+        return new UiActionResult(layoutId, actionId, Handled: true, dispatch.RolledBack);
+    }
+
+    private static bool DeclaresAction(UiNode node, string actionId)
+    {
+        if (string.Equals(node.Action, actionId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        foreach (var child in node.Children)
+        {
+            if (DeclaresAction(child, actionId))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static long AllocateActorVisualId(this SystemicGame game) => game.Presentation().AllocateActorVisualId();

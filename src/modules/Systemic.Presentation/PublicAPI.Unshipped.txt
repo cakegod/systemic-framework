@@ -1,1 +1,20 @@
 #nullable enable
+override Systemic.Presentation.UiActionResult.Equals(object? obj) -> bool
+override Systemic.Presentation.UiActionResult.GetHashCode() -> int
+override Systemic.Presentation.UiActionResult.ToString() -> string!
+static Systemic.Presentation.PresentationGameExtensions.InvokeUiAction(this Systemic.Host.SystemicGame! game, string! layoutId, string! actionId, int? choiceOwnerEntityId = null) -> Systemic.Presentation.UiActionResult!
+static Systemic.Presentation.UiActionResult.operator !=(Systemic.Presentation.UiActionResult? left, Systemic.Presentation.UiActionResult? right) -> bool
+static Systemic.Presentation.UiActionResult.operator ==(Systemic.Presentation.UiActionResult? left, Systemic.Presentation.UiActionResult? right) -> bool
+Systemic.Presentation.UiActionResult
+Systemic.Presentation.UiActionResult.<Clone>$() -> Systemic.Presentation.UiActionResult!
+Systemic.Presentation.UiActionResult.ActionId.get -> string!
+Systemic.Presentation.UiActionResult.ActionId.init -> void
+Systemic.Presentation.UiActionResult.Deconstruct(out string! LayoutId, out string! ActionId, out bool Handled, out bool RolledBack) -> void
+Systemic.Presentation.UiActionResult.Equals(Systemic.Presentation.UiActionResult? other) -> bool
+Systemic.Presentation.UiActionResult.Handled.get -> bool
+Systemic.Presentation.UiActionResult.Handled.init -> void
+Systemic.Presentation.UiActionResult.LayoutId.get -> string!
+Systemic.Presentation.UiActionResult.LayoutId.init -> void
+Systemic.Presentation.UiActionResult.RolledBack.get -> bool
+Systemic.Presentation.UiActionResult.RolledBack.init -> void
+Systemic.Presentation.UiActionResult.UiActionResult(string! LayoutId, string! ActionId, bool Handled, bool RolledBack) -> void

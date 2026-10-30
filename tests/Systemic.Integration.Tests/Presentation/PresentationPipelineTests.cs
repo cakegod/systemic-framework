@@ -276,7 +276,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void A_choice_list_and_an_upgrade_list_share_the_same_widget_template()
+    public void AChoiceListAndAnUpgradeListShareTheSameWidgetTemplate()
     {
         var world = new World(seed: 91, valueScale: 1);
         world.Add(new DataEntity(["ui.choice"], [], ("cost", 5), ("progress", 0.5)));
