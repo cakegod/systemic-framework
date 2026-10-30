@@ -122,6 +122,7 @@ public enum RuleEffectKind
     Spawn,
     Schedule,
     InvokeAction,
+    ClearScope,
 }
 
 /// <summary>How an adjustment combines its amount with the property's current value.</summary>
@@ -314,6 +315,19 @@ public readonly record struct RuleEffect(
 
     public static RuleEffect AddTag(RuleSubject subject, string tag) =>
         new(RuleEffectKind.AddTag, subject, tag, 0);
+
+    /// <summary>Despawns every entity carrying <paramref name="tag"/>, and nothing else.</summary>
+    /// <param name="tag">The scope tag, by convention <c>scope.&lt;name&gt;</c>.</param>
+    /// <remarks>
+    /// A scope is an entity tag, so a reset is a rule over a fact rather than a framework concept:
+    /// one scope can be cleared while another is preserved, and the clear is a normal effect that
+    /// commits or rolls back with the fact.
+    /// </remarks>
+    public static RuleEffect ClearScope(string tag)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tag);
+        return new(RuleEffectKind.ClearScope, RuleSubject.Target, tag, 0);
+    }
 
     public static RuleEffect SetModifier(
         RuleSubject subject,

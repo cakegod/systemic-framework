@@ -64,7 +64,7 @@ dotnet run --project src/tools/Systemic.Cli -- simulate my-game --seconds 3600 -
 | `assets validate <dir>` | Check every visual recipe |
 | `assets atlas <dir> --out path --manifest path` | Pack recipes into an atlas |
 
-Every command except `watch` and `preview` accepts `--json`. Exit codes are `0` success, `1` content error, `2` usage, `3` runtime, and `4` verification mismatch.
+Every command except `watch` accepts `--json`. Exit codes are `0` success, `1` content error, `2` usage, `3` runtime, and `4` verification mismatch.
 
 Errors use a stable envelope:
 
@@ -127,7 +127,7 @@ The host runs fixed ticks. The simulation uses seeded random streams and integer
 | Sample | Shows | Run |
 | --- | --- | --- |
 | [`systemic-sandbox`](samples/systemic-sandbox) | A Core-only pack with rules | `validate samples/systemic-sandbox` |
-| [`incremental-quarry`](samples/incremental-quarry) | Incremental, Presentation and Gameplay2D composed in one pack | `preview samples/incremental-quarry` |
+| [`incremental-quarry`](samples/incremental-quarry) | Incremental, Presentation and Gameplay2D composed in one pack | `validate samples/incremental-quarry` |
 | [`boids-monogame`](samples/boids-monogame/README.md) | 100,000 boids on the scheduled path | `dotnet run -c Release --project samples/boids-monogame/Boids.MonoGame.csproj` |
 | [`glow-garden`](samples/glow-garden/README.md) | A playable incremental colony | `dotnet run -c Release --project samples/glow-garden` |
 | [`pixel-mine`](samples/pixel-mine/README.md) | A playable procedural mine | `dotnet run -c Release --project samples/pixel-mine/PixelMine.csproj` |
@@ -148,11 +148,11 @@ The samples are references and diagnostics. They are not the target architecture
 
 ```sh
 dotnet build Systemic.sln --configuration Release
-dotnet test Systemic.sln --configuration Release
-dotnet test tests/Systemic.Cli.Tests --configuration Release
+scripts/loop.sh --full
+scripts/loop.sh --samples
 ```
 
-The CLI tests create a template, run it, verify it, and check the JSON error envelope. The full suite also covers populations, rules, saves, replays, and the samples.
+The CLI tests create a template, run it, verify it, and check the JSON error envelope. The gate covers populations, rules, saves, and replays; the sample suites that drive the playable games run separately through `--samples`.
 
 ## Scope
 

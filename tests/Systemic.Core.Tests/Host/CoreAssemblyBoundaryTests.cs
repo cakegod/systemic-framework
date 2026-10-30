@@ -16,7 +16,6 @@ public sealed class CoreAssemblyBoundaryTests
         Assert.DoesNotContain(core.GetTypes(), type =>
             type.Namespace?.StartsWith("Systemic.Incremental", StringComparison.Ordinal) == true
                 || type.Namespace?.StartsWith("Systemic.Presentation", StringComparison.Ordinal) == true
-                || type.Namespace?.StartsWith("Systemic.Preview", StringComparison.Ordinal) == true
                 || type.Namespace?.StartsWith("Systemic.Gameplay2D", StringComparison.Ordinal) == true);
     }
 }

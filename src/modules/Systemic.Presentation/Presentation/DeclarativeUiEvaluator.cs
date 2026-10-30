@@ -34,6 +34,12 @@ public sealed class UiBindingContext
     public IReadOnlyList<ISystemicUiBindingProvider> Providers { get; }
     public int? ChoiceOwnerEntityId { get; }
     internal SystemicUiBindingContext ProviderContext { get; }
+
+    /// <summary>Gets the entity one list item is evaluated against, when this context is an item scope.</summary>
+    internal int? ItemEntityId { get; init; }
+
+    internal UiBindingContext WithItem(int entityId) =>
+        new(World, EntityIds, Selection, EventFact, Providers, ChoiceOwnerEntityId) { ItemEntityId = entityId };
 }
 
 public sealed record UiNodeState(
@@ -46,7 +52,11 @@ public sealed record UiNodeState(
     string? TextValue,
     double? Progress,
     string? VisualState,
-    ImmutableArray<UiNodeState> Children);
+    ImmutableArray<UiNodeState> Children,
+    string? Tooltip = null,
+    int? Amount = null,
+    bool IsOn = false,
+    int? ItemEntityId = null);
 
 /// <summary>Evaluates declarative UI bindings into immutable data for engine adapters to render.</summary>
 public static class DeclarativeUiEvaluator
@@ -55,12 +65,47 @@ public static class DeclarativeUiEvaluator
     {
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(context);
-        return EvaluateNode(layout.Root, context, UiBindingPlan.For(layout).Root);
+        return EvaluateNode(layout.Root, context, UiBindingPlan.For(layout).Root, new UiEvaluationBudget());
     }
 
-    private static UiNodeState EvaluateNode(UiNode node, UiBindingContext context, UiBindingNodePlan plan)
+    /// <summary>The most nodes one layout may expand to, so nested lists cannot multiply without bound.</summary>
+    private const int MaximumEvaluatedNodes = 16_384;
+
+    private static UiNodeState EvaluateNode(
+        UiNode node,
+        UiBindingContext context,
+        UiBindingNodePlan plan,
+        UiEvaluationBudget budget)
     {
+        if (++budget.Nodes > MaximumEvaluatedNodes)
+        {
+            throw new InvalidOperationException(
+                $"UI evaluation exceeded {MaximumEvaluatedNodes} nodes; nested lists must not multiply.");
+        }
+
         var descriptor = plan.Binding;
+        if (node.Type == "list" && descriptor is { Kind: UiBindingKind.List, ValuePath: { } listTag })
+        {
+            // The authored template repeats once per live entity carrying the tag, in ascending entity
+            // ID order, so a choice list and an upgrade list render through the same node tree.
+            var items = ImmutableArray.CreateBuilder<UiNodeState>();
+            if (node.Children.Length == 1)
+            {
+                foreach (var entity in context.World.Entities)
+                {
+                    if (entity.ToRemove || !context.World.HasTag(entity, listTag))
+                    {
+                        continue;
+                    }
+
+                    items.Add(EvaluateNode(node.Children[0], context.WithItem(entity.Id), plan.Children[0], budget));
+                }
+            }
+
+            return new UiNodeState(node.Type, node.Text, node.Action, node.VisualRecipeId, false, null, null,
+                null, null, items.ToImmutable(), node.Tooltip, node.Amount, ItemEntityId: context.ItemEntityId);
+        }
+
         var value = descriptor is null ? default : Resolve(context, descriptor);
         double? progress = null;
         if (node.Type == "bar" && value.Number is { } number)
@@ -73,11 +118,17 @@ public static class DeclarativeUiEvaluator
         var children = ImmutableArray.CreateBuilder<UiNodeState>(node.Children.Length);
         for (var index = 0; index < node.Children.Length; index++)
         {
-            children.Add(EvaluateNode(node.Children[index], context, plan.Children[index]));
+            children.Add(EvaluateNode(node.Children[index], context, plan.Children[index], budget));
         }
 
+        // A toggle reads one binding as a boolean threshold, so the same provider that feeds a
+        // choice list also drives the switch without a second binding kind.
+        var isOn = node.Type == "toggle" && value.Number is > 0.5;
+        // The item ID travels with every node rendered inside a list item, so a renderer can attach a
+        // button click to the entity that produced it without repeating the list query.
         return new UiNodeState(node.Type, node.Text, node.Action, node.VisualRecipeId, value.HasValue,
-            value.Number, value.Text, progress, ResolveVisualState(node, descriptor, context), children.MoveToImmutable());
+            value.Number, value.Text, progress, ResolveVisualState(node, descriptor, context),
+            children.MoveToImmutable(), node.Tooltip, node.Amount, isOn, context.ItemEntityId);
     }
 
     private static string? ResolveVisualState(UiNode node, UiBindingDescriptor? descriptor, UiBindingContext context)
@@ -116,6 +167,23 @@ public static class DeclarativeUiEvaluator
             && double.IsFinite(selectionValue))
         {
             return BindingValue.FromNumber(selectionValue);
+        }
+
+        if (binding.Kind == UiBindingKind.Item && context.ItemEntityId is { } itemId
+            && context.World.ById(itemId) is { } item)
+        {
+            var itemPath = binding.ValuePath!;
+            if (itemPath.StartsWith("tag.", StringComparison.Ordinal))
+            {
+                return BindingValue.FromNumber(
+                    context.World.HasTag(item, itemPath["tag.".Length..]) ? 1 : 0);
+            }
+
+            if (context.World.TryGetEffectiveProperty(item, itemPath, out var itemValue)
+                && double.IsFinite(itemValue))
+            {
+                return BindingValue.FromNumber(itemValue);
+            }
         }
 
         if (binding.Kind == UiBindingKind.Event && context.EventFact is { } fact)
@@ -174,6 +242,11 @@ public static class DeclarativeUiEvaluator
 
         value = default;
         return false;
+    }
+
+    private sealed class UiEvaluationBudget
+    {
+        public int Nodes { get; set; }
     }
 
     private readonly record struct BindingValue(bool HasValue, double? Number, string? Text)

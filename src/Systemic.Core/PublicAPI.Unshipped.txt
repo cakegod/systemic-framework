@@ -1,9 +1,10 @@
 #nullable enable
-
+static Systemic.Rules.RuleEffect.ClearScope(string! tag) -> Systemic.Rules.RuleEffect
 Systemic.Content.ContentTuningSchema.ParseEntity(System.ReadOnlyMemory<byte> entitiesJson, string! sourceFile, string! entityId, Systemic.Content.EntityDefinition? merged) -> Systemic.Content.TuningDocument!
 override Systemic.Rules.FactDefinition.Equals(object? obj) -> bool
 override Systemic.Rules.FactDefinition.GetHashCode() -> int
 override Systemic.Rules.FactDefinition.ToString() -> string!
+Systemic.Rules.RuleEffectKind.ClearScope = 10 -> Systemic.Rules.RuleEffectKind
 ~override Systemic.Rules.FactFieldDefinition.Equals(object obj) -> bool
 override Systemic.Rules.FactFieldDefinition.GetHashCode() -> int
 ~override Systemic.Rules.FactFieldDefinition.ToString() -> string

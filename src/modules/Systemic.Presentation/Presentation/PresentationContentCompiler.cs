@@ -284,15 +284,29 @@ internal static class PresentationContentCompiler
         string sourcePath,
         IReadOnlyDictionary<string, EntityDefinition> entitiesById,
         ImmutableDictionary<string, string> choiceIcons,
-        HashSet<string> visualIds)
+        HashSet<string> visualIds,
+        bool insideListItem = false)
     {
         Require(depth <= 32, $"UI layout '{layoutId}' exceeds the maximum nesting depth of 32.", fieldPath);
         Require(++budget.Count <= 16_384, "ui.json exceeds the 16,384-node limit.", fieldPath);
-        Require(node.Type is "column" or "row" or "text" or "value" or "bar" or "button" or "icon",
+        Require(node.Type is "column" or "row" or "text" or "value" or "bar" or "button" or "icon" or "list" or "toggle",
             $"UI layout '{layoutId}' has unknown node type '{node.Type}'.", $"{fieldPath}.type");
         if (node.Type == "button")
         {
             Require(node.Action is not null, $"UI button in '{layoutId}' requires an action ID.", $"{fieldPath}.action");
+            Require(node.Amount is null or (>= 1 and <= 1_000_000),
+                $"UI button in '{layoutId}' requires a buy amount between 1 and 1,000,000.", $"{fieldPath}.amount");
+        }
+        else
+        {
+            Require(node.Amount is null,
+                $"UI node '{node.Type}' in '{layoutId}' cannot define a buy amount.", $"{fieldPath}.amount");
+        }
+
+        if (node.Type == "toggle")
+        {
+            Require(node.Bind is not null,
+                $"UI toggle in '{layoutId}' requires a binding that reads as a boolean.", $"{fieldPath}.bind");
         }
 
         UiBindingDescriptor? bindingDescriptor = null;
@@ -301,7 +315,8 @@ internal static class PresentationContentCompiler
             bindingDescriptor = UiBindingParser.Parse(binding);
             Require(bindingDescriptor.HasGrammarShape,
                 $"UI binding '{node.Bind}' must use world., event., or selection. followed by a value path.", $"{fieldPath}.bind");
-            ValidateUiBinding(bindingDescriptor, layoutId, $"{fieldPath}.bind", sourcePath, context, entitiesById);
+            ValidateUiBinding(bindingDescriptor, layoutId, $"{fieldPath}.bind", sourcePath, context, entitiesById,
+                insideListItem);
         }
 
         if (node.Type == "bar")
@@ -320,6 +335,14 @@ internal static class PresentationContentCompiler
         {
             Require(node.Minimum is null && node.Maximum is null,
                 $"UI node '{node.Type}' in '{layoutId}' cannot define a numeric range.", fieldPath);
+        }
+
+        if (node.Type == "list")
+        {
+            Require(bindingDescriptor is { Kind: UiBindingKind.List, ValuePath: { Length: > 0 } },
+                $"UI list in '{layoutId}' requires a list.tag: binding.", $"{fieldPath}.bind");
+            Require(node.Children is { Length: 1 },
+                $"UI list in '{layoutId}' requires exactly one child template.", $"{fieldPath}.children");
         }
 
         var visualRecipeId = node.VisualRecipeId;
@@ -348,11 +371,12 @@ internal static class PresentationContentCompiler
         for (var childIndex = 0; childIndex < children.Length; childIndex++)
         {
             compiledChildren.Add(CompileNode(children[childIndex]!, layoutId, $"{fieldPath}.children[{childIndex}]", depth + 1, budget,
-                context, sourcePath, entitiesById, choiceIcons, visualIds));
+                context, sourcePath, entitiesById, choiceIcons, visualIds,
+                insideListItem || node.Type == "list"));
         }
 
         return new UiNode(node.Type, node.Text, node.Bind, node.Action, compiledChildren.MoveToImmutable(),
-            node.Minimum, node.Maximum, visualRecipeId);
+            node.Minimum, node.Maximum, visualRecipeId, node.Tooltip, node.Amount);
     }
 
     private static void ValidateUiBinding(
@@ -361,10 +385,21 @@ internal static class PresentationContentCompiler
         string fieldPath,
         string sourcePath,
         ContentModuleContext context,
-        IReadOnlyDictionary<string, EntityDefinition> entitiesById)
+        IReadOnlyDictionary<string, EntityDefinition> entitiesById,
+        bool insideListItem)
     {
-        if (binding.Kind == UiBindingKind.Selection)
+        if (binding.Kind is UiBindingKind.Selection or UiBindingKind.List)
         {
+            // A list tag is checked against the live world at evaluation time, and the item template is
+            // shared by every tag that renders through it.
+            return;
+        }
+
+        if (binding.Kind == UiBindingKind.Item)
+        {
+            // Outside a list template there is no item, so the binding would silently render nothing.
+            Require(insideListItem,
+                $"UI layout '{layoutId}' binds '{binding.Binding}' outside a list template.", fieldPath);
             return;
         }
 
@@ -506,5 +541,7 @@ internal static class PresentationContentCompiler
         UiNodeFile[]? Children = null,
         double? Minimum = null,
         double? Maximum = null,
-        string? VisualRecipeId = null);
+        string? VisualRecipeId = null,
+        string? Tooltip = null,
+        int? Amount = null);
 }

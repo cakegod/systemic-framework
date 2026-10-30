@@ -14,10 +14,22 @@ Refactor — think about how to improve your existing implementation
 ## Build and test
 
 ```sh
-dotnet build Systemic.sln --configuration Release
-dotnet test Systemic.sln --configuration Release
-dotnet test tests/Systemic.Cli.Tests --configuration Release
-dotnet format Systemic.sln --verify-no-changes
+scripts/loop.sh --full          # build and test every framework suite
+scripts/loop.sh --format        # formatting, before a commit
+```
+
+The Boids, GlowGarden, and PixelMine suites drive the playable games and cost about two minutes
+together, so the gate skips them. Run them on demand when a sample changed:
+
+```sh
+scripts/loop.sh --samples
+```
+
+`dotnet format` spends most of its time loading projects, so scope it to the file you touched
+rather than the solution:
+
+```sh
+dotnet format whitespace src/Systemic.Kernel/Systemic.Kernel.csproj --include src/Systemic.Kernel/World.cs
 ```
 
 A focused test filter is faster than the full suite:

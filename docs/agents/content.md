@@ -35,6 +35,25 @@ The schedule and the rule are general primitives. A producer is a pattern, not a
 
 Give an entity the `ui.choice` tag and a `selected` property. Rules can check the tag. A generic list UI binds to entities with the tag. Do not ask for a Talent type.
 
+## Invoke a UI action
+
+A button declares an `action` id, and the game publishes that id as one fact through
+`InvokeUiAction`. The id is the fact type, the owning entity is both source and target, and
+the button's `amount` travels on the fact, so a rule can scale by the quantity the player
+chose.
+
+```json
+{ "type": "button", "text": "Buy x10", "action": "ui.buy", "amount": 10 }
+```
+
+```csharp
+var result = game.InvokeUiAction("hud", "ui.buy", game.EntityId("actor.buyer"));
+```
+
+The owning entity is required: a fact aimed at no entity matches no entity-addressed rule.
+`result.Handled` reports whether a rule actually matched, not merely that the fact was
+published, so a button no rule listens for returns `false`.
+
 ## Declare facts and payloads
 
 Add a `facts` array to `rules.json` when a fact should carry typed data. Each fact
@@ -139,6 +158,7 @@ that read only `query.count` or `query.value` still run.
 ## Effects
 
 - `adjustProperty`: change a numeric property. `quantity` picks how: `add` (default), `set`, `multiply`, `min`, or `max`.
+- `clearScope`: despawn every entity carrying the given scope tag, for example `scope.run`, and leave the other scopes intact. It addresses the whole scope, so it takes only `tag`; `subject`, `row`, and `factRow` are rejected at load rather than silently ignored.
 - `setModifier`: typed, staged, optionally timed modifier. `operation` is `add`, `multiply`, `set`, `min`, or `max`. Add `fromProperty` to make the amount follow another property at read time, which is how an upgrade rank drives its own effects.
 - `addTag`, `removeTag`: change an entity's tags.
 - `emitEvent`: dispatch another fact immediately.

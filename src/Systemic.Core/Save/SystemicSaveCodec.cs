@@ -109,7 +109,11 @@ public sealed class SystemicSaveCodec
                 [.. world.Grants],
                 world.BoundRoles.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
                 [.. world.RequiredEntityIds]),
-            game.EntityIds.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+            // A scope reset can remove a named entity, so only names that still resolve are written.
+            // A stale name would fail this document's own load-time reference check.
+            game.EntityIds
+                .Where(pair => world.ById(pair.Value) is { ToRemove: false })
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
             extensionStates);
 
         var json = JsonSerializer.Serialize(document, SystemicSaveJsonContext.Default.SaveDocument);

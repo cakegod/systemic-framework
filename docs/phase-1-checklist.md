@@ -6,7 +6,7 @@ Gate G1: 41/41 talents are general rules and tags, with zero framework genre typ
 pattern pack covers producer, upgrade, merge, prestige, and worker with tests.
 `Systemic.Incremental` stays frozen, and no new genre API is added.
 
-Status: 1.1 through 1.7 are complete. 1.8 is the next slice. Every unchecked item below
+Status: 1.1 through 1.9 are complete. 1.10 is the next slice. Every unchecked item below
 is a TDD slice: failing test first, smallest implementation to green, then refactor.
 
 ## Execution rules
@@ -30,13 +30,13 @@ is a TDD slice: failing test first, smallest implementation to green, then refac
 | 1.5 | Modifiers: add, multiply, set, min, max, stacking, duration, scope, and rank awareness | `ModifierPrimitiveTests` covers clamping, source stacking, timed expiry, and rank-aware reads; `EffectContentTests` runs an upgrade whose modifier follows its rank from JSON | 1.3 | done |
 | 1.6 | Rules and rule bundles: guards, priority, while conditions, enable and disable, deterministic order | `RuleBundleAndTimeTests` proves a talent tag enables a bundle and a timed grant expires it; rule order is priority then ID, asserted in `RuleEngineTests` | 1.4, 1.5 | done |
 | 1.7 | Time: tick, schedule, delay, cooldown, and deterministic fast-forward | `RuleBundleAndTimeTests` covers a cooldown window and eight hours (1,728,000 ticks) of fast-forward, which matches online exactly | 1.4, 1.5 | done |
-| 1.8 | Generic UI binding: lists, toggles, costs, cooldowns, tooltips, buy amounts, actions | A choice list and an upgrade list use the same widgets and bindings; action results are tested | 1.5, 1.6 | pending |
-| 1.9 | Generic save: scopes, state graph, migration, content fingerprint | Save and load across a reset and a content change; a migration test covers the old schema | 1.6, 1.7 | pending |
+| 1.8 | Generic UI binding: lists, toggles, costs, cooldowns, tooltips, buy amounts, actions | `AChoiceListAndAnUpgradeListShareTheSameWidgetTemplate` repeats one template per tagged entity; `UiWidgetTests` covers the toggle threshold, the tooltip, the buy amount, and rejection of an amount on a non-button; `UiActionTests` covers dispatch and an undeclared action | 1.5, 1.6 | done |
+| 1.9 | Generic save: scopes, state graph, migration, content fingerprint | `ClearScopeTests` saves, clears a scope through a rule, and restores the cleared entities from that save; `SystemicSaveExtensionTests` covers sequential migrations and rejects a missing step; every document carries a content fingerprint | 1.6, 1.7 | done |
 | 1.10 | Pattern pack: producer, upgrade, talent, merge, prestige, worker, offline, status, unlock | Each pattern has a minimal content example and a test; no pattern names a framework type | 1.4, 1.5, 1.6, 1.7, 1.9 | pending |
 | 1.11 | Port all 41 talents as tags and rules, one file per group plus default | 41/41 talents authored as content; each at most 12 behavior lines; zero C# | 1.3, 1.4, 1.5, 1.6, 1.10 | pending |
 | 1.12 | One headless test per talent, positive and negative | 41 tests green; every test names its talent and asserts both the enabled and disabled case | 1.11 | pending |
 | 1.13 | Asset DSL: primitives, outline, shading, gradient, dither, symmetry, parts, frames, atlas metadata | The target `gnorp.slammer` recipe compiles; every new primitive has a raster test | 1.2 | pending |
-| 1.14 | Asset commands: `sheet`, `validate`, `atlas`, `preview`, labeled manifest | Sheet, atlas, manifest, and preview are produced from content; a bad recipe names its file and path | 1.13 | pending |
+| 1.14 | Asset commands: `sheet`, `validate`, `atlas`, labeled manifest | Sheet, atlas, and manifest are produced from content; a bad recipe names its file and path | 1.13 | pending |
 | 1.15 | Quality checks: palette, alpha, bounds, pivot, frames, silhouette, contrast | A bad recipe fails once for each check with a useful diagnostic; a good batch passes | 1.13, 1.14 | pending |
 | 1.16 | Port the slice's art to recipes; delete hand-made atlases and Aseprite dependency | Only the font remains imported; the contact sheet is accepted; the game loads the generated atlas | 1.13, 1.14, 1.15 | pending |
 | G1 | Phase 1 exit gate | 41/41 talents, pattern pack tests, frozen Incremental module, no genre type in the framework, asset sheet and atlas accepted | all above | pending |
