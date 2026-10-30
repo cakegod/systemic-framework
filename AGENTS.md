@@ -59,6 +59,7 @@ Content files are JSON with strict schemas in `schemas/`. Every diagnostic carri
 
 ## Rules for changes
 
+- Adding a new feature must always use TDD: write a failing test first (red), make the smallest change that passes (green), then refactor. Repeat until the behavior is complete.
 - The framework must not add a type, method, or module named Talent, Merge, Prestige, Upgrade, Producer, or Colony. Express those as content patterns over general primitives.
 - Authoritative simulation state uses integer or fixed-point math. Do not use floats, ambient time, or unordered iteration in systems.
 - Declare every column and World access a system uses. A wrong declaration is a race, not a performance hint.

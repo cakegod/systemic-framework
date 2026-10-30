@@ -161,6 +161,9 @@ public readonly record struct RuleEffect(
     ModifierStage Stage = ModifierStage.Standard,
     int DurationTicks = -1)
 {
+    /// <summary>Gets the typed payload carried by an emitted fact, when one is declared.</summary>
+    public SimulationFactPayload? Payload { get; init; }
+
     public static RuleEffect AdjustProperty(RuleSubject subject, string property, double amount) =>
         new(RuleEffectKind.AdjustProperty, subject, property, amount);
 
@@ -176,8 +179,10 @@ public readonly record struct RuleEffect(
         int durationTicks = -1) =>
         new(RuleEffectKind.SetModifier, subject, property, value, operation, stage, durationTicks);
 
-    public static RuleEffect Emit(string eventType) =>
-        new(RuleEffectKind.EmitEvent, RuleSubject.Target, eventType, 0);
+    public static RuleEffect Emit(string eventType) => Emit(eventType, null);
+
+    public static RuleEffect Emit(string eventType, SimulationFactPayload? payload) =>
+        new(RuleEffectKind.EmitEvent, RuleSubject.Target, eventType, 0) { Payload = payload };
 }
 
 public sealed record CompiledRule(
@@ -194,7 +199,17 @@ public sealed record RuleScheduleDefinition(
     int OffsetTicks,
     string? SourceEntityId,
     string? TargetEntityId,
-    double Amount);
+    double Amount)
+{
+    /// <summary>Gets the typed payload carried by the scheduled fact, when one is declared.</summary>
+    public SimulationFactPayload? Payload { get; init; }
+}
+
+/// <summary>One typed field in a declared fact payload.</summary>
+public readonly record struct FactFieldDefinition(string Key, SimulationFactValueKind Kind);
+
+/// <summary>A named fact and the typed payload its authors may attach.</summary>
+public sealed record FactDefinition(string Id, ImmutableArray<FactFieldDefinition> Fields);
 
 /// <summary>Rules sorted once during content compilation, ready for deterministic event dispatch.</summary>
 public sealed class CompiledRuleSet
@@ -220,6 +235,9 @@ public sealed class CompiledRuleSet
     }
 
     public ImmutableArray<CompiledRule> Rules { get; }
+
+    /// <summary>Gets the declared fact contracts, ordered by ID.</summary>
+    public ImmutableArray<FactDefinition> Facts { get; init; } = [];
 
     public ImmutableArray<string> EventTypes { get; }
 

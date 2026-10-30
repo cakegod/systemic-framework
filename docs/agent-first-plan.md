@@ -1,6 +1,6 @@
 # Systemic game plan (personal use)
 
-Status: proposed  
+Status: Phase 0 complete; Phase 1 in progress  
 Date: 2026-10-30  
 Scope: one developer, one repository, no external users.  
 Target: Gnorp-like and Idle Colony-like games built from general mechanics, plus a second game with different mechanics to prove the framework did not bake the genre in.
@@ -346,6 +346,11 @@ Stop rule: if G0 needs a human step, do not start Phase 1.
 ## Phase 1: the composition layer (5 weeks)
 
 Goal: the rule model can express producers, upgrades, talents, merges, prestige, and workers without any of those being framework concepts.
+
+Started 2026-10-30: 1.1 audit is recorded in
+[`phase-1-incremental-audit.md`](phase-1-incremental-audit.md). 1.2 is implemented for
+declared facts with typed payloads, including payloads on emitted and scheduled facts.
+The next slice is 1.3 queries.
 
 | ID | Work | Acceptance evidence |
 | --- | --- | --- |

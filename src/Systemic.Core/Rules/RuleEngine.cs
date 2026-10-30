@@ -1508,7 +1508,7 @@ public sealed class RuleEngine
             // The row reference travels with the reaction, so a later fact still names the same row
             // and can detect that the row despawned in between.
             EnqueueFact(new SimulationFact(effect.Name, fact.SourceId, fact.TargetId, fact.Depth + 1,
-                fact.Amount, fact.Position, fact.Payload, fact.Row));
+                fact.Amount, fact.Position, effect.Payload ?? fact.Payload, fact.Row));
             return;
         }
 

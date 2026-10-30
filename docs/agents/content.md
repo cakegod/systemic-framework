@@ -35,6 +35,43 @@ The schedule and the rule are general primitives. A producer is a pattern, not a
 
 Give an entity the `ui.choice` tag and a `selected` property. Rules can check the tag. A generic list UI binds to entities with the tag. Do not ask for a Talent type.
 
+## Declare facts and payloads
+
+Add a `facts` array to `rules.json` when a fact should carry typed data. Each fact
+names its payload fields and their kinds: `integer`, `number`, `text`, or `boolean`.
+
+```json
+{
+  "facts": [
+    {
+      "id": "fruit.combine",
+      "payload": [
+        { "key": "tier", "kind": "integer" },
+        { "key": "label", "kind": "text" }
+      ]
+    }
+  ]
+}
+```
+
+A rule or schedule attaches values by key:
+
+```json
+{
+  "kind": "emitEvent",
+  "event": "fruit.combine",
+  "payload": [
+    { "key": "tier", "value": 3 },
+    { "key": "label", "value": "pear" }
+  ]
+}
+```
+
+When `facts` is present, every `on` event, `emitEvent`, and schedule event must be
+declared. Payload fields are optional per emission, but a supplied key must match a
+declared field and its kind. Duplicate keys, unknown fields, and wrong value kinds
+are content errors with a path to the offending value.
+
 ## Conditions
 
 - `hasTag`: subject has a tag.

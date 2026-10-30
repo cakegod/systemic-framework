@@ -21,7 +21,7 @@ Phase 0 is the agent loop:
 - Render procedural visual recipes to a contact sheet and an atlas.
 - Do all of it with `--json` and stable exit codes.
 
-That loop is implemented. The broader composition layer, the 41-talent conformance pack, and the second game are Phase 1 and later.
+That loop is implemented. Phase 1 has started with declared facts: a fact can name a typed payload, and emitted and scheduled facts carry it through the same dispatch path. The [Incremental audit](docs/phase-1-incremental-audit.md) freezes the old module and maps its behaviour to general patterns. Queries, the broader effect set, and the 41-talent pack are next.
 
 ## Quick start
 
@@ -84,7 +84,7 @@ A pack has three required files:
 
 - `game.json`: manifest, tick rate, file paths, and optional modules.
 - `entities.json`: entities, tags, numeric properties, links, and visual recipe IDs.
-- `rules.json`: schedules, rules, conditions, effects, and fragments.
+- `rules.json`: facts, schedules, rules, conditions, effects, and fragments.
 
 Optional declarative presentation lives in `ui.json`, `visuals.json`, and `presentation.json`. The schemas are in `schemas/`, and every diagnostic names the file and JSON path.
 
@@ -138,6 +138,7 @@ The samples are references and diagnostics. They are not the target architecture
 ## Documentation
 
 - [Agent-first plan](docs/agent-first-plan.md) is the current direction and gates.
+- [Incremental audit](docs/phase-1-incremental-audit.md) records the Phase 1.1 freeze and pattern mapping.
 - [Agent recipes](docs/agents) cover the run, content, asset, and save loops.
 - [Framework guides](docs/index.md) cover the system context, populations, and analyzers.
 - [ADRs](docs/adr/0001-populations-as-rule-subjects.md) record the population and expression decisions.

@@ -218,6 +218,53 @@ public static partial class ContentPackLoader
             }
         }
 
+        var factDefinitions = new Dictionary<string, FactDefinition>(StringComparer.Ordinal);
+        var facts = ImmutableArray.CreateBuilder<FactDefinition>();
+        var factsDeclared = file.Facts is not null;
+        if (file.Facts is { } sourceFacts)
+        {
+            for (var factIndex = 0; factIndex < sourceFacts.GetArrayLength(); factIndex++)
+            {
+                var fact = sourceFacts[factIndex];
+                var factPath = $"$.facts[{factIndex}]";
+                var factId = (string)fact.IdValue;
+                var fields = ImmutableArray.CreateBuilder<FactFieldDefinition>();
+                var fieldKeys = new HashSet<string>(StringComparer.Ordinal);
+                if (fact.Payload is { } sourceFields)
+                {
+                    for (var fieldIndex = 0; fieldIndex < sourceFields.GetArrayLength(); fieldIndex++)
+                    {
+                        var field = sourceFields[fieldIndex];
+                        var fieldPath = $"{factPath}.payload[{fieldIndex}]";
+                        var key = field.Key.GetString();
+                        var kindName = field.Kind.GetString();
+                        Require(!string.IsNullOrWhiteSpace(key)
+                            && key.Length <= SimulationFactPayload.MaximumKeyLength,
+                            $"Fact '{factId}' payload key must be 1-{SimulationFactPayload.MaximumKeyLength} characters.",
+                            $"{fieldPath}.key");
+                        Require(fieldKeys.Add(key!),
+                            $"Fact '{factId}' declares payload key '{key}' more than once.",
+                            $"{fieldPath}.key");
+                        var kind = kindName switch
+                        {
+                            "integer" => SimulationFactValueKind.Integer,
+                            "number" => SimulationFactValueKind.Number,
+                            "text" => SimulationFactValueKind.Text,
+                            "boolean" => SimulationFactValueKind.Boolean,
+                            _ => throw new ContentPackException(
+                                $"Fact '{factId}' has unknown payload kind '{kindName}'.", $"{fieldPath}.kind"),
+                        };
+                        fields.Add(new FactFieldDefinition(key!, kind));
+                    }
+                }
+
+                var definition = new FactDefinition(factId, fields.ToImmutable());
+                Require(factDefinitions.TryAdd(factId, definition),
+                    $"Duplicate fact id '{factId}'.", $"{factPath}.id");
+                facts.Add(definition);
+            }
+        }
+
         var expandedRules = new List<(RulesContentFile.Rule Rule, string Path, string? Prefix)>();
         if (file.UseFragments is { } usedFragmentIds)
         {
@@ -246,9 +293,14 @@ public static partial class ContentPackLoader
         foreach (var source in expandedRules)
         {
             var rule = source.Rule;
-            var rulePath = source.Path;
-            var ruleId = source.Prefix is { } prefix ? $"{prefix}.{(string)rule.IdValue}" : (string)rule.IdValue;
+            var rulePath = source.Path;                var ruleId = source.Prefix is { } prefix ? $"{prefix}.{(string)rule.IdValue}" : (string)rule.IdValue;
             Require(ids.Add(ruleId), $"Duplicate rule id '{ruleId}'.", $"{rulePath}.id");
+            var eventType = (string)rule.On;
+            if (factsDeclared)
+            {
+                Require(factDefinitions.ContainsKey(eventType),
+                    $"Rule '{ruleId}' listens for undeclared fact '{eventType}'.", $"{rulePath}.on");
+            }
 
             var conditions = ImmutableArray.CreateBuilder<RuleCondition>();
             if (rule.When is { } sourceConditions)
@@ -381,7 +433,18 @@ public static partial class ContentPackLoader
                         var emittedEvent = effect.Event?.GetString();
                         Require(emittedEvent is not null && StableIdRegex().IsMatch(emittedEvent),
                             $"Rule '{ruleId}' emitEvent requires a stable event ID.", $"{effectPath}.event");
-                        effects.Add(RuleEffect.Emit(emittedEvent!));
+                        FactDefinition? emittedFact = null;
+                        if (factsDeclared)
+                        {
+                            Require(emittedEvent is not null
+                                && factDefinitions.TryGetValue(emittedEvent, out emittedFact),
+                                $"Rule '{ruleId}' emits undeclared fact '{emittedEvent}'.", $"{effectPath}.event");
+                        }
+
+                        var emittedPayload = effect.Payload is { } sourcePayload
+                            ? CompilePayload(sourcePayload, $"{effectPath}.payload", emittedFact)
+                            : null;
+                        effects.Add(RuleEffect.Emit(emittedEvent!, emittedPayload));
                         break;
                     default:
                         throw new ContentPackException($"Rule '{ruleId}' uses unknown effect '{effectKind}'.", $"{effectPath}.kind");
@@ -404,6 +467,7 @@ public static partial class ContentPackLoader
                 var schedule = sourceSchedules[index];
                 var schedulePath = $"$.schedules[{index}]";
                 var scheduleId = (string)schedule.IdValue;
+                var scheduleEvent = (string)schedule.Event;
                 var everyTicks = (int)schedule.EveryTicks;
                 var offsetTicks = schedule.OffsetTicks is { } offset ? (int)offset : 0;
                 var amount = schedule.Amount is { } scheduleAmount ? (double)scheduleAmount : 0;
@@ -417,8 +481,19 @@ public static partial class ContentPackLoader
                     $"{schedulePath}.amount");
                 ValidateScheduledEntity(sourceEntityId, "sourceEntityId");
                 ValidateScheduledEntity(targetEntityId, "targetEntityId");
-                schedules.Add(new RuleScheduleDefinition(scheduleId, (string)schedule.Event, everyTicks,
-                    offsetTicks, sourceEntityId, targetEntityId, amount));
+                FactDefinition? scheduledFact = null;
+                if (factsDeclared)
+                {
+                    Require(factDefinitions.TryGetValue(scheduleEvent, out scheduledFact),
+                        $"Schedule '{scheduleId}' emits undeclared fact '{scheduleEvent}'.",
+                        $"{schedulePath}.event");
+                }
+
+                var schedulePayload = schedule.Payload is { } sourcePayload
+                    ? CompilePayload(sourcePayload, $"{schedulePath}.payload", scheduledFact)
+                    : null;
+                schedules.Add(new RuleScheduleDefinition(scheduleId, scheduleEvent, everyTicks,
+                    offsetTicks, sourceEntityId, targetEntityId, amount) { Payload = schedulePayload });
 
                 void ValidateScheduledEntity(string? entityId, string field)
                 {
@@ -436,7 +511,129 @@ public static partial class ContentPackLoader
             }
         }
 
-        return new CompiledRuleSet(rules.MoveToImmutable(), schedules.ToImmutable());
+        return new CompiledRuleSet(rules.MoveToImmutable(), schedules.ToImmutable())
+        {
+            Facts = [.. facts.OrderBy(fact => fact.Id, StringComparer.Ordinal)],
+        };
+    }
+
+    private static SimulationFactPayload? CompilePayload(
+        RulesContentFile.Effect.PayloadArray payload,
+        string fieldPath,
+        FactDefinition? fact)
+    {
+        var entries = new List<SimulationFactPayloadEntry>(payload.GetArrayLength());
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < payload.GetArrayLength(); index++)
+        {
+            entries.Add(CompilePayloadEntry(payload[index], $"{fieldPath}[{index}]", fact, keys));
+        }
+
+        return entries.Count == 0 ? null : new SimulationFactPayload(entries);
+    }
+
+    private static SimulationFactPayload? CompilePayload(
+        RulesContentFile.Schedule.PayloadArray payload,
+        string fieldPath,
+        FactDefinition? fact)
+    {
+        var entries = new List<SimulationFactPayloadEntry>(payload.GetArrayLength());
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < payload.GetArrayLength(); index++)
+        {
+            entries.Add(CompilePayloadEntry(payload[index], $"{fieldPath}[{index}]", fact, keys));
+        }
+
+        return entries.Count == 0 ? null : new SimulationFactPayload(entries);
+    }
+
+    private static SimulationFactPayloadEntry CompilePayloadEntry(
+        RulesContentFile.PayloadValue item,
+        string itemPath,
+        FactDefinition? fact,
+        HashSet<string> keys)
+    {
+        var key = item.Key.GetString();
+        Require(!string.IsNullOrWhiteSpace(key)
+            && key.Length <= SimulationFactPayload.MaximumKeyLength,
+            $"A fact payload key must be 1-{SimulationFactPayload.MaximumKeyLength} characters.",
+            $"{itemPath}.key");
+        Require(keys.Add(key!), $"Duplicate fact payload key '{key}'.", $"{itemPath}.key");
+        FactFieldDefinition? field = null;
+        if (fact is not null)
+        {
+            foreach (var candidate in fact.Fields)
+            {
+                if (string.Equals(candidate.Key, key, StringComparison.Ordinal))
+                {
+                    field = candidate;
+                    break;
+                }
+            }
+
+            Require(field is not null,
+                $"Fact '{fact.Id}' does not declare payload field '{key}'.", $"{itemPath}.key");
+        }
+
+        return new SimulationFactPayloadEntry(key!,
+            ParsePayloadValue(item.Value, field?.Kind ?? SimulationFactValueKind.None, itemPath));
+    }
+
+    private static SimulationFactValue ParsePayloadValue(
+        RulesContentFile.PayloadValue.ValueEntity value,
+        SimulationFactValueKind expectedKind,
+        string fieldPath)
+    {
+        if (value.ValueKind == Corvus.Text.Json.JsonValueKind.Number)
+        {
+            if (expectedKind == SimulationFactValueKind.Integer)
+            {
+                Require(value.TryGetValue(out long integer),
+                    "A declared integer payload value must be a whole number.", $"{fieldPath}.value");
+                return SimulationFactValue.FromInteger(integer);
+            }
+
+            if (expectedKind is SimulationFactValueKind.Number or SimulationFactValueKind.None)
+            {
+                if (expectedKind == SimulationFactValueKind.None && value.TryGetValue(out long exact))
+                {
+                    return SimulationFactValue.FromInteger(exact);
+                }
+
+                Require(value.TryGetValue(out double number) && double.IsFinite(number),
+                    "A numeric payload value must be finite.", $"{fieldPath}.value");
+                return SimulationFactValue.FromNumber(number);
+            }
+
+            throw new ContentPackException(
+                $"Payload value must be {expectedKind.ToString().ToLowerInvariant()}, not a number.",
+                $"{fieldPath}.value");
+        }
+
+        if (value.ValueKind == Corvus.Text.Json.JsonValueKind.String)
+        {
+            Require(expectedKind is SimulationFactValueKind.Text or SimulationFactValueKind.None,
+                $"Payload value must be {expectedKind.ToString().ToLowerInvariant()}, not text.",
+                $"{fieldPath}.value");
+            var text = value.GetString()!;
+            Require(text.Length <= SimulationFactValue.MaximumTextLength,
+                $"A text payload value exceeds the {SimulationFactValue.MaximumTextLength}-character limit.",
+                $"{fieldPath}.value");
+            return SimulationFactValue.FromText(text);
+        }
+
+        if (value.ValueKind is Corvus.Text.Json.JsonValueKind.True or Corvus.Text.Json.JsonValueKind.False)
+        {
+            Require(expectedKind is SimulationFactValueKind.Boolean or SimulationFactValueKind.None,
+                $"Payload value must be {expectedKind.ToString().ToLowerInvariant()}, not boolean.",
+                $"{fieldPath}.value");
+            Require(value.TryGetValue(out bool boolean),
+                "A boolean payload value is malformed.", $"{fieldPath}.value");
+            return SimulationFactValue.FromBoolean(boolean);
+        }
+
+        throw new ContentPackException(
+            "A fact payload value must be a number, text, or boolean.", $"{fieldPath}.value");
     }
 
     private static CompiledEntities CompileEntities(EntitiesFile file, string sourceFile)
