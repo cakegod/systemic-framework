@@ -2,10 +2,8 @@ using System.Text.Json.Nodes;
 using Systemic.Content;
 using Systemic.Host;
 using Systemic.Kernel;
-using Systemic.Presentation;
 using Systemic.Rules;
 using Systemic.Save;
-using Xunit;
 
 namespace Systemic.Tests.Presentation;
 
@@ -85,7 +83,7 @@ public sealed class UiReviewRegressionTests
                     ]
                   }
                 }
-                """));
+                """u8));
             File.WriteAllText(uiPath, document.ToJsonString());
 
             var content = SystemicTestContent.Load(root);
