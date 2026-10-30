@@ -290,12 +290,36 @@ public static partial class ContentPackLoader
         Require(expandedRules.Count <= 16_384, "rules.json exceeds the 16,384-rule limit.", "$.rules");
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var rules = ImmutableArray.CreateBuilder<CompiledRule>(expandedRules.Count);
+        var spawnTemplates = new Dictionary<string, SpawnTemplate>(StringComparer.Ordinal);
+        var bundles = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (file.Bundles is { } sourceBundles)
+        {
+            for (var bundleIndex = 0; bundleIndex < sourceBundles.GetArrayLength(); bundleIndex++)
+            {
+                var bundle = sourceBundles[bundleIndex];
+                var bundlePath = $"$.bundles[{bundleIndex}]";
+                var bundleId = (string)bundle.IdValue;
+                var enabledByTag = (string)bundle.EnabledByTag;
+                Require(!string.IsNullOrWhiteSpace(enabledByTag),
+                    $"Bundle '{bundleId}' requires enabledByTag.", $"{bundlePath}.enabledByTag");
+                Require(bundles.TryAdd(bundleId, enabledByTag!),
+                    $"Duplicate bundle id '{bundleId}'.", $"{bundlePath}.id");
+            }
+        }
         foreach (var source in expandedRules)
         {
             var rule = source.Rule;
             var rulePath = source.Path; var ruleId = source.Prefix is { } prefix ? $"{prefix}.{(string)rule.IdValue}" : (string)rule.IdValue;
             Require(ids.Add(ruleId), $"Duplicate rule id '{ruleId}'.", $"{rulePath}.id");
             var eventType = (string)rule.On;
+            var bundleName = rule.Bundle?.GetString();
+            if (bundleName is not null)
+            {
+                Require(bundles.ContainsKey(bundleName),
+                    $"Rule '{ruleId}' references unknown bundle '{bundleName}'.", $"{rulePath}.bundle");
+            }
+
+            var cooldownTicks = rule.CooldownTicks is { } cooldownValue ? (int)cooldownValue : 0;
             if (factsDeclared)
             {
                 Require(factDefinitions.ContainsKey(eventType),
@@ -385,7 +409,19 @@ public static partial class ContentPackLoader
                             $"Rule '{ruleId}' adjustProperty requires property.", $"{effectPath}.property");
                         Require(amount is { } finiteAmount && double.IsFinite(finiteAmount),
                             $"Rule '{ruleId}' effect amount must be finite.", $"{effectPath}.amount");
-                        effects.Add(RuleEffect.AdjustProperty(adjustSubject, adjustProperty!, amount.GetValueOrDefault()));
+                        var quantityName = effect.Quantity?.GetString();
+                        var quantity = quantityName switch
+                        {
+                            null or "add" => QuantityOperation.Add,
+                            "set" => QuantityOperation.Set,
+                            "multiply" => QuantityOperation.Multiply,
+                            "min" => QuantityOperation.Min,
+                            "max" => QuantityOperation.Max,
+                            _ => throw new ContentPackException(
+                                $"Rule '{ruleId}' has unknown quantity operation '{quantityName}'.",
+                                $"{effectPath}.quantity"),
+                        };
+                        effects.Add(RuleEffect.AdjustProperty(adjustSubject, adjustProperty!, amount.GetValueOrDefault(), quantity));
                         break;
                     case "setModifier":
                         var modifierProperty = effect.Property?.GetString();
@@ -405,6 +441,8 @@ public static partial class ContentPackLoader
                             "add" => ModifierOperation.Add,
                             "multiply" => ModifierOperation.Multiply,
                             "set" => ModifierOperation.Set,
+                            "min" => ModifierOperation.Min,
+                            "max" => ModifierOperation.Max,
                             _ => throw new ContentPackException(
                                 $"Rule '{ruleId}' has unknown modifier operation '{operationName}'.", $"{effectPath}.operation"),
                         };
@@ -422,8 +460,15 @@ public static partial class ContentPackLoader
                         Require(durationTicks is -1 or >= 1 and <= 1_000_000,
                             $"Rule '{ruleId}' modifier durationTicks must be between 1 and 1,000,000 when specified.",
                             $"{effectPath}.durationTicks");
-                        effects.Add(RuleEffect.SetModifier(modifierSubject, modifierProperty!, operation,
-                            modifierValue.GetValueOrDefault(), stage, durationTicks));
+                        var fromProperty = effect.FromProperty?.GetString();
+                        Require(fromProperty is null || !string.IsNullOrWhiteSpace(fromProperty),
+                            $"Rule '{ruleId}' setModifier fromProperty cannot be blank.",
+                            $"{effectPath}.fromProperty");
+                        effects.Add(fromProperty is null
+                            ? RuleEffect.SetModifier(modifierSubject, modifierProperty!, operation,
+                                modifierValue.GetValueOrDefault(), stage, durationTicks)
+                            : RuleEffect.SetModifierFromProperty(modifierSubject, modifierProperty!, operation,
+                                modifierValue.GetValueOrDefault(), fromProperty, stage, durationTicks));
                         break;
                     case "addTag":
                         var addedTag = effect.Tag?.GetString();
@@ -431,6 +476,91 @@ public static partial class ContentPackLoader
                             effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
                         Require(!string.IsNullOrWhiteSpace(addedTag), $"Rule '{ruleId}' addTag requires tag.", $"{effectPath}.tag");
                         effects.Add(RuleEffect.AddTag(tagSubject, addedTag!));
+                        break;
+                    case "removeTag":
+                        var removedTag = effect.Tag?.GetString();
+                        var removeTagSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
+                            effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
+                        Require(!string.IsNullOrWhiteSpace(removedTag),
+                            $"Rule '{ruleId}' removeTag requires tag.", $"{effectPath}.tag");
+                        effects.Add(RuleEffect.RemoveTag(removeTagSubject, removedTag!));
+                        break;
+                    case "despawn":
+                        var despawnSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
+                            effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
+                        effects.Add(RuleEffect.Despawn(despawnSubject));
+                        break;
+                    case "transfer":
+                        var transferProperty = effect.Property?.GetString();
+                        var transferTargetProperty = effect.TargetProperty?.GetString() ?? transferProperty;
+                        var transferAmount = effect.Amount is { } transferAmountValue
+                            ? (double)transferAmountValue
+                            : (double?)null;
+                        var transferSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
+                            effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
+                        Require(!string.IsNullOrWhiteSpace(transferProperty),
+                            $"Rule '{ruleId}' transfer requires property.", $"{effectPath}.property");
+                        Require(!string.IsNullOrWhiteSpace(transferTargetProperty),
+                            $"Rule '{ruleId}' transfer requires targetProperty.", $"{effectPath}.targetProperty");
+                        Require(transferAmount is { } finiteTransferAmount && double.IsFinite(finiteTransferAmount)
+                            && finiteTransferAmount >= 0,
+                            $"Rule '{ruleId}' transfer amount must be zero or more.", $"{effectPath}.amount");
+                        effects.Add(RuleEffect.Transfer(transferSubject, transferProperty!,
+                            transferTargetProperty!, transferAmount.GetValueOrDefault()));
+                        break;
+                    case "spawn":
+                        var templateId = effect.Template?.GetString();
+                        var spawnSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
+                            effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
+                        Require(!string.IsNullOrWhiteSpace(templateId),
+                            $"Rule '{ruleId}' spawn requires template.", $"{effectPath}.template");
+                        var templateDefinition = entities?.Definitions.FirstOrDefault(definition =>
+                            string.Equals(definition.Id, templateId, StringComparison.Ordinal));
+                        Require(templateDefinition is not null,
+                            $"Rule '{ruleId}' spawn names unknown template '{templateId}'.",
+                            $"{effectPath}.template");
+                        var spawnTemplate = new SpawnTemplate(templateDefinition!.Id, templateDefinition.Tags,
+                            templateDefinition.Capabilities, templateDefinition.Properties,
+                            templateDefinition.SpatialBounds);
+                        spawnTemplates[spawnTemplate.Id] = spawnTemplate;
+                        effects.Add(RuleEffect.Spawn(spawnSubject, spawnTemplate));
+                        break;
+                    case "schedule":
+                        var scheduledEvent = effect.Event?.GetString();
+                        Require(scheduledEvent is not null && StableIdRegex().IsMatch(scheduledEvent),
+                            $"Rule '{ruleId}' schedule requires a stable event ID.", $"{effectPath}.event");
+                        var delayTicks = effect.DelayTicks is { } delay ? (int)delay : 0;
+                        Require(delayTicks is >= 1 and <= 1_000_000,
+                            $"Rule '{ruleId}' schedule delayTicks must be between 1 and 1,000,000.",
+                            $"{effectPath}.delayTicks");
+                        FactDefinition? scheduledFactDefinition = null;
+                        if (factsDeclared)
+                        {
+                            Require(factDefinitions.TryGetValue(scheduledEvent!, out scheduledFactDefinition),
+                                $"Rule '{ruleId}' schedules undeclared fact '{scheduledEvent}'.",
+                                $"{effectPath}.event");
+                        }
+
+                        var scheduledPayload = effect.Payload is { } schedulePayloadSource
+                            ? CompilePayload(schedulePayloadSource, $"{effectPath}.payload", scheduledFactDefinition)
+                            : null;
+                        effects.Add(RuleEffect.Schedule(scheduledEvent!, delayTicks, scheduledPayload));
+                        break;
+                    case "action":
+                        var actionName = effect.Action?.GetString();
+                        var actionAmount = effect.Amount is { } actionAmountValue
+                            ? (double)actionAmountValue
+                            : 0;
+                        var actionSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
+                            effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
+                        Require(!string.IsNullOrWhiteSpace(actionName),
+                            $"Rule '{ruleId}' action requires a name.", $"{effectPath}.action");
+                        Require(double.IsFinite(actionAmount),
+                            $"Rule '{ruleId}' action amount must be finite.", $"{effectPath}.amount");
+                        var actionPayload = effect.Payload is { } actionPayloadSource
+                            ? CompilePayload(actionPayloadSource, $"{effectPath}.payload", null)
+                            : null;
+                        effects.Add(RuleEffect.InvokeAction(actionName!, actionSubject, actionAmount, actionPayload));
                         break;
                     case "emitEvent":
                         var emittedEvent = effect.Event?.GetString();
@@ -455,7 +585,11 @@ public static partial class ContentPackLoader
             }
 
             rules.Add(new CompiledRule(ruleId, (string)rule.On, (int)rule.Priority,
-                conditions.ToImmutable(), effects.ToImmutable()));
+                conditions.ToImmutable(), effects.ToImmutable())
+            {
+                BundleId = bundleName,
+                CooldownTicks = cooldownTicks,
+            });
         }
 
         var entityIds = entities?.Definitions.Select(definition => definition.Id)
@@ -518,6 +652,8 @@ public static partial class ContentPackLoader
         return new CompiledRuleSet(rules.MoveToImmutable(), schedules.ToImmutable())
         {
             Facts = [.. facts.OrderBy(fact => fact.Id, StringComparer.Ordinal)],
+            Templates = spawnTemplates.ToImmutableDictionary(StringComparer.Ordinal),
+            Bundles = bundles.ToImmutableDictionary(StringComparer.Ordinal),
         };
     }
 

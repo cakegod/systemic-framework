@@ -467,6 +467,7 @@ public sealed class SystemicGameBuilder
     private readonly List<ISystemicStatefulExtension> _statefulExtensions = [];
     private readonly List<FactObserverRegistration> _factObservers = [];
     private readonly List<ISystemicUiBindingProvider> _uiBindingProviders = [];
+    private readonly Dictionary<string, RuleActionHandler> _ruleActions = new(StringComparer.Ordinal);
     private readonly Dictionary<Type, object> _services = [];
     private readonly ExtensionModuleCatalog _extensions = new();
     private readonly ImmutableDictionary<string, JsonElement>? _extensionStates;
@@ -570,6 +571,27 @@ public sealed class SystemicGameBuilder
         return this;
     }
 
+    /// <summary>Registers a game action that content rules may invoke by name.</summary>
+    /// <param name="name">The name a rule's action effect uses.</param>
+    /// <param name="handler">The handler that runs inside the dispatch transaction.</param>
+    /// <remarks>
+    /// A pack arrived from disk has no handlers, because handlers are code. Registering one here
+    /// merges it into the loaded rule set before the engine binds, so a rule that invokes an action
+    /// works through the normal directory load path.
+    /// </remarks>
+    public SystemicGameBuilder AddRuleAction(string name, RuleActionHandler handler)
+    {
+        EnsureNotBuilt();
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(handler);
+        if (!_ruleActions.TryAdd(name, handler))
+        {
+            throw new InvalidOperationException($"Rule action '{name}' is already registered.");
+        }
+
+        return this;
+    }
+
     public SystemicGameBuilder AddFactObserver(int order, SimulationFactObserver observer)
     {
         EnsureNotBuilt();
@@ -639,7 +661,8 @@ public sealed class SystemicGameBuilder
             throw new InvalidOperationException($"System ID '{duplicateSystem.Key}' is registered more than once.");
         }
 
-        var contentRules = new RuleEngine(Content.Rules, tickRateHz: Content.Manifest.TickRateHz);
+        var rules = _ruleActions.Count == 0 ? Content.Rules : Content.Rules.WithActions(_ruleActions);
+        var contentRules = new RuleEngine(rules, tickRateHz: Content.Manifest.TickRateHz);
         var clock = new FixedStepClock(Content.Manifest.TickRateHz, Content.Manifest.MaxCatchUpSteps);
         var hasSavedPopulationState = _extensionStates?.ContainsKey(PopulationStatefulExtension.ExtensionId) == true;
         var populationStateExtension = World.HasPopulations || hasSavedPopulationState
@@ -897,6 +920,12 @@ public sealed class SystemicGame : IDisposable
         World.LogicalTick = checked(World.LogicalTick + 1);
         _schedule?.Execute(World, World.LogicalTick);
         DispatchDeferredFacts();
+        // Delayed facts belong to the tick that reached their due tick, with the same observers and
+        // the same enclosing transaction as any other fact this tick dispatches.
+        if (_contentRules.HasScheduledFacts)
+        {
+            _contentRules.DispatchDue(World, CombineFactObservers(null));
+        }
 
         World.AdvanceModifiers();
     }

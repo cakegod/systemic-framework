@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Systemic.Kernel;
 using Systemic.Content;
 using Systemic.Host;
@@ -235,9 +236,18 @@ public sealed class SystemicSaveCodec
 
             foreach (var modifier in worldState.Modifiers)
             {
-                world.SetModifier(modifier.Source, world.ById(modifier.EntityId)!, modifier.Property,
-                    modifier.Operation, modifier.Value,
-                    RemainingFromExpiry(modifier.ExpiryTick, world.LogicalTick), modifier.Priority, modifier.Stage);
+                var remainingTicks = RemainingFromExpiry(modifier.ExpiryTick, world.LogicalTick);
+                if (modifier.SourceProperty is { } sourceProperty)
+                {
+                    world.SetModifierFromProperty(modifier.Source, world.ById(modifier.EntityId)!, modifier.Property,
+                        modifier.Operation, modifier.Value, sourceProperty, remainingTicks,
+                        modifier.Priority, modifier.Stage);
+                }
+                else
+                {
+                    world.SetModifier(modifier.Source, world.ById(modifier.EntityId)!, modifier.Property,
+                        modifier.Operation, modifier.Value, remainingTicks, modifier.Priority, modifier.Stage);
+                }
             }
 
             foreach (var grant in worldState.Grants)
@@ -428,7 +438,8 @@ public sealed class SystemicSaveCodec
         {
             RequireSavedEntity(entityIds, modifier.EntityId, "modifier");
             Require(!string.IsNullOrWhiteSpace(modifier.Source) && !string.IsNullOrWhiteSpace(modifier.Property)
-                && double.IsFinite(modifier.Value),
+                && double.IsFinite(modifier.Value)
+                && (modifier.SourceProperty is null || !string.IsNullOrWhiteSpace(modifier.SourceProperty)),
                 "Save contains an invalid property modifier.");
         }
 
@@ -572,4 +583,9 @@ internal sealed record SavedEntity(
     bool ToRemove,
     Bounds2? SpatialBounds);
 
-internal sealed record RuleHistoryState(RuleEventHistorySample[] Samples);
+internal sealed record RuleHistoryState(
+    RuleEventHistorySample[] Samples,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    RuleEngine.RuleScheduledFactState[]? Scheduled = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    RuleEngine.RuleCooldownState[]? Cooldowns = null);

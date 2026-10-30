@@ -72,6 +72,26 @@ declared. Payload fields are optional per emission, but a supplied key must matc
 declared field and its kind. Duplicate keys, unknown fields, and wrong value kinds
 are content errors with a path to the offending value.
 
+## Rule bundles and cooldowns
+
+A bundle is a named group of rules that runs only while a tag is present. Give the rule a
+`bundle` name and declare the bundle once. A timed tag grant turns it on and its expiry
+turns it off, so a status effect does not need a second rule to clean up after itself.
+
+```json
+{
+  "bundles": [ { "id": "talent.hiking", "enabledByTag": "talent.hiking" } ],
+  "rules": [
+    { "id": "talent.hiking.boost", "on": "talent.tick", "bundle": "talent.hiking",
+      "priority": 0, "cooldownTicks": 30,
+      "effects": [ { "kind": "adjustProperty", "subject": "target", "property": "speed", "amount": 1 } ] }
+  ]
+}
+```
+
+`cooldownTicks` is the minimum number of ticks between two matches of the same rule for
+the same source and target. A cooled-down rule is skipped, so it costs no effects.
+
 ## Conditions
 
 - `hasTag`: subject has a tag.
@@ -112,13 +132,22 @@ expression values such as `tick` and `source.<property>`.
 The spatial filter uses the selected origin entity's bounds. An entity without bounds
 matches no range query. `limit` applies after ordering. A non-count aggregate over an
 empty selection fails the condition, so `query.matched` distinguishes zero from a
-real zero sum.
+real zero sum. An origin or a match without bounds has no distance, so a formula that
+reads `query.nearest` fails the condition instead of aborting the dispatch; formulas
+that read only `query.count` or `query.value` still run.
 
 ## Effects
 
-- `adjustProperty`: add to a numeric property.
-- `setModifier`: typed, staged, optionally timed modifier.
-- `addTag`: add a tag to an entity.
-- `emitEvent`: dispatch another fact.
+- `adjustProperty`: change a numeric property. `quantity` picks how: `add` (default), `set`, `multiply`, `min`, or `max`.
+- `setModifier`: typed, staged, optionally timed modifier. `operation` is `add`, `multiply`, `set`, `min`, or `max`. Add `fromProperty` to make the amount follow another property at read time, which is how an upgrade rank drives its own effects.
+- `addTag`, `removeTag`: change an entity's tags.
+- `emitEvent`: dispatch another fact immediately.
+- `schedule`: dispatch a fact after `delayTicks`. `DispatchDue` on the rule engine runs the facts whose tick has arrived.
+- `spawn`: create an entity from an authored template at the fact position, or where the subject stands.
+- `despawn`: mark the subject for removal, applied when the world prunes removed entities.
+- `transfer`: move up to `amount` of `property` from the subject into the fact target's `targetProperty`. A source that holds less moves what it has.
+- `action`: invoke a game action the game registered by name. Actions are domain verbs such as strike or deposit, and every rule can share one.
+
+Row subjects accept property adjustments, tags, and modifiers. Spawn, despawn, transfer, schedule, and actions address entities, because a population row has no world position, no removal lifetime, and no entity to hand an action.
 
 If a mechanic cannot be expressed, add a general primitive or a game action. Do not add a genre noun to the framework.

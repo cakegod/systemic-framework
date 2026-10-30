@@ -281,8 +281,9 @@ internal static class EntityQueryEvaluator
 
             matched++;
             sum += value;
-            // An incremental mean stays finite where a sum of two huge values would overflow.
-            mean += (value - mean) / matched;
+            // A weighted mean stays finite where a sum of two huge values would overflow, and it
+            // avoids the overflowing difference an incremental mean takes across opposite signs.
+            mean = (mean * (matched - 1) / matched) + (value / matched);
             minimum = Math.Min(minimum, value);
             maximum = Math.Max(maximum, value);
         }
@@ -300,6 +301,13 @@ internal static class EntityQueryEvaluator
             QueryAggregateKind.Average => mean,
             _ => throw new InvalidOperationException($"Unknown query aggregate '{query.Aggregate}'."),
         };
+        if (!double.IsFinite(aggregate))
+        {
+            // An expression cannot carry a non-finite number, so an unrepresentable aggregate is no
+            // value at all rather than a dispatch-aborting throw.
+            return QueryResult.Empty;
+        }
+
         return new QueryResult(count, true, aggregate, NearestDistance(world, query.Selector, fact, candidates));
     }
 

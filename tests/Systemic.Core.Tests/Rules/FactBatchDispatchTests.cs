@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Systemic.Kernel;
 using Systemic.Rules;
 
@@ -82,6 +83,42 @@ public sealed class FactBatchDispatchTests
         Assert.False(result.RolledBack);
         Assert.True(target.TryGetProperty(world, "value", out var value));
         Assert.Equal(2, value);
+    }
+
+    [Fact]
+    public void A_throwing_action_restores_the_scheduled_queue_and_cooldowns()
+    {
+        var world = new World(seed: 3, valueScale: 1);
+        var target = world.Add(new DataEntity([], [], ("value", 0.0)));
+        var engine = new RuleEngine(new CompiledRuleSet([
+            new CompiledRule("slow", "slow", 0, [],
+                [RuleEffect.AdjustProperty(RuleSubject.Target, "value", 1)])
+            {
+                CooldownTicks = 10,
+            },
+            new CompiledRule("wait", "wait", 0, [], [RuleEffect.Schedule("later", 5)]),
+            new CompiledRule("fail", "fail", 0, [],
+                [RuleEffect.InvokeAction("explode", RuleSubject.Target)])
+        ])
+        {
+            Actions = new Dictionary<string, RuleActionHandler>
+            {
+                ["explode"] = (in RuleActionContext context) =>
+                    throw new InvalidOperationException("action failed"),
+            }.ToImmutableDictionary()
+        });
+
+        Assert.Throws<InvalidOperationException>(() => engine.DispatchBatch(world, [
+            new SimulationFact("slow", 0, target.Id),
+            new SimulationFact("wait", 0, target.Id),
+            new SimulationFact("fail", 0, target.Id),
+        ]));
+
+        // The exception path undoes both engine tables, so the cooldown and the delayed fact are gone.
+        var retry = engine.Dispatch(world, new SimulationFact("slow", 0, target.Id));
+        Assert.Equal(1, retry.RulesMatched);
+        world.LogicalTick = 5;
+        Assert.Equal(0, engine.DispatchDue(world));
     }
 
     private static CompiledRule AddRule() =>

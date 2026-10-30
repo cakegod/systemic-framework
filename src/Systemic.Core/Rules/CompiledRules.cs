@@ -116,7 +116,66 @@ public enum RuleEffectKind
     SetModifier,
     AddTag,
     EmitEvent,
+    RemoveTag,
+    Despawn,
+    Transfer,
+    Spawn,
+    Schedule,
+    InvokeAction,
 }
+
+/// <summary>How an adjustment combines its amount with the property's current value.</summary>
+public enum QuantityOperation
+{
+    /// <summary>Adds the amount.</summary>
+    Add,
+
+    /// <summary>Replaces the value with the amount.</summary>
+    Set,
+
+    /// <summary>Multiplies the value by the amount.</summary>
+    Multiply,
+
+    /// <summary>Keeps the smaller of the value and the amount.</summary>
+    Min,
+
+    /// <summary>Keeps the larger of the value and the amount.</summary>
+    Max,
+}
+
+/// <summary>An authored entity shape that a spawn effect instantiates.</summary>
+/// <remarks>
+/// The shape carries no identity of its own: each spawn creates a new entity with the template's
+/// tags, capabilities, properties, and half extents. Spatial bounds are centred on the fact position
+/// when one is present, so content decides where a spawn lands.
+/// </remarks>
+public sealed record SpawnTemplate(
+    string Id,
+    ImmutableArray<string> Tags,
+    ImmutableArray<string> Capabilities,
+    ImmutableDictionary<string, double> Properties,
+    Bounds2? SpatialBounds = null);
+
+/// <summary>State handed to a registered game action when a rule invokes it.</summary>
+/// <param name="World">The world the fact is being dispatched in.</param>
+/// <param name="Fact">The fact whose rule invoked the action.</param>
+/// <param name="Source">The resolved effect subject, or null when it no longer exists.</param>
+/// <param name="Target">The resolved fact target, or null when it no longer exists.</param>
+/// <param name="Effect">The authored effect, including its amount and payload.</param>
+public readonly record struct RuleActionContext(
+    World World,
+    SimulationFact Fact,
+    Entity? Source,
+    Entity? Target,
+    RuleEffect Effect);
+
+/// <summary>A game action a rule may invoke by name.</summary>
+/// <remarks>
+/// Actions are domain verbs the game registers, such as strike or deposit. They run inside the
+/// dispatch transaction, so a write they make rolls back with the rest of the fact. An action never
+/// gets a rule of its own: rules invoke it, and many rules may share one action.
+/// </remarks>
+public delegate void RuleActionHandler(in RuleActionContext context);
 
 public readonly record struct RuleCondition(
     RuleConditionKind Kind,
@@ -173,8 +232,85 @@ public readonly record struct RuleEffect(
     /// <summary>Gets the typed payload carried by an emitted fact, when one is declared.</summary>
     public SimulationFactPayload? Payload { get; init; }
 
+    /// <summary>Gets how an <see cref="RuleEffectKind.AdjustProperty"/> effect combines its amount.</summary>
+    public QuantityOperation Quantity { get; init; } = QuantityOperation.Add;
+
+    /// <summary>Gets the subject a transfer moves its quantity to, when one is set.</summary>
+    public RuleSubject? Destination { get; init; }
+
+    /// <summary>Gets the property a transfer writes on its destination.</summary>
+    public string? TargetProperty { get; init; }
+
+    /// <summary>Gets the entity shape a spawn effect instantiates.</summary>
+    public SpawnTemplate? Template { get; init; }
+
+    /// <summary>Gets how many ticks a schedule effect waits before it dispatches its fact.</summary>
+    public int DelayTicks { get; init; }
+
+    /// <summary>Gets the name of the registered game action an invocation effect runs.</summary>
+    public string? ActionName { get; init; }
+
+    /// <summary>Gets the property a rank-aware modifier reads instead of a fixed amount.</summary>
+    public string? SourceProperty { get; init; }
+
     public static RuleEffect AdjustProperty(RuleSubject subject, string property, double amount) =>
         new(RuleEffectKind.AdjustProperty, subject, property, amount);
+
+    public static RuleEffect AdjustProperty(RuleSubject subject, string property, double amount,
+        QuantityOperation quantity) =>
+        new(RuleEffectKind.AdjustProperty, subject, property, amount) { Quantity = quantity };
+
+    public static RuleEffect RemoveTag(RuleSubject subject, string tag) =>
+        new(RuleEffectKind.RemoveTag, subject, tag, 0);
+
+    public static RuleEffect Despawn(RuleSubject subject) =>
+        new(RuleEffectKind.Despawn, subject, string.Empty, 0);
+
+    /// <summary>Moves up to <paramref name="amount"/> from one subject to the fact's target.</summary>
+    /// <param name="subject">The subject the quantity leaves.</param>
+    /// <param name="property">The property the quantity leaves.</param>
+    /// <param name="targetProperty">The property the quantity arrives in, on the fact's target.</param>
+    /// <param name="amount">The maximum quantity to move; the source may hold less.</param>
+    public static RuleEffect Transfer(RuleSubject subject, string property, string targetProperty,
+        double amount) =>
+        new(RuleEffectKind.Transfer, subject, property, amount)
+        {
+            Destination = RuleSubject.Target,
+            TargetProperty = targetProperty,
+        };
+
+    public static RuleEffect Spawn(RuleSubject subject, SpawnTemplate template)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        return new RuleEffect(RuleEffectKind.Spawn, subject, template.Id, 0) { Template = template };
+    }
+
+    public static RuleEffect Schedule(string eventType, int delayTicks,
+        SimulationFactPayload? payload = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(delayTicks);
+        return new RuleEffect(RuleEffectKind.Schedule, RuleSubject.Target, eventType, 0)
+        {
+            DelayTicks = delayTicks,
+            Payload = payload,
+        };
+    }
+
+    public static RuleEffect InvokeAction(string actionName, RuleSubject subject) =>
+        InvokeAction(actionName, subject, 0, null);
+
+    /// <summary>Creates an action invocation that carries the authored amount and payload.</summary>
+    public static RuleEffect InvokeAction(string actionName, RuleSubject subject, double amount,
+        SimulationFactPayload? payload)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionName);
+        return new RuleEffect(RuleEffectKind.InvokeAction, subject, actionName, amount)
+        {
+            ActionName = actionName,
+            Payload = payload,
+        };
+    }
 
     public static RuleEffect AddTag(RuleSubject subject, string tag) =>
         new(RuleEffectKind.AddTag, subject, tag, 0);
@@ -188,6 +324,24 @@ public readonly record struct RuleEffect(
         int durationTicks = -1) =>
         new(RuleEffectKind.SetModifier, subject, property, value, operation, stage, durationTicks);
 
+    /// <summary>Creates a modifier whose amount follows another property, such as an upgrade rank.</summary>
+    public static RuleEffect SetModifierFromProperty(
+        RuleSubject subject,
+        string property,
+        ModifierOperation operation,
+        double value,
+        string sourceProperty,
+        ModifierStage stage,
+        int durationTicks)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceProperty);
+        return new RuleEffect(RuleEffectKind.SetModifier, subject, property, value, operation, stage,
+            durationTicks)
+        {
+            SourceProperty = sourceProperty,
+        };
+    }
+
     public static RuleEffect Emit(string eventType) => Emit(eventType, null);
 
     public static RuleEffect Emit(string eventType, SimulationFactPayload? payload) =>
@@ -199,7 +353,14 @@ public sealed record CompiledRule(
     string EventType,
     int Priority,
     ImmutableArray<RuleCondition> Conditions,
-    ImmutableArray<RuleEffect> Effects);
+    ImmutableArray<RuleEffect> Effects)
+{
+    /// <summary>Gets the bundle that must be enabled for this rule to match, when one is set.</summary>
+    public string? BundleId { get; init; }
+
+    /// <summary>Gets the minimum number of ticks between two matches of this rule.</summary>
+    public int CooldownTicks { get; init; }
+}
 
 public sealed record RuleScheduleDefinition(
     string Id,
@@ -249,6 +410,18 @@ public sealed class CompiledRuleSet
     /// <summary>Gets the declared fact contracts, ordered by ID.</summary>
     public ImmutableArray<FactDefinition> Facts { get; init; } = [];
 
+    /// <summary>Gets the entity shapes spawn effects may instantiate.</summary>
+    public ImmutableDictionary<string, SpawnTemplate> Templates { get; init; } =
+        ImmutableDictionary<string, SpawnTemplate>.Empty;
+
+    /// <summary>Gets the game actions rules may invoke by name.</summary>
+    public ImmutableDictionary<string, RuleActionHandler> Actions { get; init; } =
+        ImmutableDictionary<string, RuleActionHandler>.Empty;
+
+    /// <summary>Gets each bundle's enabling tag, keyed by bundle ID.</summary>
+    public ImmutableDictionary<string, string> Bundles { get; init; } =
+        ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
+
     public ImmutableArray<string> EventTypes { get; }
 
     public int MaximumEventWindowTicks { get; }
@@ -257,4 +430,23 @@ public sealed class CompiledRuleSet
 
     public ImmutableArray<CompiledRule> ForEvent(string eventType) =>
         _byEvent.TryGetValue(eventType, out var rules) ? rules : [];
+
+    /// <summary>Returns a copy of this rule set with the supplied game actions merged in.</summary>
+    /// <param name="actions">Action handlers keyed by the name rules invoke.</param>
+    /// <remarks>
+    /// A loaded pack has no action handlers, because handlers are code. A host registers them through
+    /// this copy instead of rebuilding the rule set, so facts, templates, bundles, and event windows
+    /// stay exactly as the loader compiled them.
+    /// </remarks>
+    public CompiledRuleSet WithActions(IReadOnlyDictionary<string, RuleActionHandler> actions)
+    {
+        ArgumentNullException.ThrowIfNull(actions);
+        return new CompiledRuleSet(Rules, Schedules)
+        {
+            Facts = Facts,
+            Templates = Templates,
+            Bundles = Bundles,
+            Actions = Actions.SetItems(actions),
+        };
+    }
 }
