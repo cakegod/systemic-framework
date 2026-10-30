@@ -347,7 +347,14 @@ public sealed record CompiledRule(
     string EventType,
     int Priority,
     ImmutableArray<RuleCondition> Conditions,
-    ImmutableArray<RuleEffect> Effects);
+    ImmutableArray<RuleEffect> Effects)
+{
+    /// <summary>Gets the bundle that must be enabled for this rule to match, when one is set.</summary>
+    public string? BundleId { get; init; }
+
+    /// <summary>Gets the minimum number of ticks between two matches of this rule.</summary>
+    public int CooldownTicks { get; init; }
+}
 
 public sealed record RuleScheduleDefinition(
     string Id,
@@ -404,6 +411,10 @@ public sealed class CompiledRuleSet
     /// <summary>Gets the game actions rules may invoke by name.</summary>
     public ImmutableDictionary<string, RuleActionHandler> Actions { get; init; } =
         ImmutableDictionary<string, RuleActionHandler>.Empty;
+
+    /// <summary>Gets each bundle's enabling tag, keyed by bundle ID.</summary>
+    public ImmutableDictionary<string, string> Bundles { get; init; } =
+        ImmutableDictionary.Create<string, string>(StringComparer.Ordinal);
 
     public ImmutableArray<string> EventTypes { get; }
 

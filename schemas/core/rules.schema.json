@@ -10,6 +10,7 @@
     "rules": { "type": "array", "maxItems": 16384, "items": { "$ref": "#/$defs/rule" } },
     "schedules": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/schedule" } },
     "facts": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/fact" } },
+    "bundles": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/bundle" } },
     "fragments": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/fragment" } },
     "useFragments": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
   },
@@ -43,6 +44,14 @@
         "targetEntityId": { "$ref": "#/$defs/id" },
         "amount": { "type": "number" },
         "payload": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/payloadValue" } }
+      }
+    },
+    "bundle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "enabledByTag"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "enabledByTag": { "type": "string", "pattern": "\\S" }
       }
     },
     "fact": {
@@ -86,7 +95,9 @@
         "on": { "$ref": "#/$defs/id" },
         "priority": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 },
         "when": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/condition" } },
-        "effects": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/effect" } }
+        "effects": { "type": "array", "maxItems": 64, "items": { "$ref": "#/$defs/effect" } },
+        "bundle": { "$ref": "#/$defs/id" },
+        "cooldownTicks": { "type": "integer", "minimum": 1, "maximum": 1000000 }
       }
     },
     "condition": {

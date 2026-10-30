@@ -120,6 +120,9 @@ public sealed class RuleEngine
     private bool _dispatchActive;
     private readonly List<ScheduledFactEntry> _scheduled = [];
     private long _scheduledSequence;
+    private readonly Dictionary<(string Rule, int Source, int Target), int> _lastRuleFire = [];
+    private readonly List<CooldownChange> _cooldownChanges = [];
+    private int _factTick = -1;
     private bool _factBudgetExceeded;
     private bool _invalidFact;
     private bool _eventHistoryIndexDirty;
@@ -1060,6 +1063,7 @@ public sealed class RuleEngine
         _queue.Clear();
         _queue.Add(initialFact);
         var scheduledCount = _scheduled.Count;
+        _cooldownChanges.Clear();
 
         var factsProcessed = 0;
         var rulesMatched = 0;
@@ -1123,6 +1127,23 @@ public sealed class RuleEngine
                     continue;
                 }
 
+                if (rule.BundleId is { } bundleId)
+                {
+                    // A bundle is a named group that a tag enables. A timed grant that expires removes
+                    // the tag, so the bundle disables itself without a second rule to turn it off.
+                    var owner = resolvedEntities.Resolve(world, fact, RuleSubject.Source);
+                    if (!_rules.Bundles.TryGetValue(bundleId, out var enabledByTag)
+                        || owner is null || !world.HasTag(owner, enabledByTag))
+                    {
+                        continue;
+                    }
+                }
+
+                if (!TryEnterCooldown(world, rule, fact))
+                {
+                    continue;
+                }
+
                 rulesMatched++;
                 matchedRuleIds?.Add(rule.Id);
                 foreach (var effect in rule.Effects)
@@ -1179,6 +1200,8 @@ public sealed class RuleEngine
             {
                 _scheduled.RemoveRange(scheduledCount, _scheduled.Count - scheduledCount);
             }
+
+            RestoreCooldowns();
 
             _activeTransaction = null;
             transaction.Rollback();
@@ -1791,7 +1814,9 @@ public sealed class RuleEngine
             return;
         }
 
-        _scheduled.Add(new ScheduledFactEntry((long)world.LogicalTick + effect.DelayTicks,
+        // A delayed fact schedules from its own due tick, so a fast-forward that dispatches a chain in
+        // one call lands every step at the same tick it would have reached online.
+        _scheduled.Add(new ScheduledFactEntry((long)FactTick(world) + effect.DelayTicks,
             _scheduledSequence++, scheduled));
     }
 
@@ -1838,11 +1863,76 @@ public sealed class RuleEngine
             var due = _scheduled[index];
             _scheduled.RemoveAt(index);
             dispatched++;
-            Dispatch(world, due.Fact);
+            var previousTick = _factTick;
+            _factTick = (int)Math.Min(due.DueTick, int.MaxValue);
+            try
+            {
+                Dispatch(world, due.Fact);
+            }
+            finally
+            {
+                _factTick = previousTick;
+            }
         }
     }
 
     private readonly record struct ScheduledFactEntry(long DueTick, long Sequence, SimulationFact Fact);
+
+    private readonly record struct CooldownChange((string Rule, int Source, int Target) Key, int Previous,
+        bool HadPrevious);
+
+    private int FactTick(World world) => _factTick >= 0 ? _factTick : world.LogicalTick;
+
+    private bool TryEnterCooldown(World world, CompiledRule rule, SimulationFact fact)
+    {
+        if (rule.CooldownTicks <= 0)
+        {
+            return true;
+        }
+
+        var key = (rule.Id, fact.SourceId, fact.TargetId);
+        var tick = FactTick(world);
+        if (_lastRuleFire.TryGetValue(key, out var previous))
+        {
+            _cooldownChanges.Add(new CooldownChange(key, previous, true));
+            if (tick - previous < rule.CooldownTicks)
+            {
+                return false;
+            }
+        }
+        else
+        {
+            // Cooldown memory is bounded like the other dispatch tables; a world that keeps inventing
+            // new rule and subject pairs must not grow the engine without limit.
+            if (_lastRuleFire.Count >= 100_000)
+            {
+                _lastRuleFire.Clear();
+            }
+
+            _cooldownChanges.Add(new CooldownChange(key, 0, false));
+        }
+
+        _lastRuleFire[key] = tick;
+        return true;
+    }
+
+    private void RestoreCooldowns()
+    {
+        for (var index = _cooldownChanges.Count - 1; index >= 0; index--)
+        {
+            var change = _cooldownChanges[index];
+            if (change.HadPrevious)
+            {
+                _lastRuleFire[change.Key] = change.Previous;
+            }
+            else
+            {
+                _lastRuleFire.Remove(change.Key);
+            }
+        }
+
+        _cooldownChanges.Clear();
+    }
 
     private readonly record struct EventSample(int Tick, string EventType, double Amount);
 

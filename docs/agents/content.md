@@ -72,6 +72,26 @@ declared. Payload fields are optional per emission, but a supplied key must matc
 declared field and its kind. Duplicate keys, unknown fields, and wrong value kinds
 are content errors with a path to the offending value.
 
+## Rule bundles and cooldowns
+
+A bundle is a named group of rules that runs only while a tag is present. Give the rule a
+`bundle` name and declare the bundle once. A timed tag grant turns it on and its expiry
+turns it off, so a status effect does not need a second rule to clean up after itself.
+
+```json
+{
+  "bundles": [ { "id": "talent.hiking", "enabledByTag": "talent.hiking" } ],
+  "rules": [
+    { "id": "talent.hiking.boost", "on": "talent.tick", "bundle": "talent.hiking",
+      "priority": 0, "cooldownTicks": 30,
+      "effects": [ { "kind": "adjustProperty", "subject": "target", "property": "speed", "amount": 1 } ] }
+  ]
+}
+```
+
+`cooldownTicks` is the minimum number of ticks between two matches of the same rule for
+the same source and target. A cooled-down rule is skipped, so it costs no effects.
+
 ## Conditions
 
 - `hasTag`: subject has a tag.

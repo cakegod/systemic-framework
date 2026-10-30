@@ -6,7 +6,7 @@ Gate G1: 41/41 talents are general rules and tags, with zero framework genre typ
 pattern pack covers producer, upgrade, merge, prestige, and worker with tests.
 `Systemic.Incremental` stays frozen, and no new genre API is added.
 
-Status: 1.1 through 1.5 are complete. 1.6 is the next slice. Every unchecked item below
+Status: 1.1 through 1.7 are complete. 1.8 is the next slice. Every unchecked item below
 is a TDD slice: failing test first, smallest implementation to green, then refactor.
 
 ## Execution rules
@@ -28,8 +28,8 @@ is a TDD slice: failing test first, smallest implementation to green, then refac
 | 1.3 | Queries: selectors by tag, property, range, nearest, aggregate, count, and formula | `QueryConditionTests` covers a tag count, a property filter, a spatial range, nearest selection, and an aggregate formula; the selector is a bounded content primitive, so Motivation and Extra Housing compile without a genre type | 1.2 | done |
 | 1.4 | Effects: quantity ops, spawn, despawn, transfer, emit, schedule, tag, and action invocation | `EffectPrimitiveTests` covers each primitive, spawn rollback, and action invocation; `EffectContentTests` runs merge and Hiking Buddy from JSON only | 1.3 | done |
 | 1.5 | Modifiers: add, multiply, set, min, max, stacking, duration, scope, and rank awareness | `ModifierPrimitiveTests` covers clamping, source stacking, timed expiry, and rank-aware reads; `EffectContentTests` runs an upgrade whose modifier follows its rank from JSON | 1.3 | done |
-| 1.6 | Rules and rule bundles: guards, priority, while conditions, enable and disable, deterministic order | A talent tag toggles a named bundle; a status expires and disables its follow-up rule; order is asserted | 1.4, 1.5 | pending |
-| 1.7 | Time: tick, schedule, delay, cooldown, and deterministic fast-forward | Eight hours of fast-forward matches online within one percent; delay and cooldown have tests | 1.4, 1.5 | pending |
+| 1.6 | Rules and rule bundles: guards, priority, while conditions, enable and disable, deterministic order | `RuleBundleAndTimeTests` proves a talent tag enables a bundle and a timed grant expires it; rule order is priority then ID, asserted in `RuleEngineTests` | 1.4, 1.5 | done |
+| 1.7 | Time: tick, schedule, delay, cooldown, and deterministic fast-forward | `RuleBundleAndTimeTests` covers a cooldown window and eight hours (1,728,000 ticks) of fast-forward, which matches online exactly | 1.4, 1.5 | done |
 | 1.8 | Generic UI binding: lists, toggles, costs, cooldowns, tooltips, buy amounts, actions | A choice list and an upgrade list use the same widgets and bindings; action results are tested | 1.5, 1.6 | pending |
 | 1.9 | Generic save: scopes, state graph, migration, content fingerprint | Save and load across a reset and a content change; a migration test covers the old schema | 1.6, 1.7 | pending |
 | 1.10 | Pattern pack: producer, upgrade, talent, merge, prestige, worker, offline, status, unlock | Each pattern has a minimal content example and a test; no pattern names a framework type | 1.4, 1.5, 1.6, 1.7, 1.9 | pending |

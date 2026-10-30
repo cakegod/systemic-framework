@@ -291,12 +291,35 @@ public static partial class ContentPackLoader
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var rules = ImmutableArray.CreateBuilder<CompiledRule>(expandedRules.Count);
         var spawnTemplates = new Dictionary<string, SpawnTemplate>(StringComparer.Ordinal);
+        var bundles = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (file.Bundles is { } sourceBundles)
+        {
+            for (var bundleIndex = 0; bundleIndex < sourceBundles.GetArrayLength(); bundleIndex++)
+            {
+                var bundle = sourceBundles[bundleIndex];
+                var bundlePath = $"$.bundles[{bundleIndex}]";
+                var bundleId = (string)bundle.IdValue;
+                var enabledByTag = (string)bundle.EnabledByTag;
+                Require(!string.IsNullOrWhiteSpace(enabledByTag),
+                    $"Bundle '{bundleId}' requires enabledByTag.", $"{bundlePath}.enabledByTag");
+                Require(bundles.TryAdd(bundleId, enabledByTag!),
+                    $"Duplicate bundle id '{bundleId}'.", $"{bundlePath}.id");
+            }
+        }
         foreach (var source in expandedRules)
         {
             var rule = source.Rule;
             var rulePath = source.Path; var ruleId = source.Prefix is { } prefix ? $"{prefix}.{(string)rule.IdValue}" : (string)rule.IdValue;
             Require(ids.Add(ruleId), $"Duplicate rule id '{ruleId}'.", $"{rulePath}.id");
             var eventType = (string)rule.On;
+            var bundleName = rule.Bundle?.GetString();
+            if (bundleName is not null)
+            {
+                Require(bundles.ContainsKey(bundleName),
+                    $"Rule '{ruleId}' references unknown bundle '{bundleName}'.", $"{rulePath}.bundle");
+            }
+
+            var cooldownTicks = rule.CooldownTicks is { } cooldownValue ? (int)cooldownValue : 0;
             if (factsDeclared)
             {
                 Require(factDefinitions.ContainsKey(eventType),
@@ -554,7 +577,11 @@ public static partial class ContentPackLoader
             }
 
             rules.Add(new CompiledRule(ruleId, (string)rule.On, (int)rule.Priority,
-                conditions.ToImmutable(), effects.ToImmutable()));
+                conditions.ToImmutable(), effects.ToImmutable())
+            {
+                BundleId = bundleName,
+                CooldownTicks = cooldownTicks,
+            });
         }
 
         var entityIds = entities?.Definitions.Select(definition => definition.Id)
@@ -618,6 +645,7 @@ public static partial class ContentPackLoader
         {
             Facts = [.. facts.OrderBy(fact => fact.Id, StringComparer.Ordinal)],
             Templates = spawnTemplates.ToImmutableDictionary(StringComparer.Ordinal),
+            Bundles = bundles.ToImmutableDictionary(StringComparer.Ordinal),
         };
     }
 
