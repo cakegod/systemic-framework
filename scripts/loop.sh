@@ -16,7 +16,8 @@ project="${1:-tests/Systemic.Integration.Tests}"
 if [ "$project" = "--full" ]; then
     dotnet build Systemic.sln --configuration Release
     dotnet test Systemic.sln --configuration Release --no-build
-    dotnet format Systemic.sln --verify-no-changes
+    # --no-restore: the build above restored already, and format's own restore is most of the wait.
+    dotnet format Systemic.sln --verify-no-changes --no-restore
     exit
 fi
 
@@ -26,4 +27,12 @@ if [ -n "$filter" ]; then
     dotnet test "$project" --configuration Release --no-build --filter "FullyQualifiedName~$filter"
 else
     dotnet test "$project" --configuration Release --no-build
+fi
+
+# Format only the files this branch changes, inside the project being iterated. A solution-wide
+# verify spends nearly all of its time loading projects, which is what made the loop feel slow;
+# this check is a few seconds and still catches the file actually being edited.
+mapfile -t changed < <(git diff --name-only --diff-filter=ACM origin/main -- '*.cs')
+if [ "${#changed[@]}" -gt 0 ]; then
+    dotnet format "$project" --verify-no-changes --no-restore --include "${changed[@]}"
 fi

@@ -17,7 +17,14 @@ Refactor — think about how to improve your existing implementation
 dotnet build Systemic.sln --configuration Release
 dotnet test Systemic.sln --configuration Release
 dotnet test tests/Systemic.Cli.Tests --configuration Release
-dotnet format Systemic.sln --verify-no-changes
+dotnet format Systemic.sln --verify-no-changes --no-restore
+```
+
+`dotnet format` spends most of its time loading projects, so scope it to the file you touched
+rather than the solution:
+
+```sh
+dotnet format whitespace src/Systemic.Kernel/Systemic.Kernel.csproj --include src/Systemic.Kernel/World.cs
 ```
 
 A focused test filter is faster than the full suite:
