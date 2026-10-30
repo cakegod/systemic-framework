@@ -161,6 +161,63 @@ public sealed class QueryConditionTests
         Assert.Equal(1, score);
     }
 
+    [Fact]
+    public void An_empty_selection_cannot_pass_a_formula()
+    {
+        using var pack = TestPack.Create();
+        WriteEntities(pack, """
+            { "schemaVersion": 2, "entities": [
+              { "id": "actor.owner", "kind": "actor", "properties": { "score": 0 } }
+            ] }
+            """);
+        WriteRules(pack, """
+            { "schemaVersion": 2, "rules": [
+              { "id": "nothing", "on": "contact", "priority": 0,
+                "when": [{ "kind": "query", "selector": { "tag": "housing" },
+                  "aggregate": "sum", "aggregateProperty": "built",
+                  "formula": "query.value <= 5" }],
+                "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "score", "amount": 1 }] }
+            ] }
+            """);
+        var content = SystemicTestContent.Load(pack.Root);
+        var materialized = content.CreateWorld(seed: 1, valueScale: 1);
+        var owner = materialized.World.ById(materialized.EntityIds["actor.owner"])!;
+
+        var result = new RuleEngine(content.Rules).Dispatch(materialized.World,
+            new SimulationFact("contact", owner.Id, owner.Id));
+
+        Assert.Equal(0, result.RulesMatched);
+        Assert.Equal(0, materialized.World.EffectiveProperty(owner, "score"));
+    }
+
+    [Fact]
+    public void A_nearest_query_without_bounds_does_not_match()
+    {
+        using var pack = TestPack.Create();
+        WriteEntities(pack, """
+            { "schemaVersion": 2, "entities": [
+              { "id": "enemy.nowhere", "kind": "prop", "tags": ["enemy"] },
+              { "id": "actor.owner", "kind": "actor", "bounds": { "x": 0, "y": 0, "halfWidth": 1, "halfHeight": 1 }, "properties": { "score": 0 } }
+            ] }
+            """);
+        WriteRules(pack, """
+            { "schemaVersion": 2, "rules": [
+              { "id": "enemy.close", "on": "contact", "priority": 0,
+                "when": [{ "kind": "query", "selector": { "tag": "enemy", "origin": "source" },
+                  "aggregate": "nearest", "comparison": "atMost", "value": 1 }],
+                "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "score", "amount": 1 }] }
+            ] }
+            """);
+        var content = SystemicTestContent.Load(pack.Root);
+        var materialized = content.CreateWorld(seed: 1, valueScale: 1);
+        var owner = materialized.World.ById(materialized.EntityIds["actor.owner"])!;
+
+        var result = new RuleEngine(content.Rules).Dispatch(materialized.World,
+            new SimulationFact("contact", owner.Id, owner.Id));
+
+        Assert.Equal(0, result.RulesMatched);
+    }
+
     private static void WriteEntities(TestPack pack, string json) =>
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), json);
 

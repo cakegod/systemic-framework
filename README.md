@@ -120,7 +120,7 @@ A schedule and a rule are enough to express a producer:
 
 The host runs fixed ticks. The simulation uses seeded random streams and integer or fixed-point state. The same seed, content fingerprint, and inputs produce the same save state and replay hash.
 
-`verify` checks three things: two fresh runs match, a save restores to the same hash, and a replay advances to the same hash on every tick. A mismatch exits with code 4.
+`verify` checks that two fresh runs finish with the same hash and that a save restores to that hash. Use `replay record` and `replay verify` to compare replay hashes on every tick. A mismatch exits with code 4.
 
 ## Samples
 

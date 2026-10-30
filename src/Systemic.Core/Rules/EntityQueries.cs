@@ -172,30 +172,43 @@ internal static class EntityQueryEvaluator
 
     private static void Filter(World world, EntitySelector selector, List<int> candidates)
     {
-        for (var index = candidates.Count - 1; index >= 0; index--)
+        // Compact in one pass: removing from the middle would shift the retained tail once per
+        // rejected candidate, which is quadratic on a list that keeps few matches.
+        var kept = 0;
+        for (var index = 0; index < candidates.Count; index++)
         {
-            var entity = world.ById(candidates[index]);
-            if (entity is null || entity.ToRemove)
+            if (Keeps(world, selector, candidates[index]))
             {
-                candidates.RemoveAt(index);
-                continue;
-            }
-
-            if (selector.Tag is { } tag && !world.HasTag(entity, tag))
-            {
-                candidates.RemoveAt(index);
-                continue;
-            }
-
-            if (selector.Property is { } property)
-            {
-                if (!world.TryGetEffectiveProperty(entity, property, out var value)
-                    || !Compare(value, selector.PropertyValue, selector.PropertyComparison))
-                {
-                    candidates.RemoveAt(index);
-                }
+                candidates[kept++] = candidates[index];
             }
         }
+
+        if (kept < candidates.Count)
+        {
+            candidates.RemoveRange(kept, candidates.Count - kept);
+        }
+    }
+
+    private static bool Keeps(World world, EntitySelector selector, int id)
+    {
+        var entity = world.ById(id);
+        if (entity is null || entity.ToRemove)
+        {
+            return false;
+        }
+
+        if (selector.Tag is { } tag && !world.HasTag(entity, tag))
+        {
+            return false;
+        }
+
+        if (selector.Property is { } property)
+        {
+            return world.TryGetEffectiveProperty(entity, property, out var value)
+                && Compare(value, selector.PropertyValue, selector.PropertyComparison);
+        }
+
+        return true;
     }
 
     private static QueryResult Aggregate(World world, CompiledQuery query, SimulationFact fact, List<int> candidates)
@@ -226,6 +239,7 @@ internal static class EntityQueryEvaluator
 
         var matched = 0;
         var sum = 0.0;
+        var mean = 0.0;
         var minimum = double.PositiveInfinity;
         var maximum = double.NegativeInfinity;
         foreach (var id in candidates)
@@ -239,11 +253,13 @@ internal static class EntityQueryEvaluator
 
             matched++;
             sum += value;
+            // An incremental mean stays finite where a sum of two huge values would overflow.
+            mean += (value - mean) / matched;
             minimum = Math.Min(minimum, value);
             maximum = Math.Max(maximum, value);
         }
 
-        if (matched == 0)
+        if (matched == 0 || (query.Aggregate == QueryAggregateKind.Sum && !double.IsFinite(sum)))
         {
             return QueryResult.Empty;
         }
@@ -253,7 +269,7 @@ internal static class EntityQueryEvaluator
             QueryAggregateKind.Sum => sum,
             QueryAggregateKind.Minimum => minimum,
             QueryAggregateKind.Maximum => maximum,
-            QueryAggregateKind.Average => sum / matched,
+            QueryAggregateKind.Average => mean,
             _ => throw new InvalidOperationException($"Unknown query aggregate '{query.Aggregate}'."),
         };
         return new QueryResult(count, true, aggregate, NearestDistance(world, query.Selector, fact, candidates));
@@ -261,9 +277,11 @@ internal static class EntityQueryEvaluator
 
     private static double NearestDistance(World world, EntitySelector selector, SimulationFact fact, List<int> candidates)
     {
+        // A missing origin or an entity without bounds has no distance. Returning zero here would
+        // read as "right next to me" and pass a proximity test nothing actually satisfies.
         if (candidates.Count == 0 || !TryGetOriginCenter(world, fact, selector.Origin, out var center))
         {
-            return 0;
+            return double.NaN;
         }
 
         var nearest = double.PositiveInfinity;
@@ -272,7 +290,7 @@ internal static class EntityQueryEvaluator
             nearest = Math.Min(nearest, DistanceSquared(world, id, center));
         }
 
-        return double.IsFinite(nearest) ? Math.Sqrt(nearest) : 0;
+        return double.IsFinite(nearest) ? Math.Sqrt(nearest) : double.NaN;
     }
 
     private static bool TryGetOriginCenter(World world, SimulationFact fact, RuleSubject origin, out Point2 center)

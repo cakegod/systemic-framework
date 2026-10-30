@@ -1229,6 +1229,13 @@ public sealed class RuleEngine
                 }
 
                 var result = EntityQueryEvaluator.Evaluate(world, query, fact);
+                // A selection with nothing to aggregate has no value: a formula must not read it as
+                // zero and pass, which would run effects for a query that matched nothing.
+                if (!result.HasValue)
+                {
+                    return false;
+                }
+
                 if (query.Formula is { } formula)
                 {
                     if (!formula.EvaluateBoolean(new QueryExpressionScope(world, fact, this, result)))

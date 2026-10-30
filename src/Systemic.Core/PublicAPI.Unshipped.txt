@@ -37,3 +37,4 @@ Systemic.Rules.RuleEffect.Payload.init -> void
 Systemic.Rules.RuleScheduleDefinition.Payload.get -> Systemic.Rules.SimulationFactPayload?
 Systemic.Rules.RuleScheduleDefinition.Payload.init -> void
 Systemic.Rules.RuleConditionKind.Query = 4 -> Systemic.Rules.RuleConditionKind
+Systemic.Host.HeadlessSystemicHost.Dispose() -> void

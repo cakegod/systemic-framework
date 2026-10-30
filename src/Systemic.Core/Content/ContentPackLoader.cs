@@ -639,7 +639,9 @@ public static partial class ContentPackLoader
             entries.Add(CompilePayloadEntry(payload[index], $"{fieldPath}[{index}]", fact, keys));
         }
 
-        return entries.Count == 0 ? null : new SimulationFactPayload(entries);
+        // An explicit empty array is a payload with no fields, not an absent payload: emitting it must
+        // not inherit the incoming fact's values.
+        return new SimulationFactPayload(entries);
     }
 
     private static SimulationFactPayload? CompilePayload(
@@ -654,7 +656,9 @@ public static partial class ContentPackLoader
             entries.Add(CompilePayloadEntry(payload[index], $"{fieldPath}[{index}]", fact, keys));
         }
 
-        return entries.Count == 0 ? null : new SimulationFactPayload(entries);
+        // An explicit empty array is a payload with no fields, not an absent payload: emitting it must
+        // not inherit the incoming fact's values.
+        return new SimulationFactPayload(entries);
     }
 
     private static SimulationFactPayloadEntry CompilePayloadEntry(

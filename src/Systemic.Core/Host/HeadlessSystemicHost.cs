@@ -16,7 +16,7 @@ public interface ISystemicHostAdapter
 }
 
 /// <summary>Runs the engine-neutral Core host without rendering or engine services.</summary>
-public sealed class HeadlessSystemicHost : ISystemicHostAdapter
+public sealed class HeadlessSystemicHost : ISystemicHostAdapter, IDisposable
 {
     private readonly SystemicSaveCodec _saveCodec;
 
@@ -28,6 +28,9 @@ public sealed class HeadlessSystemicHost : ISystemicHostAdapter
     }
 
     public SystemicGame Game { get; }
+
+    /// <summary>Disposes the hosted game, which stops its worker threads and releases its state.</summary>
+    public void Dispose() => Game.Dispose();
 
     public static HeadlessSystemicHost Create(
         ContentPack content,

@@ -50,6 +50,6 @@ jobs:
         run: >
           dotnet run --configuration Release
           --project benchmarks/Systemic.Benchmarks
-          --no-build --no-restore
+          --no-restore
           --
           --gate --scenario all --warmup-ticks 200 --ticks 200 --repeat 1 --max-tick-ms 50

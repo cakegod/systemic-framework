@@ -378,7 +378,7 @@ static int RunProject(string directory, int ticks, int seed, bool json)
     }
 
     var pack = LoadPack(directory);
-    var host = HeadlessSystemicHost.Create(pack, seed);
+    using var host = HeadlessSystemicHost.Create(pack, seed);
     var stopwatch = Stopwatch.StartNew();
     host.RunTicks(ticks);
     stopwatch.Stop();
@@ -407,9 +407,15 @@ static int SimulateProject(string directory, double seconds, int seed, string cs
     }
 
     var pack = LoadPack(directory);
-    var host = HeadlessSystemicHost.Create(pack, seed);
+    using var host = HeadlessSystemicHost.Create(pack, seed);
     var tickRate = pack.Manifest.TickRateHz;
-    var totalTicks = (int)Math.Min(10_000_000, Math.Round(seconds * tickRate));
+    var requestedTicks = Math.Round(seconds * tickRate);
+    if (requestedTicks > 10_000_000)
+    {
+        throw new ArgumentException("--seconds exceeds the 10,000,000-tick simulation limit.");
+    }
+
+    var totalTicks = (int)requestedTicks;
     var sampleEvery = Math.Max(1, tickRate);
     var fullPath = Path.GetFullPath(csvPath);
     Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -468,7 +474,7 @@ static void WriteSample(StreamWriter writer, HeadlessSystemicHost host, int tick
             writer.Write(',');
             writer.Write(EscapeCsv(property));
             writer.Write(',');
-            writer.Write(value.ToString("0.###", CultureInfo.InvariantCulture));
+            writer.Write(value.ToString("R", CultureInfo.InvariantCulture));
             writer.WriteLine();
         }
     }
@@ -560,13 +566,13 @@ static int VerifyProject(string directory, int ticks, int seed, bool json)
     }
 
     var pack = LoadPack(directory);
-    var first = HeadlessSystemicHost.Create(pack, seed);
+    using var first = HeadlessSystemicHost.Create(pack, seed);
     first.RunTicks(ticks);
     var firstHash = StateHash(first);
     var save = first.Save();
-    var restored = HeadlessSystemicHost.Restore(pack, save);
+    using var restored = HeadlessSystemicHost.Restore(pack, save);
     var restoredHash = StateHash(restored);
-    var second = HeadlessSystemicHost.Create(pack, seed);
+    using var second = HeadlessSystemicHost.Create(pack, seed);
     second.RunTicks(ticks);
     var secondHash = StateHash(second);
     var ok = string.Equals(firstHash, secondHash, StringComparison.Ordinal)
@@ -686,19 +692,29 @@ static int AssetsValidate(string directory, bool json)
 
         try
         {
-            var pixels = ProceduralRasterizer.Rasterize(recipe);
-            var opaque = 0;
-            for (var index = 3; index < pixels.Pixels.Length; index += 4)
+            var renderedStates = 0;
+            foreach (var state in VisualStates(recipe))
             {
-                if (pixels.Pixels.Span[index] != 0)
+                var pixels = ProceduralRasterizer.Rasterize(recipe, 0, state);
+                var opaque = false;
+                for (var index = 3; index < pixels.Pixels.Length; index += 4)
                 {
-                    opaque++;
+                    if (pixels.Pixels.Span[index] != 0)
+                    {
+                        opaque = true;
+                        break;
+                    }
+                }
+
+                if (opaque)
+                {
+                    renderedStates++;
                 }
             }
 
-            if (opaque == 0)
+            if (renderedStates == 0)
             {
-                errors.Add(new { recipe = recipe.Id, code = "asset.empty", message = "Recipe rasterized to an empty canvas." });
+                errors.Add(new { recipe = recipe.Id, code = "asset.empty", message = "Recipe rasterized to an empty canvas in every state." });
             }
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
@@ -717,6 +733,18 @@ static int AssetsValidate(string directory, bool json)
     return errors.Count == 0 ? 0 : 1;
 }
 
+/// <summary>Every state a recipe can render, with the default state first.</summary>
+static string?[] VisualStates(VisualRecipe recipe) =>
+[
+    null,
+    .. recipe.Layers
+        .Concat(recipe.Parts.SelectMany(part => part.Recipe.Layers))
+        .Select(layer => layer.State)
+        .Where(state => !string.IsNullOrWhiteSpace(state))
+        .Distinct(StringComparer.Ordinal)
+        .Order(StringComparer.Ordinal),
+];
+
 static int AssetsSheet(string directory, string output, int scale, bool json)
 {
     if (scale is < 1 or > 16)
@@ -730,8 +758,10 @@ static int AssetsSheet(string directory, string output, int scale, bool json)
         throw new ArgumentException("The pack has no visual recipes.");
     }
 
-    var columns = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(recipes.Length)));
-    var rows = (int)Math.Ceiling(recipes.Length / (double)columns);
+    var cells = recipes.SelectMany(recipe => VisualStates(recipe)
+        .Select(state => (Recipe: recipe, State: state))).ToArray();
+    var columns = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(cells.Length)));
+    var rows = (int)Math.Ceiling(cells.Length / (double)columns);
     var cellWidth = (recipes.Max(recipe => recipe.CanvasWidth) * scale) + 16;
     var cellHeight = (recipes.Max(recipe => recipe.CanvasHeight) * scale) + 28;
     using var sheet = new SKBitmap(new SKImageInfo(columns * cellWidth, rows * cellHeight,
@@ -741,23 +771,23 @@ static int AssetsSheet(string directory, string output, int scale, bool json)
     using var label = new SKPaint { Color = new SKColor(232, 220, 200), IsAntialias = true };
     using var font = new SKFont(SKTypeface.Default, 12);
     using var draw = new SKPaint { IsAntialias = false };
-    for (var index = 0; index < recipes.Length; index++)
+    for (var index = 0; index < cells.Length; index++)
     {
-        var recipe = recipes[index];
+        var (recipe, state) = cells[index];
         var column = index % columns;
         var row = index / columns;
         var x = (column * cellWidth) + 8;
         var y = (row * cellHeight) + 20;
-        using var bitmap = ToBitmap(ProceduralRasterizer.Rasterize(recipe));
+        using var bitmap = ToBitmap(ProceduralRasterizer.Rasterize(recipe, 0, state));
         canvas.DrawBitmap(bitmap, SKRect.Create(x, y, recipe.CanvasWidth * scale, recipe.CanvasHeight * scale), new SKSamplingOptions(SKFilterMode.Nearest));
-        canvas.DrawText(recipe.Id, x, y - 6, SKTextAlign.Left, font, label);
+        canvas.DrawText(state is null ? recipe.Id : $"{recipe.Id}:{state}", x, y - 6, SKTextAlign.Left, font, label);
     }
 
     var fullPath = Path.GetFullPath(output);
     Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
     using (var image = SKImage.FromBitmap(sheet))
     using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
-    using (var stream = File.OpenWrite(fullPath))
+    using (var stream = File.Create(fullPath))
     {
         data.SaveTo(stream);
     }
@@ -783,8 +813,10 @@ static int AssetsAtlas(string directory, string output, string manifest, bool js
         throw new ArgumentException("The pack has no visual recipes.");
     }
 
-    var columns = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(recipes.Length)));
-    var rows = (int)Math.Ceiling(recipes.Length / (double)columns);
+    var cells = recipes.SelectMany(recipe => VisualStates(recipe)
+        .Select(state => (Recipe: recipe, State: state))).ToArray();
+    var columns = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(cells.Length)));
+    var rows = (int)Math.Ceiling(cells.Length / (double)columns);
     var cellWidth = recipes.Max(recipe => recipe.CanvasWidth) + 2;
     var cellHeight = recipes.Max(recipe => recipe.CanvasHeight) + 2;
     using var atlas = new SKBitmap(new SKImageInfo(columns * cellWidth, rows * cellHeight,
@@ -793,16 +825,17 @@ static int AssetsAtlas(string directory, string output, string manifest, bool js
     canvas.Clear(SKColors.Transparent);
     using var draw = new SKPaint { IsAntialias = false };
     var frames = new List<object>();
-    for (var index = 0; index < recipes.Length; index++)
+    for (var index = 0; index < cells.Length; index++)
     {
-        var recipe = recipes[index];
+        var (recipe, state) = cells[index];
         var x = ((index % columns) * cellWidth) + 1;
         var y = ((index / columns) * cellHeight) + 1;
-        using var bitmap = ToBitmap(ProceduralRasterizer.Rasterize(recipe));
+        using var bitmap = ToBitmap(ProceduralRasterizer.Rasterize(recipe, 0, state));
         canvas.DrawBitmap(bitmap, SKRect.Create(x, y, recipe.CanvasWidth, recipe.CanvasHeight), new SKSamplingOptions(SKFilterMode.Nearest));
         frames.Add(new
         {
             id = recipe.Id,
+            state,
             x,
             y,
             width = recipe.CanvasWidth,
@@ -818,7 +851,7 @@ static int AssetsAtlas(string directory, string output, string manifest, bool js
     Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
     using (var image = SKImage.FromBitmap(atlas))
     using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
-    using (var stream = File.OpenWrite(atlasPath))
+    using (var stream = File.Create(atlasPath))
     {
         data.SaveTo(stream);
     }
