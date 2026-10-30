@@ -1,6 +1,5 @@
 using Systemic.Kernel;
 using Systemic.Content;
-using Systemic.Incremental;
 using Systemic.Host;
 using Systemic.Preview;
 using Systemic.Rules;
@@ -10,7 +9,7 @@ namespace Systemic.Tests;
 public sealed class ContentPackTests
 {
     [Fact]
-    public void Compiles_a_versioned_pack_and_keeps_stable_rule_order()
+    public void CompilesAVersionedPackAndKeepsStableRuleOrder()
     {
         using var pack = TestPack.Create();
 
@@ -25,7 +24,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Keeps_alternative_prerequisite_closures_that_avoid_later_exclusions()
+    public void KeepsAlternativePrerequisiteClosuresThatAvoidLaterExclusions()
     {
         using var pack = TestPack.Create();
         var gamePath = Path.Combine(pack.Root, "game.json");
@@ -67,7 +66,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_version_one_content_with_a_version_upgrade_diagnostic()
+    public void RejectsVersionOneContentWithAVersionUpgradeDiagnostic()
     {
         using var pack = TestPack.Create(schemaVersion: 1);
 
@@ -78,7 +77,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Compiles_and_evaluates_expression_rule_conditions()
+    public void CompilesAndEvaluatesExpressionRuleConditions()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -103,7 +102,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Seeded_chance_conditions_replay_from_the_world_draw_stream()
+    public void SeededChanceConditionsReplayFromTheWorldDrawStream()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -134,7 +133,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Logical_time_schedules_repeat_from_the_saved_tick()
+    public void LogicalTimeSchedulesRepeatFromTheSavedTick()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -163,7 +162,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_content_paths_that_escape_the_pack_root()
+    public void RejectsContentPathsThatEscapeThePackRoot()
     {
         using var pack = TestPack.Create(rulesPath: "../outside.json");
 
@@ -173,7 +172,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_content_symlinks_that_escape_the_pack_root()
+    public void RejectsContentSymlinksThatEscapeThePackRoot()
     {
         using var pack = TestPack.Create();
         var outsidePath = Path.Combine(Path.GetTempPath(), $"systemic-outside-{Guid.NewGuid():N}.json");
@@ -203,7 +202,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_json_property_names_that_do_not_match_the_schema_case()
+    public void RejectsJsonPropertyNamesThatDoNotMatchTheSchemaCase()
     {
         using var pack = TestPack.Create();
         var gamePath = Path.Combine(pack.Root, "game.json");
@@ -213,7 +212,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_numeric_values_encoded_as_json_strings()
+    public void RejectsNumericValuesEncodedAsJsonStrings()
     {
         using var pack = TestPack.Create();
         var gamePath = Path.Combine(pack.Root, "game.json");
@@ -223,7 +222,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_unknown_rule_effects_at_schema_validation()
+    public void RejectsUnknownRuleEffectsAtSchemaValidation()
     {
         using var pack = TestPack.Create(ruleEffect: "run_script");
 
@@ -235,7 +234,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rule_effects_can_apply_sourced_timed_modifiers()
+    public void RuleEffectsCanApplySourcedTimedModifiers()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -264,7 +263,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Timed_modifier_effects_roll_back_with_their_dispatch()
+    public void TimedModifierEffectsRollBackWithTheirDispatch()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -289,7 +288,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_dangling_entity_links_before_world_materialization()
+    public void RejectsDanglingEntityLinksBeforeWorldMaterialization()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -304,7 +303,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Applies_single_level_entity_archetypes_with_overrides_and_explicit_removals()
+    public void AppliesSingleLevelEntityArchetypesWithOverridesAndExplicitRemovals()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -337,7 +336,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_archetype_chains_before_expanding_entities()
+    public void RejectsArchetypeChainsBeforeExpandingEntities()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -353,7 +352,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_entities_that_reference_unknown_archetypes()
+    public void RejectsEntitiesThatReferenceUnknownArchetypes()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -367,7 +366,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Expands_rule_fragments_in_order_before_local_rules()
+    public void ExpandsRuleFragmentsInOrderBeforeLocalRules()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -397,7 +396,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_unused_rule_fragment_without_a_rules_array()
+    public void RejectsUnusedRuleFragmentWithoutARulesArray()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -415,7 +414,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Accepts_unused_rule_fragment_with_an_empty_rules_array()
+    public void AcceptsUnusedRuleFragmentWithAnEmptyRulesArray()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -431,7 +430,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_unused_fragment_rule_without_an_effects_array()
+    public void RejectsUnusedFragmentRuleWithoutAnEffectsArray()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -451,7 +450,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Accepts_unused_fragment_rule_with_an_empty_effects_array()
+    public void AcceptsUnusedFragmentRuleWithAnEmptyEffectsArray()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -469,7 +468,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_recursive_or_unknown_rule_fragments()
+    public void RejectsRecursiveOrUnknownRuleFragments()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -484,7 +483,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_unknown_rule_fragments()
+    public void RejectsUnknownRuleFragments()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -497,7 +496,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Resolves_visual_fragment_layers_and_named_palette_roles()
+    public void ResolvesVisualFragmentLayersAndNamedPaletteRoles()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "visuals.json"), """
@@ -530,7 +529,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_visual_parts_that_reference_unknown_recipes()
+    public void RejectsVisualPartsThatReferenceUnknownRecipes()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "visuals.json"), """
@@ -546,7 +545,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_nested_visual_parts_to_keep_composition_bounded()
+    public void RejectsNestedVisualPartsToKeepCompositionBounded()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "visuals.json"), """
@@ -566,7 +565,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Presentation_module_diagnostics_use_the_manifest_module_path()
+    public void PresentationModuleDiagnosticsUseTheManifestModulePath()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "ui.json"), """
@@ -584,7 +583,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_composed_visual_recipes_that_exceed_the_raster_work_budget()
+    public void RejectsComposedVisualRecipesThatExceedTheRasterWorkBudget()
     {
         using var pack = TestPack.Create();
         var fullCanvasLayer = "{\"shape\":\"rect\",\"color\":0,\"x\":0,\"y\":0,\"width\":256,\"height\":256}";
@@ -606,7 +605,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Loads_an_optional_engine_neutral_incremental_catalog()
+    public void LoadsAnOptionalEngineNeutralIncrementalCatalog()
     {
         using var pack = TestPack.Create();
         var gamePath = Path.Combine(pack.Root, "game.json");
@@ -622,7 +621,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Incremental_validation_reports_the_invalid_producer_field_path()
+    public void IncrementalValidationReportsTheInvalidProducerFieldPath()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "game.json"), File.ReadAllText(Path.Combine(pack.Root, "game.json"))
@@ -650,7 +649,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Loads_an_optional_gated_build_choice_catalog()
+    public void LoadsAnOptionalGatedBuildChoiceCatalog()
     {
         using var pack = TestPack.Create();
         var gamePath = Path.Combine(pack.Root, "game.json");
@@ -696,7 +695,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Advancement_validation_reports_the_invalid_choice_field_path()
+    public void AdvancementValidationReportsTheInvalidChoiceFieldPath()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "game.json"), File.ReadAllText(Path.Combine(pack.Root, "game.json"))
@@ -727,7 +726,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_entity_bounds_that_exceed_the_world_spatial_membership_budget()
+    public void RejectsEntityBoundsThatExceedTheWorldSpatialMembershipBudget()
     {
         using var pack = TestPack.Create();
         var definitions = Enumerable.Range(0, 62).Select(index =>
@@ -741,7 +740,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_missing_required_visual_canvas_dimensions()
+    public void RejectsMissingRequiredVisualCanvasDimensions()
     {
         using var pack = TestPack.Create();
         var visualsPath = Path.Combine(pack.Root, "visuals.json");
@@ -753,7 +752,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_rules_that_omit_required_effect_fields()
+    public void RejectsRulesThatOmitRequiredEffectFields()
     {
         using var pack = TestPack.Create();
         var rulesPath = Path.Combine(pack.Root, "rules.json");
@@ -770,7 +769,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_rules_without_an_effect_array_at_schema_validation()
+    public void RejectsRulesWithoutAnEffectArrayAtSchemaValidation()
     {
         using var pack = TestPack.Create();
         var rulesPath = Path.Combine(pack.Root, "rules.json");
@@ -788,7 +787,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Rejects_ui_bindings_without_a_path_after_the_namespace()
+    public void RejectsUiBindingsWithoutAPathAfterTheNamespace()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "ui.json"), """
@@ -803,7 +802,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Compiles_the_generic_sample_and_renders_only_read_only_preview_markup()
+    public void CompilesTheGenericSampleAndRendersOnlyReadOnlyPreviewMarkup()
     {
         var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
         var compiled = SystemicTestContent.Load(samplePath);
@@ -827,7 +826,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Preview_enforces_an_aggregate_pixel_budget_before_rasterizing()
+    public void PreviewEnforcesAnAggregatePixelBudgetBeforeRasterizing()
     {
         var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
         var content = SystemicTestContent.Load(samplePath);
@@ -844,7 +843,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public void Preview_enforces_an_aggregate_raster_work_budget_before_rendering()
+    public void PreviewEnforcesAnAggregateRasterWorkBudgetBeforeRendering()
     {
         var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
         var content = SystemicTestContent.Load(samplePath);
@@ -864,7 +863,7 @@ public sealed class ContentPackTests
     // Row-addressed rules are content like any other: the fact carries a row reference and the
     // authored rule names that row with 'factRow' in both its conditions and its effects.
     [Fact]
-    public void Compiles_row_addressed_rules_from_content_and_applies_them_to_the_facts_row()
+    public void CompilesRowAddressedRulesFromContentAndAppliesThemToTheFactsRow()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -920,7 +919,7 @@ public sealed class ContentPackTests
     }
 
     [Fact]
-    public static void Preview_includes_states_defined_only_by_composed_parts()
+    public static void PreviewIncludesStatesDefinedOnlyByComposedParts()
     {
         var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
         var content = SystemicTestContent.Load(samplePath);

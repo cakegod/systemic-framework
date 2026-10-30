@@ -1,5 +1,3 @@
-using Systemic.Content;
-using Systemic.Kernel;
 using Systemic.Rules;
 
 namespace Systemic.Tests;
@@ -7,7 +5,7 @@ namespace Systemic.Tests;
 public sealed class QueryConditionTests
 {
     [Fact]
-    public void Counts_entities_by_tag()
+    public void CountsEntitiesByTag()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -39,7 +37,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void Filters_entities_by_property_threshold()
+    public void FiltersEntitiesByPropertyThreshold()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -71,7 +69,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void Selects_entities_inside_a_spatial_range()
+    public void SelectsEntitiesInsideASpatialRange()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -100,7 +98,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void Selects_the_nearest_entity_with_a_limit()
+    public void SelectsTheNearestEntityWithALimit()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -130,7 +128,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void Aggregates_a_property_and_tests_a_formula()
+    public void AggregatesAPropertyAndTestsAFormula()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -162,7 +160,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void A_range_wider_than_the_spatial_index_still_matches()
+    public void ARangeWiderThanTheSpatialIndexStillMatches()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -190,7 +188,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void An_empty_selection_cannot_pass_a_formula()
+    public void AnEmptySelectionCannotPassAFormula()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -219,7 +217,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void A_nearest_query_without_bounds_does_not_match()
+    public void ANearestQueryWithoutBoundsDoesNotMatch()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -247,7 +245,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void An_average_of_opposite_huge_values_is_their_real_mean()
+    public void AnAverageOfOppositeHugeValuesIsTheirRealMean()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -277,7 +275,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void A_formula_reading_a_missing_distance_does_not_throw()
+    public void AFormulaReadingAMissingDistanceDoesNotThrow()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """
@@ -306,7 +304,7 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
-    public void A_count_only_formula_still_matches_without_a_distance()
+    public void ACountOnlyFormulaStillMatchesWithoutADistance()
     {
         using var pack = TestPack.Create();
         WriteEntities(pack, """

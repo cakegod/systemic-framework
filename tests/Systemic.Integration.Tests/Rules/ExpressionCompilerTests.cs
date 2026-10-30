@@ -5,7 +5,7 @@ namespace Systemic.Tests.Rules;
 public sealed class ExpressionCompilerTests
 {
     [Fact]
-    public void Compiles_count_arithmetic_and_floor_formulas()
+    public void CompilesCountArithmeticAndFloorFormulas()
     {
         var scope = new TestExpressionScope(counts: new Dictionary<string, double>
         {
@@ -18,7 +18,7 @@ public sealed class ExpressionCompilerTests
     }
 
     [Fact]
-    public void Compiles_rolling_rates_and_boolean_comparisons()
+    public void CompilesRollingRatesAndBooleanComparisons()
     {
         var scope = new TestExpressionScope(rates: new Dictionary<(string, int), double>
         {
@@ -37,7 +37,7 @@ public sealed class ExpressionCompilerTests
     [InlineData("1 +")]
     [InlineData("System.IO.File.Delete(\"save.json\")")]
     [InlineData("count(\"workers\", 1, 2)")]
-    public void Rejects_unsupported_or_malformed_expression_syntax(string source)
+    public void RejectsUnsupportedOrMalformedExpressionSyntax(string source)
     {
         var error = Assert.Throws<ExpressionCompileException>(() => ExpressionCompiler.Compile(source));
 
@@ -45,7 +45,7 @@ public sealed class ExpressionCompilerTests
     }
 
     [Fact]
-    public void Rejects_non_finite_evaluation_results()
+    public void RejectsNonFiniteEvaluationResults()
     {
         var expression = ExpressionCompiler.Compile("amount / 0");
         var scope = new TestExpressionScope(numbers: new Dictionary<string, double>
@@ -59,7 +59,7 @@ public sealed class ExpressionCompilerTests
     [Theory]
     [InlineData("false && 1 / 0 > 0", false)]
     [InlineData("true || 1 / 0 > 0", true)]
-    public void Boolean_operators_short_circuit(string source, bool expected)
+    public void BooleanOperatorsShortCircuit(string source, bool expected)
     {
         var expression = ExpressionCompiler.Compile(source);
 
@@ -67,7 +67,7 @@ public sealed class ExpressionCompilerTests
     }
 
     [Fact]
-    public void Rejects_expressions_that_exceed_the_source_length_limit()
+    public void RejectsExpressionsThatExceedTheSourceLengthLimit()
     {
         var source = "1" + new string(' ', 4096);
 

@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Threading;
 
 using Microsoft.Extensions.ObjectPool;
 
@@ -194,7 +193,10 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         }
 
         if (systemAccess is { } declaredAccess)
+        {
             lease.BindSystemAccess(declaredAccess, Environment.CurrentManagedThreadId);
+        }
+
         return lease;
     }
 
@@ -228,7 +230,10 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             catch
             {
                 if (scopeEntered)
+                {
                     _storage.ExitScope(parallel: false);
+                }
+
                 _storage.ReleaseLease();
                 throw;
             }
@@ -283,7 +288,10 @@ public sealed class Population<TKind> where TKind : IPopulationKind
             catch
             {
                 if (scopeEntered)
+                {
                     _storage.ExitScope(parallel: false);
+                }
+
                 _storage.ReleaseLease();
                 throw;
             }
@@ -322,7 +330,9 @@ public sealed class Population<TKind> where TKind : IPopulationKind
     internal void EndScheduledRangeAccess()
     {
         lock (World.TransactionGate)
+        {
             _storage.ReleaseLease();
+        }
     }
 
     internal long BeginScheduledRangeScope(
@@ -362,7 +372,9 @@ public sealed class Population<TKind> where TKind : IPopulationKind
         EnsureActive();
         ArgumentNullException.ThrowIfNull(column);
         if (!Owns(column))
+        {
             throw new ArgumentException("The column does not belong to this population.", nameof(column));
+        }
     }
 
     internal bool Owns(PopulationColumnBase column) =>
@@ -1387,7 +1399,10 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
         ArgumentNullException.ThrowIfNull(callback);
         var access = _systemAccess;
         if (_systemBound && Environment.CurrentManagedThreadId != _systemThreadId)
+        {
             throw new InvalidOperationException("Serial population access from a scheduled system belongs to its execution thread.");
+        }
+
         var lifetime = _storage.SerialScopeLifetime;
         var generation = BeginScopedAccess(range, lifetime, access, parallel: false, group: null);
         var scope = new PopulationAccessScope<TKind>(this, lifetime, generation);
@@ -1418,7 +1433,10 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
         ArgumentNullException.ThrowIfNull(callback);
         var access = _systemAccess;
         if (_systemBound && Environment.CurrentManagedThreadId != _systemThreadId)
+        {
             throw new InvalidOperationException("Serial population access from a scheduled system belongs to its execution thread.");
+        }
+
         var lifetime = _storage.SerialScopeLifetime;
         var generation = BeginScopedAccess(range, lifetime, access, parallel: false, group: null);
         var scope = new PopulationAccessScope<TKind>(this, lifetime, generation);
@@ -1437,9 +1455,16 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
     {
         lock (_world.TransactionGate)
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
+
             if (_storage.HasActiveScopes)
+            {
                 throw new InvalidOperationException("A population lease cannot be disposed while a scoped callback is active.");
+            }
+
             _disposed = true;
             _storage.ReleaseLease();
         }
@@ -1513,7 +1538,9 @@ public sealed class PopulationLease<TKind> : IDisposable where TKind : IPopulati
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(column);
         if (!_population.Owns(column))
+        {
             throw new ArgumentException("The column does not belong to the leased population.", nameof(column));
+        }
     }
 }
 

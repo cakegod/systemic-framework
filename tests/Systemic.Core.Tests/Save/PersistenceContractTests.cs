@@ -10,7 +10,7 @@ namespace Systemic.Tests.Save;
 public sealed class PersistenceContractTests
 {
     [Fact]
-    public void Round_trip_restores_original_seed_and_partial_clock_phase()
+    public void RoundTripRestoresOriginalSeedAndPartialClockPhase()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -29,7 +29,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Tampered_save_is_rejected_with_checksum_diagnostic()
+    public void TamperedSaveIsRejectedWithChecksumDiagnostic()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -45,7 +45,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Content_fingerprint_uses_loaded_bytes_and_ignores_unrelated_files()
+    public void ContentFingerprintUsesLoadedBytesAndIgnoresUnrelatedFiles()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -69,7 +69,7 @@ public sealed class PersistenceContractTests
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
-    public void Older_save_versions_are_rejected_with_actionable_diagnostic(int version)
+    public void OlderSaveVersionsAreRejectedWithActionableDiagnostic(int version)
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -86,7 +86,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Save_checksum_accepts_reordered_properties_but_rejects_duplicates()
+    public void SaveChecksumAcceptsReorderedPropertiesButRejectsDuplicates()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -102,7 +102,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Synthetic_and_modified_packs_require_an_explicit_content_fingerprint()
+    public void SyntheticAndModifiedPacksRequireAnExplicitContentFingerprint()
     {
         using var pack = CoreOnlyPack.Create();
         var loaded = ContentPackLoader.Load(pack.Root);
@@ -122,7 +122,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Clock_phase_larger_than_uint64_round_trips_without_loss()
+    public void ClockPhaseLargerThanUint64RoundTripsWithoutLoss()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -137,7 +137,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Saved_clock_configuration_must_match_the_loaded_manifest()
+    public void SavedClockConfigurationMustMatchTheLoadedManifest()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -153,7 +153,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Save_file_replaces_existing_file_and_loads_the_new_state()
+    public void SaveFileReplacesExistingFileAndLoadsTheNewState()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -169,7 +169,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Failed_replacement_cleans_temporary_file_and_preserves_destination()
+    public void FailedReplacementCleansTemporaryFileAndPreservesDestination()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -185,7 +185,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Capture_failure_preserves_an_existing_save_file()
+    public void CaptureFailurePreservesAnExistingSaveFile()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -201,7 +201,7 @@ public sealed class PersistenceContractTests
     }
 
     [Fact]
-    public void Load_from_file_rejects_invalid_utf8_as_a_save_error()
+    public void LoadFromFileRejectsInvalidUtf8AsASaveError()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);

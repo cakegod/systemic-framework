@@ -1,8 +1,6 @@
 using System.Collections.Immutable;
 using Systemic.Content;
 using Systemic.Gameplay2D;
-using Systemic.Incremental;
-using Systemic.Presentation;
 
 namespace Systemic.Tests;
 

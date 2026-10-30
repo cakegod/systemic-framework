@@ -1,13 +1,12 @@
 using Systemic.Host;
 using Systemic.Kernel;
-using Xunit;
 
 namespace Systemic.Tests.Host;
 
 public sealed class FixedStepClockStateTests
 {
     [Fact]
-    public void Snapshot_restores_fractional_phase_and_continues_identically()
+    public void SnapshotRestoresFractionalPhaseAndContinuesIdentically()
     {
         var original = new FixedStepClock(tickRateHz: 60, maxCatchUpSteps: 4);
         var steps = 0;
@@ -28,7 +27,7 @@ public sealed class FixedStepClockStateTests
     }
 
     [Fact]
-    public void Restore_rejects_invalid_or_incompatible_state_without_mutating_clock()
+    public void RestoreRejectsInvalidOrIncompatibleStateWithoutMutatingClock()
     {
         var clock = new FixedStepClock(tickRateHz: 60, maxCatchUpSteps: 4);
         clock.Advance(TimeSpan.FromTicks(100), () => { });
@@ -41,7 +40,7 @@ public sealed class FixedStepClockStateTests
     }
 
     [Fact]
-    public void Failed_step_preserves_pending_time_for_retry()
+    public void FailedStepPreservesPendingTimeForRetry()
     {
         var clock = new FixedStepClock(tickRateHz: 60, maxCatchUpSteps: 4);
         Assert.Throws<InvalidOperationException>(() => clock.Advance(TimeSpan.FromTicks(166_667),
@@ -56,17 +55,17 @@ public sealed class FixedStepClockStateTests
     }
 
     [Fact]
-    public void Post_commit_callback_failure_does_not_retry_the_committed_step()
+    public void PostCommitCallbackFailureDoesNotRetryTheCommittedStep()
     {
         var clock = new FixedStepClock(60, 4);
         Assert.Throws<WorldCommitCallbackException>(() => clock.Advance(TimeSpan.FromTicks(166_667),
             () => throw new WorldCommitCallbackException([new InvalidOperationException("observer failed")])));
 
-        Assert.Equal(0, clock.Advance(TimeSpan.Zero, () => throw new Exception("committed tick was retried")).Steps);
+        Assert.Equal(0, clock.Advance(TimeSpan.Zero, () => throw new InvalidOperationException("committed tick was retried")).Steps);
     }
 
     [Fact]
-    public void Commit_callback_observes_the_committed_tick_already_consumed()
+    public void CommitCallbackObservesTheCommittedTickAlreadyConsumed()
     {
         var clock = new FixedStepClock(1, 4);
         FixedStepClockState observed = default;
@@ -77,7 +76,7 @@ public sealed class FixedStepClockStateTests
     }
 
     [Fact]
-    public void Catch_up_uses_exact_integer_phase_and_reports_dropped_duration()
+    public void CatchUpUsesExactIntegerPhaseAndReportsDroppedDuration()
     {
         var clock = new FixedStepClock(tickRateHz: 60, maxCatchUpSteps: 2);
         var result = clock.Advance(TimeSpan.FromMilliseconds(100), () => { });

@@ -99,9 +99,9 @@ public sealed class PixelFont : IDisposable
         _atlas.SetData(pixels);
     }
 
-    public int Height(float scale) => (int)(GlyphHeight * scale);
+    public static int Height(float scale) => (int)(GlyphHeight * scale);
 
-    public int Measure(string text, float scale) => (int)(text.Length * GlyphStride * scale);
+    public static int Measure(string text, float scale) => (int)(text.Length * GlyphStride * scale);
 
     public void Draw(SpriteBatch batch, string text, int x, int y, float scale, Color color)
     {

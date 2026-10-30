@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
-using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
 
@@ -12,7 +11,7 @@ public sealed class CliProcessTests
     private const int MaximumPreviewStartupAttempts = 3;
 
     [Fact]
-    public async Task Help_lists_the_supported_commands_and_returns_success()
+    public async Task HelpListsTheSupportedCommandsAndReturnsSuccess()
     {
         var result = await RunCliAsync("--help");
 
@@ -24,7 +23,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task Invalid_command_shape_keeps_the_usage_exit_code()
+    public async Task InvalidCommandShapeKeepsTheUsageExitCode()
     {
         var result = await RunCliAsync("validate");
 
@@ -33,7 +32,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task Preview_rejects_an_out_of_range_port_with_the_usage_exit_code()
+    public async Task PreviewRejectsAnOutOfRangePortWithTheUsageExitCode()
     {
         var result = await RunCliAsync("preview", SamplePath("incremental-quarry"), "--port", "65536");
 
@@ -42,7 +41,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task Content_loading_failure_keeps_the_content_error_exit_code()
+    public async Task ContentLoadingFailureKeepsTheContentErrorExitCode()
     {
         var result = await RunCliAsync("validate", SamplePath("missing-content-pack"));
 
@@ -51,7 +50,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task Core_only_sandbox_validates_and_traces_through_the_cli()
+    public async Task CoreOnlySandboxValidatesAndTracesThroughTheCli()
     {
         var root = FindRepositoryRoot();
         var sample = Path.Combine(root, "samples", "systemic-sandbox");
@@ -69,7 +68,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task Quarry_validates_all_declared_modules_through_the_cli()
+    public async Task QuarryValidatesAllDeclaredModulesThroughTheCli()
     {
         var sample = SamplePath("incremental-quarry");
 
@@ -84,7 +83,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task Quarry_trace_runs_cross_module_rules_through_the_cli()
+    public async Task QuarryTraceRunsCrossModuleRulesThroughTheCli()
     {
         var result = await RunCliAsync("trace", SamplePath("incremental-quarry"), "incremental.production",
             "quarry.ember-source", "quarry.ore");
@@ -97,7 +96,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task Watch_timeout_stops_and_awaits_the_cli_process_tree()
+    public async Task WatchTimeoutStopsAndAwaitsTheCliProcessTree()
     {
         var result = await RunCliAsync(TimeSpan.FromMilliseconds(250), "Watching", "watch", SamplePath("systemic-sandbox"))
             .WaitAsync(TimeSpan.FromSeconds(15));
@@ -117,7 +116,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task New_template_runs_and_verifies_with_json()
+    public async Task NewTemplateRunsAndVerifiesWithJson()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"systemic-cli-{Guid.NewGuid():N}");
         try
@@ -153,7 +152,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task Json_content_error_uses_the_machine_envelope()
+    public async Task JsonContentErrorUsesTheMachineEnvelope()
     {
         var result = await RunCliAsync("validate", SamplePath("missing-content-pack"), "--json");
 
@@ -163,7 +162,7 @@ public sealed class CliProcessTests
     }
 
     [Fact]
-    public async Task Quarry_preview_retries_startup_exit_and_serves_the_real_local_preview_page()
+    public async Task QuarryPreviewRetriesStartupExitAndServesTheRealLocalPreviewPage()
     {
         var ports = new[] { FindAvailablePort(), FindAvailablePort() };
         var attempts = 0;

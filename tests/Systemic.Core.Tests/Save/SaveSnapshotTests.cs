@@ -3,14 +3,13 @@ using Systemic.Host;
 using Systemic.Kernel;
 using Systemic.Save;
 using Systemic.Tests.Content;
-using VerifyXunit;
 
 namespace Systemic.Tests.Save;
 
 public sealed class SaveSnapshotTests
 {
     [Fact]
-    public Task Save_document_matches_the_checked_in_snapshot()
+    public Task SaveDocumentMatchesTheCheckedInSnapshot()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);

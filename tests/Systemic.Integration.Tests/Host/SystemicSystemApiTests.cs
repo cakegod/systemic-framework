@@ -1,16 +1,13 @@
-using Systemic.Content;
-using Systemic.Extensions;
 using Systemic.Host;
 using Systemic.Kernel;
 using Systemic.Rules;
-using Systemic.Tests;
 
 namespace Systemic.Tests.Host;
 
 public sealed class SystemicSystemApiTests
 {
     [Fact]
-    public void One_system_api_defaults_to_exclusive_access_and_preserves_order_registration_order()
+    public void OneSystemApiDefaultsToExclusiveAccessAndPreservesOrderRegistrationOrder()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"))
             with
@@ -31,7 +28,10 @@ public sealed class SystemicSystemApiTests
             {
                 for (var row = range.Start; row < range.End; row++)
                 {
-                    lock (rows) rows.Add(row);
+                    lock (rows)
+                    {
+                        rows.Add(row);
+                    }
                 }
             });
         });
@@ -53,7 +53,7 @@ public sealed class SystemicSystemApiTests
     }
 
     [Fact]
-    public void Unified_context_rollback_registration_is_honored_when_a_later_system_fails()
+    public void UnifiedContextRollbackRegistrationIsHonoredWhenALaterSystemFails()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"))
             with

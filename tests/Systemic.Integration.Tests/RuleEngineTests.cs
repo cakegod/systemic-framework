@@ -10,7 +10,7 @@ namespace Systemic.Tests;
 public sealed class RuleEngineTests
 {
     [Fact]
-    public void Resolves_bounded_chains_in_stable_order_and_reports_cutoffs()
+    public void ResolvesBoundedChainsInStableOrderAndReportsCutoffs()
     {
         var world = new World(seed: 1, valueScale: 1);
         var actor = world.Add(new DataEntity([], [], ("health", 0)));
@@ -33,7 +33,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Numeric_overflow_stops_a_reaction_without_writing_infinity()
+    public void NumericOverflowStopsAReactionWithoutWritingInfinity()
     {
         var world = new World(seed: 2, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("heat", double.MaxValue)));
@@ -52,7 +52,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Repeated_reaction_property_writes_still_rollback_to_the_dispatch_start_value()
+    public void RepeatedReactionPropertyWritesStillRollbackToTheDispatchStartValue()
     {
         var world = new World(seed: 23, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("score", 0), ("heat", double.MaxValue)));
@@ -75,7 +75,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Modifier_effect_overflow_rolls_back_the_rule_dispatch()
+    public void ModifierEffectOverflowRollsBackTheRuleDispatch()
     {
         var world = new World(seed: 35, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("power", 2)));
@@ -93,7 +93,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Emitted_facts_preserve_the_original_source_and_target()
+    public void EmittedFactsPreserveTheOriginalSourceAndTarget()
     {
         var world = new World(seed: 3, valueScale: 1);
         var source = world.Add(new DataEntity(["spark"], []));
@@ -114,7 +114,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Expression_conditions_read_committed_event_counts_and_rates()
+    public void ExpressionConditionsReadCommittedEventCountsAndRates()
     {
         var world = new World(seed: 30, valueScale: 1) { LogicalTick = 10 };
         var entity = world.Add(new DataEntity([], [], ("score", 0)));
@@ -136,7 +136,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Rolled_back_dispatches_do_not_enter_expression_event_history()
+    public void RolledBackDispatchesDoNotEnterExpressionEventHistory()
     {
         var world = new World(seed: 34, valueScale: 1) { LogicalTick = 10 };
         var entity = world.Add(new DataEntity([], [], ("heat", double.MaxValue), ("score", 0)));
@@ -158,7 +158,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Nested_dispatch_history_is_discarded_when_its_outer_world_transaction_rolls_back()
+    public void NestedDispatchHistoryIsDiscardedWhenItsOuterWorldTransactionRollsBack()
     {
         var world = new World(seed: 36, valueScale: 1) { LogicalTick = 20 };
         var entity = world.Add(new DataEntity([], [], ("score", 0)));
@@ -182,7 +182,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Event_queries_match_an_ordered_scan_for_mixed_types_and_windows()
+    public void EventQueriesMatchAnOrderedScanForMixedTypesAndWindows()
     {
         var samples = new[]
         {
@@ -235,7 +235,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Pending_event_queries_update_between_reaction_facts()
+    public void PendingEventQueriesUpdateBetweenReactionFacts()
     {
         var world = new World(seed: 46, valueScale: 1) { LogicalTick = 10 };
         var entity = world.Add(new DataEntity([], [], ("score", 0)));
@@ -262,7 +262,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Restored_history_survives_prune_rollback_and_is_pruned_after_commit()
+    public void RestoredHistorySurvivesPruneRollbackAndIsPrunedAfterCommit()
     {
         var world = new World(seed: 47, valueScale: 1) { LogicalTick = 5 };
         var entity = world.Add(new DataEntity([], [], ("score", 0)));
@@ -296,7 +296,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Prune_rollback_restores_expired_prefix_before_retained_history()
+    public void PruneRollbackRestoresExpiredPrefixBeforeRetainedHistory()
     {
         var world = new World(seed: 49, valueScale: 1) { LogicalTick = 10 };
         var entity = world.Add(new DataEntity([], [], ("score", 0)));
@@ -333,7 +333,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Event_rate_keeps_the_existing_floating_point_sum_order_at_the_rule_threshold()
+    public void EventRateKeepsTheExistingFloatingPointSumOrderAtTheRuleThreshold()
     {
         var world = new World(seed: 48, valueScale: 1) { LogicalTick = 10 };
         var entity = world.Add(new DataEntity([], [], ("score", 0)));
@@ -368,7 +368,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Observed_reactions_share_the_bounded_fact_budget()
+    public void ObservedReactionsShareTheBoundedFactBudget()
     {
         var world = new World(seed: 31, valueScale: 1);
         var observer = new SimulationFactObserver((fact, enqueue) =>
@@ -383,7 +383,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Invalid_observed_fact_rolls_back_prior_effects_in_the_dispatch()
+    public void InvalidObservedFactRollsBackPriorEffectsInTheDispatch()
     {
         var world = new World(seed: 37, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("score", 0)));
@@ -409,7 +409,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Trace_records_the_ordered_facts_and_rules_that_caused_each_reaction()
+    public void TraceRecordsTheOrderedFactsAndRulesThatCausedEachReaction()
     {
         var world = new World(seed: 32, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("heat", 0)));
@@ -430,7 +430,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Warm_rule_dispatch_allocates_nothing_per_fact()
+    public void WarmRuleDispatchAllocatesNothingPerFact()
     {
         var world = new World(seed: 33, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("heat", 0)));
@@ -458,7 +458,7 @@ public sealed class RuleEngineTests
     [Theory]
     [InlineData(-1)]
     [InlineData(9)]
-    public void Rejects_initial_fact_depth_outside_the_configured_range(int depth)
+    public void RejectsInitialFactDepthOutsideTheConfiguredRange(int depth)
     {
         var world = new World(seed: 4, valueScale: 1);
         var engine = new RuleEngine(new CompiledRuleSet([]), maxDepth: 8);
@@ -468,7 +468,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Fixed_step_clock_caps_catch_up_without_changing_step_size()
+    public void FixedStepClockCapsCatchUpWithoutChangingStepSize()
     {
         var clock = new FixedStepClock(tickRateHz: 50, maxCatchUpSteps: 2);
         var steps = 0;
@@ -481,7 +481,7 @@ public sealed class RuleEngineTests
     }
 
     [Fact]
-    public void Extensions_are_explicit_and_duplicate_modules_are_rejected()
+    public void ExtensionsAreExplicitAndDuplicateModulesAreRejected()
     {
         var catalog = new ExtensionModuleCatalog().Add(new TestExtension());
 
@@ -499,7 +499,7 @@ public sealed class RuleEngineHistoryWorkloadTests(ITestOutputHelper output)
 {
     [Fact]
     [Trait("Category", "Performance")]
-    public void Repeated_event_queries_report_release_cost_without_a_timing_gate()
+    public void RepeatedEventQueriesReportReleaseCostWithoutATimingGate()
     {
         const int historySamples = 4_320;
         const int ruleCount = 96;

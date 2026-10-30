@@ -3,17 +3,15 @@ using System.Text.Json;
 using Systemic.Kernel;
 using Systemic.Content;
 using Systemic.Host;
-using Systemic.Incremental;
 using Systemic.Rules;
 using Systemic.Save;
-using Systemic.Tests;
 
 namespace Systemic.Tests.Incremental;
 
 public sealed class BuildChoiceRuntimeTests
 {
     [Fact]
-    public void Conflict_indexes_preserve_self_directional_and_reciprocal_exclusions()
+    public void ConflictIndexesPreserveSelfDirectionalAndReciprocalExclusions()
     {
         var (world, runtime, primaryOwnerId) = CreateChoiceRuntime(
             ("self", ["self"]),
@@ -43,7 +41,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Owner_membership_and_capture_order_remain_stable()
+    public void OwnerMembershipAndCaptureOrderRemainStable()
     {
         using var pack = CreateChoicePack();
         var content = SystemicTestContent.Load(pack.Root);
@@ -71,7 +69,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Choice_state_reads_live_world_values_after_external_mutation_and_rollback()
+    public void ChoiceStateReadsLiveWorldValuesAfterExternalMutationAndRollback()
     {
         using var pack = CreateChoicePack();
         var content = SystemicTestContent.Load(pack.Root);
@@ -93,7 +91,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Free_choice_is_always_selected_and_does_not_use_a_selectable_slot()
+    public void FreeChoiceIsAlwaysSelectedAndDoesNotUseASelectableSlot()
     {
         using var pack = CreateChoicePack();
         var content = SystemicTestContent.Load(pack.Root);
@@ -114,7 +112,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Choice_commands_require_the_group_owner_and_do_not_spend_for_other_actors()
+    public void ChoiceCommandsRequireTheGroupOwnerAndDoNotSpendForOtherActors()
     {
         using var pack = CreateChoicePack();
         var content = SystemicTestContent.Load(pack.Root);
@@ -131,7 +129,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Timed_choice_exposes_active_and_cooldown_state_and_expires_deterministically()
+    public void TimedChoiceExposesActiveAndCooldownStateAndExpiresDeterministically()
     {
         using var pack = CreateChoicePack();
         var content = SystemicTestContent.Load(pack.Root);
@@ -168,7 +166,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Triggered_choice_emits_a_separate_bounded_activation_fact()
+    public void TriggeredChoiceEmitsASeparateBoundedActivationFact()
     {
         using var pack = CreateChoicePack();
         var content = SystemicTestContent.Load(pack.Root) with
@@ -194,7 +192,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Nested_prerequisites_and_exclusions_control_choice_availability()
+    public void NestedPrerequisitesAndExclusionsControlChoiceAvailability()
     {
         using var pack = CreateChoicePack();
         var advancementPath = Path.Combine(pack.Root, "advancements.json");
@@ -235,7 +233,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Alternative_prerequisite_can_break_a_required_choice_cycle()
+    public void AlternativePrerequisiteCanBreakARequiredChoiceCycle()
     {
         using var pack = CreateChoicePack();
         var path = Path.Combine(pack.Root, "advancements.json");
@@ -263,7 +261,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Pure_prerequisite_cycles_are_rejected_as_unselectable()
+    public void PurePrerequisiteCyclesAreRejectedAsUnselectable()
     {
         using var pack = CreateChoicePack();
         var path = Path.Combine(pack.Root, "advancements.json");
@@ -278,7 +276,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Prerequisite_chains_must_fit_the_group_selection_limit()
+    public void PrerequisiteChainsMustFitTheGroupSelectionLimit()
     {
         using var pack = CreateChoicePack();
         var path = Path.Combine(pack.Root, "advancements.json");
@@ -295,7 +293,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Transitive_prerequisite_chains_must_fit_the_group_selection_limit()
+    public void TransitivePrerequisiteChainsMustFitTheGroupSelectionLimit()
     {
         using var pack = CreateChoicePack();
         var path = Path.Combine(pack.Root, "advancements.json");
@@ -312,7 +310,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Transitive_prerequisites_must_not_conflict_with_the_choice()
+    public void TransitivePrerequisitesMustNotConflictWithTheChoice()
     {
         using var pack = CreateChoicePack();
         var path = Path.Combine(pack.Root, "advancements.json");
@@ -329,7 +327,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Selection_limit_counts_a_prerequisites_alternative_unlock_chain()
+    public void SelectionLimitCountsAPrerequisitesAlternativeUnlockChain()
     {
         using var pack = CreateChoicePack();
         var path = Path.Combine(pack.Root, "advancements.json");
@@ -345,7 +343,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Choice_ownership_is_independent_per_actor_and_survives_save_restore()
+    public void ChoiceOwnershipIsIndependentPerActorAndSurvivesSaveRestore()
     {
         using var pack = CreateChoicePack();
         var uiPath = Path.Combine(pack.Root, "ui.json");
@@ -381,7 +379,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Failed_tick_restores_existing_additional_owners_without_duplicates()
+    public void FailedTickRestoresExistingAdditionalOwnersWithoutDuplicates()
     {
         var (world, runtime, _) = CreateChoiceRuntime(("choice.test", []));
         var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
@@ -400,7 +398,7 @@ public sealed class BuildChoiceRuntimeTests
     }
 
     [Fact]
-    public void Rolling_back_owner_registration_removes_its_mappings_and_allows_retry()
+    public void RollingBackOwnerRegistrationRemovesItsMappingsAndAllowsRetry()
     {
         var (world, runtime, _) = CreateChoiceRuntime(("choice.test", []));
         var owner = world.Add(new DataEntity([], [], ("progress", 0)));

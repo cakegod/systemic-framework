@@ -1,6 +1,6 @@
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Systemic.Kernel.Generator;
 using Xunit;
 
 namespace Systemic.Kernel.Generator.Tests;
@@ -8,7 +8,7 @@ namespace Systemic.Kernel.Generator.Tests;
 public sealed class PopulationSchemaGeneratorTests
 {
     [Fact]
-    public void Generates_a_typed_population_facade_for_an_annotated_partial_struct()
+    public void GeneratesATypedPopulationFacadeForAnAnnotatedPartialStruct()
     {
         const string source = """
             using System.Numerics;
@@ -69,7 +69,7 @@ public sealed class PopulationSchemaGeneratorTests
     }
 
     [Fact]
-    public void Snapshot_copies_a_range_into_a_caller_buffer()
+    public void SnapshotCopiesARangeIntoACallerBuffer()
     {
         const string source = """
             using Systemic.Kernel;
@@ -114,7 +114,7 @@ public sealed class PopulationSchemaGeneratorTests
     }
 
     [Fact]
-    public void Generated_row_and_range_writes_use_checked_columns_and_restore_transaction_state()
+    public void GeneratedRowAndRangeWritesUseCheckedColumnsAndRestoreTransactionState()
     {
         const string source = """
             using Systemic.Kernel;
@@ -222,7 +222,7 @@ public sealed class PopulationSchemaGeneratorTests
     }
 
     [Fact]
-    public void Generated_initializer_does_not_allocate_a_temporary_input_copy()
+    public void GeneratedInitializerDoesNotAllocateATemporaryInputCopy()
     {
         const string source = """
             using Systemic.Kernel;
@@ -264,7 +264,7 @@ public sealed class PopulationSchemaGeneratorTests
     }
 
     [Fact]
-    public void Population_scope_and_spans_cannot_escape_the_callback()
+    public void PopulationScopeAndSpansCannotEscapeTheCallback()
     {
         const string source = """
             using System;
@@ -300,7 +300,7 @@ public sealed class PopulationSchemaGeneratorTests
     }
 
     [Fact]
-    public void Generated_projections_reject_invalid_rows_and_ranges_before_writing()
+    public void GeneratedProjectionsRejectInvalidRowsAndRangesBeforeWriting()
     {
         const string source = """
             using System;
@@ -357,7 +357,7 @@ public sealed class PopulationSchemaGeneratorTests
     }
 
     [Fact]
-    public void Schemas_with_the_same_name_in_different_namespaces_generate_independently()
+    public void SchemasWithTheSameNameInDifferentNamespacesGenerateIndependently()
     {
         const string source = """
             using Systemic.Kernel;
@@ -374,7 +374,7 @@ public sealed class PopulationSchemaGeneratorTests
     }
 
     [Fact]
-    public void Schema_namespaces_that_differ_only_by_case_do_not_collide()
+    public void SchemaNamespacesThatDifferOnlyByCaseDoNotCollide()
     {
         const string source = """
             using Systemic.Kernel;
@@ -390,7 +390,7 @@ public sealed class PopulationSchemaGeneratorTests
     }
 
     [Fact]
-    public void Generated_projections_support_keywords_and_fields_named_like_local_parameters()
+    public void GeneratedProjectionsSupportKeywordsAndFieldsNamedLikeLocalParameters()
     {
         const string source = """
             using Systemic.Kernel;
@@ -443,7 +443,7 @@ public sealed class PopulationSchemaGeneratorTests
     [Theory]
     [InlineData("public struct Particle { [PopulationColumn(\"energy\")] public float Energy; }", "partial")]
     [InlineData("public partial struct Particle { [PopulationColumn(\"name\")] public string Name; }", "unmanaged")]
-    public void Reports_invalid_schema_instead_of_emitting_broken_source(string declaration, string message)
+    public void ReportsInvalidSchemaInsteadOfEmittingBrokenSource(string declaration, string message)
     {
         var source = $$"""
             using Systemic.Kernel;
@@ -461,7 +461,7 @@ public sealed class PopulationSchemaGeneratorTests
         Assert.Null(result.Exception);
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal("PTBK001", diagnostic.Id);
-        Assert.Contains(message, diagnostic.GetMessage(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(message, diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase);
         Assert.Empty(result.GeneratedSources);
     }
 
@@ -471,7 +471,7 @@ public sealed class PopulationSchemaGeneratorTests
     [InlineData("[PopulationColumn(\"x\")] public int Columns;", "Columns")]
     [InlineData("[PopulationColumn(\"x\")] public int ValidateOffset;", "ValidateOffset")]
     [InlineData("[PopulationColumn(\"x\")] public int FooKey; [PopulationColumn(\"y\")] public int ReadFoo;", "ReadFooKey")]
-    public void Reports_generated_member_name_conflicts(string fields, string conflictingName)
+    public void ReportsGeneratedMemberNameConflicts(string fields, string conflictingName)
     {
         var source = $$"""
             using Systemic.Kernel;
@@ -482,7 +482,7 @@ public sealed class PopulationSchemaGeneratorTests
         Assert.Null(result.Exception);
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal("PTBK001", diagnostic.Id);
-        Assert.Contains(conflictingName, diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains(conflictingName, diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
         Assert.Empty(result.GeneratedSources);
     }
 

@@ -1,13 +1,12 @@
 using Systemic.Kernel;
 using Systemic.Content;
-using Systemic.Gameplay2D;
 
 namespace Systemic.Gameplay2D.Tests;
 
 public sealed class Gameplay2DContentTests
 {
     [Fact]
-    public void Loaded_blueprints_spawn_actors_and_apply_statuses_without_manual_translation()
+    public void LoadedBlueprintsSpawnActorsAndApplyStatusesWithoutManualTranslation()
     {
         var content = Gameplay2DContentLoader.Parse("""
             {
@@ -46,7 +45,7 @@ public sealed class Gameplay2DContentTests
     }
 
     [Fact]
-    public static void Quarry_sample_includes_loadable_optional_2d_definitions()
+    public static void QuarrySampleIncludesLoadableOptional2dDefinitions()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry", "gameplay2d.json");
 
@@ -61,7 +60,7 @@ public sealed class Gameplay2DContentTests
     [InlineData("{\"schemaVersion\":2,\"actors\":[{\"id\":\"scout\",\"tags\":[],\"capabilities\":[],\"properties\":{},\"halfWidth\":-1,\"halfHeight\":1}],\"statuses\":[]}", "$.actors[0].halfWidth")]
     [InlineData("{\"schemaVersion\":2,\"actors\":[{\"id\":\"scout\",\"tags\":[],\"capabilities\":[],\"properties\":{},\"halfHeight\":1}],\"statuses\":[]}", "$.actors[0].halfWidth")]
     [InlineData("{\"schemaVersion\":2,\"actors\":[],\"statuses\":[{\"id\":\"quickening\",\"tag\":\"status.quickening\",\"property\":\"power\",\"operation\":\"divide\",\"value\":2,\"durationTicks\":8}]}", "$.statuses[0].operation")]
-    public void Invalid_gameplay_content_reports_a_stable_json_path(string json, string expectedPath)
+    public void InvalidGameplayContentReportsAStableJsonPath(string json, string expectedPath)
     {
         var exception = Assert.Throws<Gameplay2DContentException>(() => Gameplay2DContentLoader.Parse(json));
 
@@ -70,7 +69,7 @@ public sealed class Gameplay2DContentTests
     }
 
     [Fact]
-    public void Public_parse_and_load_require_schema_case_exact_member_names()
+    public void PublicParseAndLoadRequireSchemaCaseExactMemberNames()
     {
         const string json = "{\"SchemaVersion\":2,\"actors\":[],\"statuses\":[]}";
         var parseError = Assert.Throws<Gameplay2DContentException>(() => Gameplay2DContentLoader.Parse(json));
@@ -94,7 +93,7 @@ public sealed class Gameplay2DContentTests
     [Theory]
     [InlineData("{\"schemaVersion\":2,\"actors\":[null],\"statuses\":[]}", "$.actors[0]")]
     [InlineData("{\"schemaVersion\":2,\"actors\":[],\"statuses\":[null]}", "$.statuses[0]")]
-    public void Null_gameplay_definitions_report_their_array_path(string json, string expectedPath)
+    public void NullGameplayDefinitionsReportTheirArrayPath(string json, string expectedPath)
     {
         var exception = Assert.Throws<Gameplay2DContentException>(() => Gameplay2DContentLoader.Parse(json));
 
@@ -104,7 +103,7 @@ public sealed class Gameplay2DContentTests
     [Theory]
     [InlineData("{}", "$.modules.systemic.gameplay2d.gameplay2d")]
     [InlineData("{\"gameplay2d\": []}", "$.modules['systemic.gameplay2d'].gameplay2d")]
-    public void Missing_or_wrong_type_gameplay_file_key_reports_manifest_diagnostic(string declaration, string expectedPath)
+    public void MissingOrWrongTypeGameplayFileKeyReportsManifestDiagnostic(string declaration, string expectedPath)
     {
         using var pack = ModulePack.Create(declaration);
         var registry = new ContentModuleRegistry().Add(new Gameplay2DContentModule());
@@ -117,7 +116,7 @@ public sealed class Gameplay2DContentTests
     }
 
     [Fact]
-    public void Gameplay2d_schema_errors_report_owning_file_and_json_path()
+    public void Gameplay2dSchemaErrorsReportOwningFileAndJsonPath()
     {
         using var pack = ModulePack.Create("{\"gameplay2d\": \"gameplay2d.json\"}");
         File.WriteAllText(Path.Combine(pack.Root, "gameplay2d.json"), """

@@ -26,7 +26,11 @@ internal static class SaveTestDocument
             writer.WriteStartObject();
             foreach (var property in element.EnumerateObject().OrderBy(item => item.Name, StringComparer.Ordinal))
             {
-                if (root && property.Name == "checksum") continue;
+                if (root && property.Name == "checksum")
+                {
+                    continue;
+                }
+
                 writer.WritePropertyName(property.Name);
                 Write(writer, property.Value);
             }
@@ -35,7 +39,11 @@ internal static class SaveTestDocument
         else if (element.ValueKind == JsonValueKind.Array)
         {
             writer.WriteStartArray();
-            foreach (var child in element.EnumerateArray()) Write(writer, child);
+            foreach (var child in element.EnumerateArray())
+            {
+                Write(writer, child);
+            }
+
             writer.WriteEndArray();
         }
         else

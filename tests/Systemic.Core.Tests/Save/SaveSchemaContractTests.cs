@@ -11,7 +11,7 @@ namespace Systemic.Tests.Save;
 public sealed class SaveSchemaContractTests
 {
     [Fact]
-    public void Save_schema_matches_the_current_v6_codec_contract()
+    public void SaveSchemaMatchesTheCurrentV6CodecContract()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -58,7 +58,7 @@ public sealed class SaveSchemaContractTests
     }
 
     [Fact]
-    public void Current_save_is_schema_validated_after_checksum_verification()
+    public void CurrentSaveIsSchemaValidatedAfterChecksumVerification()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -73,7 +73,7 @@ public sealed class SaveSchemaContractTests
     }
 
     [Fact]
-    public void Save_semantic_validation_rejects_even_random_stream_increments()
+    public void SaveSemanticValidationRejectsEvenRandomStreamIncrements()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -88,7 +88,7 @@ public sealed class SaveSchemaContractTests
     }
 
     [Fact]
-    public void Save_semantic_validation_requires_next_entity_id_above_saved_ids()
+    public void SaveSemanticValidationRequiresNextEntityIdAboveSavedIds()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -102,7 +102,7 @@ public sealed class SaveSchemaContractTests
     }
 
     [Fact]
-    public void Save_semantic_validation_rejects_invalid_spatial_bounds()
+    public void SaveSemanticValidationRejectsInvalidSpatialBounds()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -122,7 +122,7 @@ public sealed class SaveSchemaContractTests
     }
 
     [Fact]
-    public void Save_semantic_validation_rejects_whitespace_entity_tags()
+    public void SaveSemanticValidationRejectsWhitespaceEntityTags()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);

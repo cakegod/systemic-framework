@@ -9,6 +9,8 @@ namespace Systemic.Tests.Rules;
 /// </summary>
 public sealed class RowScanTests
 {
+    private static readonly float[] s_expectedPressure = [0f, 3e38f];
+
     private static readonly PopulationColumnKey<int> s_energyKey =
         new("test.scan.energy", 1, PopulationCodecs.Int32);
 
@@ -16,7 +18,7 @@ public sealed class RowScanTests
         new("test.scan.pressure", 1, PopulationCodecs.Single);
 
     [Fact]
-    public void A_scan_evaluates_the_rule_for_every_row_and_applies_conditional_effects()
+    public void AScanEvaluatesTheRuleForEveryRowAndAppliesConditionalEffects()
     {
         var world = new World(seed: 121, valueScale: 1);
         var population = Create(world, [1, 0, 2, 0, 1]);
@@ -32,7 +34,7 @@ public sealed class RowScanTests
     }
 
     [Fact]
-    public void A_scan_condition_reads_tags_and_writes_them_per_row()
+    public void AScanConditionReadsTagsAndWritesThemPerRow()
     {
         var world = new World(seed: 122, valueScale: 1);
         var population = Create(world, [5, 5, 5]);
@@ -53,7 +55,7 @@ public sealed class RowScanTests
     // A leading tag condition lets the scan test one mask bit per row, so this pins that the skip is
     // only a skip: a tagged row that fails a later condition must still be left alone.
     [Fact]
-    public void A_tag_prefilter_still_applies_the_remaining_conditions()
+    public void ATagPrefilterStillAppliesTheRemainingConditions()
     {
         var world = new World(seed: 127, valueScale: 1);
         var population = Create(world, [5, 0, 3, 5]);
@@ -73,7 +75,7 @@ public sealed class RowScanTests
     }
 
     [Fact]
-    public void A_scan_only_evaluates_the_rows_in_the_range()
+    public void AScanOnlyEvaluatesTheRowsInTheRange()
     {
         var world = new World(seed: 123, valueScale: 1);
         var population = Create(world, [2, 2, 2, 2]);
@@ -86,7 +88,7 @@ public sealed class RowScanTests
     }
 
     [Fact]
-    public void A_scan_does_not_allocate_once_warmed()
+    public void AScanDoesNotAllocateOnceWarmed()
     {
         var world = new World(seed: 124, valueScale: 1);
         var population = Create(world, [.. Enumerable.Repeat(1_000_000, 100_000)]);
@@ -112,7 +114,7 @@ public sealed class RowScanTests
     }
 
     [Fact]
-    public void A_scan_rejects_entity_subjects_and_emitted_events_before_any_row()
+    public void AScanRejectsEntitySubjectsAndEmittedEventsBeforeAnyRow()
     {
         var world = new World(seed: 125, valueScale: 1);
         var population = Create(world, [3, 3]);
@@ -133,7 +135,7 @@ public sealed class RowScanTests
     }
 
     [Fact]
-    public void A_scan_rejects_a_range_outside_the_population_and_a_population_without_handles()
+    public void AScanRejectsARangeOutsideThePopulationAndAPopulationWithoutHandles()
     {
         var world = new World(seed: 126, valueScale: 1);
         var population = Create(world, [1, 1]);
@@ -156,7 +158,7 @@ public sealed class RowScanTests
     // The scan keeps a packed tag bitset instead of the mask column. Undo restores the mask behind
     // its back, so this pins that a rollback cannot leave the scan believing a live tag is absent.
     [Fact]
-    public void A_scan_prefilter_sees_a_tag_a_rollback_restored()
+    public void AScanPrefilterSeesATagARollbackRestored()
     {
         var world = new World(seed: 129, valueScale: 1);
         var population = Create(world, [5, 5]);
@@ -177,7 +179,7 @@ public sealed class RowScanTests
     // An effect that throws must unwind the scan's own scope: an unclosed scope would keep the
     // rows before the failure in the journal and block the next transaction.
     [Fact]
-    public void A_scan_that_overflows_during_an_effect_rolls_back_and_closes_its_scope()
+    public void AScanThatOverflowsDuringAnEffectRollsBackAndClosesItsScope()
     {
         var world = new World(seed: 131, valueScale: 1);
         var population = CreatePressure(world, [0f, 3e38f]);
@@ -189,12 +191,12 @@ public sealed class RowScanTests
             engine.EvaluateRowEvent(world, "test.think", Crowd.Id, new PopulationRange(0, 2)));
 
         Assert.False(world.HasActiveScope);
-        Assert.Equal(new float[] { 0f, 3e38f }, ReadPressure(population));
+        Assert.Equal(s_expectedPressure, ReadPressure(population));
     }
 
     // A swap-back removal moves a row's mask word, which the incremental bit update never sees.
     [Fact]
-    public void A_scan_prefilter_follows_a_tag_when_a_removed_row_is_swapped_back()
+    public void AScanPrefilterFollowsATagWhenARemovedRowIsSwappedBack()
     {
         var world = new World(seed: 130, valueScale: 1);
         var population = Create(world, [5, 5, 5]);

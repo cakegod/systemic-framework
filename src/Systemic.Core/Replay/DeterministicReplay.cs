@@ -2,7 +2,6 @@ using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Systemic.Content;
 using Systemic.Host;
@@ -67,7 +66,10 @@ public sealed class ReplayRecorder
     {
         _target = target ?? throw new ArgumentNullException(nameof(target));
         if (!ReplayStateHash.Valid(target.ContentFingerprint) || target.Tick < 0)
+        {
             throw new ArgumentException("Replay target requires a valid content fingerprint and non-negative tick.", nameof(target));
+        }
+
         _seed = target.Seed;
         _fingerprint = target.ContentFingerprint;
         _initialTick = target.Tick;
@@ -76,19 +78,34 @@ public sealed class ReplayRecorder
 
     public void RecordTick(IEnumerable<ReplayInput> inputs)
     {
-        if (_failed) throw new InvalidOperationException("This recording has failed and cannot continue.");
+        if (_failed)
+        {
+            throw new InvalidOperationException("This recording has failed and cannot continue.");
+        }
+
         try
         {
             ArgumentNullException.ThrowIfNull(inputs);
             if (_target.Seed != _seed || _target.ContentFingerprint != _fingerprint
                 || _target.Tick != _initialTick + _ticks.Count
                 || ReplayStateHash.Compute(_target.CaptureState().Span) != _lastHash)
+            {
                 throw new InvalidOperationException("Replay target changed outside the recorded inputs and ticks.");
+            }
+
             var copy = inputs.ToImmutableArray();
-            foreach (var input in copy) _target.ApplyInput(input ?? throw new ArgumentException("Replay input is null."));
+            foreach (var input in copy)
+            {
+                _target.ApplyInput(input ?? throw new ArgumentException("Replay input is null."));
+            }
+
             _target.Step();
             var expectedTick = checked(_initialTick + _ticks.Count + 1);
-            if (_target.Tick != expectedTick) throw new InvalidOperationException("Replay target did not advance exactly one tick.");
+            if (_target.Tick != expectedTick)
+            {
+                throw new InvalidOperationException("Replay target did not advance exactly one tick.");
+            }
+
             _lastHash = ReplayStateHash.Compute(_target.CaptureState().Span);
             _ticks.Add(new ReplayTick(expectedTick, copy, _lastHash));
         }
@@ -99,7 +116,10 @@ public sealed class ReplayRecorder
     {
         if (_failed || _target.Tick != _initialTick + _ticks.Count
             || ReplayStateHash.Compute(_target.CaptureState().Span) != _lastHash)
+        {
             throw new InvalidOperationException("Recording cannot finish after a failed tick or external state change.");
+        }
+
         return new ReplayArtifact(1, _seed, _fingerprint, _initialTick, _initialHash, [.. _ticks]);
     }
 }
@@ -113,19 +133,45 @@ public static class ReplayRunner
         ReplayCodec.Validate(artifact);
         ReplayVerificationResult Fail(string code, int tick, string? expected, string? actual) =>
             new(false, new ReplayMismatch(code, tick, expected, actual));
-        if (artifact.Seed != target.Seed) return Fail("seed", target.Tick, artifact.Seed.ToString(), target.Seed.ToString());
+        if (artifact.Seed != target.Seed)
+        {
+            return Fail("seed", target.Tick, artifact.Seed.ToString(), target.Seed.ToString());
+        }
+
         if (artifact.ContentFingerprint != target.ContentFingerprint)
+        {
             return Fail("contentFingerprint", target.Tick, artifact.ContentFingerprint, target.ContentFingerprint);
-        if (artifact.InitialTick != target.Tick) return Fail("initialTick", target.Tick, artifact.InitialTick.ToString(), target.Tick.ToString());
+        }
+
+        if (artifact.InitialTick != target.Tick)
+        {
+            return Fail("initialTick", target.Tick, artifact.InitialTick.ToString(), target.Tick.ToString());
+        }
+
         var initial = ReplayStateHash.Compute(target.CaptureState().Span);
-        if (artifact.InitialStateHash != initial) return Fail("initialState", target.Tick, artifact.InitialStateHash, initial);
+        if (artifact.InitialStateHash != initial)
+        {
+            return Fail("initialState", target.Tick, artifact.InitialStateHash, initial);
+        }
+
         foreach (var tick in artifact.Ticks)
         {
-            foreach (var input in tick.Inputs) target.ApplyInput(input);
+            foreach (var input in tick.Inputs)
+            {
+                target.ApplyInput(input);
+            }
+
             target.Step();
-            if (target.Tick != tick.Tick) return Fail("tick", tick.Tick, tick.Tick.ToString(), target.Tick.ToString());
+            if (target.Tick != tick.Tick)
+            {
+                return Fail("tick", tick.Tick, tick.Tick.ToString(), target.Tick.ToString());
+            }
+
             var actual = ReplayStateHash.Compute(target.CaptureState().Span);
-            if (actual != tick.StateHash) return Fail("state", tick.Tick, tick.StateHash, actual);
+            if (actual != tick.StateHash)
+            {
+                return Fail("state", tick.Tick, tick.StateHash, actual);
+            }
         }
         return new(true, null);
     }
@@ -137,10 +183,26 @@ public static class ReplayDiff
     {
         ReplayCodec.Validate(first);
         ReplayCodec.Validate(second);
-        if (first.Seed != second.Seed) return new("seed", first.InitialTick, first.Seed.ToString(), second.Seed.ToString());
-        if (first.ContentFingerprint != second.ContentFingerprint) return new("contentFingerprint", first.InitialTick, first.ContentFingerprint, second.ContentFingerprint);
-        if (first.InitialTick != second.InitialTick) return new("initialTick", first.InitialTick, first.InitialTick.ToString(), second.InitialTick.ToString());
-        if (first.InitialStateHash != second.InitialStateHash) return new("initialState", first.InitialTick, first.InitialStateHash, second.InitialStateHash);
+        if (first.Seed != second.Seed)
+        {
+            return new("seed", first.InitialTick, first.Seed.ToString(), second.Seed.ToString());
+        }
+
+        if (first.ContentFingerprint != second.ContentFingerprint)
+        {
+            return new("contentFingerprint", first.InitialTick, first.ContentFingerprint, second.ContentFingerprint);
+        }
+
+        if (first.InitialTick != second.InitialTick)
+        {
+            return new("initialTick", first.InitialTick, first.InitialTick.ToString(), second.InitialTick.ToString());
+        }
+
+        if (first.InitialStateHash != second.InitialStateHash)
+        {
+            return new("initialState", first.InitialTick, first.InitialStateHash, second.InitialStateHash);
+        }
+
         for (var i = 0; i < Math.Min(first.Ticks.Length, second.Ticks.Length); i++)
         {
             var a = first.Ticks[i]; var b = second.Ticks[i];
@@ -148,9 +210,15 @@ public static class ReplayDiff
             {
                 var left = j < a.Inputs.Length ? a.Inputs[j] : null;
                 var right = j < b.Inputs.Length ? b.Inputs[j] : null;
-                if (left != right) return new("input", a.Tick, left?.ToString(), right?.ToString(), j);
+                if (left != right)
+                {
+                    return new("input", a.Tick, left?.ToString(), right?.ToString(), j);
+                }
             }
-            if (a.StateHash != b.StateHash) return new("state", a.Tick, a.StateHash, b.StateHash);
+            if (a.StateHash != b.StateHash)
+            {
+                return new("state", a.Tick, a.StateHash, b.StateHash);
+            }
         }
         return first.Ticks.Length == second.Ticks.Length ? null
             : new("length", first.InitialTick, first.Ticks.Length.ToString(), second.Ticks.Length.ToString());
@@ -173,7 +241,12 @@ public sealed class HostReplayTarget(ISystemicHostAdapter host, Action<SystemicG
         var document = JsonNode.Parse(host.Save())!.AsObject();
         document.Remove("checksum");
         if (document["extensionStates"] is JsonObject extensions)
-            foreach (var name in _transient) extensions.Remove(name);
+        {
+            foreach (var name in _transient)
+            {
+                extensions.Remove(name);
+            }
+        }
         // WHY: host state is bounded by the save limit, not the smaller limit for authored replay inputs.
         return Encoding.UTF8.GetBytes(CanonicalReplayJson.Normalize(document.ToJsonString(),
             checked((int)ContentFileReader.MaximumFileBytes)));

@@ -6,7 +6,7 @@ namespace Systemic.GlowGarden.Tests;
 public sealed class GardenStableRandomTests
 {
     [Fact]
-    public void Scouting_draws_are_independent_of_population_row_order()
+    public void ScoutingDrawsAreIndependentOfPopulationRowOrder()
     {
         using var first = GardenHost.Create(42);
         using var second = GardenHost.Create(42);
@@ -21,7 +21,7 @@ public sealed class GardenStableRandomTests
     }
 
     [Fact]
-    public void Scouting_draws_include_the_world_seed()
+    public void ScoutingDrawsIncludeTheWorldSeed()
     {
         using var first = GardenHost.Create(42);
         using var second = GardenHost.Create(43);

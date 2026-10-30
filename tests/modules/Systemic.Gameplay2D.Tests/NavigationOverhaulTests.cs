@@ -5,7 +5,7 @@ namespace Systemic.Gameplay2D.Tests;
 public sealed class NavigationOverhaulTests
 {
     [Fact]
-    public void Equal_cost_path_uses_stable_neighbour_and_priority_order()
+    public void EqualCostPathUsesStableNeighbourAndPriorityOrder()
     {
         var field = new StaticBlockingField2D(3, 3, [], GridOutOfBoundsPolicy.Blocked);
         var expected = new[] { new GridCell2D(0, 0), new(1, 0), new(2, 0), new(2, 1), new(2, 2) };
@@ -19,7 +19,7 @@ public sealed class NavigationOverhaulTests
     }
 
     [Fact]
-    public void Path_and_reusable_flow_field_route_around_a_blocker()
+    public void PathAndReusableFlowFieldRouteAroundABlocker()
     {
         var field = new StaticBlockingField2D(3, 3, [new(1, 1)], GridOutOfBoundsPolicy.Blocked);
         var path = DeterministicNavigation2D.FindPath(field, new(0, 1), new(2, 1));
@@ -41,7 +41,7 @@ public sealed class NavigationOverhaulTests
     }
 
     [Fact]
-    public void Invalid_blocked_or_unreachable_endpoints_have_no_path()
+    public void InvalidBlockedOrUnreachableEndpointsHaveNoPath()
     {
         var field = new StaticBlockingField2D(3, 3, [new(1, 0), new(1, 1), new(1, 2)], GridOutOfBoundsPolicy.Free);
         Assert.Empty(DeterministicNavigation2D.FindPath(field, new(0, 0), new(2, 0)));
@@ -60,7 +60,7 @@ public sealed class NavigationOverhaulTests
     }
 
     [Fact]
-    public void Diagonal_contact_does_not_connect_two_four_way_cells()
+    public void DiagonalContactDoesNotConnectTwoFourWayCells()
     {
         var field = new StaticBlockingField2D(2, 2, [new(1, 0), new(0, 1)], GridOutOfBoundsPolicy.Blocked);
         Assert.Empty(DeterministicNavigation2D.FindPath(field, new(0, 0), new(1, 1)));

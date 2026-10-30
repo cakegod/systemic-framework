@@ -8,7 +8,7 @@ namespace Systemic.Tests.Content;
 public sealed class ContentReloadTests
 {
     [Fact]
-    public void Compatible_candidate_compiles_new_rules_without_changing_the_running_game()
+    public void CompatibleCandidateCompilesNewRulesWithoutChangingTheRunningGame()
     {
         using var pack = CoreOnlyPack.Create();
         var active = ContentPackLoader.Load(pack.Root);
@@ -32,7 +32,7 @@ public sealed class ContentReloadTests
     }
 
     [Fact]
-    public void Invalid_schema_has_actionable_file_diagnostics_and_keeps_active_content()
+    public void InvalidSchemaHasActionableFileDiagnosticsAndKeepsActiveContent()
     {
         using var pack = CoreOnlyPack.Create();
         var active = ContentPackLoader.Load(pack.Root);
@@ -49,7 +49,7 @@ public sealed class ContentReloadTests
     }
 
     [Fact]
-    public void Reload_requires_the_active_tuning_schemas_to_validate_its_candidate()
+    public void ReloadRequiresTheActiveTuningSchemasToValidateItsCandidate()
     {
         using var pack = CoreOnlyPack.Create();
         var schema = new ContentTuningSchema([TuningProperty.Number("health", minimum: 0, maximum: 10)]);
@@ -67,7 +67,7 @@ public sealed class ContentReloadTests
     }
 
     [Fact]
-    public void Reload_runs_supplied_tuning_schemas_and_preserves_typed_candidate_values()
+    public void ReloadRunsSuppliedTuningSchemasAndPreservesTypedCandidateValues()
     {
         using var pack = CoreOnlyPack.Create();
         var schema = new ContentTuningSchema([TuningProperty.Number("health", minimum: 0, maximum: 10)]);
@@ -96,7 +96,7 @@ public sealed class ContentReloadTests
     [Theory]
     [InlineData("\"id\": \"sample.core\"", "\"id\": \"sample.other\"", "reload.identity_mismatch")]
     [InlineData("\"tickRateHz\": 30", "\"tickRateHz\": 60", "reload.clock_mismatch")]
-    public void Incompatible_manifest_is_rejected(string original, string replacement, string diagnosticCode)
+    public void IncompatibleManifestIsRejected(string original, string replacement, string diagnosticCode)
     {
         using var pack = CoreOnlyPack.Create();
         var active = ContentPackLoader.Load(pack.Root);
@@ -113,7 +113,7 @@ public sealed class ContentReloadTests
     }
 
     [Fact]
-    public void Changed_stable_entity_identity_is_rejected()
+    public void ChangedStableEntityIdentityIsRejected()
     {
         using var pack = CoreOnlyPack.Create();
         var active = ContentPackLoader.Load(pack.Root);
@@ -128,7 +128,7 @@ public sealed class ContentReloadTests
     }
 
     [Fact]
-    public void Module_compilation_never_reuses_the_active_module_instance()
+    public void ModuleCompilationNeverReusesTheActiveModuleInstance()
     {
         using var pack = CoreOnlyPack.Create();
         var path = Path.Combine(pack.Root, "game.json");

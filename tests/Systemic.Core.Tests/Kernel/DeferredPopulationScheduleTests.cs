@@ -4,18 +4,20 @@ namespace Systemic.Tests.Kernel;
 
 public sealed class DeferredPopulationScheduleTests
 {
+    private static readonly int[] s_values = [10, 20, 30, 40];
+
     private static readonly PopulationColumnKey<int> s_key = new("deferred.value", 1, PopulationCodecs.Int32);
 
     [Theory]
     [InlineData(1)]
     [InlineData(4)]
-    public void Barrier_combines_original_row_removals_and_spawns_in_system_and_partition_order(int workers)
+    public void BarrierCombinesOriginalRowRemovalsAndSpawnsInSystemAndPartitionOrder(int workers)
     {
         var world = new World(1, 1);
         var population = world.DefinePopulation<Kind>(enableHandles: true);
         var column = population.Column(s_key);
         population.AddRange(4);
-        new[] { 10, 20, 30, 40 }.CopyTo(column.EditRange(0, 4));
+        s_values.CopyTo(column.EditRange(0, 4));
         var kept = population.GetHandle(2);
         var builder = new DeterministicSystemScheduleBuilder(workers);
         builder.Add(new TestSystem("first", context =>
@@ -42,7 +44,7 @@ public sealed class DeferredPopulationScheduleTests
     }
 
     [Fact]
-    public void Invalid_deferred_batch_rolls_back_the_whole_tick_and_expires_its_buffers()
+    public void InvalidDeferredBatchRollsBackTheWholeTickAndExpiresItsBuffers()
     {
         var world = new World(2, 1);
         var population = world.DefinePopulation<Kind>();
@@ -69,7 +71,7 @@ public sealed class DeferredPopulationScheduleTests
     }
 
     [Fact]
-    public void Deferred_buffers_cannot_be_flushed_before_the_barrier()
+    public void DeferredBuffersCannotBeFlushedBeforeTheBarrier()
     {
         var world = new World(3, 1);
         var population = world.DefinePopulation<Kind>();
@@ -87,7 +89,7 @@ public sealed class DeferredPopulationScheduleTests
     }
 
     [Fact]
-    public void Deferred_population_commands_require_a_world_write_declaration()
+    public void DeferredPopulationCommandsRequireAWorldWriteDeclaration()
     {
         var world = new World(4, 1);
         var population = world.DefinePopulation<Kind>();
@@ -100,7 +102,7 @@ public sealed class DeferredPopulationScheduleTests
     }
 
     [Fact]
-    public void Partition_callbacks_cannot_register_new_deferred_buffers()
+    public void PartitionCallbacksCannotRegisterNewDeferredBuffers()
     {
         var world = new World(5, 1);
         var population = world.DefinePopulation<Kind>();
@@ -114,7 +116,7 @@ public sealed class DeferredPopulationScheduleTests
     }
 
     [Fact]
-    public void Scheduled_leases_expire_before_deferred_structural_commands_run()
+    public void ScheduledLeasesExpireBeforeDeferredStructuralCommandsRun()
     {
         var world = new World(6, 1);
         var population = world.DefinePopulation<Kind>();
@@ -141,7 +143,7 @@ public sealed class DeferredPopulationScheduleTests
     }
 
     [Fact]
-    public void Scheduled_leases_close_when_a_system_fails_so_rollback_can_complete()
+    public void ScheduledLeasesCloseWhenASystemFailsSoRollbackCanComplete()
     {
         var world = new World(7, 1);
         var population = world.DefinePopulation<Kind>();
@@ -173,7 +175,11 @@ public sealed class DeferredPopulationScheduleTests
             var destination = population.Column(s_key).EditRange(range.Start, range.Length);
             for (var index = 0; index < values.Length; index++)
             {
-                if (values[index].Value < 0) throw new InvalidDataException("negative");
+                if (values[index].Value < 0)
+                {
+                    throw new InvalidDataException("negative");
+                }
+
                 destination[index] = values[index].Value;
             }
         }

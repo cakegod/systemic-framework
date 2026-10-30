@@ -13,7 +13,10 @@ public sealed class ContentDrivenTalentTests
         var directory = Path.Combine(Path.GetTempPath(), "garden-tuning-" + Guid.NewGuid());
         Directory.CreateDirectory(directory);
         foreach (var file in Directory.GetFiles(GardenHost.ContentDirectory))
+        {
             File.Copy(file, Path.Combine(directory, Path.GetFileName(file)));
+        }
+
         return directory;
     }
 
@@ -131,7 +134,10 @@ public sealed class ContentDrivenTalentTests
             {
                 for (var x = 0; x < buffer.Width; x++)
                 {
-                    if (buffer.GetPixel(x, y).A > 0) visible++;
+                    if (buffer.GetPixel(x, y).A > 0)
+                    {
+                        visible++;
+                    }
                 }
             }
             Assert.True(visible > 0, $"Recipe '{recipe.Id}' rendered no visible pixels.");
@@ -153,7 +159,10 @@ public sealed class ContentDrivenTalentTests
         host.Step(1);
 
         var cues = new List<PresentationCue>();
-        while (host.Game.PresentationCues().TryDequeue(out var cue)) cues.Add(cue);
+        while (host.Game.PresentationCues().TryDequeue(out var cue))
+        {
+            cues.Add(cue);
+        }
 
         var burst = cues.Single(cue => cue.FactType == "garden.pod.burst");
         Assert.Equal("garden.burst-ring", burst.TimelineId);

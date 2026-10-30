@@ -68,7 +68,10 @@ public sealed class GardenHost : IDisposable
     public void Step(int ticks)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(ticks);
-        for (var i = 0; i < ticks; i++) Game.Step();
+        for (var i = 0; i < ticks; i++)
+        {
+            Game.Step();
+        }
     }
 
     public void Dispose() => Game.Dispose();

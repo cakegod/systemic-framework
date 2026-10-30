@@ -39,17 +39,27 @@ public readonly struct Fixed64 : IEquatable<Fixed64>, IComparable<Fixed64>
             | ((UInt128)unchecked((uint)bits[2]) << 64);
         var scale = (bits[3] >> 16) & 0xff;
         UInt128 divisor = 1;
-        for (var i = 0; i < scale; i++) divisor *= 10;
+        for (var i = 0; i < scale; i++)
+        {
+            divisor *= 10;
+        }
+
         var numerator = coefficient << 32;
         var quotient = numerator / divisor;
         var remainder = numerator % divisor;
         var twiceRemainder = remainder * 2;
         if (twiceRemainder > divisor || (twiceRemainder == divisor && (quotient & 1) != 0))
+        {
             quotient++;
+        }
 
         var negative = (bits[3] & int.MinValue) != 0;
         var maximumMagnitude = negative ? (UInt128)long.MaxValue + 1 : (UInt128)long.MaxValue;
-        if (quotient > maximumMagnitude) throw new OverflowException();
+        if (quotient > maximumMagnitude)
+        {
+            throw new OverflowException();
+        }
+
         return new Fixed64(checked((long)(negative ? -(Int128)quotient : (Int128)quotient)));
     }
 
@@ -85,7 +95,11 @@ public readonly struct Fixed64 : IEquatable<Fixed64>, IComparable<Fixed64>
     // 2^64, so sign normalization and doubled remainders cannot overflow Int128.
     internal static Int128 RoundDivide(Int128 numerator, Int128 denominator)
     {
-        if (denominator == 0) throw new DivideByZeroException();
+        if (denominator == 0)
+        {
+            throw new DivideByZeroException();
+        }
+
         if (denominator < 0)
         {
             denominator = -denominator;
@@ -95,7 +109,10 @@ public readonly struct Fixed64 : IEquatable<Fixed64>, IComparable<Fixed64>
         var remainder = numerator % denominator;
         var twiceRemainder = Int128.Abs(remainder) * 2;
         if (twiceRemainder > denominator || (twiceRemainder == denominator && (quotient & 1) != 0))
+        {
             quotient += numerator < 0 ? -1 : 1;
+        }
+
         return quotient;
     }
 }

@@ -1,4 +1,3 @@
-using Systemic.Content;
 using Systemic.Preview;
 
 namespace Systemic.Tests.Preview;
@@ -6,7 +5,7 @@ namespace Systemic.Tests.Preview;
 public sealed class PresentationPreviewTests
 {
     [Fact]
-    public static void Preview_exposes_timeline_controls_and_event_bindings()
+    public static void PreviewExposesTimelineControlsAndEventBindings()
     {
         var pack = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
 

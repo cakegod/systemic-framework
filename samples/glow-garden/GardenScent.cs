@@ -28,8 +28,15 @@ internal sealed class GardenScent
 
     internal void Decay(float factor)
     {
-        if (factor >= 1) return;
-        for (var i = 0; i < _cells.Length; i++) _cells[i] *= factor;
+        if (factor >= 1)
+        {
+            return;
+        }
+
+        for (var i = 0; i < _cells.Length; i++)
+        {
+            _cells[i] *= factor;
+        }
     }
 
     internal float[] Capture() => (float[])_cells.Clone();
@@ -42,7 +49,11 @@ internal sealed class GardenScent
     /// <summary>Deposits a trail that tapers from the food outward, so uphill always means "toward food".</summary>
     internal void StampTrail(Vector2 food, Vector2 home, float strength)
     {
-        if (strength <= 0) return;
+        if (strength <= 0)
+        {
+            return;
+        }
+
         var length = Vector2.Distance(food, home);
         var steps = Math.Max(1, (int)MathF.Ceiling(length / (_cellSize * 0.5f)));
         for (var step = 0; step <= steps; step++)
@@ -50,7 +61,10 @@ internal sealed class GardenScent
             var progress = step / (float)steps;
             var value = strength * (1 - (0.6f * progress));
             var index = Index(Vector2.Lerp(food, home, progress));
-            if (value > _cells[index]) _cells[index] = value;
+            if (value > _cells[index])
+            {
+                _cells[index] = value;
+            }
         }
     }
 
@@ -67,23 +81,43 @@ internal sealed class GardenScent
         {
             for (var offsetX = -1; offsetX <= 1; offsetX++)
             {
-                if (offsetX == 0 && offsetY == 0) continue;
+                if (offsetX == 0 && offsetY == 0)
+                {
+                    continue;
+                }
+
                 var nextColumn = column + offsetX;
                 var nextRow = row + offsetY;
-                if (nextColumn < 0 || nextColumn >= _columns || nextRow < 0 || nextRow >= _rows) continue;
+                if (nextColumn < 0 || nextColumn >= _columns || nextRow < 0 || nextRow >= _rows)
+                {
+                    continue;
+                }
+
                 var value = _cells[(nextRow * _columns) + nextColumn];
-                if (value <= best || value < threshold) continue;
+                if (value <= best || value < threshold)
+                {
+                    continue;
+                }
+
                 best = value;
                 bestColumn = nextColumn;
                 bestRow = nextRow;
             }
         }
 
-        if (bestColumn < 0) return false;
+        if (bestColumn < 0)
+        {
+            return false;
+        }
+
         var centre = new Vector2((bestColumn + 0.5f) * _cellSize, (bestRow + 0.5f) * _cellSize);
         var delta = centre - position;
         var distance = delta.Length();
-        if (distance < 0.001f) return false;
+        if (distance < 0.001f)
+        {
+            return false;
+        }
+
         direction = delta / distance;
         return true;
     }

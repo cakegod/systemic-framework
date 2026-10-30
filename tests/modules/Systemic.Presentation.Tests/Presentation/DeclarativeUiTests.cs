@@ -11,7 +11,7 @@ namespace Systemic.Tests.Presentation;
 public sealed class DeclarativeUiTests
 {
     [Fact]
-    public void Evaluates_world_selection_and_event_bindings_into_host_neutral_node_state()
+    public void EvaluatesWorldSelectionAndEventBindingsIntoHostNeutralNodeState()
     {
         var world = new World(seed: 1, valueScale: 1);
         var actor = world.Add(new DataEntity(["worker"], [], ("heat", 14)));
@@ -36,7 +36,7 @@ public sealed class DeclarativeUiTests
     }
 
     [Fact]
-    public void Compiled_bindings_preserve_world_selection_and_event_values()
+    public void CompiledBindingsPreserveWorldSelectionAndEventValues()
     {
         using var pack = PresentationPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -84,7 +84,7 @@ public sealed class DeclarativeUiTests
     [InlineData("world.actor.tag.", "empty tag binding")]
     [InlineData("world.actor.missing", "unknown property 'missing'")]
     [InlineData("world.ghost.heat", "unknown world entity or property")]
-    public void Invalid_world_bindings_keep_compiler_diagnostics(string binding, string message)
+    public void InvalidWorldBindingsKeepCompilerDiagnostics(string binding, string message)
     {
         using var pack = PresentationPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -104,7 +104,7 @@ public sealed class DeclarativeUiTests
     }
 
     [Fact]
-    public void Binding_plan_uses_each_evaluation_context_and_provider()
+    public void BindingPlanUsesEachEvaluationContextAndProvider()
     {
         var layout = new UiLayout("context", new UiNode("column", null, null, null,
         [
@@ -156,7 +156,7 @@ public sealed class DeclarativeUiTests
     }
 
     [Fact]
-    public void Empty_binding_paths_preserve_runtime_selection_event_and_provider_fallbacks()
+    public void EmptyBindingPathsPreserveRuntimeSelectionEventAndProviderFallbacks()
     {
         var provider = new EmptyPathProvider();
         var layout = new UiLayout("empty-paths", new UiNode("column", null, null, null,

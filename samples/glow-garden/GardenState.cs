@@ -69,7 +69,9 @@ public sealed partial class GardenSimulation
             || snapshot.Reactions.Any(reaction => reaction.CreatureId < 0 || reaction.Bursts < 1)
             || snapshot.Pending.Any(pending => !ValidPosition(pending.Position)
                 || pending.DueTick < 0 || pending.ExpiryTick < pending.DueTick))
+        {
             throw new InvalidDataException("Garden state contains invalid progression, scent, or pending work.");
+        }
 
         var reactions = snapshot.Reactions.Select(reaction => new Reaction(reaction.CreatureId, reaction.AllowBounce)
         {
@@ -80,7 +82,10 @@ public sealed partial class GardenSimulation
         {
             if (!ValidPosition(impact.Position) || impact.Depth < 0
                 || impact.ReactionIndex < -1 || impact.ReactionIndex >= reactions.Length)
+            {
                 throw new InvalidDataException("Garden state contains an invalid impact.");
+            }
+
             return new Impact(impact.Position,
                 impact.ReactionIndex == -1 ? null : reactions[impact.ReactionIndex], impact.Depth);
         }
@@ -88,7 +93,10 @@ public sealed partial class GardenSimulation
         var intents = snapshot.Intents.Select(intent =>
         {
             if (!Enum.IsDefined(intent.Talent))
+            {
                 throw new InvalidDataException("Garden state contains an invalid talent.");
+            }
+
             return new TalentIntent(intent.Talent, RestoreImpact(intent.Impact));
         }).ToArray();
         Impact? publishing = snapshot.Publishing is { } impact ? RestoreImpact(impact) : null;
@@ -107,7 +115,11 @@ public sealed partial class GardenSimulation
         _pending.Clear();
         _pending.AddRange(snapshot.Pending);
         _talentIntents.Clear();
-        foreach (var intent in intents) _talentIntents.Enqueue(intent);
+        foreach (var intent in intents)
+        {
+            _talentIntents.Enqueue(intent);
+        }
+
         _publishingImpact = publishing;
     }
 

@@ -12,7 +12,7 @@ public sealed class PopulationScopedAccessTests
         new("scoped-other-value", 1, PopulationCodecs.Int32);
 
     [Fact]
-    public void Serial_access_exposes_the_whole_read_and_only_the_assigned_write_range()
+    public void SerialAccessExposesTheWholeReadAndOnlyTheAssignedWriteRange()
     {
         var population = new World(seed: 801, valueScale: 1).DefinePopulation<ScopedKind>();
         var values = population.Column(s_valueKey);
@@ -30,7 +30,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void A_lease_cannot_be_disposed_while_a_scoped_callback_is_running()
+    public void ALeaseCannotBeDisposedWhileAScopedCallbackIsRunning()
     {
         var population = new World(seed: 802, valueScale: 1).DefinePopulation<ScopedKind>();
         var values = population.Column(s_valueKey);
@@ -47,7 +47,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Scheduled_parallel_access_requires_declared_column_write_access()
+    public void ScheduledParallelAccessRequiresDeclaredColumnWriteAccess()
     {
         var world = new World(seed: 803, valueScale: 1);
         var population = world.DefinePopulation<ScopedKind>();
@@ -64,7 +64,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Scheduled_write_without_a_column_declaration_is_rejected()
+    public void ScheduledWriteWithoutAColumnDeclarationIsRejected()
     {
         var world = new World(seed: 804, valueScale: 1);
         var population = world.DefinePopulation<ScopedKind>();
@@ -77,7 +77,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void A_scheduled_lease_cannot_bypass_column_declarations_through_serial_access()
+    public void AScheduledLeaseCannotBypassColumnDeclarationsThroughSerialAccess()
     {
         var world = new World(seed: 805, valueScale: 1);
         var population = world.DefinePopulation<ScopedKind>();
@@ -90,7 +90,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Parallel_read_write_access_cannot_read_the_full_single_buffered_column()
+    public void ParallelReadWriteAccessCannotReadTheFullSingleBufferedColumn()
     {
         var world = new World(seed: 807, valueScale: 1);
         var population = world.DefinePopulation<ScopedKind>();
@@ -107,7 +107,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void A_second_lease_cannot_bypass_parallel_single_buffer_read_restrictions()
+    public void ASecondLeaseCannotBypassParallelSingleBufferReadRestrictions()
     {
         var world = new World(seed: 811, valueScale: 1);
         var population = world.DefinePopulation<ScopedKind>();
@@ -125,7 +125,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Write_world_does_not_grant_typed_population_column_access()
+    public void WriteWorldDoesNotGrantTypedPopulationColumnAccess()
     {
         var world = new World(seed: 808, valueScale: 1);
         var population = world.DefinePopulation<ScopedKind>();
@@ -138,7 +138,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Scope_guard_expires_after_the_callback_returns()
+    public void ScopeGuardExpiresAfterTheCallbackReturns()
     {
         var population = new World(seed: 809, valueScale: 1).DefinePopulation<ScopedKind>();
         population.AddRange(1);
@@ -150,7 +150,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void A_scope_rejects_a_column_from_another_population()
+    public void AScopeRejectsAColumnFromAnotherPopulation()
     {
         var world = new World(seed: 810, valueScale: 1);
         var first = world.DefinePopulation<ScopedKind>();
@@ -167,7 +167,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Declared_access_matches_schema_ids_that_contain_the_column_separator()
+    public void DeclaredAccessMatchesSchemaIdsThatContainTheColumnSeparator()
     {
         var population = new World(seed: 813, valueScale: 1).DefinePopulation<DelimiterScopedKind>();
         var values = population.Column(s_valueKey);
@@ -193,7 +193,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Population_access_scopes_expire_and_reject_the_wrong_thread()
+    public void PopulationAccessScopesExpireAndRejectTheWrongThread()
     {
         var population = new World(seed: 806, valueScale: 1).DefinePopulation<ScopedKind>();
         var values = population.Column(s_valueKey);
@@ -230,7 +230,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Scheduled_population_lease_captures_the_row_count_it_protects()
+    public void ScheduledPopulationLeaseCapturesTheRowCountItProtects()
     {
         var population = new World(seed: 812, valueScale: 1).DefinePopulation<ScopedKind>();
         population.AddRange(2);
@@ -248,7 +248,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Population_column_types_expose_no_raw_borrowed_views()
+    public void PopulationColumnTypesExposeNoRawBorrowedViews()
     {
         Assert.Null(typeof(PopulationColumn<int>).GetProperty("ReadOnlySpan"));
         Assert.Null(typeof(PopulationColumn<int>).GetProperty("ReadOnlyMemory"));
@@ -263,7 +263,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Parallel_scopes_admit_disjoint_declared_columns_of_one_population()
+    public void ParallelScopesAdmitDisjointDeclaredColumnsOfOnePopulation()
     {
         var world = new World(seed: 814, valueScale: 1);
         var population = world.DefinePopulation<ScopedKind>();
@@ -296,7 +296,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Parallel_scopes_still_reject_two_writers_of_one_column()
+    public void ParallelScopesStillRejectTwoWritersOfOneColumn()
     {
         var world = new World(seed: 815, valueScale: 1);
         var population = world.DefinePopulation<ScopedKind>();
@@ -321,7 +321,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void Parallel_scopes_of_one_partition_group_may_still_overlap()
+    public void ParallelScopesOfOnePartitionGroupMayStillOverlap()
     {
         var world = new World(seed: 816, valueScale: 1);
         var population = world.DefinePopulation<ScopedKind>();
@@ -345,7 +345,7 @@ public sealed class PopulationScopedAccessTests
     }
 
     [Fact]
-    public void The_schedule_and_population_scopes_share_one_access_conflict_rule()
+    public void TheScheduleAndPopulationScopesShareOneAccessConflictRule()
     {
         ImmutableArray<SystemAccess> read = [SystemAccess.ReadColumn<ScopedKind, int>(s_valueKey)];
         ImmutableArray<SystemAccess> write = [SystemAccess.WriteColumn<ScopedKind, int>(s_valueKey)];

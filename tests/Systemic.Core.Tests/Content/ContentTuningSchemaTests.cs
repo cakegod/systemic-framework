@@ -5,8 +5,10 @@ namespace Systemic.Tests.Content;
 
 public sealed class ContentTuningSchemaTests
 {
+    private static readonly string[] s_requiredTags = ["hostile", "mobile"];
+
     [Fact]
-    public void Valid_tuning_has_typed_values_defaults_and_required_tags()
+    public void ValidTuningHasTypedValuesDefaultsAndRequiredTags()
     {
         var schema = new ContentTuningSchema([
             TuningProperty.Number("speed", minimum: 0, maximum: 10, required: true),
@@ -26,14 +28,14 @@ public sealed class ContentTuningSchemaTests
         Assert.Equal(3, document.GetInteger("count"));
         Assert.True(document.GetBoolean("enabled"));
         Assert.Equal("scout", document.GetText("label"));
-        Assert.Equal(new[] { "hostile", "mobile" }, document.Tags);
+        Assert.Equal(s_requiredTags, document.Tags);
         Assert.False(document.TryGetValue("optional", out _));
         Assert.Throws<InvalidOperationException>(() => document.GetInteger("speed"));
         Assert.Throws<KeyNotFoundException>(() => document.GetNumber("missing"));
     }
 
     [Fact]
-    public void An_inherited_value_satisfies_a_required_declaration_and_beats_the_default()
+    public void AnInheritedValueSatisfiesARequiredDeclarationAndBeatsTheDefault()
     {
         const string json = """
             {
@@ -56,7 +58,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Loader_validates_tunings_against_values_inherited_from_an_archetype()
+    public void LoaderValidatesTuningsAgainstValuesInheritedFromAnArchetype()
     {
         using var pack = CoreOnlyPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -82,7 +84,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Inherited_integers_outside_the_exact_double_range_are_not_rounded()
+    public void InheritedIntegersOutsideTheExactDoubleRangeAreNotRounded()
     {
         const string json = """
             {
@@ -103,7 +105,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Inherited_integers_inside_the_exact_double_range_still_inherit()
+    public void InheritedIntegersInsideTheExactDoubleRangeStillInherit()
     {
         const string json = """
             {
@@ -123,7 +125,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Entity_tuning_keeps_full_file_paths_and_original_source_locations()
+    public void EntityTuningKeepsFullFilePathsAndOriginalSourceLocations()
     {
         const string json = """
             {
@@ -155,7 +157,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Invalid_values_unknown_properties_and_missing_tags_report_file_path_and_line()
+    public void InvalidValuesUnknownPropertiesAndMissingTagsReportFilePathAndLine()
     {
         var schema = new ContentTuningSchema([
             TuningProperty.Number("speed", minimum: 0, maximum: 10, required: true),
@@ -189,7 +191,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Missing_required_values_and_tags_point_to_their_container()
+    public void MissingRequiredValuesAndTagsPointToTheirContainer()
     {
         var schema = new ContentTuningSchema([TuningProperty.Integer("count", required: true)], requiredTags: ["hostile"]);
         var error = Assert.Throws<ContentTuningException>(() => schema.Parse("""
@@ -203,7 +205,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Duplicate_and_unknown_fields_are_rejected_with_escaped_paths()
+    public void DuplicateAndUnknownFieldsAreRejectedWithEscapedPaths()
     {
         var schema = new ContentTuningSchema([TuningProperty.Number("speed")]);
         var error = Assert.Throws<ContentTuningException>(() => schema.Parse("""
@@ -221,7 +223,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Malformed_json_and_wrong_container_types_produce_diagnostics()
+    public void MalformedJsonAndWrongContainerTypesProduceDiagnostics()
     {
         var schema = new ContentTuningSchema([TuningProperty.Number("speed")]);
         var parseError = Assert.Throws<ContentTuningException>(() => schema.Parse("{\n  \"properties\": { \"speed\": }\n}", "broken.json"));
@@ -233,7 +235,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Schema_rejects_conflicting_declarations_and_invalid_defaults()
+    public void SchemaRejectsConflictingDeclarationsAndInvalidDefaults()
     {
         Assert.Throws<ArgumentException>(() => new ContentTuningSchema([TuningProperty.Number("a"), TuningProperty.Boolean("a")]));
         Assert.Throws<ArgumentException>(() => new ContentTuningSchema([], requiredTags: [" "]));
@@ -244,7 +246,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Defaults_and_schema_are_immutable_across_parses()
+    public void DefaultsAndSchemaAreImmutableAcrossParses()
     {
         var declarations = new[] { TuningProperty.Integer("count", defaultValue: 7) };
         var schema = new ContentTuningSchema(declarations, requiredTags: ["hostile"]);
@@ -258,7 +260,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Diagnostics_count_bare_carriage_returns_and_crlf_as_line_breaks()
+    public void DiagnosticsCountBareCarriageReturnsAndCrlfAsLineBreaks()
     {
         var schema = new ContentTuningSchema([TuningProperty.Number("speed", maximum: 1)]);
         var error = Assert.Throws<ContentTuningException>(() => schema.Parse(
@@ -275,7 +277,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Invalid_value_is_not_replaced_silently_by_a_default()
+    public void InvalidValueIsNotReplacedSilentlyByADefault()
     {
         var schema = new ContentTuningSchema([TuningProperty.Integer("count", defaultValue: 5)]);
         var error = Assert.Throws<ContentTuningException>(() => schema.Parse(
@@ -285,7 +287,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Integer_values_are_exact_and_document_size_is_bounded()
+    public void IntegerValuesAreExactAndDocumentSizeIsBounded()
     {
         var schema = new ContentTuningSchema([TuningProperty.Integer("count", minimum: long.MinValue, maximum: long.MaxValue)]);
         Assert.Equal(long.MinValue, schema.Parse("{\"properties\":{\"count\":-9223372036854775808}}", "value.json").GetInteger("count"));
@@ -298,7 +300,7 @@ public sealed class ContentTuningSchemaTests
     }
 
     [Fact]
-    public void Invalid_unicode_in_json_is_reported_as_a_content_diagnostic()
+    public void InvalidUnicodeInJsonIsReportedAsAContentDiagnostic()
     {
         var schema = new ContentTuningSchema([TuningProperty.Text("label")]);
         var error = Assert.Throws<ContentTuningException>(() => schema.Parse(

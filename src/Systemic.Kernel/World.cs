@@ -143,7 +143,13 @@ public sealed class World
     internal long StructuralVersion { get; private set; }
     internal int UndoRecordCount
     {
-        get { lock (TransactionGate) return _journal.Count; }
+        get
+        {
+            lock (TransactionGate)
+            {
+                return _journal.Count;
+            }
+        }
     }
     internal bool HasPendingRemovals => _removalCandidates.Count != 0;
 
@@ -153,7 +159,10 @@ public sealed class World
     internal void AcquirePopulationLease()
     {
         if (_activePopulationLeases == int.MaxValue)
+        {
             throw new InvalidOperationException("Too many active population leases.");
+        }
+
         _activePopulationLeases++;
     }
 
@@ -167,7 +176,10 @@ public sealed class World
         lock (TransactionGate)
         {
             if (_activeScheduledSystems == int.MaxValue)
+            {
                 throw new InvalidOperationException("Too many scheduled systems are active for this World.");
+            }
+
             _activeScheduledSystems++;
         }
 
@@ -180,24 +192,34 @@ public sealed class World
     internal void ExitScheduledSystem(World? previousWorld, ImmutableArray<SystemAccess>? previousAccess)
     {
         if (!ReferenceEquals(s_currentSystemWorld, this))
+        {
             throw new InvalidOperationException("Scheduled system access must end on the thread that started it.");
+        }
 
         s_currentSystemWorld = previousWorld;
         s_currentSystemAccess = previousAccess;
         lock (TransactionGate)
+        {
             _activeScheduledSystems--;
+        }
     }
 
     internal ImmutableArray<SystemAccess>? GetCurrentSystemAccess()
     {
         if (ReferenceEquals(s_currentSystemWorld, this))
+        {
             return s_currentSystemAccess ?? ImmutableArray<SystemAccess>.Empty;
+        }
 
         if (s_currentSystemWorld is not null)
+        {
             throw new InvalidOperationException("A scheduled system cannot use a population from another World.");
+        }
 
         if (Volatile.Read(ref _activeScheduledSystems) != 0)
+        {
             throw new InvalidOperationException("Population access from a scheduled system must use its execution thread and scoped context.");
+        }
 
         return null;
     }
@@ -205,12 +227,20 @@ public sealed class World
     private void EnsureNoPopulationLeases()
     {
         if (_activePopulationLeases != 0)
+        {
             throw new InvalidOperationException("Complete all population leases before changing world or transaction structure.");
+        }
     }
 
     internal bool HasActiveScope
     {
-        get { lock (TransactionGate) return !_undoing && _scopes.Count > 0; }
+        get
+        {
+            lock (TransactionGate)
+            {
+                return !_undoing && _scopes.Count > 0;
+            }
+        }
     }
 
     private bool _tagIndexDirty = true;
@@ -612,7 +642,9 @@ public sealed class World
     internal bool TryCapturePopulationStructure(object population)
     {
         lock (TransactionGate)
+        {
             return !_undoing && _scopes.Count > 0 && _scopes.Peek().CapturePopulationStructure(population);
+        }
     }
 
     internal void ReleasePopulationStructureCapture(object population)
@@ -629,7 +661,9 @@ public sealed class World
     internal bool TryCapturePopulationRole(PopulationColumnBase column)
     {
         lock (TransactionGate)
+        {
             return !_undoing && _scopes.Count > 0 && _scopes.Peek().CapturePopulationRole(column);
+        }
     }
 
     internal void ReleasePopulationRoleCapture(PopulationColumnBase column)
@@ -746,7 +780,9 @@ public sealed class World
     internal bool HasChanges(ScopeState scope, ulong generation)
     {
         lock (TransactionGate)
+        {
             return scope.Generation == generation && !scope.Closed && _journal.Count > scope.Mark;
+        }
     }
 
     public IReadOnlyList<Entity> Entities => _entities;
@@ -3154,16 +3190,25 @@ public readonly struct WorldTransaction : IDisposable
 
     public void Commit()
     {
-        if (_owned) _scope.Commit();
+        if (_owned)
+        {
+            _scope.Commit();
+        }
     }
 
     public void Rollback()
     {
-        if (_owned) _scope.Rollback();
+        if (_owned)
+        {
+            _scope.Rollback();
+        }
     }
 
     public void Dispose()
     {
-        if (_owned) _scope.Dispose();
+        if (_owned)
+        {
+            _scope.Dispose();
+        }
     }
 }

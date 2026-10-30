@@ -6,7 +6,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class DeterministicPrimitivesTests
 {
     [Fact]
-    public void Fixed_conversions_use_q32_32_and_correctly_round_decimal_boundaries()
+    public void FixedConversionsUseQ3232AndCorrectlyRoundDecimalBoundaries()
     {
         Assert.Equal(5_368_709_120L, ((Fixed64)1.25m).RawValue);
         Assert.Equal(-9_663_676_416L, ((Fixed64)(-2.25m)).RawValue);
@@ -24,7 +24,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Fixed_arithmetic_rounds_half_to_even_for_both_signs()
+    public void FixedArithmeticRoundsHalfToEvenForBothSigns()
     {
         var half = (Fixed64)0.5m;
         Assert.Equal(0, (Fixed64.FromRaw(1) * half).RawValue);
@@ -41,7 +41,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Fixed_arithmetic_and_conversions_check_overflow_and_division_by_zero()
+    public void FixedArithmeticAndConversionsCheckOverflowAndDivisionByZero()
     {
         var maximum = Fixed64.FromRaw(long.MaxValue);
         var minimum = Fixed64.FromRaw(long.MinValue);
@@ -55,7 +55,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Fixed_vector_operations_preserve_q32_values()
+    public void FixedVectorOperationsPreserveQ32Values()
     {
         var a = new FixedVector2((Fixed64)3, (Fixed64)4);
         var b = new FixedVector2((Fixed64)(-1), (Fixed64)2);
@@ -67,7 +67,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Integer_trigonometry_uses_exact_cardinal_turns_and_wraps()
+    public void IntegerTrigonometryUsesExactCardinalTurnsAndWraps()
     {
         Assert.Equal((Fixed64.Zero, Fixed64.One), DeterministicTrig.SinCos(Fixed64.Zero));
         Assert.Equal((Fixed64.One, Fixed64.Zero), DeterministicTrig.SinCos((Fixed64)0.25m));
@@ -80,7 +80,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Integer_trigonometry_matches_fixed_reference_vectors()
+    public void IntegerTrigonometryMatchesFixedReferenceVectors()
     {
         var (sine, cosine) = DeterministicTrig.SinCos((Fixed64)0.125m);
         Assert.Equal(3_037_000_500L, sine.RawValue);
@@ -94,7 +94,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Random_version_one_matches_portable_golden_vectors()
+    public void RandomVersionOneMatchesPortableGoldenVectors()
     {
         Assert.Equal(1, DeterministicRandom.AlgorithmVersion);
         Assert.Equal(0x70D7928FBC5645D8UL, DeterministicRandom.HashSystemId("movement"));
@@ -111,7 +111,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Random_draws_depend_on_identity_and_counter_not_execution_order_or_culture()
+    public void RandomDrawsDependOnIdentityAndCounterNotExecutionOrderOrCulture()
     {
         var first = new DeterministicRandom(20, "İ/wood", 42, 7);
         var second = new DeterministicRandom(20, "İ/wood", 43, 7);
@@ -138,7 +138,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Random_rejects_missing_or_invalid_system_identifiers()
+    public void RandomRejectsMissingOrInvalidSystemIdentifiers()
     {
         Assert.Throws<ArgumentNullException>(() => DeterministicRandom.HashSystemId(null!));
         Assert.Throws<ArgumentException>(() => DeterministicRandom.HashSystemId(""));
@@ -146,7 +146,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Decimal_operations_round_exact_results_to_the_requested_scale()
+    public void DecimalOperationsRoundExactResultsToTheRequestedScale()
     {
         Assert.Equal(1.24m, DeterministicDecimal.Round(1.235m, 2));
         Assert.Equal(1.24m, DeterministicDecimal.Round(1.245m, 2));
@@ -166,7 +166,7 @@ public sealed class DeterministicPrimitivesTests
     }
 
     [Fact]
-    public void Decimal_scaling_is_canonical_and_rejects_unrepresentable_results()
+    public void DecimalScalingIsCanonicalAndRejectsUnrepresentableResults()
     {
         Assert.Equal(decimal.GetBits(1.20m), decimal.GetBits(DeterministicDecimal.Round(1.2m, 2)));
         Assert.Equal(decimal.GetBits(0.00m), decimal.GetBits(DeterministicDecimal.Round(-0.001m, 2)));

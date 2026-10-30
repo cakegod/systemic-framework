@@ -14,7 +14,7 @@ public sealed class ReplayRowChainTests
     private const string Fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     [Fact]
-    public void Replay_reproduces_a_row_reaction_chain_across_a_despawn()
+    public void ReplayReproducesARowReactionChainAcrossADespawn()
     {
         var recorder = new ReplayRecorder(new RowChainTarget());
         recorder.RecordTick([new ReplayInput("hit-row", "1")]);

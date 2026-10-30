@@ -1,5 +1,3 @@
-using Xunit;
-
 namespace Systemic.Tests.Kernel;
 
 /// <summary>
@@ -10,7 +8,7 @@ namespace Systemic.Tests.Kernel;
 /// not run alongside other collections.
 /// </summary>
 [CollectionDefinition(Name, DisableParallelization = true)]
-public sealed class AllocationMeasurementCollection
+public sealed class AllocationMeasurementGroup
 {
     public const string Name = "Allocation measurements";
 }

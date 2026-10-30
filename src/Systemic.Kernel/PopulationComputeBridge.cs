@@ -25,7 +25,11 @@ public sealed class CpuPopulationComputeBackend : IPopulationComputeBackend
     public ValueTask<PopulationComputeResult> IntegrateAsync(ReadOnlyMemory<PopulationComputeAgent> input,
         Memory<PopulationComputeAgent> output, Fixed64 elapsed, CancellationToken cancellationToken = default)
     {
-        if (output.Length < input.Length) throw new ArgumentException("Output is smaller than input.", nameof(output));
+        if (output.Length < input.Length)
+        {
+            throw new ArgumentException("Output is smaller than input.", nameof(output));
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         var scratch = ArrayPool<PopulationComputeAgent>.Shared.Rent(input.Length);
         try
@@ -34,7 +38,11 @@ public sealed class CpuPopulationComputeBackend : IPopulationComputeBackend
             Int128 sumX = 0, sumY = 0;
             for (var index = 0; index < source.Length; index++)
             {
-                if ((index & 1023) == 0) cancellationToken.ThrowIfCancellationRequested();
+                if ((index & 1023) == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
                 var agent = source[index];
                 var position = agent.Position + (agent.Velocity * elapsed);
                 scratch[index] = agent with { Position = position };

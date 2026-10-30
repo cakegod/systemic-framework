@@ -6,14 +6,18 @@ namespace Systemic.Tests.Kernel;
 public sealed class SpatialTraversalTests
 {
     [Fact]
-    public void Nearest_stops_before_filtering_rows_in_cells_that_cannot_improve_result()
+    public void NearestStopsBeforeFilteringRowsInCellsThatCannotImproveResult()
     {
         Vector2[] positions = [new(50.1f, 50.1f), new(95, 95), new(3, 6), new(91, 1)];
         var bounds = new Bounds2(50, 50, 50, 50);
         var grid = new PopulationSpatialGrid2D(bounds, 5);
         grid.Rebuild(positions);
         var incremental = new IncrementalPopulationSpatialGrid2D(bounds, 5);
-        for (var row = 0; row < positions.Length; row++) incremental.Add(row, positions[row]);
+        for (var row = 0; row < positions.Length; row++)
+        {
+            incremental.Add(row, positions[row]);
+        }
+
         var visits = 0;
         Predicate<int> filter = _ => { visits++; return true; };
         Assert.True(grid.TryQueryNearest(new Vector2(50, 50), out var nearest, filter));
@@ -26,14 +30,18 @@ public sealed class SpatialTraversalTests
     }
 
     [Fact]
-    public void Nearest_continues_across_cell_boundaries_for_equal_distance_and_smaller_row()
+    public void NearestContinuesAcrossCellBoundariesForEqualDistanceAndSmallerRow()
     {
         Vector2[] positions = [new(49, 50), new(51, 50), new(90, 90)];
         var bounds = new Bounds2(50, 50, 50, 50);
         var grid = new PopulationSpatialGrid2D(bounds, 10);
         grid.Rebuild(positions);
         var incremental = new IncrementalPopulationSpatialGrid2D(bounds, 10);
-        for (var row = 0; row < positions.Length; row++) incremental.Add(row, positions[row]);
+        for (var row = 0; row < positions.Length; row++)
+        {
+            incremental.Add(row, positions[row]);
+        }
+
         Assert.True(grid.TryQueryNearest(new Vector2(50, 50), out var nearest));
         Assert.Equal(0, nearest);
         Assert.True(incremental.TryQueryNearest(new Vector2(50, 50), out nearest));
@@ -46,14 +54,18 @@ public sealed class SpatialTraversalTests
     }
 
     [Fact]
-    public void Wrapped_partial_seam_search_finds_smaller_tie_and_skips_far_cells()
+    public void WrappedPartialSeamSearchFindsSmallerTieAndSkipsFarCells()
     {
         Vector2[] positions = [new(99, 50), new(1, 50), new(40, 50), new(70, 75)];
         var bounds = new Bounds2(50, 50, 50, 50);
         var grid = new PopulationSpatialGrid2D(bounds, 7, wrapX: true);
         grid.Rebuild(positions);
         var incremental = new IncrementalPopulationSpatialGrid2D(bounds, 7, wrapX: true);
-        for (var row = 0; row < positions.Length; row++) incremental.Add(row, positions[row]);
+        for (var row = 0; row < positions.Length; row++)
+        {
+            incremental.Add(row, positions[row]);
+        }
+
         var visits = 0;
         Predicate<int> filter = _ => { visits++; return true; };
         Assert.True(grid.TryQueryNearest(new Vector2(0, 50), out var nearest, filter));
@@ -66,14 +78,18 @@ public sealed class SpatialTraversalTests
     }
 
     [Fact]
-    public void K_nearest_with_filter_continues_past_rejected_near_rows_and_exits_after_filling()
+    public void KNearestWithFilterContinuesPastRejectedNearRowsAndExitsAfterFilling()
     {
         Vector2[] positions = [new(50.1f, 50), new(51, 50), new(52, 50), new(99, 99)];
         var bounds = new Bounds2(50, 50, 50, 50);
         var grid = new PopulationSpatialGrid2D(bounds, 5);
         grid.Rebuild(positions);
         var incremental = new IncrementalPopulationSpatialGrid2D(bounds, 5);
-        for (var row = 0; row < positions.Length; row++) incremental.Add(row, positions[row]);
+        for (var row = 0; row < positions.Length; row++)
+        {
+            incremental.Add(row, positions[row]);
+        }
+
         var visits = 0;
         Predicate<int> filter = row => { visits++; return row != 0; };
         Span<int> rows = stackalloc int[2];
@@ -91,7 +107,7 @@ public sealed class SpatialTraversalTests
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public void Ring_traversal_matches_brute_force_for_irregular_bounds_and_distant_centers(bool wrapX, bool wrapY)
+    public void RingTraversalMatchesBruteForceForIrregularBoundsAndDistantCenters(bool wrapX, bool wrapY)
     {
         var random = new Random(76239);
         for (var world = 0; world < 25; world++)
@@ -111,7 +127,11 @@ public sealed class SpatialTraversalTests
             var grid = new PopulationSpatialGrid2D(bounds, cellSize, wrapX, wrapY);
             grid.Rebuild(positions);
             var incremental = new IncrementalPopulationSpatialGrid2D(bounds, cellSize, wrapX, wrapY);
-            for (var row = 0; row < positions.Length; row++) incremental.Add(row * 7 + 3, positions[row]);
+            for (var row = 0; row < positions.Length; row++)
+            {
+                incremental.Add(row * 7 + 3, positions[row]);
+            }
+
             var actual = new int[9];
             for (var query = 0; query < 30; query++)
             {

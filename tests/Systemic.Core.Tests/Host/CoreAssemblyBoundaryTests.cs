@@ -5,7 +5,7 @@ namespace Systemic.Tests.Host;
 public sealed class CoreAssemblyBoundaryTests
 {
     [Fact]
-    public void Core_assembly_has_no_optional_module_references()
+    public void CoreAssemblyHasNoOptionalModuleReferences()
     {
         var core = typeof(SystemicGame).Assembly;
 

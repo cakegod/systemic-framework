@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Sockets;
-using Systemic.Content;
 using Systemic.Preview;
 
 namespace Systemic.Tests.Preview;
@@ -8,7 +7,7 @@ namespace Systemic.Tests.Preview;
 public sealed class ContentPreviewServerTests
 {
     [Fact]
-    public async Task Preview_server_is_loopback_only_and_read_only()
+    public async Task PreviewServerIsLoopbackOnlyAndReadOnly()
     {
         var pack = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var portProbe = new TcpListener(IPAddress.Loopback, 0);

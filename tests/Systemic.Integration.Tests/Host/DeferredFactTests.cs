@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Systemic.Content;
 using Systemic.Host;
 using Systemic.Kernel;
@@ -11,7 +10,7 @@ public sealed class DeferredFactTests
     [Theory]
     [InlineData(1)]
     [InlineData(4)]
-    public void Deferred_facts_flush_in_system_order(int workers)
+    public void DeferredFactsFlushInSystemOrder(int workers)
     {
         var seen = new List<string>();
         using var game = new SystemicGameBuilder(EmptyContent(), new World(seed: 3, valueScale: 1))
@@ -27,7 +26,7 @@ public sealed class DeferredFactTests
     }
 
     [Fact]
-    public void Deferring_facts_without_deferred_or_exclusive_access_throws()
+    public void DeferringFactsWithoutDeferredOrExclusiveAccessThrows()
     {
         using var game = new SystemicGameBuilder(EmptyContent(), new World(seed: 3, valueScale: 1))
             .AddSystem(new RestrictedDeferSystem())

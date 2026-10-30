@@ -30,7 +30,11 @@ public sealed class SystemicTickStats
 
     public void SetBudget(string systemId, TimeSpan? budget)
     {
-        if (budget is { } value && value <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(budget));
+        if (budget is { } value && value <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(budget));
+        }
+
         Get(systemId).SetBudget(budget);
     }
 
@@ -69,7 +73,10 @@ public sealed class SystemicTickStats
                 _total += elapsed;
                 _max = Math.Max(_max, elapsed);
                 _allocated += Math.Max(0, allocated);
-                if (_budget is { } budget && elapsed > budget) _budgetExceeded++;
+                if (_budget is { } budget && elapsed > budget)
+                {
+                    _budgetExceeded++;
+                }
             }
         }
 

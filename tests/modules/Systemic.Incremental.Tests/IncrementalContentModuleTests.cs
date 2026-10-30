@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Systemic.Content;
 using Systemic.Host;
 using Systemic.Incremental;
@@ -8,7 +7,7 @@ namespace Systemic.Tests.Modules.Incremental;
 public sealed class IncrementalContentModuleTests
 {
     [Fact]
-    public void Incremental_schema_errors_report_the_module_file_and_json_path()
+    public void IncrementalSchemaErrorsReportTheModuleFileAndJsonPath()
     {
         using var pack = IncrementalPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "incremental.json"), """
@@ -32,7 +31,7 @@ public sealed class IncrementalContentModuleTests
     }
 
     [Fact]
-    public void Incremental_module_initializes_and_steps_without_optional_sibling_modules()
+    public void IncrementalModuleInitializesAndStepsWithoutOptionalSiblingModules()
     {
         using var pack = IncrementalPack.Create();
         var content = ContentPackLoader.Load(pack.Root,

@@ -1,9 +1,7 @@
 using Systemic.Kernel;
 using Systemic.Content;
 using Systemic.Host;
-using Systemic.Presentation;
 using Systemic.Rules;
-using Systemic.Save;
 using Systemic.Ui;
 
 namespace Systemic.Tests.Presentation;
@@ -11,7 +9,7 @@ namespace Systemic.Tests.Presentation;
 public sealed class PresentationPipelineTests
 {
     [Fact]
-    public void Imported_pixels_compose_with_generated_layers_and_missing_assets_fall_back()
+    public void ImportedPixelsComposeWithGeneratedLayersAndMissingAssetsFallBack()
     {
         var importedPixels = new PixelBuffer(2, 1, [0, 0, 255, 255, 0, 0, 255, 255]);
         var provider = new TestAssetProvider(new Dictionary<string, PixelBuffer>
@@ -38,7 +36,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Timeline_keyframes_interpolate_motion_and_stop_at_duration()
+    public void TimelineKeyframesInterpolateMotionAndStopAtDuration()
     {
         var timeline = new PresentationTimeline("spark", "sprite", 10, false, 3,
             [new PresentationKeyframe(0, Scale: 1, Opacity: 1, VisualState: "start"),
@@ -55,7 +53,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Cue_stream_orders_entries_and_drops_the_oldest_with_a_counter()
+    public void CueStreamOrdersEntriesAndDropsTheOldestWithACounter()
     {
         var stream = new PresentationCueStream(capacity: 2);
 
@@ -76,7 +74,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Cue_stream_rejects_invalid_metadata_without_consuming_a_sequence()
+    public void CueStreamRejectsInvalidMetadataWithoutConsumingASequence()
     {
         var stream = new PresentationCueStream(capacity: 2);
 
@@ -87,7 +85,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Cue_publication_is_ordered_post_commit_and_uses_position_snapshots()
+    public void CuePublicationIsOrderedPostCommitAndUsesPositionSnapshots()
     {
         var content = ContentWithCueRules();
         var host = HeadlessSystemicHost.Create(content, seed: 81);
@@ -113,7 +111,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Explicit_fact_position_anchors_presentation_and_emitted_reactions()
+    public void ExplicitFactPositionAnchorsPresentationAndEmittedReactions()
     {
         var host = HeadlessSystemicHost.Create(ContentWithCueRules(), seed: 81);
         var sourceId = host.Game.EntityId("quarry.ember-source");
@@ -129,7 +127,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Cue_publication_waits_for_the_enclosing_world_transaction()
+    public void CuePublicationWaitsForTheEnclosingWorldTransaction()
     {
         var host = HeadlessSystemicHost.Create(ContentWithCueRules(), seed: 811);
         var sourceId = host.Game.EntityId("quarry.ember-source");
@@ -150,7 +148,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Cue_publication_is_discarded_when_the_enclosing_world_transaction_rolls_back()
+    public void CuePublicationIsDiscardedWhenTheEnclosingWorldTransactionRollsBack()
     {
         var host = HeadlessSystemicHost.Create(ContentWithCueRules(), seed: 812);
         var sourceId = host.Game.EntityId("quarry.ember-source");
@@ -173,7 +171,7 @@ public sealed class PresentationPipelineTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Invalid_fact_metadata_is_rejected_before_rule_effects_commit(bool negativeSourceId)
+    public void InvalidFactMetadataIsRejectedBeforeRuleEffectsCommit(bool negativeSourceId)
     {
         var host = HeadlessSystemicHost.Create(ContentWithCueRules(), seed: 82);
         var sourceId = host.Game.EntityId("quarry.ember-source");
@@ -190,7 +188,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Rolled_back_rules_suppress_cues_and_cue_seeds_survive_save_restore()
+    public void RolledBackRulesSuppressCuesAndCueSeedsSurviveSaveRestore()
     {
         var sampleContent = SystemicTestContent.Load(SamplePath());
         var timeline = new PresentationTimeline("cue", "quarry.ember-spark", 8, false, 2,
@@ -233,7 +231,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Sample_pack_compiles_generic_presentation_bindings()
+    public void SamplePackCompilesGenericPresentationBindings()
     {
         var content = SystemicTestContent.Load(SamplePath());
 
@@ -243,7 +241,7 @@ public sealed class PresentationPipelineTests
     }
 
     [Fact]
-    public void Compiled_ui_pipeline_uses_current_provider_and_world_context_for_one_layout()
+    public void CompiledUiPipelineUsesCurrentProviderAndWorldContextForOneLayout()
     {
         var sampleContent = SystemicTestContent.Load(SamplePath());
         var presentation = SystemicTestContent.Presentation(sampleContent);

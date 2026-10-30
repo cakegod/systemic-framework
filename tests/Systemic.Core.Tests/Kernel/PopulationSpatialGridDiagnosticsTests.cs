@@ -6,7 +6,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class PopulationSpatialGridDiagnosticsTests
 {
     [Fact]
-    public void Strict_rebuild_names_population_row_value_and_bounds_and_keeps_previous_snapshot()
+    public void StrictRebuildNamesPopulationRowValueAndBoundsAndKeepsPreviousSnapshot()
     {
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), 2);
         var previous = grid.Rebuild([new Vector2(1, 1), new Vector2(9, 9)]);
@@ -25,7 +25,7 @@ public sealed class PopulationSpatialGridDiagnosticsTests
     }
 
     [Fact]
-    public void Lenient_rebuild_skips_bad_rows_preserves_original_row_ids_and_counts_them()
+    public void LenientRebuildSkipsBadRowsPreservesOriginalRowIdsAndCountsThem()
     {
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), 2);
 

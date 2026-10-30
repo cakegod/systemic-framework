@@ -13,7 +13,7 @@ public sealed class PopulationSinkTests
         new("test.sink.health", 1, PopulationCodecs.Int32);
 
     [Fact]
-    public void A_hundred_thousand_crossings_become_one_fact()
+    public void AHundredThousandCrossingsBecomeOneFact()
     {
         var world = new World(seed: 101, valueScale: 1);
         var population = Create(world, 100_000, crossedHalf: 50_000);
@@ -29,7 +29,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void Fact_volume_is_one_at_a_thousand_rows_and_at_a_million()
+    public void FactVolumeIsOneAtAThousandRowsAndAtAMillion()
     {
         var small = new World(seed: 102, valueScale: 1);
         var smallPopulation = Create(small, 1_000, crossedHalf: 500);
@@ -47,7 +47,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void An_unchanged_count_costs_no_fact_and_a_changed_one_reports_the_new_total()
+    public void AnUnchangedCountCostsNoFactAndAChangedOneReportsTheNewTotal()
     {
         var world = new World(seed: 104, valueScale: 1);
         var population = Create(world, 4, crossedHalf: 2);
@@ -66,7 +66,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void A_tag_filter_counts_only_tagged_rows()
+    public void ATagFilterCountsOnlyTaggedRows()
     {
         var world = new World(seed: 105, valueScale: 1);
         var population = Create(world, 6, crossedHalf: 6);
@@ -82,7 +82,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void A_rolled_back_tick_restores_the_baseline_so_the_retry_reports_the_change()
+    public void ARolledBackTickRestoresTheBaselineSoTheRetryReportsTheChange()
     {
         var world = new World(seed: 111, valueScale: 1);
         var population = Create(world, 4, crossedHalf: 2);
@@ -110,7 +110,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void A_despawned_anchor_stops_emitting()
+    public void ADespawnedAnchorStopsEmitting()
     {
         var world = new World(seed: 106, valueScale: 1);
         var population = Create(world, 4, crossedHalf: 2);
@@ -126,7 +126,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void Sampling_does_not_allocate_once_warmed()
+    public void SamplingDoesNotAllocateOnceWarmed()
     {
         var world = new World(seed: 107, valueScale: 1);
         var population = Create(world, 100_000, crossedHalf: 50_000);
@@ -150,7 +150,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void A_sink_fact_dispatches_to_a_rule_on_its_anchor_row()
+    public void ASinkFactDispatchesToARuleOnItsAnchorRow()
     {
         var world = new World(seed: 108, valueScale: 1);
         var population = Create(world, 4, crossedHalf: 2);
@@ -174,7 +174,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void A_sink_rejects_a_double_buffered_column_when_it_is_created()
+    public void ASinkRejectsADoubleBufferedColumnWhenItIsCreated()
     {
         var world = new World(seed: 112, valueScale: 1);
         var population = world.DefinePopulation<Crowd>(enableHandles: true);
@@ -190,7 +190,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void A_sink_rejects_an_unknown_column_and_a_non_numeric_one()
+    public void ASinkRejectsAnUnknownColumnAndANonNumericOne()
     {
         var world = new World(seed: 109, valueScale: 1);
         var population = Create(world, 1, crossedHalf: 0);
@@ -210,7 +210,7 @@ public sealed class PopulationSinkTests
     }
 
     [Fact]
-    public void A_sink_rejects_an_anchor_from_another_population_and_a_dead_one()
+    public void ASinkRejectsAnAnchorFromAnotherPopulationAndADeadOne()
     {
         var world = new World(seed: 110, valueScale: 1);
         var population = Create(world, 2, crossedHalf: 0);

@@ -8,7 +8,7 @@ namespace Systemic.GlowGarden.Tests;
 public sealed class GardenObstacleTraversalTests
 {
     [Fact]
-    public void Clear_path_checks_a_thin_wall_beyond_the_old_64_sample_limit()
+    public void ClearPathChecksAThinWallBeyondTheOld64SampleLimit()
     {
         var obstacles = OpenField(1024, 64);
         SetBlocked(obstacles, 69, 0, true);
@@ -17,7 +17,7 @@ public sealed class GardenObstacleTraversalTests
     }
 
     [Fact]
-    public void Steer_does_not_take_a_free_endpoint_through_an_intervening_thicket()
+    public void SteerDoesNotTakeAFreeEndpointThroughAnInterveningThicket()
     {
         var obstacles = OpenField(256, 128);
         SetBlocked(obstacles, 7, 0, true);
@@ -32,7 +32,7 @@ public sealed class GardenObstacleTraversalTests
     }
 
     [Fact]
-    public void Clear_path_rejects_a_corner_crossing_that_touches_a_blocked_side_cell()
+    public void ClearPathRejectsACornerCrossingThatTouchesABlockedSideCell()
     {
         var obstacles = OpenField(64, 64);
         SetBlocked(obstacles, 1, 0, true);
@@ -41,7 +41,7 @@ public sealed class GardenObstacleTraversalTests
     }
 
     [Fact]
-    public void Clear_path_checks_both_sides_of_a_grid_line_for_the_full_segment()
+    public void ClearPathChecksBothSidesOfAGridLineForTheFullSegment()
     {
         var obstacles = OpenField(64, 64);
         SetBlocked(obstacles, 1, 0, true);
@@ -50,7 +50,7 @@ public sealed class GardenObstacleTraversalTests
     }
 
     [Fact]
-    public void Escape_does_not_cut_between_two_walls_that_meet_at_a_corner()
+    public void EscapeDoesNotCutBetweenTwoWallsThatMeetAtACorner()
     {
         var obstacles = OpenField(64, 64);
         SetBlocked(obstacles, 1, 0, true);
@@ -64,7 +64,7 @@ public sealed class GardenObstacleTraversalTests
     }
 
     [Fact]
-    public void Escape_uses_a_clear_cardinal_exit_from_a_free_wedge()
+    public void EscapeUsesAClearCardinalExitFromAFreeWedge()
     {
         var obstacles = OpenField(64, 64);
         SetBlocked(obstacles, 1, 0, true);

@@ -3,11 +3,11 @@ using Systemic.Kernel;
 
 namespace Systemic.Tests.Kernel;
 
-[Collection(AllocationMeasurementCollection.Name)]
+[Collection(AllocationMeasurementGroup.Name)]
 public sealed class PopulationSpatialGrid2DTests
 {
     [Fact]
-    public void Radius_and_bounds_queries_return_exact_rows_once_in_stable_order()
+    public void RadiusAndBoundsQueriesReturnExactRowsOnceInStableOrder()
     {
         Vector2[] positions =
         [
@@ -32,7 +32,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Bounded_radius_queries_keep_the_lowest_rows_in_stable_order()
+    public void BoundedRadiusQueriesKeepTheLowestRowsInStableOrder()
     {
         Vector2[] positions = [new(5, 5), new(3, 5), new(6, 5), new(4, 5), new(5, 6)];
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), cellSize: 2);
@@ -44,7 +44,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Candidate_queries_stop_early_in_repeatable_cell_order()
+    public void CandidateQueriesStopEarlyInRepeatableCellOrder()
     {
         Vector2[] positions = [new(9, 9), new(1, 1), new(1.5f, 1.5f)];
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), cellSize: 2);
@@ -56,7 +56,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Wrapped_queries_cross_world_edges_without_duplicate_rows()
+    public void WrappedQueriesCrossWorldEdgesWithoutDuplicateRows()
     {
         Vector2[] positions =
         [
@@ -79,7 +79,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Wrapped_neighbor_cell_candidates_use_repeatable_order()
+    public void WrappedNeighborCellCandidatesUseRepeatableOrder()
     {
         Vector2[] positions = [new(0.5f, 5), new(9.5f, 5), new(5, 5)];
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), cellSize: 2,
@@ -92,7 +92,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Wrapped_candidate_query_covers_partial_final_cells_and_honors_zero_limit()
+    public void WrappedCandidateQueryCoversPartialFinalCellsAndHonorsZeroLimit()
     {
         Vector2[] positions =
         [
@@ -119,7 +119,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Span_candidate_query_uses_caller_storage_and_handles_an_empty_destination()
+    public void SpanCandidateQueryUsesCallerStorageAndHandlesAnEmptyDestination()
     {
         Vector2[] positions = [new(580, 300), new(610, 300), new(630, 300), new(10, 300)];
         var grid = new PopulationSpatialGrid2D(
@@ -135,7 +135,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Row_candidate_enumerator_matches_span_order_and_supports_early_exit()
+    public void RowCandidateEnumeratorMatchesSpanOrderAndSupportsEarlyExit()
     {
         Vector2[] positions = [new(580, 300), new(610, 300), new(630, 300), new(10, 300)];
         var grid = new PopulationSpatialGrid2D(
@@ -159,7 +159,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Wrapped_row_enumerator_matches_span_order_at_cell_edges_and_partial_world_edges()
+    public void WrappedRowEnumeratorMatchesSpanOrderAtCellEdgesAndPartialWorldEdges()
     {
         Vector2[] positions =
         [
@@ -190,7 +190,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Warmed_row_candidate_enumeration_does_not_allocate()
+    public void WarmedRowCandidateEnumerationDoesNotAllocate()
     {
         Vector2[] positions = new Vector2[128];
         for (var row = 0; row < positions.Length; row++)
@@ -222,7 +222,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Rebuilding_invalidates_an_active_candidate_enumerator()
+    public void RebuildingInvalidatesAnActiveCandidateEnumerator()
     {
         Vector2[] positions = [new(2, 3), new(2.1f, 3)];
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), cellSize: 2);
@@ -245,7 +245,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Invalid_rebuild_keeps_the_previous_wrapped_row_candidate_snapshot_intact()
+    public void InvalidRebuildKeepsThePreviousWrappedRowCandidateSnapshotIntact()
     {
         var grid = new PopulationSpatialGrid2D(
             new Bounds2(10, 10, 10, 10), cellSize: 4, wrapX: true, wrapY: true);
@@ -263,7 +263,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Reserved_span_candidate_queries_do_not_allocate()
+    public void ReservedSpanCandidateQueriesDoNotAllocate()
     {
         Vector2[] positions = new Vector2[128];
         for (var row = 0; row < positions.Length; row++)
@@ -289,7 +289,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Wrapped_query_spanning_multiple_cells_after_seam_keeps_all_candidates()
+    public void WrappedQuerySpanningMultipleCellsAfterSeamKeepsAllCandidates()
     {
         Vector2[] positions = [new(45, 5), new(75, 5), new(5, 5), new(100, 5)];
         var grid = new PopulationSpatialGrid2D(new Bounds2(52.5f, 5, 52.5f, 5), cellSize: 30,
@@ -302,7 +302,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Rebuilding_invalidates_older_snapshots()
+    public void RebuildingInvalidatesOlderSnapshots()
     {
         Vector2[] positions = [new(2, 3)];
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), cellSize: 2);
@@ -326,7 +326,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Invalid_rebuild_preserves_the_previous_snapshot()
+    public void InvalidRebuildPreservesThePreviousSnapshot()
     {
         var validPositions = new Vector2[] { new(2, 3), new(8, 7) };
         var invalidPositions = new Vector2[] { new(4, 5), new(float.NaN, 1) };
@@ -344,7 +344,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Radius_queries_match_a_brute_force_reference_for_seeded_positions()
+    public void RadiusQueriesMatchABruteForceReferenceForSeededPositions()
     {
         var random = new Random(1234);
         var positions = new Vector2[256];
@@ -379,7 +379,7 @@ public sealed class PopulationSpatialGrid2DTests
     }
 
     [Fact]
-    public void Reserved_rebuild_and_query_path_does_not_allocate()
+    public void ReservedRebuildAndQueryPathDoesNotAllocate()
     {
         var positions = new Vector2[128];
         for (var row = 0; row < positions.Length; row++)

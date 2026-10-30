@@ -7,7 +7,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class DeterministicColumnKernelsTests
 {
     [Fact]
-    public void Integer_kernels_process_all_vector_lanes_and_scalar_tail_without_touching_extra_destination()
+    public void IntegerKernelsProcessAllVectorLanesAndScalarTailWithoutTouchingExtraDestination()
     {
         var length = Vector<int>.Count * 3 + 3;
         var left = Enumerable.Range(0, length).Select(i => i - 100).ToArray();
@@ -15,18 +15,29 @@ public sealed class DeterministicColumnKernelsTests
         var destination = Enumerable.Repeat(999, length + 2).ToArray();
 
         DeterministicColumnKernels.Add(left, right, destination);
-        for (var i = 0; i < length; i++) Assert.Equal(4 * i - 123, destination[i]);
+        for (var i = 0; i < length; i++)
+        {
+            Assert.Equal(4 * i - 123, destination[i]);
+        }
+
         Assert.Equal(999, destination[length]);
         Assert.Equal(999, destination[length + 1]);
 
         DeterministicColumnKernels.Subtract(left, right, destination);
-        for (var i = 0; i < length; i++) Assert.Equal(-2 * i - 77, destination[i]);
+        for (var i = 0; i < length; i++)
+        {
+            Assert.Equal(-2 * i - 77, destination[i]);
+        }
+
         DeterministicColumnKernels.Multiply(left, 3, destination);
-        for (var i = 0; i < length; i++) Assert.Equal(3 * i - 300, destination[i]);
+        for (var i = 0; i < length; i++)
+        {
+            Assert.Equal(3 * i - 300, destination[i]);
+        }
     }
 
     [Fact]
-    public void Long_kernels_process_all_vector_lanes_and_scalar_tail()
+    public void LongKernelsProcessAllVectorLanesAndScalarTail()
     {
         var length = Vector<long>.Count * 3 + 1;
         var left = Enumerable.Range(0, length).Select(i => 1_000_000_000_000L + i).ToArray();
@@ -36,11 +47,14 @@ public sealed class DeterministicColumnKernelsTests
         DeterministicColumnKernels.Add(left, right, destination);
         Assert.All(destination, value => Assert.Equal(999_999_998_000L, value));
         DeterministicColumnKernels.Subtract(left, right, destination);
-        for (var i = 0; i < length; i++) Assert.Equal(1_000_000_002_000L + 2L * i, destination[i]);
+        for (var i = 0; i < length; i++)
+        {
+            Assert.Equal(1_000_000_002_000L + 2L * i, destination[i]);
+        }
     }
 
     [Fact]
-    public void Sum_accumulates_across_lanes_and_tail_into_a_wide_integer()
+    public void SumAccumulatesAcrossLanesAndTailIntoAWideInteger()
     {
         var length = Vector<int>.Count * 2 + 1;
         var values = Enumerable.Range(0, length)
@@ -53,7 +67,7 @@ public sealed class DeterministicColumnKernelsTests
     [Theory]
     [InlineData(int.MaxValue, 1)]
     [InlineData(int.MinValue, -1)]
-    public void Add_overflow_in_a_vector_lane_or_tail_never_changes_the_destination(int a, int b)
+    public void AddOverflowInAVectorLaneOrTailNeverChangesTheDestination(int a, int b)
     {
         var length = Vector<int>.Count * 2 + 1;
         foreach (var index in new[] { Vector<int>.Count - 1, length - 1 })
@@ -71,7 +85,7 @@ public sealed class DeterministicColumnKernelsTests
     [Theory]
     [InlineData(int.MaxValue, -1)]
     [InlineData(int.MinValue, 1)]
-    public void Subtract_overflow_never_changes_the_destination(int a, int b)
+    public void SubtractOverflowNeverChangesTheDestination(int a, int b)
     {
         int[] left = [1, a];
         int[] right = [1, b];
@@ -83,7 +97,7 @@ public sealed class DeterministicColumnKernelsTests
     [Theory]
     [InlineData(int.MinValue, -1)]
     [InlineData(int.MaxValue, 2)]
-    public void Multiply_overflow_in_any_lane_never_changes_the_destination(int value, int factor)
+    public void MultiplyOverflowInAnyLaneNeverChangesTheDestination(int value, int factor)
     {
         var length = Vector<int>.Count * 2 + 1;
         foreach (var index in new[] { Vector<int>.Count - 1, length - 1 })
@@ -97,7 +111,7 @@ public sealed class DeterministicColumnKernelsTests
     }
 
     [Fact]
-    public void Long_overflow_is_checked_for_both_operations_without_partial_writes()
+    public void LongOverflowIsCheckedForBothOperationsWithoutPartialWrites()
     {
         long[] destination = [9, 9];
         Assert.Throws<OverflowException>(() => DeterministicColumnKernels.Add([0L, long.MaxValue], [0L, 1L], destination));
@@ -107,7 +121,7 @@ public sealed class DeterministicColumnKernelsTests
     }
 
     [Fact]
-    public void Invalid_lengths_fail_before_any_destination_writes()
+    public void InvalidLengthsFailBeforeAnyDestinationWrites()
     {
         int[] destination = [7, 8, 9];
         Assert.Throws<ArgumentException>(() => DeterministicColumnKernels.Add([1, 2], [3], destination));
@@ -121,7 +135,7 @@ public sealed class DeterministicColumnKernelsTests
     }
 
     [Fact]
-    public void Overlap_in_opposite_directions_uses_original_inputs()
+    public void OverlapInOppositeDirectionsUsesOriginalInputs()
     {
         int[] values = [1, 2, 3, 4, 5, 6];
         DeterministicColumnKernels.Add(values.AsSpan(0, 4), values.AsSpan(2, 4), values.AsSpan(1, 4));
@@ -129,7 +143,7 @@ public sealed class DeterministicColumnKernelsTests
     }
 
     [Fact]
-    public void In_place_and_backward_overlapping_writes_use_original_inputs()
+    public void InPlaceAndBackwardOverlappingWritesUseOriginalInputs()
     {
         int[] values = [1, 2, 3, 4, 5, 6];
         DeterministicColumnKernels.Multiply(values.AsSpan(1, 4), 10, values.AsSpan(0, 4));
@@ -140,7 +154,7 @@ public sealed class DeterministicColumnKernelsTests
     }
 
     [Fact]
-    public void Overflow_with_overlapping_input_and_destination_changes_no_bytes()
+    public void OverflowWithOverlappingInputAndDestinationChangesNoBytes()
     {
         int[] values = [1, 2, 3, int.MaxValue, 9];
         var before = values.ToArray();
@@ -150,7 +164,7 @@ public sealed class DeterministicColumnKernelsTests
     }
 
     [Fact]
-    public void Non_aligned_byte_overlapping_spans_use_the_original_inputs()
+    public void NonAlignedByteOverlappingSpansUseTheOriginalInputs()
     {
         var bytes = new byte[20];
         var input = MemoryMarshal.Cast<byte, int>(bytes.AsSpan(0, 16));

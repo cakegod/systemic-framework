@@ -1,13 +1,9 @@
-using Systemic.Content;
-using Systemic.Presentation;
-using Systemic.Tests;
-
 namespace Systemic.Tests.Presentation;
 
 public sealed class ProceduralRasterizerTests
 {
     [Fact]
-    public void Pixel_recipes_are_seeded_repeatable_and_support_variants()
+    public void PixelRecipesAreSeededRepeatableAndSupportVariants()
     {
         var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
         var recipe = SystemicTestContent.Presentation(SystemicTestContent.Load(samplePath)).Visuals.Recipes
@@ -31,7 +27,7 @@ public sealed class ProceduralRasterizerTests
     }
 
     [Fact]
-    public void Composite_recipes_place_and_scale_reusable_pixel_parts()
+    public void CompositeRecipesPlaceAndScaleReusablePixelParts()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "visuals.json"), """
@@ -58,7 +54,7 @@ public sealed class ProceduralRasterizerTests
     }
 
     [Fact]
-    public void Raster_work_budget_counts_long_lines_even_when_their_canvas_is_small()
+    public void RasterWorkBudgetCountsLongLinesEvenWhenTheirCanvasIsSmall()
     {
         var line = new VisualLayer("line", 0, 0, 0, 1024, 1024, 0);
         var partRecipe = new VisualRecipe("part", "prop", 1, 1, 1, ["#ffffff"],

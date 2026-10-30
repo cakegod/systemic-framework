@@ -92,7 +92,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Warmed_single_worker_scheduled_boid_ticks_do_not_allocate_on_simulation_thread()
+    public void WarmedSingleWorkerScheduledBoidTicksDoNotAllocateOnSimulationThread()
     {
         const int warmupTicks = 200;
         const int measuredTicks = 20;
@@ -120,7 +120,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Failed_later_scheduled_system_restores_the_predators_food_target()
+    public void FailedLaterScheduledSystemRestoresThePredatorsFoodTarget()
     {
         var setup = new Setup { BoidCount = 64, Seed = 83, AddFood = true };
         var (world, flock) = CreateFlock(setup);
@@ -140,7 +140,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Multiple_ticks_inside_an_outer_transaction_restore_public_views_and_population_on_rollback()
+    public void MultipleTicksInsideAnOuterTransactionRestorePublicViewsAndPopulationOnRollback()
     {
         var (world, flock) = CreateFlock(new Setup { BoidCount = 64, Seed = 83, AddFood = true });
         using var disposeFlock = flock;
@@ -164,7 +164,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Kernel_schedule_preserves_seeded_ecology_across_worker_counts()
+    public void KernelSchedulePreservesSeededEcologyAcrossWorkerCounts()
     {
         var setup = new Setup { BoidCount = 512, Seed = 127, AddFood = true };
         var (first, second) = (CreateFlock(setup), CreateFlock(setup));
@@ -332,7 +332,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Boids_want_food_only_below_the_hunger_threshold()
+    public void BoidsWantFoodOnlyBelowTheHungerThreshold()
     {
         Assert.True(BoidFlockSystem.WantsFood(0.2f));
         Assert.True(BoidFlockSystem.WantsFood(0.649f));
@@ -341,7 +341,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Energy_scales_speed_between_the_starved_factor_and_full_speed()
+    public void EnergyScalesSpeedBetweenTheStarvedFactorAndFullSpeed()
     {
         Assert.Equal(0.4f, BoidFlockSystem.EnergySpeedFactor(0.0f, 0.4f), 3);
         Assert.Equal(0.7f, BoidFlockSystem.EnergySpeedFactor(0.5f, 0.4f), 3);
@@ -350,7 +350,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Hungry_boids_spend_patch_stock_and_restore_energy()
+    public void HungryBoidsSpendPatchStockAndRestoreEnergy()
     {
         var setup = new Setup
         {
@@ -385,7 +385,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Predator_fills_up_at_food_and_stops_hunting()
+    public void PredatorFillsUpAtFoodAndStopsHunting()
     {
         var setup = new Setup
         {
@@ -411,7 +411,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Predator_wakes_when_its_energy_drains()
+    public void PredatorWakesWhenItsEnergyDrains()
     {
         var setup = new Setup
         {
@@ -434,7 +434,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Predator_drains_energy_from_boids_inside_its_consume_radius()
+    public void PredatorDrainsEnergyFromBoidsInsideItsConsumeRadius()
     {
         static float MeanEnergy(Setup setup)
         {
@@ -469,7 +469,7 @@ public sealed class BoidEcologyTests
     }
 
     [Fact]
-    public void Species_flee_weight_scatters_boids_from_the_predator()
+    public void SpeciesFleeWeightScattersBoidsFromThePredator()
     {
         static double MeanPredatorDistance(Setup setup)
         {

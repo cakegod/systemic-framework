@@ -14,7 +14,7 @@ public sealed class RowAddressedRuleTests
         new("test.handled.health", 1, PopulationCodecs.Int32);
 
     [Fact]
-    public void Entity_subject_addresses_one_entity_regardless_of_the_fact()
+    public void EntitySubjectAddressesOneEntityRegardlessOfTheFact()
     {
         var world = new World(seed: 7, valueScale: 1);
         var first = world.Add(new DataEntity([], [], ("value", 0.0)));
@@ -32,7 +32,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_effect_adjusts_the_addressed_column_and_leaves_other_rows_alone()
+    public void RowEffectAdjustsTheAddressedColumnAndLeavesOtherRowsAlone()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreatePrey(world, 3);
@@ -48,7 +48,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_condition_reads_the_addressed_column()
+    public void RowConditionReadsTheAddressedColumn()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreatePrey(world, 2);
@@ -69,7 +69,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_effect_on_a_despawned_slot_is_skipped()
+    public void RowEffectOnADespawnedSlotIsSkipped()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreatePrey(world, 2);
@@ -84,7 +84,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_effects_roll_back_with_the_dispatch_transaction()
+    public void RowEffectsRollBackWithTheDispatchTransaction()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreatePrey(world, 2);
@@ -107,7 +107,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_dispatch_does_not_allocate_once_warmed()
+    public void RowDispatchDoesNotAllocateOnceWarmed()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreatePrey(world, 4);
@@ -132,7 +132,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Unknown_row_property_fails_at_bind_with_the_rule_and_schema_named()
+    public void UnknownRowPropertyFailsAtBindWithTheRuleAndSchemaNamed()
     {
         var world = new World(seed: 7, valueScale: 1);
         CreatePrey(world, 1);
@@ -151,7 +151,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Unknown_population_fails_at_bind()
+    public void UnknownPopulationFailsAtBind()
     {
         var world = new World(seed: 7, valueScale: 1);
         CreatePrey(world, 1);
@@ -166,7 +166,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Unknown_row_tag_fails_at_bind_with_the_rule_tag_and_declared_tags_named()
+    public void UnknownRowTagFailsAtBindWithTheRuleTagAndDeclaredTagsNamed()
     {
         var world = new World(seed: 7, valueScale: 1);
         CreateTaggedPrey(world, 1);
@@ -182,7 +182,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_tag_effect_sets_the_schema_bit_for_one_row()
+    public void RowTagEffectSetsTheSchemaBitForOneRow()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateTaggedPrey(world, 3);
@@ -200,7 +200,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_tag_condition_reads_the_schema_bit_without_an_effect_when_unset()
+    public void RowTagConditionReadsTheSchemaBitWithoutAnEffectWhenUnset()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateTaggedPrey(world, 2);
@@ -221,7 +221,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_tag_effects_roll_back_with_the_dispatch_transaction()
+    public void RowTagEffectsRollBackWithTheDispatchTransaction()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateTaggedPrey(world, 2);
@@ -244,7 +244,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_tag_dispatch_does_not_allocate_once_warmed()
+    public void RowTagDispatchDoesNotAllocateOnceWarmed()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateTaggedPrey(world, 4);
@@ -270,7 +270,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Fractional_adjustment_of_an_integer_column_is_rejected_at_bind()
+    public void FractionalAdjustmentOfAnIntegerColumnIsRejectedAtBind()
     {
         var world = new World(seed: 7, valueScale: 1);
         CreatePrey(world, 1);
@@ -285,7 +285,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_rules_bind_on_first_dispatch_so_a_missing_column_still_fails_loudly()
+    public void RowRulesBindOnFirstDispatchSoAMissingColumnStillFailsLoudly()
     {
         var world = new World(seed: 7, valueScale: 1);
         CreatePrey(world, 1);
@@ -301,7 +301,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void A_negative_adjustment_decreases_an_unsigned_column()
+    public void ANegativeAdjustmentDecreasesAnUnsignedColumn()
     {
         var world = new World(seed: 7, valueScale: 1);
         var population = world.DefinePopulation<UnsignedPrey>();
@@ -320,7 +320,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void A_double_buffered_column_cannot_be_bound_by_a_row_rule()
+    public void ADoubleBufferedColumnCannotBeBoundByARowRule()
     {
         var world = new World(seed: 7, valueScale: 1);
         var population = world.DefinePopulation<Prey>();
@@ -337,7 +337,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void A_rolled_back_population_definition_does_not_leave_stale_bindings()
+    public void ARolledBackPopulationDefinitionDoesNotLeaveStaleBindings()
     {
         var world = new World(seed: 7, valueScale: 1);
         var engine = new RuleEngine(new CompiledRuleSet([
@@ -388,7 +388,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_modifier_effect_changes_the_effective_value_and_not_the_column()
+    public void RowModifierEffectChangesTheEffectiveValueAndNotTheColumn()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateBuffPrey(world, 3);
@@ -406,7 +406,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_condition_reads_the_effective_value_so_a_modifier_changes_the_match()
+    public void RowConditionReadsTheEffectiveValueSoAModifierChangesTheMatch()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateBuffPrey(world, 2);
@@ -425,7 +425,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_modifier_effects_roll_back_with_the_dispatch_transaction()
+    public void RowModifierEffectsRollBackWithTheDispatchTransaction()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateBuffPrey(world, 2);
@@ -449,7 +449,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_modifier_on_an_undeclared_property_fails_at_bind_with_the_declared_list_named()
+    public void RowModifierOnAnUndeclaredPropertyFailsAtBindWithTheDeclaredListNamed()
     {
         var world = new World(seed: 7, valueScale: 1);
         CreateBuffPrey(world, 1);
@@ -465,7 +465,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_modifier_operation_other_than_add_fails_at_bind()
+    public void RowModifierOperationOtherThanAddFailsAtBind()
     {
         var world = new World(seed: 7, valueScale: 1);
         CreateBuffPrey(world, 1);
@@ -481,7 +481,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Row_modifier_dispatch_does_not_allocate_once_warmed()
+    public void RowModifierDispatchDoesNotAllocateOnceWarmed()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateBuffPrey(world, 2);
@@ -507,7 +507,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Fact_row_rule_writes_the_row_the_fact_names()
+    public void FactRowRuleWritesTheRowTheFactNames()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateHandledPrey(world, 3);
@@ -522,7 +522,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Fact_row_condition_reads_the_row_the_fact_names()
+    public void FactRowConditionReadsTheRowTheFactNames()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateHandledPrey(world, 2);
@@ -542,7 +542,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void Fact_row_on_a_despawned_row_is_skipped_instead_of_retargeting_the_new_occupant()
+    public void FactRowOnADespawnedRowIsSkippedInsteadOfRetargetingTheNewOccupant()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateHandledPrey(world, 3);
@@ -565,7 +565,7 @@ public sealed class RowAddressedRuleTests
     }
 
     [Fact]
-    public void A_despawn_during_a_reaction_chain_leaves_the_new_occupant_alone()
+    public void ADespawnDuringAReactionChainLeavesTheNewOccupantAlone()
     {
         var world = new World(seed: 7, valueScale: 1);
         var prey = CreateHandledPrey(world, 3);

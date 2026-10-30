@@ -5,7 +5,7 @@ namespace Systemic.Tests;
 public sealed class SpatialIndexTests
 {
     [Fact]
-    public void Nearby_queries_are_exact_deterministic_and_reusable()
+    public void NearbyQueriesAreExactDeterministicAndReusable()
     {
         var index = new SpatialIndex(cellSize: 8);
         index.Upsert(9, new Bounds2(0, 0, 1, 1));
@@ -25,7 +25,7 @@ public sealed class SpatialIndexTests
     }
 
     [Fact]
-    public void Overlap_queries_include_edge_touching_bounds_once()
+    public void OverlapQueriesIncludeEdgeTouchingBoundsOnce()
     {
         var index = new SpatialIndex(cellSize: 4);
         index.Upsert(3, new Bounds2(0, 0, 2, 2));
@@ -39,7 +39,7 @@ public sealed class SpatialIndexTests
     }
 
     [Fact]
-    public void World_spatial_queries_keep_sorted_results_and_filter_pending_removals()
+    public void WorldSpatialQueriesKeepSortedResultsAndFilterPendingRemovals()
     {
         var world = new World(seed: 4, valueScale: 1, spatialCellSize: 8);
         var first = world.Add(new DataEntity([], []));
@@ -60,7 +60,7 @@ public sealed class SpatialIndexTests
     }
 
     [Fact]
-    public void Spatial_queries_support_sparse_ids_outside_the_dense_lookup_cache()
+    public void SpatialQueriesSupportSparseIdsOutsideTheDenseLookupCache()
     {
         var index = new SpatialIndex(cellSize: 4);
         index.Upsert(int.MaxValue - 1, new Bounds2(0, 0, 1, 1));
@@ -72,7 +72,7 @@ public sealed class SpatialIndexTests
     }
 
     [Fact]
-    public void Spatial_queries_fall_back_for_sparse_ids_inside_the_dense_cache_capacity()
+    public void SpatialQueriesFallBackForSparseIdsInsideTheDenseCacheCapacity()
     {
         var index = new SpatialIndex(cellSize: 4);
         index.Upsert(1, new Bounds2(0, 0, 1, 1));
@@ -86,7 +86,7 @@ public sealed class SpatialIndexTests
     }
 
     [Fact]
-    public void Moving_a_previously_cached_entity_after_removals_updates_its_bounds()
+    public void MovingAPreviouslyCachedEntityAfterRemovalsUpdatesItsBounds()
     {
         var index = new SpatialIndex(cellSize: 10);
         index.Upsert(1, new Bounds2(0, 0, 0, 0));

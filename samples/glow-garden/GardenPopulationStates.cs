@@ -38,19 +38,29 @@ internal abstract class PopulationStates<TKind, TState> : IReadOnlyList<TState>
 
     internal void Add(TState value)
     {
-        if (Count >= Capacity) throw new InvalidOperationException("Garden population cap reached.");
+        if (Count >= Capacity)
+        {
+            throw new InvalidOperationException("Garden population cap reached.");
+        }
+
         this[Population.AddRange(1).Start] = value;
     }
 
     internal void RemoveAt(int index) => Population.RemoveSwapBack(index);
     internal void Clear()
     {
-        while (Count > 0) RemoveAt(Count - 1);
+        while (Count > 0)
+        {
+            RemoveAt(Count - 1);
+        }
     }
 
     public IEnumerator<TState> GetEnumerator()
     {
-        for (var row = 0; row < Count; row++) yield return this[row];
+        for (var row = 0; row < Count; row++)
+        {
+            yield return this[row];
+        }
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();

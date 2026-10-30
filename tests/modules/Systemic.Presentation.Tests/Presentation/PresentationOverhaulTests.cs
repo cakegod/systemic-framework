@@ -1,13 +1,12 @@
 using System.Collections.Concurrent;
 using Systemic.Kernel;
-using Systemic.Presentation;
 
 namespace Systemic.Presentation.Tests;
 
 public sealed class PresentationOverhaulTests
 {
     [Fact]
-    public void Runtime_can_configure_its_owned_cue_stream()
+    public void RuntimeCanConfigureItsOwnedCueStream()
     {
         var runtime = new PresentationRuntime(new World(1, 1), new PresentationCatalog([], []),
             new PresentationCueStreamOptions
@@ -24,7 +23,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Expiry_removes_old_cues_in_queue_order_even_when_ticks_are_out_of_order()
+    public void ExpiryRemovesOldCuesInQueueOrderEvenWhenTicksAreOutOfOrder()
     {
         var events = new List<PresentationCueStreamEvent>();
         var stream = new PresentationCueStream(new PresentationCueStreamOptions
@@ -54,7 +53,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Zero_age_expires_current_cues_but_preserves_future_cues()
+    public void ZeroAgeExpiresCurrentCuesButPreservesFutureCues()
     {
         var stream = new PresentationCueStream(new PresentationCueStreamOptions { MaxAgeTicks = 0 });
         stream.Enqueue(Cue("now", 0));
@@ -68,7 +67,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Drop_newest_reports_rejection_and_keeps_the_existing_cue()
+    public void DropNewestReportsRejectionAndKeepsTheExistingCue()
     {
         var events = new List<PresentationCueStreamEvent>();
         var stream = new PresentationCueStream(new PresentationCueStreamOptions
@@ -92,7 +91,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Drop_oldest_reports_the_evicted_fact_type()
+    public void DropOldestReportsTheEvictedFactType()
     {
         var events = new List<PresentationCueStreamEvent>();
         var stream = new PresentationCueStream(new PresentationCueStreamOptions { Capacity = 1, Observer = events.Add });
@@ -109,7 +108,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Incoming_fact_type_selects_its_own_copied_overflow_policy()
+    public void IncomingFactTypeSelectsItsOwnCopiedOverflowPolicy()
     {
         var policies = new Dictionary<string, PresentationCueOverflowPolicy>
         {
@@ -130,7 +129,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Coalescing_caps_particles_sums_amount_and_preserves_first_cue_identity()
+    public void CoalescingCapsParticlesSumsAmountAndPreservesFirstCueIdentity()
     {
         var events = new List<PresentationCueStreamEvent>();
         var stream = new PresentationCueStream(new PresentationCueStreamOptions
@@ -167,7 +166,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Coalescing_requires_every_key_field_to_match()
+    public void CoalescingRequiresEveryKeyFieldToMatch()
     {
         var first = Cue("same");
         var differentKeys = new[]
@@ -196,7 +195,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Coalesced_amount_saturates_to_a_finite_value()
+    public void CoalescedAmountSaturatesToAFiniteValue()
     {
         var stream = new PresentationCueStream(new PresentationCueStreamOptions
         {
@@ -210,7 +209,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Sampling_admits_only_configured_attempts_when_full()
+    public void SamplingAdmitsOnlyConfiguredAttemptsWhenFull()
     {
         var stream = new PresentationCueStream(new PresentationCueStreamOptions
         {
@@ -234,7 +233,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Observer_runs_outside_the_queue_lock_for_coalescing_drops_and_expiry()
+    public void ObserverRunsOutsideTheQueueLockForCoalescingDropsAndExpiry()
     {
         var events = new List<PresentationCueStreamEvent>();
         PresentationCueStream? stream = null;
@@ -264,7 +263,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Concurrent_producers_assign_unique_sequences_and_preserve_fifo_order()
+    public void ConcurrentProducersAssignUniqueSequencesAndPreserveFifoOrder()
     {
         const int attempts = 4_000;
         var stream = new PresentationCueStream(attempts);
@@ -285,7 +284,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Concurrent_rejections_do_not_change_the_first_accepted_cues()
+    public void ConcurrentRejectionsDoNotChangeTheFirstAcceptedCues()
     {
         var stream = new PresentationCueStream(new PresentationCueStreamOptions
         {
@@ -306,7 +305,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Stream_options_reject_invalid_configuration()
+    public void StreamOptionsRejectInvalidConfiguration()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new PresentationCueStream(0));
         Assert.Throws<ArgumentOutOfRangeException>(() => new PresentationCueStream(new PresentationCueStreamOptions { MaxAgeTicks = -1 }));
@@ -321,7 +320,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Viewport_clamps_camera_and_transforms_and_culls_world_bounds()
+    public void ViewportClampsCameraAndTransformsAndCullsWorldBounds()
     {
         var viewport = new PresentationViewport(new Bounds2(50, 50, 50, 50), new Bounds2(100, 50, 100, 50),
             new Point2(200, 200), 2);
@@ -337,7 +336,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Viewport_centers_letterboxing_and_clamps_after_zoom_changes()
+    public void ViewportCentersLetterboxingAndClampsAfterZoomChanges()
     {
         var viewport = new PresentationViewport(new Bounds2(50, 50, 50, 50), new Bounds2(200, 150, 200, 150));
         Assert.Equal(3, viewport.Scale);
@@ -353,7 +352,7 @@ public sealed class PresentationOverhaulTests
     }
 
     [Fact]
-    public void Viewport_rejects_invalid_bounds_zoom_and_coordinates()
+    public void ViewportRejectsInvalidBoundsZoomAndCoordinates()
     {
         var world = new Bounds2(50, 50, 50, 50);
         var screen = new Bounds2(100, 50, 100, 50);

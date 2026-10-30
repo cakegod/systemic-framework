@@ -1,12 +1,9 @@
-using Systemic.Content;
-using Systemic.Presentation;
-
 namespace Systemic.Tests.Presentation;
 
 public sealed class VisualVariantCacheTests
 {
     [Fact]
-    public void Cache_reuses_warm_variants_and_evicts_by_a_hard_byte_limit()
+    public void CacheReusesWarmVariantsAndEvictsByAHardByteLimit()
     {
         var recipe = SystemicTestContent.Presentation(SystemicTestContent.Load(
             Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry")))
@@ -36,7 +33,7 @@ public sealed class VisualVariantCacheTests
     }
 
     [Fact]
-    public void Cache_keeps_visual_states_separate_for_the_same_recipe_seed()
+    public void CacheKeepsVisualStatesSeparateForTheSameRecipeSeed()
     {
         var recipe = SystemicTestContent.Presentation(SystemicTestContent.Load(
             Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry")))
@@ -52,7 +49,7 @@ public sealed class VisualVariantCacheTests
     }
 
     [Fact]
-    public void Cache_keys_composite_parts_by_their_resolved_recipe_content()
+    public void CacheKeysCompositePartsByTheirResolvedRecipeContent()
     {
         var redPart = new VisualRecipe("part", "prop", 1, 1, 1, ["#ff0000"],
             [new VisualLayer("rect", 0, 0, 0, 1, 1, 0)]);

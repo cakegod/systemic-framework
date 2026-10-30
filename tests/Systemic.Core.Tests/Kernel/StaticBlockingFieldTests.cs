@@ -4,21 +4,23 @@ namespace Systemic.Tests.Kernel;
 
 public sealed class StaticBlockingFieldTests
 {
+    private static readonly bool[] s_expectedMask = [false, true, false, false, false, true];
+
     [Fact]
-    public void Mask_is_a_read_only_snapshot_of_the_input_cells()
+    public void MaskIsAReadOnlySnapshotOfTheInputCells()
     {
         var blocked = new List<GridCell2D> { new(1, 0), new(2, 1) };
         var field = new StaticBlockingField2D(3, 2, blocked, GridOutOfBoundsPolicy.Blocked);
         blocked.Clear();
 
-        Assert.Equal(new[] { false, true, false, false, false, true }, field.BlockedMask);
+        Assert.Equal(s_expectedMask, field.BlockedMask);
         Assert.True(field.IsBlocked(new(1, 0)));
         Assert.Throws<NotSupportedException>(() => ((IList<bool>)field.BlockedMask)[1] = false);
         Assert.True(field.IsBlocked(new(1, 0)));
     }
 
     [Fact]
-    public void Dimensions_and_input_cells_must_fit_the_bounded_mask()
+    public void DimensionsAndInputCellsMustFitTheBoundedMask()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new StaticBlockingField2D(0, 1, [], GridOutOfBoundsPolicy.Blocked));
@@ -37,7 +39,7 @@ public sealed class StaticBlockingFieldTests
     [InlineData(0, -1)]
     [InlineData(3, 0)]
     [InlineData(0, 2)]
-    public void Out_of_bounds_queries_follow_the_explicit_policy(int x, int y)
+    public void OutOfBoundsQueriesFollowTheExplicitPolicy(int x, int y)
     {
         var blocked = new StaticBlockingField2D(3, 2, [], GridOutOfBoundsPolicy.Blocked);
         var free = new StaticBlockingField2D(3, 2, [], GridOutOfBoundsPolicy.Free);
@@ -50,7 +52,7 @@ public sealed class StaticBlockingFieldTests
     }
 
     [Fact]
-    public void Line_of_sight_checks_endpoints_and_out_of_bounds_policy()
+    public void LineOfSightChecksEndpointsAndOutOfBoundsPolicy()
     {
         var field = new StaticBlockingField2D(4, 2, [new(0, 0), new(3, 0)], GridOutOfBoundsPolicy.Blocked);
         Assert.False(field.HasLineOfSight(new(0, 0), new(2, 0)));
@@ -63,7 +65,7 @@ public sealed class StaticBlockingFieldTests
     }
 
     [Fact]
-    public void Line_of_sight_handles_extreme_outside_coordinates_without_overflow()
+    public void LineOfSightHandlesExtremeOutsideCoordinatesWithoutOverflow()
     {
         var field = new StaticBlockingField2D(2, 2, [new(1, 0)], GridOutOfBoundsPolicy.Free);
         var empty = new StaticBlockingField2D(2, 2, [], GridOutOfBoundsPolicy.Free);
@@ -76,7 +78,7 @@ public sealed class StaticBlockingFieldTests
     }
 
     [Fact]
-    public void Line_of_sight_cannot_skip_a_thin_obstacle()
+    public void LineOfSightCannotSkipAThinObstacle()
     {
         var field = new StaticBlockingField2D(7, 4, [new(3, 2), new(1, 0)], GridOutOfBoundsPolicy.Blocked);
 
@@ -89,7 +91,7 @@ public sealed class StaticBlockingFieldTests
     [Theory]
     [InlineData(1, 0)]
     [InlineData(0, 1)]
-    public void Line_of_sight_checks_both_cells_touched_at_a_corner(int blockedX, int blockedY)
+    public void LineOfSightChecksBothCellsTouchedAtACorner(int blockedX, int blockedY)
     {
         var field = new StaticBlockingField2D(2, 2, [new(blockedX, blockedY)], GridOutOfBoundsPolicy.Blocked);
         Assert.False(field.HasLineOfSight(new(0, 0), new(1, 1)));
@@ -97,7 +99,7 @@ public sealed class StaticBlockingFieldTests
     }
 
     [Fact]
-    public void Connectivity_is_four_way_bounded_and_has_stable_breadth_first_order()
+    public void ConnectivityIsFourWayBoundedAndHasStableBreadthFirstOrder()
     {
         var field = new StaticBlockingField2D(3, 3, [new(1, 0), new(1, 1), new(1, 2)], GridOutOfBoundsPolicy.Free);
 
@@ -113,7 +115,7 @@ public sealed class StaticBlockingFieldTests
     }
 
     [Fact]
-    public void Nearest_free_cell_uses_manhattan_distance_and_row_major_ties()
+    public void NearestFreeCellUsesManhattanDistanceAndRowMajorTies()
     {
         var field = new StaticBlockingField2D(3, 3, [new(1, 1)], GridOutOfBoundsPolicy.Blocked);
         Assert.True(field.TryFindNearestFree(new(1, 1), out var nearest));

@@ -7,7 +7,7 @@ namespace Systemic.Tests;
 public sealed class RuleBundleAndTimeTests
 {
     [Fact]
-    public void A_bundle_runs_only_while_its_tag_is_present()
+    public void ABundleRunsOnlyWhileItsTagIsPresent()
     {
         using var workspace = new RuleJsonWorkspace(
             rules: """
@@ -47,7 +47,7 @@ public sealed class RuleBundleAndTimeTests
     }
 
     [Fact]
-    public void An_expired_timed_tag_disables_its_bundle()
+    public void AnExpiredTimedTagDisablesItsBundle()
     {
         using var workspace = new RuleJsonWorkspace(
             rules: """
@@ -88,7 +88,7 @@ public sealed class RuleBundleAndTimeTests
     }
 
     [Fact]
-    public void A_cooldown_blocks_early_matches_and_allows_the_next_window()
+    public void ACooldownBlocksEarlyMatchesAndAllowsTheNextWindow()
     {
         using var workspace = new RuleJsonWorkspace(
             rules: """
@@ -126,7 +126,7 @@ public sealed class RuleBundleAndTimeTests
     }
 
     [Fact]
-    public void Eight_hours_of_fast_forward_matches_stepping_every_tick()
+    public void EightHoursOfFastForwardMatchesSteppingEveryTick()
     {
         const int ticksPerStep = 60;
         const int eightHoursAtSixtyHertz = 60 * 60 * 8 * 60;
@@ -151,7 +151,7 @@ public sealed class RuleBundleAndTimeTests
     }
 
     [Fact]
-    public void A_fact_without_a_live_target_can_schedule_delayed_work()
+    public void AFactWithoutALiveTargetCanScheduleDelayedWork()
     {
         var world = new World(seed: 5, valueScale: 1);
         var actor = world.Add(new DataEntity([], [], ("score", 0)));
@@ -170,7 +170,7 @@ public sealed class RuleBundleAndTimeTests
     }
 
     [Fact]
-    public void Fast_forward_expires_a_timed_bonus_before_a_later_due_fact()
+    public void FastForwardExpiresATimedBonusBeforeALaterDueFact()
     {
         var world = new World(seed: 6, valueScale: 1);
         var actor = world.Add(new DataEntity([], [], ("score", 0), ("speed", 0)));

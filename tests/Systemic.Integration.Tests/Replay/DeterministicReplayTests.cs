@@ -15,7 +15,7 @@ public sealed class DeterministicReplayTests
     private const string Fingerprint = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     [Fact]
-    public void State_hash_uses_versioned_length_framing_and_sha256()
+    public void StateHashUsesVersionedLengthFramingAndSha256()
     {
         Assert.Equal("f5aad88cfa6639367771eb2fff79c43d670781ba4d1e876c611fb8a85ecea619",
             ReplayStateHash.Compute(Encoding.UTF8.GetBytes("abc")));
@@ -23,7 +23,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Inputs_canonicalize_keys_and_numeric_spelling_while_preserving_array_order_and_negative_zero()
+    public void InputsCanonicalizeKeysAndNumericSpellingWhilePreservingArrayOrderAndNegativeZero()
     {
         var first = new ReplayInput("move", "{\"z\":[2.00,1e0],\"a\":{\"y\":-0.0,\"x\":123e-2}}");
         var second = new ReplayInput("move", "{\"a\":{\"x\":1.230,\"y\":-0},\"z\":[2,1]}");
@@ -38,7 +38,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Recorder_round_trips_inputs_and_replays_each_tick_in_original_order()
+    public void RecorderRoundTripsInputsAndReplaysEachTickInOriginalOrder()
     {
         var recorder = new ReplayRecorder(new CounterTarget(7, Fingerprint));
         recorder.RecordTick([new ReplayInput("add", "2.0"), new ReplayInput("multiply", "3")]);
@@ -60,7 +60,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Runner_reports_the_first_divergent_tick_and_never_applies_later_inputs()
+    public void RunnerReportsTheFirstDivergentTickAndNeverAppliesLaterInputs()
     {
         var recorder = new ReplayRecorder(new CounterTarget(3, Fingerprint));
         recorder.RecordTick([new ReplayInput("add", "2")]);
@@ -79,7 +79,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Runner_rejects_seed_fingerprint_and_initial_state_mismatches_before_applying_inputs()
+    public void RunnerRejectsSeedFingerprintAndInitialStateMismatchesBeforeApplyingInputs()
     {
         var recorder = new ReplayRecorder(new CounterTarget(4, Fingerprint));
         recorder.RecordTick([new ReplayInput("add", "2")]);
@@ -95,7 +95,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Diff_reports_input_order_and_hash_divergence_with_tick_and_input_index()
+    public void DiffReportsInputOrderAndHashDivergenceWithTickAndInputIndex()
     {
         var first = new ReplayRecorder(new CounterTarget(2, Fingerprint));
         first.RecordTick([new ReplayInput("add", "3"), new ReplayInput("multiply", "2")]);
@@ -109,7 +109,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Recorder_rejects_unrecorded_state_changes_and_failed_ticks_cannot_be_finished()
+    public void RecorderRejectsUnrecordedStateChangesAndFailedTicksCannotBeFinished()
     {
         var target = new CounterTarget(1, Fingerprint);
         var recorder = new ReplayRecorder(target);
@@ -122,7 +122,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Artifact_parser_rejects_duplicates_versions_gaps_and_malformed_hashes()
+    public void ArtifactParserRejectsDuplicatesVersionsGapsAndMalformedHashes()
     {
         var recorder = new ReplayRecorder(new CounterTarget(9, Fingerprint));
         recorder.RecordTick([]);
@@ -136,7 +136,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Replay_serializer_rejects_artifacts_over_the_utf8_byte_limit()
+    public void ReplaySerializerRejectsArtifactsOverTheUtf8ByteLimit()
     {
         var input = new ReplayInput("payload", "\"" + new string('é', 1_000_000) + "\"");
         var tick = new ReplayTick(1, Enumerable.Repeat(input, 34).ToImmutableArray(), Fingerprint);
@@ -146,7 +146,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Replay_parser_counts_utf8_bytes_instead_of_utf16_characters()
+    public void ReplayParserCountsUtf8BytesInsteadOfUtf16Characters()
     {
         var largeType = new string('é', 33_554_433);
         var json = string.Concat(
@@ -160,7 +160,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Host_adapter_excludes_declared_transient_extensions_and_the_save_checksum()
+    public void HostAdapterExcludesDeclaredTransientExtensionsAndTheSaveChecksum()
     {
         var left = CreateHost(17, transient: 1);
         var right = CreateHost(17, transient: 999);
@@ -172,7 +172,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Host_capture_accepts_save_state_above_the_replay_input_limit()
+    public void HostCaptureAcceptsSaveStateAboveTheReplayInputLimit()
     {
         var setup = CreateHost(seed: 5, transient: 0);
         var target = new HostReplayTarget(new LargeSaveHost(setup.Host), (game, input) => { });
@@ -186,7 +186,7 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
-    public void Host_fixture_matches_checked_in_replay_and_reports_mismatches()
+    public void HostFixtureMatchesCheckedInReplayAndReportsMismatches()
     {
         var setup = CreateHost(seed: 41, transient: 7);
         var target = new HostReplayTarget(setup.Host, (game, input) =>
@@ -239,7 +239,10 @@ public sealed class DeterministicReplayTests
         {
             Tick++;
             Value += seed;
-            if (Tick == DriftAtTick) Value++;
+            if (Tick == DriftAtTick)
+            {
+                Value++;
+            }
         }
         public ReadOnlyMemory<byte> CaptureState()
         {

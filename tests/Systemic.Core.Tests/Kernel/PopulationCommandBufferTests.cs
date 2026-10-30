@@ -11,7 +11,7 @@ public sealed class PopulationCommandBufferTests
         new("command.energy", 1, PopulationCodecs.Single);
 
     [Fact]
-    public void Spawn_batch_initializes_current_and_next_buffers_and_single_columns()
+    public void SpawnBatchInitializesCurrentAndNextBuffersAndSingleColumns()
     {
         var world = new World(seed: 91, valueScale: 1);
         var population = world.DefinePopulation<CommandParticle>(enableHandles: true);
@@ -38,7 +38,7 @@ public sealed class PopulationCommandBufferTests
     }
 
     [Fact]
-    public void Batch_removals_use_the_original_rows_and_stale_handles_are_ignored()
+    public void BatchRemovalsUseTheOriginalRowsAndStaleHandlesAreIgnored()
     {
         var world = new World(seed: 92, valueScale: 1);
         var population = world.DefinePopulation<CommandParticle>(enableHandles: true);
@@ -76,7 +76,7 @@ public sealed class PopulationCommandBufferTests
     }
 
     [Fact]
-    public void Invalid_removal_aborts_the_entire_batch_without_spawning_rows()
+    public void InvalidRemovalAbortsTheEntireBatchWithoutSpawningRows()
     {
         var world = new World(seed: 93, valueScale: 1);
         var population = world.DefinePopulation<CommandParticle>();
@@ -94,7 +94,7 @@ public sealed class PopulationCommandBufferTests
     }
 
     [Fact]
-    public void Schema_failure_rolls_back_spawned_rows_and_keeps_the_batch_uncommitted()
+    public void SchemaFailureRollsBackSpawnedRowsAndKeepsTheBatchUncommitted()
     {
         var world = new World(seed: 94, valueScale: 1);
         var population = world.DefinePopulation<CommandParticle>();
@@ -109,7 +109,7 @@ public sealed class PopulationCommandBufferTests
     }
 
     [Fact]
-    public void Reserved_warmed_spawn_and_remove_batches_do_not_allocate()
+    public void ReservedWarmedSpawnAndRemoveBatchesDoNotAllocate()
     {
         var world = new World(seed: 95, valueScale: 1);
         var population = world.DefinePopulation<CommandParticle>(enableHandles: true);

@@ -56,7 +56,11 @@ public static class DeterministicDecimal
         ValidateScale(scale);
         var (a, aScale) = Parts(left);
         var (b, bScale) = Parts(right);
-        if (b.IsZero) throw new DivideByZeroException();
+        if (b.IsZero)
+        {
+            throw new DivideByZeroException();
+        }
+
         return Result(a * Power10(bScale), b * Power10(aScale), scale);
     }
 
@@ -66,7 +70,11 @@ public static class DeterministicDecimal
         decimal.GetBits(value, bits);
         BigInteger coefficient = unchecked((uint)bits[0]) | ((BigInteger)unchecked((uint)bits[1]) << 32)
             | ((BigInteger)unchecked((uint)bits[2]) << 64);
-        if ((bits[3] & int.MinValue) != 0) coefficient = -coefficient;
+        if ((bits[3] & int.MinValue) != 0)
+        {
+            coefficient = -coefficient;
+        }
+
         return (coefficient, (bits[3] >> 16) & 0xff);
     }
 
@@ -77,8 +85,16 @@ public static class DeterministicDecimal
         var negative = numerator.Sign < 0;
         var quotient = BigInteger.DivRem(BigInteger.Abs(numerator), denominator, out var remainder);
         var compare = (remainder * 2).CompareTo(denominator);
-        if (compare > 0 || (compare == 0 && !quotient.IsEven)) quotient++;
-        if (quotient > MaximumCoefficient) throw new OverflowException();
+        if (compare > 0 || (compare == 0 && !quotient.IsEven))
+        {
+            quotient++;
+        }
+
+        if (quotient > MaximumCoefficient)
+        {
+            throw new OverflowException();
+        }
+
         var low = (uint)(quotient & uint.MaxValue);
         var middle = (uint)((quotient >> 32) & uint.MaxValue);
         var high = (uint)((quotient >> 64) & uint.MaxValue);
@@ -89,6 +105,9 @@ public static class DeterministicDecimal
     private static BigInteger Power10(int scale) => BigInteger.Pow(10, scale);
     private static void ValidateScale(int scale)
     {
-        if (scale < 0 || scale > 28) throw new ArgumentOutOfRangeException(nameof(scale), "Scale must be between 0 and 28.");
+        if (scale < 0 || scale > 28)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scale), "Scale must be between 0 and 28.");
+        }
     }
 }

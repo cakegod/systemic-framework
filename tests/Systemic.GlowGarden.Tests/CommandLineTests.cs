@@ -1,6 +1,8 @@
 using GlowGarden;
 using Xunit;
 
+namespace Systemic.GlowGarden.Tests;
+
 public class CommandLineTests
 {
     [Theory]

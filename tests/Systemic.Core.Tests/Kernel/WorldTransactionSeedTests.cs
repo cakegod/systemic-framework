@@ -8,7 +8,7 @@ public sealed class WorldTransactionSeedTests
     [InlineData(0)]
     [InlineData(-17)]
     [InlineData(int.MaxValue)]
-    public void Seed_is_preserved_by_cloning_and_adoption(int seed)
+    public void SeedIsPreservedByCloningAndAdoption(int seed)
     {
         var world = new World(seed, 1);
         var branch = world.Clone();
@@ -23,7 +23,7 @@ public sealed class WorldTransactionSeedTests
     }
 
     [Fact]
-    public void Adoption_rejects_a_world_with_a_different_seed_without_consuming_either_world()
+    public void AdoptionRejectsAWorldWithADifferentSeedWithoutConsumingEitherWorld()
     {
         var world = new World(1, 1);
         var other = new World(2, 1);

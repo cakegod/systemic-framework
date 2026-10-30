@@ -7,7 +7,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class FixedSpatialQueryTests
 {
     [Fact]
-    public void Exact_fixed_nearest_distinguishes_one_raw_unit_and_preserves_ties()
+    public void ExactFixedNearestDistinguishesOneRawUnitAndPreservesTies()
     {
         var one = 1L << 32;
         var grid = new FixedPopulationSpatialIndex2D(Point(0, 0), Point(10 * one, 10 * one));
@@ -28,7 +28,7 @@ public sealed class FixedSpatialQueryTests
     }
 
     [Fact]
-    public void Fixed_wrapped_endpoints_are_equal_and_results_do_not_repeat()
+    public void FixedWrappedEndpointsAreEqualAndResultsDoNotRepeat()
     {
         var scale = 1L << 32;
         var grid = new FixedPopulationSpatialIndex2D(Point(0, 0), Point(10 * scale, 10 * scale), wrapX: true, wrapY: true);
@@ -44,7 +44,7 @@ public sealed class FixedSpatialQueryTests
     }
 
     [Fact]
-    public void Fixed_queries_handle_full_signed_range_without_squared_distance_overflow()
+    public void FixedQueriesHandleFullSignedRangeWithoutSquaredDistanceOverflow()
     {
         var grid = new FixedPopulationSpatialIndex2D(Point(long.MinValue, long.MinValue), Point(long.MaxValue, long.MaxValue));
         var snapshot = grid.Rebuild([
@@ -66,12 +66,16 @@ public sealed class FixedSpatialQueryTests
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public void Fixed_queries_match_big_integer_oracle_across_full_range(bool wrapX, bool wrapY)
+    public void FixedQueriesMatchBigIntegerOracleAcrossFullRange(bool wrapX, bool wrapY)
     {
         var random = new Random(202606);
         var grid = new FixedPopulationSpatialIndex2D(Point(long.MinValue, long.MinValue), Point(long.MaxValue, long.MaxValue), wrapX, wrapY);
         var positions = new FixedVector2[80];
-        for (var i = 0; i < positions.Length; i++) positions[i] = Point(NextRaw(random), NextRaw(random));
+        for (var i = 0; i < positions.Length; i++)
+        {
+            positions[i] = Point(NextRaw(random), NextRaw(random));
+        }
+
         positions[0] = Point(long.MinValue, long.MinValue);
         positions[1] = Point(long.MaxValue, long.MaxValue);
         var snapshot = grid.Rebuild(positions);
@@ -98,7 +102,7 @@ public sealed class FixedSpatialQueryTests
     }
 
     [Fact]
-    public void Fixed_rebuild_validation_and_snapshot_lifetime_are_explicit()
+    public void FixedRebuildValidationAndSnapshotLifetimeAreExplicit()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new FixedPopulationSpatialIndex2D(Point(0, 0), Point(0, 1)));
         var grid = new FixedPopulationSpatialIndex2D(Point(0, 0), Point(10, 10));
@@ -119,7 +123,7 @@ public sealed class FixedSpatialQueryTests
     }
 
     [Fact]
-    public void Fixed_queries_reject_rebuilds_from_a_filter_and_retain_smallest_rows_when_capped()
+    public void FixedQueriesRejectRebuildsFromAFilterAndRetainSmallestRowsWhenCapped()
     {
         var grid = new FixedPopulationSpatialIndex2D(Point(0, 0), Point(10, 10));
         grid.Rebuild([Point(1, 1), Point(1, 1), Point(1, 1)]);

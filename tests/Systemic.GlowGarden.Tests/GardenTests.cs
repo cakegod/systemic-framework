@@ -122,7 +122,11 @@ public class GardenTests
     {
         var plants = s._plants;
         plants.Clear();
-        for (var i = 0; i < 20; i++) plants.Add(new(i, GardenSimulation.Colony + new System.Numerics.Vector2(i * 8, 0), 1));
+        for (var i = 0; i < 20; i++)
+        {
+            plants.Add(new(i, GardenSimulation.Colony + new System.Numerics.Vector2(i * 8, 0), 1));
+        }
+
         var workers = s._creatures;
         workers.Clear();
         workers.Add(new(0, CreatureKind.Burstling, GardenSimulation.Colony, 0, 0, false));
@@ -154,12 +158,26 @@ public class GardenTests
         Arrange(s);
         s.ToggleTalent(talent);
         host.Step(1);
-        if (talent is Talent.Echo or Talent.Seedstorm) Assert.True(s.PendingImpactCount > 0);
-        if (talent == Talent.ChainReaction) Assert.InRange(s.BurstCount, 2, GardenSimulation.MaxReactionBursts);
+        if (talent is Talent.Echo or Talent.Seedstorm)
+        {
+            Assert.True(s.PendingImpactCount > 0);
+        }
+
+        if (talent == Talent.ChainReaction)
+        {
+            Assert.InRange(s.BurstCount, 2, GardenSimulation.MaxReactionBursts);
+        }
+
         host.Step(20);
         Assert.True(s.EffectCount(talent) > 0);
-        if (talent == Talent.Seedstorm) Assert.True(s.Plants.Count > 20);
-        else Assert.True(s.BurstCount > 1);
+        if (talent == Talent.Seedstorm)
+        {
+            Assert.True(s.Plants.Count > 20);
+        }
+        else
+        {
+            Assert.True(s.BurstCount > 1);
+        }
     }
 
     [Fact]
@@ -301,7 +319,11 @@ public class GardenTests
         foreach (var host in new[] { first, second })
         {
             Arrange(host.Simulation);
-            foreach (var talent in new[] { a, b, c }) host.Simulation.ToggleTalent(talent);
+            foreach (var talent in new[] { a, b, c })
+            {
+                host.Simulation.ToggleTalent(talent);
+            }
+
             host.Step(5000);
             Assert.InRange(host.Simulation.CopyCount, 0, GardenSimulation.MaxCopies);
             Assert.InRange(host.Simulation.PendingImpactCount, 0, GardenSimulation.MaxPendingImpacts);
@@ -311,7 +333,10 @@ public class GardenTests
         Assert.Equal(first.Simulation.Plants.ToArray(), second.Simulation.Plants.ToArray());
         Assert.Equal(first.Simulation.Creatures.ToArray(), second.Simulation.Creatures.ToArray());
         Assert.Equal(first.Simulation.Motes.ToArray(), second.Simulation.Motes.ToArray());
-        foreach (var talent in Enum.GetValues<Talent>()) Assert.Equal(first.Simulation.EffectCount(talent), second.Simulation.EffectCount(talent));
+        foreach (var talent in Enum.GetValues<Talent>())
+        {
+            Assert.Equal(first.Simulation.EffectCount(talent), second.Simulation.EffectCount(talent));
+        }
     }
     [Fact]
     public void ProjectileRelocatesWorkerAndClonesOnlyAfterActualBounce()
@@ -338,7 +363,11 @@ public class GardenTests
         var s = host.Simulation;
         Arrange(s);
         var plants = s._plants;
-        for (var i = 0; i < plants.Count; i++) plants[i] = plants[i] with { Growth = 0 };
+        for (var i = 0; i < plants.Count; i++)
+        {
+            plants[i] = plants[i] with { Growth = 0 };
+        }
+
         s.ToggleTalent(Talent.ChainReaction);
         s.ToggleTalent(Talent.Clone);
         s.ToggleTalent(Talent.LivingProjectile);

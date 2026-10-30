@@ -8,7 +8,7 @@ namespace Systemic.Tests.Host;
 public sealed class DeferredFactBatchTests
 {
     [Fact]
-    public void A_tick_of_deferred_facts_commits_as_one_transaction()
+    public void ATickOfDeferredFactsCommitsAsOneTransaction()
     {
         var world = new World(seed: 3, valueScale: 1);
         var target = world.Add(new DataEntity([], [], ("value", 0.0)));
@@ -24,7 +24,7 @@ public sealed class DeferredFactBatchTests
     }
 
     [Fact]
-    public void A_tick_rolls_back_every_deferred_fact_when_a_later_fact_aborts()
+    public void ATickRollsBackEveryDeferredFactWhenALaterFactAborts()
     {
         var world = new World(seed: 3, valueScale: 1);
         var target = world.Add(new DataEntity([], [], ("value", 0.0)));

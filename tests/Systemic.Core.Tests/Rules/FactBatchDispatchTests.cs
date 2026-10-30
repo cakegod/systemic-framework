@@ -7,7 +7,7 @@ namespace Systemic.Tests.Rules;
 public sealed class FactBatchDispatchTests
 {
     [Fact]
-    public void Batch_commits_every_fact_in_one_transaction()
+    public void BatchCommitsEveryFactInOneTransaction()
     {
         var world = new World(seed: 1, valueScale: 1);
         var target = world.Add(new DataEntity([], [], ("value", 0.0)));
@@ -23,7 +23,7 @@ public sealed class FactBatchDispatchTests
     }
 
     [Fact]
-    public void Batch_rolls_back_earlier_facts_when_a_later_fact_aborts()
+    public void BatchRollsBackEarlierFactsWhenALaterFactAborts()
     {
         var world = new World(seed: 1, valueScale: 1);
         var target = world.Add(new DataEntity([], [], ("value", 0.0)));
@@ -47,7 +47,7 @@ public sealed class FactBatchDispatchTests
     }
 
     [Fact]
-    public void Empty_batch_reports_no_work()
+    public void EmptyBatchReportsNoWork()
     {
         var world = new World(seed: 1, valueScale: 1);
         var rules = new RuleEngine(new CompiledRuleSet([AddRule()]));
@@ -59,7 +59,7 @@ public sealed class FactBatchDispatchTests
     }
 
     [Fact]
-    public void A_batch_that_cannot_begin_a_transaction_does_not_poison_the_engine()
+    public void ABatchThatCannotBeginATransactionDoesNotPoisonTheEngine()
     {
         var world = new World(seed: 2, valueScale: 1);
         var target = world.Add(new DataEntity([], [], ("value", 0.0)));
@@ -86,7 +86,7 @@ public sealed class FactBatchDispatchTests
     }
 
     [Fact]
-    public void A_throwing_action_restores_the_scheduled_queue_and_cooldowns()
+    public void AThrowingActionRestoresTheScheduledQueueAndCooldowns()
     {
         var world = new World(seed: 3, valueScale: 1);
         var target = world.Add(new DataEntity([], [], ("value", 0.0)));

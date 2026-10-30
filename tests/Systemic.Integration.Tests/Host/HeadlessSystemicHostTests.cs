@@ -1,13 +1,11 @@
-using Systemic.Content;
 using Systemic.Host;
-using Systemic.Save;
 
 namespace Systemic.Tests.Host;
 
 public sealed class HeadlessSystemicHostTests
 {
     [Fact]
-    public void Headless_host_runs_the_same_ticks_ui_and_save_lifecycle_as_other_adapters()
+    public void HeadlessHostRunsTheSameTicksUiAndSaveLifecycleAsOtherAdapters()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var host = HeadlessSystemicHost.Create(content, seed: 44);

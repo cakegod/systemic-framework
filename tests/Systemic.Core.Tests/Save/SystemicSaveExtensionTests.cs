@@ -1,9 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Systemic.Content;
-using Systemic.Extensions;
 using Systemic.Host;
-using Systemic.Kernel;
 using Systemic.Save;
 using Systemic.Tests.Content;
 
@@ -12,7 +10,7 @@ namespace Systemic.Tests.Save;
 public sealed class SystemicSaveExtensionTests
 {
     [Fact]
-    public void Future_migrations_run_sequentially_on_an_independent_checked_copy()
+    public void FutureMigrationsRunSequentiallyOnAnIndependentCheckedCopy()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -35,7 +33,7 @@ public sealed class SystemicSaveExtensionTests
     }
 
     [Fact]
-    public void Future_migrations_reject_tampering_and_missing_steps()
+    public void FutureMigrationsRejectTamperingAndMissingSteps()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -56,7 +54,7 @@ public sealed class SystemicSaveExtensionTests
     }
 
     [Fact]
-    public void New_saves_capture_and_restore_registered_extension_state_by_id()
+    public void NewSavesCaptureAndRestoreRegisteredExtensionStateById()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -77,7 +75,7 @@ public sealed class SystemicSaveExtensionTests
     }
 
     [Fact]
-    public void Version_five_documents_drop_the_retired_event_engine_state()
+    public void VersionFiveDocumentsDropTheRetiredEventEngineState()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);

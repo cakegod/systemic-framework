@@ -1,6 +1,4 @@
 using Systemic.Kernel;
-using Systemic.Content;
-using Systemic.Extensions;
 using Systemic.Host;
 
 namespace Systemic.Tests.Host;
@@ -8,7 +6,7 @@ namespace Systemic.Tests.Host;
 public sealed class SystemicGameTests
 {
     [Fact]
-    public void Game_host_runs_systems_in_stable_order_and_uses_content_reactions()
+    public void GameHostRunsSystemsInStableOrderAndUsesContentReactions()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"))
             with
@@ -36,7 +34,7 @@ public sealed class SystemicGameTests
     }
 
     [Fact]
-    public void Game_host_accumulates_fixed_steps_from_compiled_tick_rate()
+    public void GameHostAccumulatesFixedStepsFromCompiledTickRate()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"))
             with
@@ -53,7 +51,7 @@ public sealed class SystemicGameTests
     }
 
     [Fact]
-    public void Host_runs_scheduled_systems_after_legacy_systems_with_deferred_world_commands()
+    public void HostRunsScheduledSystemsAfterLegacySystemsWithDeferredWorldCommands()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"))
             with
@@ -74,7 +72,7 @@ public sealed class SystemicGameTests
     }
 
     [Fact]
-    public void Disposing_a_host_disposes_its_schedule_and_stops_future_steps()
+    public void DisposingAHostDisposesItsScheduleAndStopsFutureSteps()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"))
             with
@@ -90,7 +88,7 @@ public sealed class SystemicGameTests
     }
 
     [Fact]
-    public void Scheduled_fact_dispatch_requires_exclusive_world_write_access_and_expires_its_context()
+    public void ScheduledFactDispatchRequiresExclusiveWorldWriteAccessAndExpiresItsContext()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"))
             with
@@ -109,7 +107,7 @@ public sealed class SystemicGameTests
     }
 
     [Fact]
-    public void Failed_scheduled_tick_rolls_back_world_commands_and_logical_tick()
+    public void FailedScheduledTickRollsBackWorldCommandsAndLogicalTick()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"))
             with
@@ -130,7 +128,7 @@ public sealed class SystemicGameTests
     }
 
     [Fact]
-    public void Registered_module_content_runs_through_the_core_builder()
+    public void RegisteredModuleContentRunsThroughTheCoreBuilder()
     {
         var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
         var content = SystemicTestContent.Load(samplePath);

@@ -1,7 +1,5 @@
 using Systemic.Kernel;
 using Systemic.Content;
-using Systemic.Extensions;
-using Systemic.Gameplay2D;
 using Systemic.Host;
 using Systemic.Rules;
 using Systemic.Save;
@@ -11,7 +9,7 @@ namespace Systemic.Gameplay2D.Tests;
 public sealed class Gameplay2DTests
 {
     [Fact]
-    public void Module_shares_a_scheduling_wave_with_other_deferred_writers()
+    public void ModuleSharesASchedulingWaveWithOtherDeferredWriters()
     {
         var content = ContentPackLoader.Load(
             Path.Combine(AppContext.BaseDirectory, "samples", "systemic-sandbox"));
@@ -35,7 +33,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Spatial_target_selection_is_nearest_and_stable_on_ties()
+    public void SpatialTargetSelectionIsNearestAndStableOnTies()
     {
         var world = new World(seed: 1, valueScale: 1);
         var blueprint = Actor("target", new Dictionary<string, double>());
@@ -49,7 +47,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Spatial_target_selection_can_choose_the_farthest_match_with_a_stable_tie_break()
+    public void SpatialTargetSelectionCanChooseTheFarthestMatchWithAStableTieBreak()
     {
         var world = new World(seed: 18, valueScale: 1);
         _ = Gameplay2D.SpawnActor(world, Actor("target", new Dictionary<string, double>()), new Point2(2, 0));
@@ -63,7 +61,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Resource_transfer_is_atomic_and_respects_capacity()
+    public void ResourceTransferIsAtomicAndRespectsCapacity()
     {
         var world = new World(seed: 2, valueScale: 1);
         var source = world.Add(new DataEntity([], [], ("ore", 8)));
@@ -83,7 +81,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Resource_transfer_rejects_a_self_transfer_without_creating_resources()
+    public void ResourceTransferRejectsASelfTransferWithoutCreatingResources()
     {
         var world = new World(seed: 17, valueScale: 1);
         var resource = world.Add(new DataEntity([], [], ("ore", 8)));
@@ -96,7 +94,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Projectiles_move_deterministically_and_expire_on_their_logical_tick()
+    public void ProjectilesMoveDeterministicallyAndExpireOnTheirLogicalTick()
     {
         var world = new World(seed: 3, valueScale: 1);
         var projectile = Gameplay2D.SpawnProjectile(world, Actor("bolt", new Dictionary<string, double>()),
@@ -121,7 +119,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Out_of_range_projectile_motion_rolls_back_properties_and_spatial_bounds()
+    public void OutOfRangeProjectileMotionRollsBackPropertiesAndSpatialBounds()
     {
         var world = new World(seed: 21, valueScale: 1);
         var projectile = Gameplay2D.SpawnProjectile(world, Actor("overflowing-bolt", new Dictionary<string, double>()),
@@ -140,7 +138,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Projectile_with_unindexable_trajectory_is_rejected_before_it_can_poison_game_ticks()
+    public void ProjectileWithUnindexableTrajectoryIsRejectedBeforeItCanPoisonGameTicks()
     {
         var world = new World(seed: 211, valueScale: 1);
         var content = Systemic.Content.ContentPackLoader.Load(
@@ -159,7 +157,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Stackable_statuses_refresh_expire_and_restore_effective_properties()
+    public void StackableStatusesRefreshExpireAndRestoreEffectiveProperties()
     {
         var world = new World(seed: 4, valueScale: 1);
         var target = world.Add(new DataEntity([], [], ("power", 10)));
@@ -185,7 +183,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Status_that_overflows_an_effective_property_is_rejected_atomically()
+    public void StatusThatOverflowsAnEffectivePropertyIsRejectedAtomically()
     {
         var world = new World(seed: 22, valueScale: 1);
         var target = world.Add(new DataEntity([], [], ("power", 2)));
@@ -200,7 +198,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Modifier_durations_advance_in_the_host_without_the_optional_2d_module()
+    public void ModifierDurationsAdvanceInTheHostWithoutTheOptional2dModule()
     {
         var content = Systemic.Content.ContentPackLoader.Load(
             Path.Combine(AppContext.BaseDirectory, "samples", "systemic-sandbox"));
@@ -219,7 +217,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Gameplay_module_can_be_registered_as_one_systemic_extension()
+    public void GameplayModuleCanBeRegisteredAsOneSystemicExtension()
     {
         var builder = new SystemicGameBuilder(
             Systemic.Content.ContentPackLoader.Load(
@@ -235,7 +233,7 @@ public sealed class Gameplay2DTests
     }
 
     [Fact]
-    public void Saved_projectile_motion_and_spatial_bounds_resume_deterministically()
+    public void SavedProjectileMotionAndSpatialBoundsResumeDeterministically()
     {
         var content = ContentPackLoader.Load(Path.Combine(AppContext.BaseDirectory, "samples", "systemic-sandbox"));
         var initial = content.CreateWorld(seed: 20, valueScale: 1);

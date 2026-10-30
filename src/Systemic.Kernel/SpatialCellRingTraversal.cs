@@ -133,12 +133,24 @@ internal struct SpatialCellRingTraversal
 
         public AxisCellRange Window(int ring)
         {
-            if (ring < 0) return default;
+            if (ring < 0)
+            {
+                return default;
+            }
+
             if (Wrap)
             {
-                if ((2L * ring) + 1 >= Count) return new AxisCellRange(0, Count);
+                if ((2L * ring) + 1 >= Count)
+                {
+                    return new AxisCellRange(0, Count);
+                }
+
                 var start = _centerCell - ring;
-                if (start < 0) start += Count;
+                if (start < 0)
+                {
+                    start += Count;
+                }
+
                 return new AxisCellRange(start, (2 * ring) + 1);
             }
             var first = Math.Max(0, _centerCell - ring);
@@ -164,8 +176,15 @@ internal struct SpatialCellRingTraversal
             var right = _centerCell + ring;
             if (Wrap)
             {
-                if (left < 0) left += Count;
-                if (right >= Count) right -= Count;
+                if (left < 0)
+                {
+                    left += Count;
+                }
+
+                if (right >= Count)
+                {
+                    right -= Count;
+                }
             }
             count = 0;
             if (left >= 0 && left < Count)
@@ -175,8 +194,15 @@ internal struct SpatialCellRingTraversal
             }
             if (right >= 0 && right < Count && right != left)
             {
-                if (count == 0) first = right;
-                else second = right;
+                if (count == 0)
+                {
+                    first = right;
+                }
+                else
+                {
+                    second = right;
+                }
+
                 count++;
             }
         }
@@ -184,9 +210,17 @@ internal struct SpatialCellRingTraversal
         public double DistanceToOutside(int ring)
         {
             GetNewCells(ring + 1, out var first, out var second, out var count);
-            if (count == 0) return double.PositiveInfinity;
+            if (count == 0)
+            {
+                return double.PositiveInfinity;
+            }
+
             var distance = DistanceToCell(first);
-            if (count == 2) distance = Math.Min(distance, DistanceToCell(second));
+            if (count == 2)
+            {
+                distance = Math.Min(distance, DistanceToCell(second));
+            }
+
             return Math.Max(0d, distance - _error);
         }
 
@@ -196,7 +230,10 @@ internal struct SpatialCellRingTraversal
             var end = cell == Count - 1
                 ? Math.Max(_maximum, _minimum + _size)
                 : Math.Min(_minimum + ((cell + 1) * _cellSize), Math.Max(_maximum, _minimum + _size));
-            if (!Wrap) return IntervalDistance(_center, start, end);
+            if (!Wrap)
+            {
+                return IntervalDistance(_center, start, end);
+            }
 
             var offset = SpatialGrid.Mod((_center - _minimum) % _size, _size);
             var point = _minimum + offset;

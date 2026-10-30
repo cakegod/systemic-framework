@@ -1,10 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Systemic.Kernel;
-using Systemic.Content;
 using Systemic.Extensions;
 using Systemic.Host;
-using Systemic.Incremental;
 using Systemic.Rules;
 using Systemic.Save;
 
@@ -13,7 +11,7 @@ namespace Systemic.Tests.Save;
 public sealed class SystemicSaveCodecTests
 {
     [Fact]
-    public void Round_trip_preserves_world_state_random_sequence_incremental_runtime_and_extension_state()
+    public void RoundTripPreservesWorldStateRandomSequenceIncrementalRuntimeAndExtensionState()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var initial = content.CreateWorld(seed: 17, valueScale: 1);
@@ -61,7 +59,7 @@ public sealed class SystemicSaveCodecTests
     }
 
     [Fact]
-    public void Round_trip_at_tick_zero_preserves_absolute_modifier_and_grant_expiry()
+    public void RoundTripAtTickZeroPreservesAbsoluteModifierAndGrantExpiry()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 21, valueScale: 1)).Build();
@@ -80,7 +78,7 @@ public sealed class SystemicSaveCodecTests
     }
 
     [Fact]
-    public void Version_one_save_is_rejected_with_a_current_version_diagnostic()
+    public void VersionOneSaveIsRejectedWithACurrentVersionDiagnostic()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 3, valueScale: 1)).Build();
@@ -96,7 +94,7 @@ public sealed class SystemicSaveCodecTests
     }
 
     [Fact]
-    public void Round_trip_preserves_selected_and_active_build_choice_state()
+    public void RoundTripPreservesSelectedAndActiveBuildChoiceState()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var initial = content.CreateWorld(seed: 19, valueScale: 1);
@@ -131,7 +129,7 @@ public sealed class SystemicSaveCodecTests
     }
 
     [Fact]
-    public void Save_round_trip_preserves_bounded_expression_event_history()
+    public void SaveRoundTripPreservesBoundedExpressionEventHistory()
     {
         var sourceContent = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var rules = new CompiledRuleSet([
@@ -158,7 +156,7 @@ public sealed class SystemicSaveCodecTests
     }
 
     [Fact]
-    public void Stateful_system_extension_is_registered_once_and_restored()
+    public void StatefulSystemExtensionIsRegisteredOnceAndRestored()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var extension = new StatefulSystemExtension { Value = 22 };
@@ -177,7 +175,7 @@ public sealed class SystemicSaveCodecTests
     }
 
     [Fact]
-    public void Rejects_missing_migration_steps_and_dangling_saved_links()
+    public void RejectsMissingMigrationStepsAndDanglingSavedLinks()
     {
         var content = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
         var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 3, valueScale: 1)).Build();

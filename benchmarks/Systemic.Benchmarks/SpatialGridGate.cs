@@ -271,7 +271,7 @@ internal static class SpatialGridGate
     }
 
     private static void OracleRadius(
-        IReadOnlyList<Vector2> positions,
+        Vector2[] positions,
         Vector2 center,
         float radius,
         bool wrapX,
@@ -280,7 +280,7 @@ internal static class SpatialGridGate
     {
         results.Clear();
         var limit = (double)radius * radius;
-        for (var row = 0; row < positions.Count; row++)
+        for (var row = 0; row < positions.Length; row++)
         {
             var position = positions[row];
             var dx = Math.Abs((double)center.X - position.X);
@@ -305,14 +305,14 @@ internal static class SpatialGridGate
     }
 
     private static void OracleBoxRadius(
-        IReadOnlyList<Vector2> positions,
+        Vector2[] positions,
         Vector2 center,
         float radius,
         List<int> results)
     {
         results.Clear();
         var limit = (double)radius * radius;
-        for (var row = 0; row < positions.Count; row++)
+        for (var row = 0; row < positions.Length; row++)
         {
             var position = positions[row];
             var dx = Math.Max(Math.Abs((double)center.X - position.X) - EntryHalfExtent, 0d);

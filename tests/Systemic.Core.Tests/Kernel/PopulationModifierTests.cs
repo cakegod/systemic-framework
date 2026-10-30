@@ -6,14 +6,14 @@ namespace Systemic.Tests.Kernel;
 /// Row modifiers are a fixed inline slot block, so a row pays for them once and never allocates to
 /// gain one. The slot key comes from the schema, which is what makes a saved block readable.
 /// </summary>
-[Collection(AllocationMeasurementCollection.Name)]
+[Collection(AllocationMeasurementGroup.Name)]
 public sealed class PopulationModifierTests
 {
     private static readonly PopulationColumnKey<int> s_healthKey =
         new("test.modifier.health", 1, PopulationCodecs.Int32);
 
     [Fact]
-    public void A_modifier_changes_the_effective_value_and_not_the_column()
+    public void AModifierChangesTheEffectiveValueAndNotTheColumn()
     {
         var world = new World(seed: 61, valueScale: 1);
         var population = Create(world, 2);
@@ -26,7 +26,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void Several_modifiers_on_one_property_sum_in_slot_order()
+    public void SeveralModifiersOnOnePropertySumInSlotOrder()
     {
         var world = new World(seed: 62, valueScale: 1);
         var population = Create(world, 1);
@@ -39,7 +39,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void Setting_the_same_property_again_replaces_that_row_modifier()
+    public void SettingTheSamePropertyAgainReplacesThatRowModifier()
     {
         var world = new World(seed: 63, valueScale: 1);
         var population = Create(world, 1);
@@ -51,7 +51,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void A_modifier_stays_active_through_its_absolute_expiry_tick()
+    public void AModifierStaysActiveThroughItsAbsoluteExpiryTick()
     {
         var world = new World(seed: 64, valueScale: 1);
         var population = Create(world, 1);
@@ -68,7 +68,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void A_one_tick_modifier_created_during_a_tick_applies_on_that_tick()
+    public void AOneTickModifierCreatedDuringATickAppliesOnThatTick()
     {
         var world = new World(seed: 73, valueScale: 1);
         world.LogicalTick = 5;
@@ -82,7 +82,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void A_two_tick_modifier_created_during_a_tick_applies_for_two_ticks()
+    public void ATwoTickModifierCreatedDuringATickAppliesForTwoTicks()
     {
         var world = new World(seed: 74, valueScale: 1);
         world.LogicalTick = 5;
@@ -99,7 +99,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void An_expired_slot_is_reused_instead_of_failing()
+    public void AnExpiredSlotIsReusedInsteadOfFailing()
     {
         var world = new World(seed: 65, valueScale: 1);
         var population = Create(world, 1);
@@ -117,7 +117,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void A_row_with_no_free_slot_fails_loudly_instead_of_dropping_the_modifier()
+    public void ARowWithNoFreeSlotFailsLoudlyInsteadOfDroppingTheModifier()
     {
         var world = new World(seed: 66, valueScale: 1);
         var population = Create(world, 1);
@@ -134,7 +134,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void Modifier_writes_and_expired_reads_do_not_allocate()
+    public void ModifierWritesAndExpiredReadsDoNotAllocate()
     {
         var world = new World(seed: 67, valueScale: 1);
         var population = Create(world, 100_000);
@@ -158,7 +158,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void A_modifier_write_rolls_back_with_the_enclosing_transaction()
+    public void AModifierWriteRollsBackWithTheEnclosingTransaction()
     {
         var world = new World(seed: 68, valueScale: 1);
         var population = Create(world, 1);
@@ -174,7 +174,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void Modifier_slots_round_trip_through_the_population_save_state()
+    public void ModifierSlotsRoundTripThroughThePopulationSaveState()
     {
         var source = new World(seed: 69, valueScale: 1);
         var sourcePopulation = Create(source, 2);
@@ -193,7 +193,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void An_undeclared_modifier_property_names_the_schema_and_its_declared_properties()
+    public void AnUndeclaredModifierPropertyNamesTheSchemaAndItsDeclaredProperties()
     {
         var world = new World(seed: 70, valueScale: 1);
         var population = Create(world, 1);
@@ -207,7 +207,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void A_non_finite_modifier_value_is_rejected()
+    public void ANonFiniteModifierValueIsRejected()
     {
         var world = new World(seed: 71, valueScale: 1);
         var population = Create(world, 1);
@@ -219,7 +219,7 @@ public sealed class PopulationModifierTests
     }
 
     [Fact]
-    public void A_schema_without_modifier_properties_creates_no_slot_column()
+    public void ASchemaWithoutModifierPropertiesCreatesNoSlotColumn()
     {
         var world = new World(seed: 72, valueScale: 1);
         var population = world.DefinePopulation<PlainPrey>();

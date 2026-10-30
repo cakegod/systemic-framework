@@ -23,7 +23,7 @@ public sealed class PopulationCodecTests
     private static readonly Vector4[] Vector4s = [new Vector4(1, -2, 3, 4)];
 
     [Fact]
-    public void Blittable_codecs_encode_the_stable_little_endian_wire_format()
+    public void BlittableCodecsEncodeTheStableLittleEndianWireFormat()
     {
         AssertBytes(PopulationCodecs.Int32, [-2], [0xFE, 0xFF, 0xFF, 0xFF]);
         AssertBytes(PopulationCodecs.UInt64, [0x0102_0304_0506_0708UL], [0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01]);
@@ -36,7 +36,7 @@ public sealed class PopulationCodecTests
     }
 
     [Fact]
-    public void Non_blittable_codecs_validate_their_wire_values()
+    public void NonBlittableCodecsValidateTheirWireValues()
     {
         AssertBytes(PopulationCodecs.Boolean, [true], [1]);
         Assert.Throws<FormatException>(() => PopulationCodecs.Boolean.Decode([2], new bool[1]));
@@ -44,7 +44,7 @@ public sealed class PopulationCodecTests
     }
 
     [Fact]
-    public void Every_built_in_codec_round_trips_its_values()
+    public void EveryBuiltInCodecRoundTripsItsValues()
     {
         RoundTrip(PopulationCodecs.Boolean, Booleans);
         RoundTrip(PopulationCodecs.Byte, Bytes);
@@ -65,7 +65,7 @@ public sealed class PopulationCodecTests
     }
 
     [Fact]
-    public void Handle_generations_are_deterministic_per_world()
+    public void HandleGenerationsAreDeterministicPerWorld()
     {
         static ulong[] Generations()
         {
@@ -80,7 +80,7 @@ public sealed class PopulationCodecTests
     }
 
     [Fact]
-    public void Population_state_keeps_the_two_argument_shape_existing_callers_use()
+    public void PopulationStateKeepsTheTwoArgumentShapeExistingCallersUse()
     {
         var world = new World(seed: 79, valueScale: 1);
         var population = world.DefinePopulation<HandledKind>(enableHandles: true);
@@ -97,7 +97,7 @@ public sealed class PopulationCodecTests
     }
 
     [Fact]
-    public void A_rolled_back_spawn_does_not_change_the_next_generation_a_load_issues()
+    public void ARolledBackSpawnDoesNotChangeTheNextGenerationALoadIssues()
     {
         var world = new World(seed: 78, valueScale: 1);
         var population = world.DefinePopulation<HandledKind>(enableHandles: true);

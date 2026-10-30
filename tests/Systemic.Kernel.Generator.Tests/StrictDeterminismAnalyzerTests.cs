@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Systemic.Kernel.Generator;
 using Xunit;
 
 namespace Systemic.Kernel.Generator.Tests;
@@ -10,7 +9,7 @@ namespace Systemic.Kernel.Generator.Tests;
 public sealed class StrictDeterminismAnalyzerTests
 {
     [Fact]
-    public void Diagnostics_are_errors_and_link_to_the_matching_guide_anchor()
+    public void DiagnosticsAreErrorsAndLinkToTheMatchingGuideAnchor()
     {
         var diagnostics = new StrictDeterminismAnalyzer().SupportedDiagnostics;
 
@@ -27,7 +26,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_system_reports_floating_math_clock_random_parallel_and_unordered_iteration()
+    public async Task StrictSystemReportsFloatingMathClockRandomParallelAndUnorderedIteration()
     {
         const string source = """
             using System;
@@ -75,7 +74,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task File_configuration_can_enable_strict_analysis_and_cosmetic_type_can_opt_out()
+    public async Task FileConfigurationCanEnableStrictAnalysisAndCosmeticTypeCanOptOut()
     {
         const string source = """
             using System;
@@ -99,7 +98,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Gameplay_system_implementations_are_strict_by_default()
+    public async Task GameplaySystemImplementationsAreStrictByDefault()
     {
         const string source = """
             using System;
@@ -132,7 +131,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Unrelated_interface_with_gameplay_name_does_not_enable_default_strict_analysis()
+    public async Task UnrelatedInterfaceWithGameplayNameDoesNotEnableDefaultStrictAnalysis()
     {
         const string source = """
             using System;
@@ -147,7 +146,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_reports_floating_point_results_from_inline_calls()
+    public async Task StrictCodeReportsFloatingPointResultsFromInlineCalls()
     {
         const string source = """
             using Systemic.Kernel;
@@ -168,7 +167,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_reports_composite_floating_point_call_results()
+    public async Task StrictCodeReportsCompositeFloatingPointCallResults()
     {
         const string source = """
             using System.Collections.Generic;
@@ -194,11 +193,13 @@ public sealed class StrictDeterminismAnalyzerTests
 
         var diagnostics = await Analyze(source);
         foreach (var call in new[] { "NextSamples()", "NextPositions()", "NextComplex()" })
+        {
             Assert.Contains(diagnostics, d => d.Id == "SYSDET001" && At(d, source).Contains(call));
+        }
     }
 
     [Fact]
-    public async Task Strict_code_reports_task_start_and_continuation_scheduling()
+    public async Task StrictCodeReportsTaskStartAndContinuationScheduling()
     {
         const string source = """
             using System.Threading.Tasks;
@@ -221,7 +222,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_reports_unordered_sources_hidden_by_linq_and_materialization()
+    public async Task StrictCodeReportsUnorderedSourcesHiddenByLinqAndMaterialization()
     {
         const string source = """
             using System.Collections.Generic;
@@ -248,7 +249,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_reports_unordered_sources_in_static_linq_calls()
+    public async Task StrictCodeReportsUnorderedSourcesInStaticLinqCalls()
     {
         const string source = """
             using System.Collections.Generic;
@@ -270,7 +271,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_reports_unordered_secondary_linq_sources()
+    public async Task StrictCodeReportsUnorderedSecondaryLinqSources()
     {
         const string source = """
             using System.Collections.Generic;
@@ -296,7 +297,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_does_not_treat_tied_order_by_keys_as_deterministic()
+    public async Task StrictCodeDoesNotTreatTiedOrderByKeysAsDeterministic()
     {
         const string source = """
             using System.Collections.Generic;
@@ -318,7 +319,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_accepts_identity_ordering_of_unique_integer_set_values()
+    public async Task StrictCodeAcceptsIdentityOrderingOfUniqueIntegerSetValues()
     {
         const string source = """
             using System.Collections.Generic;
@@ -339,7 +340,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_rejects_default_string_ordering_of_set_values()
+    public async Task StrictCodeRejectsDefaultStringOrderingOfSetValues()
     {
         const string source = """
             using System.Collections.Generic;
@@ -361,7 +362,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_rejects_an_explicit_ordering_comparer_for_set_values()
+    public async Task StrictCodeRejectsAnExplicitOrderingComparerForSetValues()
     {
         const string source = """
             using System.Collections.Generic;
@@ -383,7 +384,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_rejects_hash_sets_constructed_with_an_explicit_equality_comparer()
+    public async Task StrictCodeRejectsHashSetsConstructedWithAnExplicitEqualityComparer()
     {
         const string source = """
             using System.Collections.Generic;
@@ -405,7 +406,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_tracks_unordered_source_through_local_materialization()
+    public async Task StrictCodeTracksUnorderedSourceThroughLocalMaterialization()
     {
         const string source = """
             using System.Collections.Generic;
@@ -428,7 +429,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_tracks_unordered_reassignment_before_iteration()
+    public async Task StrictCodeTracksUnorderedReassignmentBeforeIteration()
     {
         const string source = """
             using System.Collections.Generic;
@@ -450,7 +451,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_ignores_unordered_assignment_overwritten_before_iteration()
+    public async Task StrictCodeIgnoresUnorderedAssignmentOverwrittenBeforeIteration()
     {
         const string source = """
             using System.Collections.Generic;
@@ -472,7 +473,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_reports_unordered_later_query_sources()
+    public async Task StrictCodeReportsUnorderedLaterQuerySources()
     {
         const string source = """
             using System.Collections.Generic;
@@ -498,7 +499,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_reports_unordered_query_syntax_but_accepts_ordered_queries()
+    public async Task StrictCodeReportsUnorderedQuerySyntaxButAcceptsOrderedQueries()
     {
         const string source = """
             using System.Collections.Generic;
@@ -523,7 +524,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Relaxed_file_disables_gameplay_system_default_but_strict_marker_overrides_it()
+    public async Task RelaxedFileDisablesGameplaySystemDefaultButStrictMarkerOverridesIt()
     {
         const string source = """
             using System;
@@ -550,7 +551,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Cosmetic_gameplay_system_is_excluded_from_default_strict_analysis()
+    public async Task CosmeticGameplaySystemIsExcludedFromDefaultStrictAnalysis()
     {
         const string source = """
             using System;
@@ -569,7 +570,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_integer_decimal_and_counter_based_random_are_accepted()
+    public async Task StrictIntegerDecimalAndCounterBasedRandomAreAccepted()
     {
         const string source = """
             using System;
@@ -594,7 +595,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Diagnostics_use_symbol_identity_for_clock_random_and_parallel_apis()
+    public async Task DiagnosticsUseSymbolIdentityForClockRandomAndParallelApis()
     {
         const string source = """
             using Systemic.Kernel;
@@ -610,7 +611,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Assembly_and_method_markers_apply_to_their_own_scopes()
+    public async Task AssemblyAndMethodMarkersApplyToTheirOwnScopes()
     {
         const string source = """
             using System;
@@ -629,7 +630,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_detects_floating_values_referenced_from_an_external_scope()
+    public async Task StrictCodeDetectsFloatingValuesReferencedFromAnExternalScope()
     {
         const string source = """
             using System;
@@ -658,7 +659,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_flags_clock_crypto_tasks_and_dictionary_key_iteration()
+    public async Task StrictCodeFlagsClockCryptoTasksAndDictionaryKeyIteration()
     {
         const string source = """
             using System;
@@ -683,13 +684,16 @@ public sealed class StrictDeterminismAnalyzerTests
             """;
         var diagnostics = await Analyze(source);
         foreach (var expression in new[] { "DateTimeOffset.UtcNow", "Environment.TickCount64", "Stopwatch.GetTimestamp", "RandomNumberGenerator.GetInt32" })
+        {
             Assert.Contains(diagnostics, d => d.Id == "SYSDET002" && At(d, source).Contains(expression));
+        }
+
         Assert.Contains(diagnostics, d => d.Id == "SYSDET003" && At(d, source).Contains("Task.Run"));
         Assert.Contains(diagnostics, d => d.Id == "SYSDET003" && At(d, source).Contains("dictionary.Keys"));
     }
 
     [Fact]
-    public async Task Existing_marker_is_reused_and_strict_method_does_not_cover_unmarked_siblings()
+    public async Task ExistingMarkerIsReusedAndStrictMethodDoesNotCoverUnmarkedSiblings()
     {
         const string source = """
             using System;
@@ -712,7 +716,7 @@ public sealed class StrictDeterminismAnalyzerTests
     }
 
     [Fact]
-    public async Task Strict_code_flags_interfaces_that_do_not_guarantee_iteration_order()
+    public async Task StrictCodeFlagsInterfacesThatDoNotGuaranteeIterationOrder()
     {
         const string source = """
             using System.Collections.Generic;

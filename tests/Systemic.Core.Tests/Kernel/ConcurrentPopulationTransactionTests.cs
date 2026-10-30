@@ -13,7 +13,7 @@ public sealed class ConcurrentPopulationTransactionTests
     private static readonly PopulationColumnKey<int> s_fourth = new("concurrent.fourth", 1, PopulationCodecs.Int32);
 
     [Fact]
-    public void Concurrent_disjoint_ranges_detach_a_cloned_buffer_once_without_a_transaction()
+    public void ConcurrentDisjointRangesDetachAClonedBufferOnceWithoutATransaction()
     {
         const int count = 131_075;
         const int workers = 8;
@@ -57,7 +57,7 @@ public sealed class ConcurrentPopulationTransactionTests
     }
 
     [Fact]
-    public void Disjoint_ranges_on_a_cloned_column_write_the_same_detached_buffer_and_roll_back()
+    public void DisjointRangesOnAClonedColumnWriteTheSameDetachedBufferAndRollBack()
     {
         const int count = 131_075; // Range boundaries also split undo pages.
         var world = new World(1, 1);
@@ -88,7 +88,7 @@ public sealed class ConcurrentPopulationTransactionTests
     }
 
     [Fact]
-    public void Independent_column_systems_keep_every_undo_record_for_outer_rollback()
+    public void IndependentColumnSystemsKeepEveryUndoRecordForOuterRollback()
     {
         const int count = 8_192;
         for (var trial = 0; trial < 25; trial++)
@@ -131,7 +131,7 @@ public sealed class ConcurrentPopulationTransactionTests
     }
 
     [Fact]
-    public void Concurrent_page_edits_followed_by_full_capture_keep_outer_and_inner_rollback_states()
+    public void ConcurrentPageEditsFollowedByFullCaptureKeepOuterAndInnerRollbackStates()
     {
         const int count = 8_195;
         var world = new World(3, 1);
@@ -176,7 +176,7 @@ public sealed class ConcurrentPopulationTransactionTests
     }
 
     [Fact]
-    public void Parallel_double_buffer_edits_and_swaps_restore_both_physical_buffers()
+    public void ParallelDoubleBufferEditsAndSwapsRestoreBothPhysicalBuffers()
     {
         const int count = 8_195;
         var world = new World(4, 1);
@@ -225,7 +225,7 @@ public sealed class ConcurrentPopulationTransactionTests
     }
 
     [Fact]
-    public void Failed_page_capture_does_not_replace_the_original_exception_during_cleanup()
+    public void FailedPageCaptureDoesNotReplaceTheOriginalExceptionDuringCleanup()
     {
         var world = new World(5, 1);
         var population = world.DefinePopulation<ConcurrentKind>();
@@ -274,7 +274,7 @@ public sealed class ConcurrentPopulationTransactionTests
     }
 
     [Fact]
-    public void Closing_a_reused_child_scope_does_not_let_an_old_handle_close_the_new_scope()
+    public void ClosingAReusedChildScopeDoesNotLetAnOldHandleCloseTheNewScope()
     {
         var world = new World(6, 1);
         var population = world.DefinePopulation<ConcurrentKind>();
@@ -299,7 +299,7 @@ public sealed class ConcurrentPopulationTransactionTests
     }
 
     [Fact]
-    public void Rollback_callback_can_wait_for_an_independent_transaction_to_finish()
+    public void RollbackCallbackCanWaitForAnIndependentTransactionToFinish()
     {
         var world = new World(7, 1);
         using var transaction = world.BeginTransaction();

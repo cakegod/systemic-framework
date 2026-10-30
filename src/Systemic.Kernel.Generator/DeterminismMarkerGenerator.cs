@@ -14,11 +14,22 @@ public sealed class DeterminismMarkerGenerator : IIncrementalGenerator
         {
             var strict = NeedsMarker(compilation, "Systemic.Kernel.StrictSimulationAttribute");
             var cosmetic = NeedsMarker(compilation, "Systemic.Kernel.CosmeticOnlyAttribute");
-            if (!strict && !cosmetic) return;
+            if (!strict && !cosmetic)
+            {
+                return;
+            }
 
             var source = new StringBuilder("#nullable enable\nnamespace Systemic.Kernel;\n");
-            if (strict) AppendMarker(source, "StrictSimulationAttribute", "Marks simulation code for strict determinism diagnostics.");
-            if (cosmetic) AppendMarker(source, "CosmeticOnlyAttribute", "Excludes cosmetic code from strict determinism diagnostics.");
+            if (strict)
+            {
+                AppendMarker(source, "StrictSimulationAttribute", "Marks simulation code for strict determinism diagnostics.");
+            }
+
+            if (cosmetic)
+            {
+                AppendMarker(source, "CosmeticOnlyAttribute", "Excludes cosmetic code from strict determinism diagnostics.");
+            }
+
             output.AddSource("Systemic.DeterminismMarkers.g.cs", SourceText.From(source.ToString(), Encoding.UTF8));
         });
     }

@@ -50,7 +50,10 @@ public sealed class FixedPopulationSpatialIndex2D
     public void Reserve(int rowCapacity)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(rowCapacity);
-        if (rowCapacity > _positions.Length) Array.Resize(ref _positions, rowCapacity);
+        if (rowCapacity > _positions.Length)
+        {
+            Array.Resize(ref _positions, rowCapacity);
+        }
     }
 
     /// <summary>Copies positions and invalidates prior snapshots after validating all positions.</summary>
@@ -99,14 +102,21 @@ public sealed class FixedPopulationSpatialIndex2D
         ArgumentOutOfRangeException.ThrowIfNegative(radius.RawValue, nameof(radius));
         ArgumentOutOfRangeException.ThrowIfNegative(maximumResults);
         results.Clear();
-        if (maximumResults == 0) return;
+        if (maximumResults == 0)
+        {
+            return;
+        }
+
         var threshold = RadiusSquared(radius);
         for (var row = 0; row < _count; row++)
         {
             if (DistanceSquared(center, _positions[row]).CompareTo(threshold) <= 0)
             {
                 results.Add(row);
-                if (results.Count == maximumResults) return;
+                if (results.Count == maximumResults)
+                {
+                    return;
+                }
             }
         }
     }
@@ -122,21 +132,36 @@ public sealed class FixedPopulationSpatialIndex2D
     internal int QueryKNearest(int version, FixedVector2 center, Fixed64? radius, int k, Span<int> results, Predicate<int>? filter)
     {
         ValidateSnapshot(version);
-        if (radius.HasValue) ArgumentOutOfRangeException.ThrowIfNegative(radius.Value.RawValue, nameof(radius));
+        if (radius.HasValue)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(radius.Value.RawValue, nameof(radius));
+        }
+
         ArgumentOutOfRangeException.ThrowIfNegative(k);
         var limit = Math.Min(k, results.Length);
-        if (limit == 0) return 0;
+        if (limit == 0)
+        {
+            return 0;
+        }
+
         var threshold = radius.HasValue ? RadiusSquared(radius.Value) : new SquaredDistance(true, UInt128.MaxValue);
         var count = 0;
         for (var row = 0; row < _count; row++)
         {
             var distance = DistanceSquared(center, _positions[row]);
-            if (distance.CompareTo(threshold) > 0) continue;
+            if (distance.CompareTo(threshold) > 0)
+            {
+                continue;
+            }
+
             if (filter is not null)
             {
                 var accepted = filter(row);
                 ValidateSnapshot(version);
-                if (!accepted) continue;
+                if (!accepted)
+                {
+                    continue;
+                }
             }
 
             var index = count;
@@ -144,7 +169,11 @@ public sealed class FixedPopulationSpatialIndex2D
             {
                 var last = results[limit - 1];
                 var comparison = distance.CompareTo(DistanceSquared(center, _positions[last]));
-                if (comparison > 0 || (comparison == 0 && row >= last)) continue;
+                if (comparison > 0 || (comparison == 0 && row >= last))
+                {
+                    continue;
+                }
+
                 index--;
             }
             else
@@ -155,7 +184,11 @@ public sealed class FixedPopulationSpatialIndex2D
             {
                 var previous = results[index - 1];
                 var comparison = distance.CompareTo(DistanceSquared(center, _positions[previous]));
-                if (comparison > 0 || (comparison == 0 && row >= previous)) break;
+                if (comparison > 0 || (comparison == 0 && row >= previous))
+                {
+                    break;
+                }
+
                 results[index] = previous;
                 index--;
             }
@@ -167,7 +200,9 @@ public sealed class FixedPopulationSpatialIndex2D
     private void ValidateSnapshot(int version)
     {
         if (version == 0 || version != _version)
+        {
             throw new InvalidOperationException("This spatial snapshot was invalidated by a later rebuild.");
+        }
     }
 
     private SquaredDistance DistanceSquared(FixedVector2 center, FixedVector2 position)
@@ -184,7 +219,11 @@ public sealed class FixedPopulationSpatialIndex2D
     {
         var signed = (Int128)first - second;
         var distance = (UInt128)(signed < 0 ? -signed : signed);
-        if (!wrap) return distance;
+        if (!wrap)
+        {
+            return distance;
+        }
+
         distance %= size;
         return UInt128.Min(distance, size - distance);
     }
@@ -199,7 +238,11 @@ public sealed class FixedPopulationSpatialIndex2D
     {
         public int CompareTo(SquaredDistance other)
         {
-            if (High != other.High) return High ? 1 : -1;
+            if (High != other.High)
+            {
+                return High ? 1 : -1;
+            }
+
             return Low.CompareTo(other.Low);
         }
     }

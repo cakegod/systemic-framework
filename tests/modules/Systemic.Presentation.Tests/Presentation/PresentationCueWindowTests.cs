@@ -5,7 +5,7 @@ namespace Systemic.Tests.Presentation;
 public sealed class PresentationCueWindowTests
 {
     [Fact]
-    public void Pump_expires_old_cues_and_keeps_future_cues_in_order()
+    public void PumpExpiresOldCuesAndKeepsFutureCuesInOrder()
     {
         var stream = new PresentationCueStream();
         var window = new PresentationCueWindow(capacity: 4, maxAgeTicks: 3);
@@ -23,7 +23,7 @@ public sealed class PresentationCueWindowTests
     }
 
     [Fact]
-    public void Pump_bounds_active_cues_by_evicting_the_oldest_and_clear_can_reset_counters()
+    public void PumpBoundsActiveCuesByEvictingTheOldestAndClearCanResetCounters()
     {
         var stream = new PresentationCueStream();
         var window = new PresentationCueWindow(capacity: 2, maxAgeTicks: 10);
@@ -43,7 +43,7 @@ public sealed class PresentationCueWindowTests
     }
 
     [Fact]
-    public void Expire_compacts_expired_cues_in_place_and_preserves_the_order_of_live_cues()
+    public void ExpireCompactsExpiredCuesInPlaceAndPreservesTheOrderOfLiveCues()
     {
         var stream = new PresentationCueStream();
         var window = new PresentationCueWindow(capacity: 8, maxAgeTicks: 3);

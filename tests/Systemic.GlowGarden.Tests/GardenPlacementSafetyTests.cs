@@ -8,7 +8,7 @@ namespace Systemic.GlowGarden.Tests;
 public sealed class GardenPlacementSafetyTests
 {
     [Fact]
-    public void Seedstorm_falls_back_to_a_free_cell_after_random_candidates_fail()
+    public void SeedstormFallsBackToAFreeCellAfterRandomCandidatesFail()
     {
         using var host = GardenHost.Create(42);
         var simulation = host.Simulation;
@@ -24,7 +24,7 @@ public sealed class GardenPlacementSafetyTests
     }
 
     [Fact]
-    public void Seedstorm_rejects_a_seed_when_no_eligible_free_cell_exists()
+    public void SeedstormRejectsASeedWhenNoEligibleFreeCellExists()
     {
         using var host = GardenHost.Create(42);
         var simulation = host.Simulation;

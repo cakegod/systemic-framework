@@ -6,7 +6,7 @@ namespace Systemic.Tests.Save;
 public sealed class ContentFingerprintTests
 {
     [Fact]
-    public void Module_source_bytes_are_fingerprinted_but_unrelated_files_are_not()
+    public void ModuleSourceBytesAreFingerprintedButUnrelatedFilesAreNot()
     {
         var source = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
         var root = Path.Combine(Path.GetTempPath(), $"systemic-save-content-{Guid.NewGuid():N}");

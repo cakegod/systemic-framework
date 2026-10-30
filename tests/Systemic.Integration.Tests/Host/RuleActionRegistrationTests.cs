@@ -13,7 +13,7 @@ namespace Systemic.Tests.Host;
 public sealed class RuleActionRegistrationTests
 {
     [Fact]
-    public void A_loaded_pack_runs_an_action_the_builder_registered()
+    public void ALoadedPackRunsAnActionTheBuilderRegistered()
     {
         using var pack = new ActionPack();
         var content = ContentPackLoader.Load(pack.Root);
@@ -37,7 +37,7 @@ public sealed class RuleActionRegistrationTests
     }
 
     [Fact]
-    public void Registering_the_same_action_twice_fails_loudly()
+    public void RegisteringTheSameActionTwiceFailsLoudly()
     {
         using var pack = new ActionPack();
         var content = ContentPackLoader.Load(pack.Root);

@@ -181,7 +181,11 @@ public sealed class PopulationSchemaGenerator : IIncrementalGenerator
         // Roslyn compares hint names case-insensitively and rejects punctuation such as '@'.
         // Hex-encode the full name so case, keywords and non-ASCII identifiers remain distinct.
         var hintName = new StringBuilder("Population_");
-        foreach (var octet in Encoding.UTF8.GetBytes(schemaType)) hintName.Append(octet.ToString("x2"));
+        foreach (var octet in Encoding.UTF8.GetBytes(schemaType))
+        {
+            hintName.Append(octet.ToString("x2"));
+        }
+
         output.AddSource($"{hintName}.g.cs", SourceText.From(builder.ToString(), Encoding.UTF8));
     }
 

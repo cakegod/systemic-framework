@@ -1,7 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using Systemic.Kernel;
-using Systemic.Incremental;
 using Systemic.Rules;
 using Xunit.Abstractions;
 
@@ -19,7 +18,7 @@ public sealed class BuildChoiceRuntimeBudgetTests(ITestOutputHelper output)
 
     [Fact]
     [Trait("Category", "Performance")]
-    public void Large_catalog_repeated_state_and_selection_checks_report_release_cost()
+    public void LargeCatalogRepeatedStateAndSelectionChecksReportReleaseCost()
     {
         var world = new World(seed: 86, valueScale: 1);
         var entityIds = new Dictionary<string, int>(StringComparer.Ordinal);

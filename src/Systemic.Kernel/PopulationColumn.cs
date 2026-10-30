@@ -300,23 +300,31 @@ internal sealed class PopulationStorage(World world)
         if (!parallel)
         {
             if (_scopes.Count != 0)
+            {
                 throw new InvalidOperationException("Population access scopes must not overlap serial access or another serial scope.");
+            }
         }
         else
         {
             foreach (var active in _scopes)
             {
                 if (!active.Parallel)
+                {
                     throw new InvalidOperationException("Population access scopes must not overlap serial access or another serial scope.");
+                }
 
                 if (ReferenceEquals(active.Group, group))
+                {
                     continue;
+                }
 
                 if (declared.IsDefaultOrEmpty
                     || active.Access.IsDefaultOrEmpty
                     || SystemAccess.Conflicts(active.Access, declared))
+                {
                     throw new InvalidOperationException(
                         "Parallel population access scopes must declare non-conflicting column access.");
+                }
             }
         }
 
@@ -332,7 +340,9 @@ internal sealed class PopulationStorage(World world)
         {
             var entry = _scopes[index];
             if (entry.Parallel != parallel || (group is not null && !ReferenceEquals(entry.Group, group)))
+            {
                 continue;
+            }
 
             _scopes.RemoveAt(index);
             return;
@@ -344,7 +354,9 @@ internal sealed class PopulationStorage(World world)
     public void EnsureNoLeases()
     {
         if (_activeLeases != 0)
+        {
             throw new InvalidOperationException("A population cannot change structure while leases or scoped callbacks are active.");
+        }
     }
 
     public void Rebind(World world) => _world = world;
@@ -1272,32 +1284,105 @@ internal static class PopulationNumeric
 
     public static double ToDouble<T>(in T value) where T : unmanaged
     {
-        if (typeof(T) == typeof(double)) return Unsafe.As<T, double>(ref Unsafe.AsRef(in value));
-        if (typeof(T) == typeof(float)) return Unsafe.As<T, float>(ref Unsafe.AsRef(in value));
-        if (typeof(T) == typeof(int)) return Unsafe.As<T, int>(ref Unsafe.AsRef(in value));
-        if (typeof(T) == typeof(long)) return Unsafe.As<T, long>(ref Unsafe.AsRef(in value));
-        if (typeof(T) == typeof(short)) return Unsafe.As<T, short>(ref Unsafe.AsRef(in value));
-        if (typeof(T) == typeof(sbyte)) return Unsafe.As<T, sbyte>(ref Unsafe.AsRef(in value));
-        if (typeof(T) == typeof(uint)) return Unsafe.As<T, uint>(ref Unsafe.AsRef(in value));
-        if (typeof(T) == typeof(ulong)) return Unsafe.As<T, ulong>(ref Unsafe.AsRef(in value));
-        if (typeof(T) == typeof(ushort)) return Unsafe.As<T, ushort>(ref Unsafe.AsRef(in value));
-        if (typeof(T) == typeof(byte)) return Unsafe.As<T, byte>(ref Unsafe.AsRef(in value));
+        if (typeof(T) == typeof(double))
+        {
+            return Unsafe.As<T, double>(ref Unsafe.AsRef(in value));
+        }
+
+        if (typeof(T) == typeof(float))
+        {
+            return Unsafe.As<T, float>(ref Unsafe.AsRef(in value));
+        }
+
+        if (typeof(T) == typeof(int))
+        {
+            return Unsafe.As<T, int>(ref Unsafe.AsRef(in value));
+        }
+
+        if (typeof(T) == typeof(long))
+        {
+            return Unsafe.As<T, long>(ref Unsafe.AsRef(in value));
+        }
+
+        if (typeof(T) == typeof(short))
+        {
+            return Unsafe.As<T, short>(ref Unsafe.AsRef(in value));
+        }
+
+        if (typeof(T) == typeof(sbyte))
+        {
+            return Unsafe.As<T, sbyte>(ref Unsafe.AsRef(in value));
+        }
+
+        if (typeof(T) == typeof(uint))
+        {
+            return Unsafe.As<T, uint>(ref Unsafe.AsRef(in value));
+        }
+
+        if (typeof(T) == typeof(ulong))
+        {
+            return Unsafe.As<T, ulong>(ref Unsafe.AsRef(in value));
+        }
+
+        if (typeof(T) == typeof(ushort))
+        {
+            return Unsafe.As<T, ushort>(ref Unsafe.AsRef(in value));
+        }
+
+        if (typeof(T) == typeof(byte))
+        {
+            return Unsafe.As<T, byte>(ref Unsafe.AsRef(in value));
+        }
+
         throw new InvalidOperationException($"'{typeof(T).Name}' is not a numeric population column type.");
     }
 
     public static void Add<T>(ref T cell, double amount) where T : unmanaged
     {
-        if (typeof(T) == typeof(double)) Unsafe.As<T, double>(ref cell) += amount;
-        else if (typeof(T) == typeof(float)) Unsafe.As<T, float>(ref cell) += (float)amount;
-        else if (typeof(T) == typeof(int)) Unsafe.As<T, int>(ref cell) = checked((int)AddSigned(Unsafe.As<T, int>(ref cell), amount));
-        else if (typeof(T) == typeof(long)) Unsafe.As<T, long>(ref cell) = AddSigned(Unsafe.As<T, long>(ref cell), amount);
-        else if (typeof(T) == typeof(short)) Unsafe.As<T, short>(ref cell) = checked((short)AddSigned(Unsafe.As<T, short>(ref cell), amount));
-        else if (typeof(T) == typeof(sbyte)) Unsafe.As<T, sbyte>(ref cell) = checked((sbyte)AddSigned(Unsafe.As<T, sbyte>(ref cell), amount));
-        else if (typeof(T) == typeof(uint)) Unsafe.As<T, uint>(ref cell) = checked((uint)AddUnsigned(Unsafe.As<T, uint>(ref cell), amount));
-        else if (typeof(T) == typeof(ulong)) Unsafe.As<T, ulong>(ref cell) = AddUnsigned(Unsafe.As<T, ulong>(ref cell), amount);
-        else if (typeof(T) == typeof(ushort)) Unsafe.As<T, ushort>(ref cell) = checked((ushort)AddUnsigned(Unsafe.As<T, ushort>(ref cell), amount));
-        else if (typeof(T) == typeof(byte)) Unsafe.As<T, byte>(ref cell) = checked((byte)AddUnsigned(Unsafe.As<T, byte>(ref cell), amount));
-        else throw new InvalidOperationException($"'{typeof(T).Name}' is not a numeric population column type.");
+        if (typeof(T) == typeof(double))
+        {
+            Unsafe.As<T, double>(ref cell) += amount;
+        }
+        else if (typeof(T) == typeof(float))
+        {
+            Unsafe.As<T, float>(ref cell) += (float)amount;
+        }
+        else if (typeof(T) == typeof(int))
+        {
+            Unsafe.As<T, int>(ref cell) = checked((int)AddSigned(Unsafe.As<T, int>(ref cell), amount));
+        }
+        else if (typeof(T) == typeof(long))
+        {
+            Unsafe.As<T, long>(ref cell) = AddSigned(Unsafe.As<T, long>(ref cell), amount);
+        }
+        else if (typeof(T) == typeof(short))
+        {
+            Unsafe.As<T, short>(ref cell) = checked((short)AddSigned(Unsafe.As<T, short>(ref cell), amount));
+        }
+        else if (typeof(T) == typeof(sbyte))
+        {
+            Unsafe.As<T, sbyte>(ref cell) = checked((sbyte)AddSigned(Unsafe.As<T, sbyte>(ref cell), amount));
+        }
+        else if (typeof(T) == typeof(uint))
+        {
+            Unsafe.As<T, uint>(ref cell) = checked((uint)AddUnsigned(Unsafe.As<T, uint>(ref cell), amount));
+        }
+        else if (typeof(T) == typeof(ulong))
+        {
+            Unsafe.As<T, ulong>(ref cell) = AddUnsigned(Unsafe.As<T, ulong>(ref cell), amount);
+        }
+        else if (typeof(T) == typeof(ushort))
+        {
+            Unsafe.As<T, ushort>(ref cell) = checked((ushort)AddUnsigned(Unsafe.As<T, ushort>(ref cell), amount));
+        }
+        else if (typeof(T) == typeof(byte))
+        {
+            Unsafe.As<T, byte>(ref cell) = checked((byte)AddUnsigned(Unsafe.As<T, byte>(ref cell), amount));
+        }
+        else
+        {
+            throw new InvalidOperationException($"'{typeof(T).Name}' is not a numeric population column type.");
+        }
     }
 
     // WHY: a negative whole-number adjustment must decrease an integral cell. Casting the amount to

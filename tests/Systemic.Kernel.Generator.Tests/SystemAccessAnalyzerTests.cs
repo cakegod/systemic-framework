@@ -1,9 +1,8 @@
+using System.Globalization;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Systemic.Kernel;
-using Systemic.Kernel.Generator;
 using Xunit;
 
 namespace Systemic.Kernel.Generator.Tests;
@@ -11,7 +10,7 @@ namespace Systemic.Kernel.Generator.Tests;
 public sealed class SystemAccessAnalyzerTests
 {
     [Fact]
-    public void Diagnostics_sit_in_the_system_access_category_and_link_to_the_guide()
+    public void DiagnosticsSitInTheSystemAccessCategoryAndLinkToTheGuide()
     {
         var analyzerType = typeof(StrictDeterminismAnalyzer).Assembly
             .GetType("Systemic.Kernel.Generator.SystemAccessAnalyzer");
@@ -27,7 +26,7 @@ public sealed class SystemAccessAnalyzerTests
         {
             Assert.Equal("SystemAccess", descriptor.Category);
             Assert.True(descriptor.IsEnabledByDefault);
-            Assert.False(string.IsNullOrWhiteSpace(descriptor.Description.ToString()));
+            Assert.False(string.IsNullOrWhiteSpace(descriptor.Description.ToString(CultureInfo.InvariantCulture)));
             Assert.Equal(
                 $"https://github.com/cakegod/systemic-framework/blob/main/docs/api/analyzers.md#{descriptor.Id.ToLowerInvariant()}",
                 descriptor.HelpLinkUri);
@@ -35,7 +34,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Default_access_allows_immediate_world_operations()
+    public async Task DefaultAccessAllowsImmediateWorldOperations()
     {
         const string source = """
             using System.Collections.Generic;
@@ -58,7 +57,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Systems_declaring_access_do_not_report_default_exclusivity()
+    public async Task SystemsDeclaringAccessDoNotReportDefaultExclusivity()
     {
         const string source = """
             using System.Collections.Generic;
@@ -76,7 +75,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Direct_write_world_access_allows_immediate_world_operations()
+    public async Task DirectWriteWorldAccessAllowsImmediateWorldOperations()
     {
         const string source = """
             using System;
@@ -101,7 +100,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Missing_write_world_access_reports_each_immediate_world_operation()
+    public async Task MissingWriteWorldAccessReportsEachImmediateWorldOperation()
     {
         const string source = """
             using System.Collections.Generic;
@@ -125,7 +124,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Computed_access_is_skipped_when_its_permissions_cannot_be_proven()
+    public async Task ComputedAccessIsSkippedWhenItsPermissionsCannotBeProven()
     {
         const string source = """
             using System.Collections.Generic;
@@ -144,7 +143,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Mutable_private_static_access_arrays_are_not_treated_as_proven()
+    public async Task MutablePrivateStaticAccessArraysAreNotTreatedAsProven()
     {
         const string source = """
             using System.Collections.Generic;
@@ -170,7 +169,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Write_resource_matches_world_only_for_the_constant_world_sentinel()
+    public async Task WriteResourceMatchesWorldOnlyForTheConstantWorldSentinel()
     {
         const string source = """
             using System.Collections.Generic;
@@ -203,7 +202,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Immutable_array_access_fields_prove_world_permissions()
+    public async Task ImmutableArrayAccessFieldsProveWorldPermissions()
     {
         const string source = """
             using System.Collections.Generic;
@@ -230,7 +229,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Simple_private_static_readonly_generated_column_access_is_analyzed()
+    public async Task SimplePrivateStaticReadonlyGeneratedColumnAccessIsAnalyzed()
     {
         const string source = """
             using System.Collections.Generic;
@@ -292,7 +291,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Deferred_population_commands_accept_deferred_or_exclusive_world_access()
+    public async Task DeferredPopulationCommandsAcceptDeferredOrExclusiveWorldAccess()
     {
         const string source = """
             using System;
@@ -333,7 +332,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Deferred_facts_require_a_world_write_access_mode()
+    public async Task DeferredFactsRequireAWorldWriteAccessMode()
     {
         const string source = """
             using System.Collections.Generic;
@@ -365,7 +364,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Deferred_population_commands_require_a_world_write_access_mode()
+    public async Task DeferredPopulationCommandsRequireAWorldWriteAccessMode()
     {
         const string source = """
             using System;
@@ -400,7 +399,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Scoped_writes_are_allowed_but_buffer_swaps_are_flagged_inside_range_callbacks()
+    public async Task ScopedWritesAreAllowedButBufferSwapsAreFlaggedInsideRangeCallbacks()
     {
         const string source = """
             using System.Collections.Generic;
@@ -443,11 +442,11 @@ public sealed class SystemAccessAnalyzerTests
         var rangeDiagnostics = diagnostics.Where(item => item.Id == "SYSACC003").ToArray();
         Assert.Single(rangeDiagnostics);
         Assert.Contains(rangeDiagnostics, diagnostic => At(diagnostic, source).Contains("Swap"));
-        Assert.Contains("WriteRange(ref scope)", rangeDiagnostics[0].GetMessage());
+        Assert.Contains("WriteRange(ref scope)", rangeDiagnostics[0].GetMessage(CultureInfo.InvariantCulture));
     }
 
     [Fact]
-    public async Task Full_single_buffered_read_is_rejected_when_its_parallel_range_callback_writes_the_column()
+    public async Task FullSingleBufferedReadIsRejectedWhenItsParallelRangeCallbackWritesTheColumn()
     {
         const string source = """
             using System.Collections.Generic;
@@ -486,12 +485,12 @@ public sealed class SystemAccessAnalyzerTests
 
         var diagnostics = await Analyze(source, generatePopulationSchema: true);
         var diagnostic = Assert.Single(diagnostics.Where(item => item.Id == "SYSACC006"));
-        Assert.Contains("ReadRange", diagnostic.GetMessage());
+        Assert.Contains("ReadRange", diagnostic.GetMessage(CultureInfo.InvariantCulture));
         Assert.Contains("ReadAll", At(diagnostic, source));
     }
 
     [Fact]
-    public async Task Both_buffer_edits_and_swaps_are_flagged_only_inside_population_range_callbacks()
+    public async Task BothBufferEditsAndSwapsAreFlaggedOnlyInsidePopulationRangeCallbacks()
     {
         const string source = """
             using System.Collections.Generic;
@@ -531,13 +530,16 @@ public sealed class SystemAccessAnalyzerTests
         var rangeDiagnostics = diagnostics.Where(item => item.Id == "SYSACC003").ToArray();
         Assert.Equal(2, rangeDiagnostics.Length);
         foreach (var methodName in new[] { "EditBoth", "Swap" })
+        {
             Assert.Contains(rangeDiagnostics, diagnostic => At(diagnostic, source).Contains(methodName));
-        Assert.Contains("Initialize both buffers outside", rangeDiagnostics.Single(diagnostic => At(diagnostic, source).Contains("EditBoth")).GetMessage());
-        Assert.Contains("Move buffer swaps outside", rangeDiagnostics.Single(diagnostic => At(diagnostic, source).Contains("Swap")).GetMessage());
+        }
+
+        Assert.Contains("Initialize both buffers outside", rangeDiagnostics.Single(diagnostic => At(diagnostic, source).Contains("EditBoth")).GetMessage(CultureInfo.InvariantCulture));
+        Assert.Contains("Move buffer swaps outside", rangeDiagnostics.Single(diagnostic => At(diagnostic, source).Contains("Swap")).GetMessage(CultureInfo.InvariantCulture));
     }
 
     [Fact]
-    public async Task Similarly_named_unrelated_apis_do_not_report_access_diagnostics()
+    public async Task SimilarlyNamedUnrelatedApisDoNotReportAccessDiagnostics()
     {
         const string source = """
             using System;
@@ -564,7 +566,7 @@ public sealed class SystemAccessAnalyzerTests
     }
 
     [Fact]
-    public async Task Direct_generated_column_reads_and_writes_must_match_literal_access_entries()
+    public async Task DirectGeneratedColumnReadsAndWritesMustMatchLiteralAccessEntries()
     {
         const string source = """
             using System.Collections.Generic;
@@ -681,12 +683,12 @@ public sealed class SystemAccessAnalyzerTests
 
         var diagnostics = await Analyze(source, generatePopulationSchema: true);
         Assert.Equal(3, diagnostics.Count(diagnostic => diagnostic.Id == "SYSACC004"));
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "SYSACC004" && diagnostic.GetMessage().Contains("read"));
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "SYSACC004" && diagnostic.GetMessage().Contains("write"));
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "SYSACC004" && diagnostic.GetMessage(CultureInfo.InvariantCulture).Contains("read"));
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Id == "SYSACC004" && diagnostic.GetMessage(CultureInfo.InvariantCulture).Contains("write"));
     }
 
     [Fact]
-    public async Task Resource_and_unrelated_generic_column_access_do_not_disable_column_checks()
+    public async Task ResourceAndUnrelatedGenericColumnAccessDoNotDisableColumnChecks()
     {
         const string source = """
             using System.Collections.Generic;
@@ -725,11 +727,11 @@ public sealed class SystemAccessAnalyzerTests
         var diagnostics = await Analyze(source, generatePopulationSchema: true);
 
         var diagnostic = Assert.Single(diagnostics.Where(item => item.Id == "SYSACC004"));
-        Assert.Contains("Phase", diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("Phase", diagnostic.GetMessage(CultureInfo.InvariantCulture), StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Immediate_world_operations_and_shared_commands_are_forbidden_in_range_callbacks()
+    public async Task ImmediateWorldOperationsAndSharedCommandsAreForbiddenInRangeCallbacks()
     {
         const string source = """
             using System.Collections.Generic;
@@ -794,7 +796,9 @@ public sealed class SystemAccessAnalyzerTests
         var analyzerType = typeof(StrictDeterminismAnalyzer).Assembly
             .GetType("Systemic.Kernel.Generator.SystemAccessAnalyzer");
         if (analyzerType is null)
+        {
             return [];
+        }
 
         var analyzer = (DiagnosticAnalyzer)Activator.CreateInstance(analyzerType)!;
         return await compilation.WithAnalyzers([analyzer]).GetAnalyzerDiagnosticsAsync();

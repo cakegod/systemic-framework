@@ -8,7 +8,7 @@ namespace Systemic.Tests.Content;
 public sealed class ContentModuleRegistryTests
 {
     [Fact]
-    public void Duplicate_module_ids_are_rejected()
+    public void DuplicateModuleIdsAreRejected()
     {
         var registry = new ContentModuleRegistry();
         registry.Add(new TestModule("test.module"));
@@ -19,7 +19,7 @@ public sealed class ContentModuleRegistryTests
     }
 
     [Fact]
-    public void Content_references_can_be_resolved_without_module_types()
+    public void ContentReferencesCanBeResolvedWithoutModuleTypes()
     {
         var references = new ContentReferenceCatalog();
         references.Add("entity", "actor.player", "entities.json");
@@ -29,7 +29,7 @@ public sealed class ContentModuleRegistryTests
     }
 
     [Fact]
-    public void Optional_module_compiles_and_registers_services_only_when_declared()
+    public void OptionalModuleCompilesAndRegistersServicesOnlyWhenDeclared()
     {
         using var pack = CoreOnlyPack.Create();
         var module = new TestModule("test.module");
@@ -53,7 +53,7 @@ public sealed class ContentModuleRegistryTests
     }
 
     [Fact]
-    public void Fact_observers_run_in_explicit_order_before_rule_dispatch_finishes()
+    public void FactObserversRunInExplicitOrderBeforeRuleDispatchFinishes()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);

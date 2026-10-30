@@ -1,3 +1,4 @@
+using System.Globalization;
 using Systemic.Kernel;
 
 namespace Systemic.Tests.Kernel;
@@ -12,7 +13,7 @@ public sealed class PopulationTagTests
         [.. Enumerable.Range(0, Population<TaggedKind>.MaximumTags + 1).Select(index => $"tag{index}")];
 
     [Fact]
-    public void Schema_tags_pack_into_one_mask_column_in_declaration_order()
+    public void SchemaTagsPackIntoOneMaskColumnInDeclarationOrder()
     {
         var world = new World(seed: 41, valueScale: 1);
         var population = world.DefinePopulation<TaggedKind>();
@@ -30,7 +31,7 @@ public sealed class PopulationTagTests
     }
 
     [Fact]
-    public void Tag_state_rolls_back_with_the_enclosing_transaction()
+    public void TagStateRollsBackWithTheEnclosingTransaction()
     {
         var world = new World(seed: 42, valueScale: 1);
         var population = world.DefinePopulation<TaggedKind>();
@@ -55,7 +56,7 @@ public sealed class PopulationTagTests
     }
 
     [Fact]
-    public void Unknown_tag_names_the_schema_and_its_declared_tags()
+    public void UnknownTagNamesTheSchemaAndItsDeclaredTags()
     {
         var world = new World(seed: 43, valueScale: 1);
         var population = world.DefinePopulation<TaggedKind>();
@@ -69,7 +70,7 @@ public sealed class PopulationTagTests
     }
 
     [Fact]
-    public void Tag_writes_to_a_row_outside_the_live_population_are_declined()
+    public void TagWritesToARowOutsideTheLivePopulationAreDeclined()
     {
         var world = new World(seed: 44, valueScale: 1);
         var population = world.DefinePopulation<TaggedKind>();
@@ -81,18 +82,18 @@ public sealed class PopulationTagTests
     }
 
     [Fact]
-    public void A_schema_may_not_declare_more_tags_than_the_mask_holds()
+    public void ASchemaMayNotDeclareMoreTagsThanTheMaskHolds()
     {
         var world = new World(seed: 45, valueScale: 1);
 
         var error = Assert.Throws<InvalidOperationException>(() => world.DefinePopulation<TooManyTagsKind>());
 
         Assert.Contains("65", error.Message, StringComparison.Ordinal);
-        Assert.Contains(Population<TooManyTagsKind>.MaximumTags.ToString(), error.Message, StringComparison.Ordinal);
+        Assert.Contains(Population<TooManyTagsKind>.MaximumTags.ToString(CultureInfo.InvariantCulture), error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void A_schema_may_not_declare_a_tag_twice()
+    public void ASchemaMayNotDeclareATagTwice()
     {
         var world = new World(seed: 46, valueScale: 1);
 
@@ -102,7 +103,7 @@ public sealed class PopulationTagTests
     }
 
     [Fact]
-    public void Tag_masks_round_trip_through_the_population_save_state()
+    public void TagMasksRoundTripThroughThePopulationSaveState()
     {
         var source = new World(seed: 47, valueScale: 1);
         var sourcePopulation = source.DefinePopulation<TaggedKind>();
@@ -124,7 +125,7 @@ public sealed class PopulationTagTests
     }
 
     [Fact]
-    public void A_clone_shares_the_mask_until_one_side_writes()
+    public void ACloneSharesTheMaskUntilOneSideWrites()
     {
         var source = new World(seed: 48, valueScale: 1);
         var sourcePopulation = source.DefinePopulation<TaggedKind>();
@@ -143,7 +144,7 @@ public sealed class PopulationTagTests
     }
 
     [Fact]
-    public void A_schema_without_tags_creates_no_mask_column()
+    public void ASchemaWithoutTagsCreatesNoMaskColumn()
     {
         var world = new World(seed: 49, valueScale: 1);
         var population = world.DefinePopulation<UntaggedKind>();

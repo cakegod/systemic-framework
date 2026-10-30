@@ -1,7 +1,6 @@
 using GlowGarden;
 using System.Numerics;
 using System.Text.Json.Nodes;
-using Systemic.Host;
 using Systemic.Kernel;
 using Systemic.Rules;
 using Xunit;
@@ -39,7 +38,10 @@ public sealed class FrameworkIntegrationTests
     {
         using var host = GardenHost.Create(42);
         for (var tick = 0; tick < 4000 && host.Simulation.Glow < host.Simulation.HirePrice(CreatureKind.Burstling) + host.Simulation.Price(UpgradeKind.PodYield); tick++)
+        {
             host.Step(1);
+        }
+
         var before = host.Simulation.Creatures.ToArray();
         var beforeGlow = host.Simulation.Glow;
         var beforeTreeSpend = host.Simulation.Spent(UpgradeTree.MagicGrowth);
@@ -90,13 +92,20 @@ public sealed class FrameworkIntegrationTests
         try
         {
             foreach (var file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "content")))
+            {
                 File.Copy(file, Path.Combine(directory, Path.GetFileName(file)));
+            }
+
             var path = Path.Combine(directory, "rules.json");
             var document = JsonNode.Parse(File.ReadAllText(path))!;
             var rules = document["rules"]!.AsArray();
             var removed = rules.FirstOrDefault(rule => rule!["id"]!.GetValue<string>() == "garden.talent.seedstorm");
             Assert.NotNull(removed);
-            if (removeRule) rules.Remove(removed);
+            if (removeRule)
+            {
+                rules.Remove(removed);
+            }
+
             File.WriteAllText(path, document.ToJsonString());
 
             using var normal = GardenHost.Create(31);
@@ -112,7 +121,11 @@ public sealed class FrameworkIntegrationTests
                 model.ToggleTalent(Talent.Seedstorm);
             }
             normal.Step(20);
-            for (var i = 0; i < 20; i++) game.Step();
+            for (var i = 0; i < 20; i++)
+            {
+                game.Step();
+            }
+
             Assert.True(normal.Simulation.Plants.Count > 1);
             if (removeRule)
             {
@@ -159,7 +172,11 @@ public sealed class FrameworkIntegrationTests
         var model = new GardenSimulation(builder.World);
         var facts = new List<SimulationFact>();
         using var game = builder.AddSystem(model).AddFactObserver(100, (fact, _) => facts.Add(fact)).Build();
-        for (var i = 0; i < 800; i++) game.Step();
+        for (var i = 0; i < 800; i++)
+        {
+            game.Step();
+        }
+
         Assert.Contains(facts, fact => fact.Type == "garden.pod.burst");
         Assert.Contains(facts, fact => fact.Type == "garden.glow.collected" && fact.Amount > 0);
         Assert.Equal(model.BankedGlow, facts.Where(fact => fact.Type == "garden.glow.deposited").Sum(fact => fact.Amount));

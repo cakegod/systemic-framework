@@ -1,0 +1,21 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      WHY: without this, IDE-style diagnostics only exist in the IDE and in `dotnet format`,
+      so a clean editor session and a red build can disagree. A rule raised to error in
+      .editorconfig then fails `dotnet test`, because the test job builds first.
+    -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!--
+      WHY: pin the level instead of inheriting the SDK default, so strictness is a visible
+      decision that a `-p:AnalysisLevel=...` override on one command line cannot lose.
+      latest-recommended adds 38 diagnostics to this tree; all of them are fixed, so the build
+      stays at zero warnings. latest-all is deliberately not used: it adds about 2,700
+      diagnostics, and they come from rules that assume library and web-server conventions
+      this engine does not share.
+    -->
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+  </PropertyGroup>
+
+</Project>

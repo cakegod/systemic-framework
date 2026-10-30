@@ -124,7 +124,10 @@ public sealed class ContentTuningSchema
                     && id.ValueKind == JsonValueKind.String
                     && string.Equals(id.GetString(), entityId, StringComparison.Ordinal))
                 {
-                    if (matchIndex >= 0) duplicate = true;
+                    if (matchIndex >= 0)
+                    {
+                        duplicate = true;
+                    }
                     else { match = entity; matchIndex = index; }
                 }
                 index++;
@@ -456,7 +459,11 @@ public sealed class ContentTuningSchema
         var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { MaxDepth = 16 });
         while (reader.Read())
         {
-            if (reader.TokenType is not JsonTokenType.String and not JsonTokenType.PropertyName) continue;
+            if (reader.TokenType is not JsonTokenType.String and not JsonTokenType.PropertyName)
+            {
+                continue;
+            }
+
             try
             {
                 _ = reader.GetString();
@@ -491,8 +498,15 @@ public sealed class ContentTuningSchema
                 case '\r': result.Append("\\r"); break;
                 case '\t': result.Append("\\t"); break;
                 default:
-                    if (char.IsControl(character)) result.Append("\\u").Append(((int)character).ToString("x4"));
-                    else result.Append(character);
+                    if (char.IsControl(character))
+                    {
+                        result.Append("\\u").Append(((int)character).ToString("x4"));
+                    }
+                    else
+                    {
+                        result.Append(character);
+                    }
+
                     break;
             }
         }
@@ -529,7 +543,11 @@ public sealed class ContentTuningSchema
             var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { MaxDepth = 16 });
             reader.Read();
             locations.Add("$", (int)reader.TokenStartIndex);
-            if (reader.TokenType != JsonTokenType.StartObject) return locations;
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                return locations;
+            }
+
             while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
             {
                 var name = reader.GetString()!;
@@ -572,7 +590,10 @@ public sealed class ContentTuningSchema
             var offset = 0;
             while (remainingLines > 0 && offset < bytes.Length)
             {
-                if (bytes[offset++] == (byte)'\n') remainingLines--;
+                if (bytes[offset++] == (byte)'\n')
+                {
+                    remainingLines--;
+                }
             }
 
             offset = (int)Math.Min(bytes.Length, offset + exception.BytePositionInLine.GetValueOrDefault());
@@ -595,7 +616,11 @@ public sealed class ContentTuningSchema
 
         public SourcePosition Take(string path)
         {
-            if (!_offsets.TryGetValue(path, out var offsets)) return First("$");
+            if (!_offsets.TryGetValue(path, out var offsets))
+            {
+                return First("$");
+            }
+
             var index = _used.GetValueOrDefault(path);
             _used[path] = index + 1;
             return Position(offsets[Math.Min(index, offsets.Count - 1)]);
@@ -607,7 +632,11 @@ public sealed class ContentTuningSchema
         private SourcePosition Position(int offset)
         {
             var index = Array.BinarySearch(_lineStarts, offset);
-            if (index < 0) index = ~index - 1;
+            if (index < 0)
+            {
+                index = ~index - 1;
+            }
+
             return new SourcePosition(index + 1, offset - _lineStarts[index] + 1);
         }
     }

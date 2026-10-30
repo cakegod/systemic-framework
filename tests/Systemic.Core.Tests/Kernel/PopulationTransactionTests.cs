@@ -78,7 +78,7 @@ public sealed class PopulationTransactionTests
     }
 
     [Fact]
-    public void Full_buffer_capture_preserves_sparse_and_nested_rollback_order()
+    public void FullBufferCapturePreservesSparseAndNestedRollbackOrder()
     {
         var world = new World(seed: 29, valueScale: 1);
         var population = world.DefinePopulation<TransactionParticleKind>();
@@ -104,7 +104,7 @@ public sealed class PopulationTransactionTests
     }
 
     [Fact]
-    public void Full_range_write_records_one_undo_item_instead_of_one_per_page()
+    public void FullRangeWriteRecordsOneUndoItemInsteadOfOnePerPage()
     {
         var world = new World(seed: 30, valueScale: 1);
         var population = world.DefinePopulation<TransactionParticleKind>();

@@ -35,12 +35,35 @@ public static class DeterministicTrig
         const long half = full / 2;
         const long quarter = full / 4;
         var angle = turns.RawValue % full;
-        if (angle > half) angle -= full;
-        if (angle < -half) angle += full;
-        if (angle == 0) return (Fixed64.Zero, Fixed64.One);
-        if (angle == quarter) return (Fixed64.One, Fixed64.Zero);
-        if (angle == -quarter) return (-Fixed64.One, Fixed64.Zero);
-        if (angle == half || angle == -half) return (Fixed64.Zero, -Fixed64.One);
+        if (angle > half)
+        {
+            angle -= full;
+        }
+
+        if (angle < -half)
+        {
+            angle += full;
+        }
+
+        if (angle == 0)
+        {
+            return (Fixed64.Zero, Fixed64.One);
+        }
+
+        if (angle == quarter)
+        {
+            return (Fixed64.One, Fixed64.Zero);
+        }
+
+        if (angle == -quarter)
+        {
+            return (-Fixed64.One, Fixed64.Zero);
+        }
+
+        if (angle == half || angle == -half)
+        {
+            return (Fixed64.Zero, -Fixed64.One);
+        }
 
         var invert = false;
         if (angle > quarter) { angle -= half; invert = true; }

@@ -1,12 +1,11 @@
 using Systemic.Kernel;
-using Systemic.Content;
 
 namespace Systemic.Tests.Content;
 
 public sealed class EntityDefinitionTests
 {
     [Fact]
-    public void File_authored_entities_materialize_properties_links_and_spatial_state()
+    public void FileAuthoredEntitiesMaterializePropertiesLinksAndSpatialState()
     {
         var pack = SystemicTestContent.Load(Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry"));
 

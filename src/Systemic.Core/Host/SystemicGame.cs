@@ -212,7 +212,10 @@ public sealed class SystemicSystemContext
     {
         ArgumentNullException.ThrowIfNull(restoreExternalState);
         if (_kernelContext is not { } kernelContext)
+        {
             throw new InvalidOperationException("Rollback actions can be registered only during a host-scheduled execution.");
+        }
+
         kernelContext.OnRollback(restoreExternalState);
     }
 
@@ -233,9 +236,13 @@ public sealed class SystemicSystemContext
         ArgumentOutOfRangeException.ThrowIfNegative(rowCount);
         ArgumentNullException.ThrowIfNull(executeRange);
         if (_standalone && rowCount > 0)
+        {
             executeRange(state, 0, new PopulationRange(0, rowCount));
+        }
         else if (!_standalone)
+        {
             throw new InvalidOperationException("System context operations are available only while the system executes.");
+        }
     }
 
     /// <summary>Runs work with callback-scoped access to a population's declared columns.</summary>
@@ -259,13 +266,20 @@ public sealed class SystemicSystemContext
         }
 
         if (!_standalone)
+        {
             throw new InvalidOperationException("System context operations are available only while the system executes.");
+        }
+
         if (!ReferenceEquals(lease.WorldIdentity, _world))
+        {
             throw new ArgumentException("The population lease belongs to a different world.", nameof(lease));
+        }
 
         var range = new PopulationRange(0, lease.Count);
         if (range.Length == 0)
+        {
             return;
+        }
 
         lease.WithAccess(range, new StandalonePopulationRangeState<TKind, TState>(state, executeRange),
             static (callbackState,
@@ -294,13 +308,20 @@ public sealed class SystemicSystemContext
         }
 
         if (!_standalone)
+        {
             throw new InvalidOperationException("System context operations are available only while the system executes.");
+        }
+
         if (!ReferenceEquals(population.World, _world))
+        {
             throw new ArgumentException("The population belongs to a different world.", nameof(population));
+        }
 
         var range = new PopulationRange(0, population.Count);
         if (range.Length == 0)
+        {
             return;
+        }
 
         population.WithAccess(range, new StandalonePopulationRangeState<TKind, TState>(state, executeRange),
             static (callbackState,
@@ -327,9 +348,15 @@ public sealed class SystemicSystemContext
         Func<TResult, TResult, TResult> merge)
     {
         if (_kernelContext is { } kernelContext)
+        {
             return kernelContext.ReduceRanges(state, rowCount, partitionCount, identity, map, merge);
+        }
+
         if (_standalone)
+        {
             return ReduceStandalone(state, rowCount, partitionCount, identity, map, merge);
+        }
+
         throw new InvalidOperationException("System context operations are available only while the system executes.");
     }
 
@@ -342,11 +369,20 @@ public sealed class SystemicSystemContext
     {
         ArgumentNullException.ThrowIfNull(population);
         if (!ReferenceEquals(population.World, _world))
+        {
             throw new ArgumentException("The population belongs to a different world.", nameof(population));
+        }
+
         if (_kernelContext is { } kernelContext)
+        {
             return kernelContext.BorrowPopulation(population);
+        }
+
         if (_standalone)
+        {
             return population.Borrow();
+        }
+
         throw new InvalidOperationException("System context operations are available only while the system executes.");
     }
 
@@ -362,13 +398,22 @@ public sealed class SystemicSystemContext
         where TKind : unmanaged, IPopulationKind, IPopulationSchema<TKind>
     {
         if (_kernelContext is { } kernelContext)
+        {
             return kernelContext.DeferPopulationCommands(population, partitionCount);
+        }
+
         if (!_standalone)
+        {
             throw new InvalidOperationException("System context operations are available only while the system executes.");
+        }
+
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
         var buffers = new PopulationCommandBuffer<TKind>[partitionCount];
         for (var index = 0; index < buffers.Length; index++)
+        {
             buffers[index] = new PopulationCommandBuffer<TKind>(population);
+        }
+
         return buffers;
     }
 
@@ -414,11 +459,17 @@ public sealed class SystemicSystemContext
         if (_kernelContext is { } kernelContext)
         {
             var commands = kernelContext.Commands;
-            if (commands.Count > 0) kernelContext.FlushCommands(_world);
+            if (commands.Count > 0)
+            {
+                kernelContext.FlushCommands(_world);
+            }
         }
         else if (_standalone)
         {
-            if (_standaloneCommands.Count > 0) _standaloneCommands.Flush(_world);
+            if (_standaloneCommands.Count > 0)
+            {
+                _standaloneCommands.Flush(_world);
+            }
         }
     }
 
@@ -434,7 +485,11 @@ public sealed class SystemicSystemContext
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(merge);
-        if (rowCount == 0) return identity;
+        if (rowCount == 0)
+        {
+            return identity;
+        }
+
         var count = Math.Min(rowCount, partitionCount);
         var result = identity;
         for (var partition = 0; partition < count; partition++)
@@ -901,7 +956,11 @@ public sealed class SystemicGame : IDisposable
             var extension = StatefulExtensions[index];
             // Kernel populations, rule history, the clock and the event engine journal their own
             // changes, so only domain state that is not journalled needs a tick snapshot.
-            if (extension is ISaveOnlyStateExtension) continue;
+            if (extension is ISaveOnlyStateExtension)
+            {
+                continue;
+            }
+
             if (extension is ISystemicReusableTransactionalState reusable)
             {
                 var snapshot = reusable.CaptureTransactionSnapshot();

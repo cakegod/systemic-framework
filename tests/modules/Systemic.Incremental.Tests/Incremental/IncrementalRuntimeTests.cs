@@ -1,16 +1,13 @@
-using Systemic.Kernel;
-using Systemic.Content;
 using Systemic.Host;
 using Systemic.Incremental;
 using Systemic.Rules;
-using Systemic.Tests;
 
 namespace Systemic.Tests.Incremental;
 
 public sealed class IncrementalRuntimeTests
 {
     [Fact]
-    public void Producers_publish_facts_that_trigger_cross_trait_chain_reactions_with_capacity_bounds()
+    public void ProducersPublishFactsThatTriggerCrossTraitChainReactionsWithCapacityBounds()
     {
         using var pack = CreatePack(initialOre: 0, capacity: 2);
         var content = TestPack.Load(pack.Root);
@@ -28,7 +25,7 @@ public sealed class IncrementalRuntimeTests
     }
 
     [Fact]
-    public void Upgrade_purchase_spends_atomically_emits_chain_reactions_and_respects_limits()
+    public void UpgradePurchaseSpendsAtomicallyEmitsChainReactionsAndRespectsLimits()
     {
         using var pack = CreatePack(initialOre: 3, capacity: 5);
         var content = TestPack.Load(pack.Root);
@@ -52,7 +49,7 @@ public sealed class IncrementalRuntimeTests
     }
 
     [Fact]
-    public void Unaffordable_upgrade_does_not_mutate_resources_or_purchase_state()
+    public void UnaffordableUpgradeDoesNotMutateResourcesOrPurchaseState()
     {
         using var pack = CreatePack(initialOre: 1, capacity: 5);
         var content = TestPack.Load(pack.Root);
@@ -72,7 +69,7 @@ public sealed class IncrementalRuntimeTests
     }
 
     [Fact]
-    public void Invalid_upgrade_reaction_rolls_back_the_cost_and_purchase_count()
+    public void InvalidUpgradeReactionRollsBackTheCostAndPurchaseCount()
     {
         using var pack = CreatePack(initialOre: 3, capacity: 5);
         var content = TestPack.Load(pack.Root);

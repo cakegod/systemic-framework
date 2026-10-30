@@ -11,26 +11,69 @@ public sealed record GardenOptions(bool Headless, bool VerifyRender, int Ticks, 
         for (var i = 0; i < args.Length; i++)
         {
             var option = args[i];
-            if (!seen.Add(option)) throw new ArgumentException($"Duplicate option {option}.");
-            if (option == "--headless") headless = true;
-            else if (option == "--verify-render") render = true;
+            if (!seen.Add(option))
+            {
+                throw new ArgumentException($"Duplicate option {option}.");
+            }
+
+            if (option == "--headless")
+            {
+                headless = true;
+            }
+            else if (option == "--verify-render")
+            {
+                render = true;
+            }
             else if (option is "--ticks" or "--seed" or "--screenshot")
             {
-                if (++i >= args.Length) throw new ArgumentException($"Missing value for {option}.");
-                if (option == "--screenshot") screenshot = args[i];
+                if (++i >= args.Length)
+                {
+                    throw new ArgumentException($"Missing value for {option}.");
+                }
+
+                if (option == "--screenshot")
+                {
+                    screenshot = args[i];
+                }
                 else
                 {
-                    if (!int.TryParse(args[i], out var value)) throw new ArgumentException($"Invalid integer for {option}.");
+                    if (!int.TryParse(args[i], out var value))
+                    {
+                        throw new ArgumentException($"Invalid integer for {option}.");
+                    }
+
                     if (option == "--ticks") { ticks = value; hasTicks = true; }
-                    else seed = value;
+                    else
+                    {
+                        seed = value;
+                    }
                 }
             }
-            else throw new ArgumentException($"Unknown option {option}.");
+            else
+            {
+                throw new ArgumentException($"Unknown option {option}.");
+            }
         }
-        if (ticks is < 1 or > 100000) throw new ArgumentException("Ticks must be 1..100000.");
-        if (headless && render) throw new ArgumentException("Choose headless or render verification.");
-        if (hasTicks && !headless) throw new ArgumentException("--ticks requires --headless.");
-        if (screenshot != null && !render) throw new ArgumentException("--screenshot requires --verify-render.");
+        if (ticks is < 1 or > 100000)
+        {
+            throw new ArgumentException("Ticks must be 1..100000.");
+        }
+
+        if (headless && render)
+        {
+            throw new ArgumentException("Choose headless or render verification.");
+        }
+
+        if (hasTicks && !headless)
+        {
+            throw new ArgumentException("--ticks requires --headless.");
+        }
+
+        if (screenshot != null && !render)
+        {
+            throw new ArgumentException("--screenshot requires --verify-render.");
+        }
+
         return new(headless, render, ticks, seed, screenshot);
     }
 }
@@ -63,7 +106,11 @@ public static class Program
         try
         {
             var options = GardenOptions.Parse(args);
-            if (options.Headless) return RunHeadless(options);
+            if (options.Headless)
+            {
+                return RunHeadless(options);
+            }
+
             using var game = new GardenGame(options);
             game.Run();
             return 0;
@@ -95,7 +142,10 @@ public static class Program
         }
         Console.WriteLine($"seed={options.Seed} ticks={model.Tick} bursts={model.BurstCount} banked={model.BankedGlow} balance={model.Glow} loose={model.Motes.Sum(m => m.Value)} carried={model.Creatures.Sum(c => c.CarriedGlow)} plants={model.Plants.Count} workers={model.Creatures.Count}");
         if (model.BurstCount == 0 || model.BankedGlow == 0)
+        {
             throw new InvalidOperationException("Smoke workflow did not produce and bank Glow; use enough ticks (e.g. 3600).");
+        }
+
         return 0;
     }
 }

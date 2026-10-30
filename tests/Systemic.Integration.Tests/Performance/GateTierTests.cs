@@ -30,7 +30,7 @@ public sealed class GateTierTests(ITestOutputHelper output)
 
     [Fact]
     [Trait("Category", "Performance")]
-    public void Content_tier_stays_within_its_allocation_budget()
+    public void ContentTierStaysWithinItsAllocationBudget()
     {
         var world = new World(seed: 17, valueScale: 1);
         var target = world.Add(new DataEntity([], [], ("value", 0.0)));

@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Diagnostics;
-using Systemic.Kernel;
 using Systemic.Content;
 using Systemic.Host;
 

@@ -53,7 +53,10 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeTypeSyntax(SyntaxNodeAnalysisContext context)
     {
         if (context.Node is not TypeSyntax typeSyntax || IsNestedName(typeSyntax)
-            || !IsStrict(context.ContainingSymbol, context.Node.SyntaxTree, context.Options, context.Compilation)) return;
+            || !IsStrict(context.ContainingSymbol, context.Node.SyntaxTree, context.Options, context.Compilation))
+        {
+            return;
+        }
 
         ITypeSymbol? type;
         if (typeSyntax is PredefinedTypeSyntax || typeSyntax is IdentifierNameSyntax { IsVar: true })
@@ -72,7 +75,9 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
         }
 
         if (IsFloating(type))
+        {
             context.ReportDiagnostic(Diagnostic.Create(Floating, typeSyntax.GetLocation(), "type"));
+        }
     }
 
     private static bool IsNestedName(TypeSyntax node) =>
@@ -80,16 +85,26 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeIteration(SyntaxNodeAnalysisContext context)
     {
-        if (!IsStrict(context.ContainingSymbol, context.Node.SyntaxTree, context.Options, context.Compilation)) return;
+        if (!IsStrict(context.ContainingSymbol, context.Node.SyntaxTree, context.Options, context.Compilation))
+        {
+            return;
+        }
+
         var expression = context.Node switch
         {
             ForEachStatementSyntax statement => statement.Expression,
             ForEachVariableStatementSyntax statement => statement.Expression,
             _ => null
         };
-        if (expression is null) return;
+        if (expression is null)
+        {
+            return;
+        }
+
         if (IsUnorderedIterationSource(expression, context.SemanticModel, context.CancellationToken, context.Node.SpanStart, context.Node))
+        {
             context.ReportDiagnostic(Diagnostic.Create(Ordering, expression.GetLocation(), "unordered collection iteration"));
+        }
     }
 
     private static bool IsUnorderedIterationSource(
@@ -101,7 +116,10 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
         HashSet<ISymbol>? visitedLocals = null)
     {
         var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type as INamedTypeSymbol;
-        if (IsUnorderedCollection(type)) return true;
+        if (IsUnorderedCollection(type))
+        {
+            return true;
+        }
 
         if (expression is IdentifierNameSyntax
             && semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is ILocalSymbol local)
@@ -121,15 +139,22 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
                 if (lastUnconditionalAssignment is null
                     && local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken) is VariableDeclaratorSyntax { Initializer.Value: { } initializer }
                     && IsUnorderedIterationSource(initializer, semanticModel, cancellationToken, usePosition, iterationNode, visitedLocals))
+                {
                     return true;
+                }
 
                 foreach (var assignment in priorAssignments)
                 {
                     if (lastUnconditionalAssignment is not null
                         && assignment.SpanStart < lastUnconditionalAssignment.SpanStart)
+                    {
                         continue;
+                    }
+
                     if (IsUnorderedIterationSource(assignment.Right, semanticModel, cancellationToken, usePosition, iterationNode, visitedLocals))
+                    {
                         return true;
+                    }
                 }
             }
         }
@@ -144,7 +169,9 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
             || semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method
             || !method.IsExtensionMethod
             || method.ContainingNamespace.ToDisplayString() != "System.Linq")
+        {
             return false;
+        }
 
         var isReducedExtensionCall = method.ReducedFrom is not null;
         var source = isReducedExtensionCall && invocation.Expression is MemberAccessExpressionSyntax memberAccess
@@ -152,10 +179,16 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
             : invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression;
         if (source is not null
             && IsUnorderedIterationSource(source, semanticModel, cancellationToken, usePosition, iterationNode, visitedLocals))
+        {
             return !IsStableIdentityOrdering(invocation, method, source, semanticModel, cancellationToken,
                 isReducedExtensionCall, usePosition);
+        }
 
-        if (!IsMultiSourceLinqOperator(method.Name)) return false;
+        if (!IsMultiSourceLinqOperator(method.Name))
+        {
+            return false;
+        }
+
         var secondarySourceStart = isReducedExtensionCall ? 0 : 1;
         return invocation.ArgumentList.Arguments.Skip(secondarySourceStart)
             .Any(argument => IsUnorderedIterationSource(argument.Expression, semanticModel, cancellationToken, usePosition, iterationNode, visitedLocals));
@@ -170,11 +203,17 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
         bool isReducedExtensionCall,
         int usePosition)
     {
-        if (method.Name is not ("OrderBy" or "OrderByDescending")) return false;
+        if (method.Name is not ("OrderBy" or "OrderByDescending"))
+        {
+            return false;
+        }
+
         var selectorIndex = isReducedExtensionCall ? 0 : 1;
         if (invocation.ArgumentList.Arguments.Count != selectorIndex + 1
             || invocation.ArgumentList.Arguments[selectorIndex].Expression is not LambdaExpressionSyntax lambda)
+        {
             return false;
+        }
 
         var parameter = lambda switch
         {
@@ -185,25 +224,37 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
         };
         if (parameter is null || lambda.Body is not ExpressionSyntax body
             || semanticModel.GetDeclaredSymbol(parameter, cancellationToken) is not IParameterSymbol parameterSymbol)
+        {
             return false;
+        }
+
         while (body is ParenthesizedExpressionSyntax parenthesizedBody)
+        {
             body = parenthesizedBody.Expression;
+        }
+
         if (!SymbolEqualityComparer.Default.Equals(
                 semanticModel.GetSymbolInfo(body, cancellationToken).Symbol, parameterSymbol))
+        {
             return false;
+        }
 
         var sourceType = semanticModel.GetTypeInfo(source, cancellationToken).Type as INamedTypeSymbol;
         if (sourceType is null || sourceType.TypeArguments.Length != 1
             || method.TypeArguments.Length != 2
             || !SymbolEqualityComparer.Default.Equals(method.TypeArguments[0], sourceType.TypeArguments[0])
             || !SymbolEqualityComparer.Default.Equals(method.TypeArguments[1], sourceType.TypeArguments[0]))
+        {
             return false;
+        }
 
         var definition = sourceType.OriginalDefinition;
         if (definition.ContainingNamespace.ToDisplayString() != "System.Collections.Generic"
             || definition.MetadataName != "HashSet`1"
             || !IsDefaultHashSetSource(source, semanticModel, cancellationToken, usePosition))
+        {
             return false;
+        }
 
         var elementType = sourceType.TypeArguments[0];
         return elementType.TypeKind == TypeKind.Enum || elementType.SpecialType is
@@ -220,21 +271,29 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
         int usePosition)
     {
         while (source is ParenthesizedExpressionSyntax parenthesized)
+        {
             source = parenthesized.Expression;
+        }
 
         if (IsDefaultHashSetConstruction(source, semanticModel, cancellationToken))
+        {
             return true;
+        }
 
         if (source is not IdentifierNameSyntax
             || semanticModel.GetSymbolInfo(source, cancellationToken).Symbol is not ILocalSymbol local)
+        {
             return false;
+        }
 
         var root = source.SyntaxTree.GetRoot(cancellationToken);
         if (root.DescendantNodes().OfType<AssignmentExpressionSyntax>().Any(assignment =>
                 assignment.SpanStart < usePosition
                 && SymbolEqualityComparer.Default.Equals(
                     semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol, local)))
+        {
             return false;
+        }
 
         return local.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(cancellationToken)
                 is VariableDeclaratorSyntax { Initializer.Value: { } initializer }
@@ -247,7 +306,9 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
         CancellationToken cancellationToken)
     {
         while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
             expression = parenthesized.Expression;
+        }
 
         return expression switch
         {
@@ -292,7 +353,9 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
             };
             if (source is not null
                 && IsUnorderedIterationSource(source, semanticModel, cancellationToken, usePosition, iterationNode, visitedLocals))
+            {
                 return true;
+            }
         }
 
         return body.Continuation is { } continuation
@@ -301,7 +364,11 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
 
     private static void AnalyzeOperation(OperationAnalysisContext context)
     {
-        if (!IsStrict(context.ContainingSymbol, context.Operation.Syntax.SyntaxTree, context.Options, context.Compilation)) return;
+        if (!IsStrict(context.ContainingSymbol, context.Operation.Syntax.SyntaxTree, context.Options, context.Compilation))
+        {
+            return;
+        }
+
         var operation = context.Operation;
         switch (operation)
         {
@@ -309,7 +376,10 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
                 AnalyzeMember(context, invocation.TargetMethod);
                 var declaringType = invocation.TargetMethod.ContainingType?.OriginalDefinition.ToDisplayString();
                 if (IsFloating(invocation.Type) && declaringType is not ("System.Math" or "System.MathF"))
+                {
                     context.ReportDiagnostic(Diagnostic.Create(Floating, invocation.Syntax.GetLocation(), "call result"));
+                }
+
                 break;
             case IObjectCreationOperation creation when creation.Constructor is not null:
                 AnalyzeMember(context, creation.Constructor);
@@ -317,12 +387,18 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
             case IPropertyReferenceOperation property:
                 AnalyzeMember(context, property.Property);
                 if (IsFloating(property.Type))
+                {
                     context.ReportDiagnostic(Diagnostic.Create(Floating, property.Syntax.GetLocation(), "property value"));
+                }
+
                 break;
             case IFieldReferenceOperation field:
                 AnalyzeMember(context, field.Field);
                 if (IsFloating(field.Type))
+                {
                     context.ReportDiagnostic(Diagnostic.Create(Floating, field.Syntax.GetLocation(), "field value"));
+                }
+
                 break;
             case ILiteralOperation or IBinaryOperation or IUnaryOperation when IsFloating(operation.Type):
                 context.ReportDiagnostic(Diagnostic.Create(Floating, operation.Syntax.GetLocation(), "arithmetic or value"));
@@ -333,7 +409,11 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeMember(OperationAnalysisContext context, ISymbol member)
     {
         var owner = member.ContainingType;
-        if (owner is null) return;
+        if (owner is null)
+        {
+            return;
+        }
+
         var ownerName = owner.OriginalDefinition.ToDisplayString();
         var name = member.Name;
         if (ownerName == "System.MathF" || (ownerName == "System.Math" && member is IMethodSymbol method
@@ -366,15 +446,35 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
 
     private static bool IsFloating(ITypeSymbol? type)
     {
-        if (type is null) return false;
-        if (type.SpecialType is SpecialType.System_Single or SpecialType.System_Double) return true;
-        if (type is IArrayTypeSymbol array) return IsFloating(array.ElementType);
+        if (type is null)
+        {
+            return false;
+        }
+
+        if (type.SpecialType is SpecialType.System_Single or SpecialType.System_Double)
+        {
+            return true;
+        }
+
+        if (type is IArrayTypeSymbol array)
+        {
+            return IsFloating(array.ElementType);
+        }
+
         if (type.ToDisplayString() is "System.Half" or "System.Numerics.Complex" or "System.Numerics.Vector2" or "System.Numerics.Vector3"
             or "System.Numerics.Vector4" or "System.Numerics.Quaternion" or "System.Numerics.Matrix3x2"
-            or "System.Numerics.Matrix4x4" or "System.Numerics.Plane") return true;
+            or "System.Numerics.Matrix4x4" or "System.Numerics.Plane")
+        {
+            return true;
+        }
+
         if (type is INamedTypeSymbol namedType)
         {
-            if (namedType.IsTupleType) return namedType.TupleElements.Any(element => IsFloating(element.Type));
+            if (namedType.IsTupleType)
+            {
+                return namedType.TupleElements.Any(element => IsFloating(element.Type));
+            }
+
             return namedType.TypeArguments.Any(IsFloating);
         }
         return false;
@@ -382,9 +482,16 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
 
     private static bool IsUnorderedCollection(INamedTypeSymbol? type)
     {
-        if (type is null) return false;
+        if (type is null)
+        {
+            return false;
+        }
         // Dictionary.Keys and .Values are nested collection types on the dictionary.
-        if (type.ContainingType is { } container && IsUnorderedCollection(container)) return true;
+        if (type.ContainingType is { } container && IsUnorderedCollection(container))
+        {
+            return true;
+        }
+
         var definition = type.OriginalDefinition;
         var ns = definition.ContainingNamespace.ToDisplayString();
         return (ns == "System.Collections.Generic" && definition.MetadataName is "Dictionary`2" or "HashSet`1" or "IDictionary`2" or "ISet`1" or "IReadOnlyDictionary`2" or "IReadOnlySet`1")
@@ -402,20 +509,41 @@ public sealed class StrictDeterminismAnalyzer : DiagnosticAnalyzer
         for (var current = symbol; current is not null; current = current.ContainingSymbol)
         {
             if (current is INamedTypeSymbol containingType && IsGameplaySystem(containingType, compilation))
+            {
                 gameplaySystem = true;
+            }
 
             foreach (var attribute in current.GetAttributes())
             {
                 var name = attribute.AttributeClass?.ToDisplayString();
-                if (name == CosmeticAttribute) return false;
-                if (name == StrictAttribute) explicitlyStrict = true;
+                if (name == CosmeticAttribute)
+                {
+                    return false;
+                }
+
+                if (name == StrictAttribute)
+                {
+                    explicitlyStrict = true;
+                }
             }
         }
 
         // Explicit strict markers retain their override semantics even in a relaxed file.
-        if (explicitlyStrict) return true;
-        if (string.Equals(fileMode, "strict", StringComparison.OrdinalIgnoreCase)) return true;
-        if (string.Equals(fileMode, "relaxed", StringComparison.OrdinalIgnoreCase)) return false;
+        if (explicitlyStrict)
+        {
+            return true;
+        }
+
+        if (string.Equals(fileMode, "strict", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(fileMode, "relaxed", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         return gameplaySystem;
     }
 

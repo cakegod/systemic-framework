@@ -16,7 +16,7 @@ public sealed class SpatialGridParityTests
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public void Rebuilt_and_incremental_population_grids_agree_with_brute_force(bool wrapX, bool wrapY)
+    public void RebuiltAndIncrementalPopulationGridsAgreeWithBruteForce(bool wrapX, bool wrapY)
     {
         var random = new Random(51_237);
         var bounds = new Bounds2(120, -80, 250, 180);
@@ -72,7 +72,7 @@ public sealed class SpatialGridParityTests
     }
 
     [Fact]
-    public void Entity_index_matches_the_population_grid_for_the_same_points()
+    public void EntityIndexMatchesThePopulationGridForTheSamePoints()
     {
         var random = new Random(88_412);
         var bounds = new Bounds2(0, 0, 400, 400);
@@ -106,7 +106,7 @@ public sealed class SpatialGridParityTests
     }
 
     [Fact]
-    public void Entity_index_answers_queries_a_bounded_population_grid_rejects()
+    public void EntityIndexAnswersQueriesABoundedPopulationGridRejects()
     {
         var index = new SpatialIndex(32);
         var positions = new[] { new Vector2(-30_000, 12_500), new Vector2(9_000, -4_000) };

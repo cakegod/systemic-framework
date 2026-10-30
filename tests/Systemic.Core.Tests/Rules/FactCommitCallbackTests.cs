@@ -6,7 +6,7 @@ namespace Systemic.Tests.Rules;
 public sealed class FactCommitCallbackTests
 {
     [Fact]
-    public void Fact_emitter_runs_commit_callbacks_only_after_successful_outer_dispatch()
+    public void FactEmitterRunsCommitCallbacksOnlyAfterSuccessfulOuterDispatch()
     {
         var rules = new RuleEngine(new CompiledRuleSet([]));
         var world = new World(seed: 1, valueScale: 1);

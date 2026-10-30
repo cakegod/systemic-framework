@@ -1,19 +1,18 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
-using Systemic.Rendering;
 
 namespace Systemic.Rendering.Tests;
 
 public sealed class SwarmInstanceTests
 {
     [Fact]
-    public void Instance_stays_small_and_layout_is_fixed()
+    public void InstanceStaysSmallAndLayoutIsFixed()
     {
         Assert.Equal(20, Marshal.SizeOf<SwarmInstance>());
     }
 
     [Fact]
-    public void Packed_colour_round_trips()
+    public void PackedColourRoundTrips()
     {
         var packed = SwarmColor.Pack(12, 34, 56, 78);
 
@@ -21,7 +20,7 @@ public sealed class SwarmInstanceTests
     }
 
     [Fact]
-    public void Default_alpha_is_opaque()
+    public void DefaultAlphaIsOpaque()
     {
         Assert.Equal(255, SwarmColor.Unpack(SwarmColor.Pack(1, 2, 3)).Alpha);
     }
@@ -30,7 +29,7 @@ public sealed class SwarmInstanceTests
 public sealed class SwarmSourceTests
 {
     [Fact]
-    public void Write_grows_past_capacity_and_exposes_written_instances()
+    public void WriteGrowsPastCapacityAndExposesWrittenInstances()
     {
         var source = new SwarmSource("boids", capacity: 2);
 
@@ -47,7 +46,7 @@ public sealed class SwarmSourceTests
     }
 
     [Fact]
-    public void Revision_bumps_once_per_completed_write()
+    public void RevisionBumpsOncePerCompletedWrite()
     {
         var source = new SwarmSource("boids");
 
@@ -63,7 +62,7 @@ public sealed class SwarmSourceTests
     }
 
     [Fact]
-    public void Open_write_keeps_the_previous_snapshot_visible()
+    public void OpenWriteKeepsThePreviousSnapshotVisible()
     {
         var source = new SwarmSource("boids", capacity: 4);
         var span = source.BeginWrite(1).Span;
@@ -77,7 +76,7 @@ public sealed class SwarmSourceTests
     }
 
     [Fact]
-    public void Published_instances_survive_the_next_write()
+    public void PublishedInstancesSurviveTheNextWrite()
     {
         var source = new SwarmSource("boids", capacity: 2);
         var first = source.BeginWrite(2).Span;
@@ -97,7 +96,7 @@ public sealed class SwarmSourceTests
     }
 
     [Fact]
-    public void Shrinking_write_hides_previous_instances()
+    public void ShrinkingWriteHidesPreviousInstances()
     {
         var source = new SwarmSource("boids");
         source.BeginWrite(3);
@@ -110,7 +109,7 @@ public sealed class SwarmSourceTests
     }
 
     [Fact]
-    public void Written_values_become_visible_after_the_write_ends()
+    public void WrittenValuesBecomeVisibleAfterTheWriteEnds()
     {
         var source = new SwarmSource("boids");
         var span = source.BeginWrite(1).Span;
@@ -127,7 +126,7 @@ public sealed class SwarmSourceTests
 public sealed class SwarmSceneTests
 {
     [Fact]
-    public void Scene_totals_instances_of_every_source()
+    public void SceneTotalsInstancesOfEverySource()
     {
         var first = new SwarmSource("first");
         var second = new SwarmSource("second");
@@ -145,7 +144,7 @@ public sealed class SwarmSceneTests
     }
 
     [Fact]
-    public void Removed_source_stops_contributing()
+    public void RemovedSourceStopsContributing()
     {
         var source = new SwarmSource("boids");
         var scene = CreateScene(source);
@@ -160,7 +159,7 @@ public sealed class SwarmSceneTests
     }
 
     [Fact]
-    public void Duplicate_source_id_is_rejected()
+    public void DuplicateSourceIdIsRejected()
     {
         var scene = CreateScene(new SwarmSource("boids"));
 

@@ -4,7 +4,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
-using System.Threading;
 
 namespace Systemic.Kernel.Generator;
 
@@ -126,16 +125,22 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
             var worldCommandBuffer = GetSystemicType(startContext.Compilation, WorldCommandBufferMetadataName, SystemicKernelAssembly);
             var immutableArray = startContext.Compilation.GetTypeByMetadataName(ImmutableArrayMetadataName);
             if (immutableArray?.ContainingAssembly.Identity.Name != "System.Collections.Immutable")
+            {
                 immutableArray = null;
+            }
 
             if (systemicSystem is null || systemicSystemContext is null || systemAccess is null
                 || populationColumn is null || doubleBufferedPopulationColumn is null
                 || populationColumnKey is null || populationAccessScope is null || worldCommandBuffer is null)
+            {
                 return;
+            }
 
             var accessProperty = systemicSystem.GetMembers("Access").OfType<IPropertySymbol>().FirstOrDefault();
             if (accessProperty is null)
+            {
                 return;
+            }
 
             startContext.RegisterSymbolAction(symbolContext => AnalyzeDefaultAccess(
                     symbolContext, systemicSystem, accessProperty),
@@ -159,16 +164,22 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
     {
         if (context.Symbol is not INamedTypeSymbol type || type.TypeKind != TypeKind.Class
             || !type.AllInterfaces.Any(iface => SymbolEqualityComparer.Default.Equals(iface, systemicSystem)))
+        {
             return;
+        }
 
         var implementation = type.FindImplementationForInterfaceMember(accessProperty);
         if (implementation is not null && implementation.ContainingType?.TypeKind != TypeKind.Interface
             && !SymbolEqualityComparer.Default.Equals(implementation, accessProperty))
+        {
             return;
+        }
 
         var location = type.Locations.FirstOrDefault(candidate => candidate.IsInSource);
         if (location is not null)
+        {
             context.ReportDiagnostic(Diagnostic.Create(ExclusiveDefaultAccess, location, type.Name));
+        }
     }
 
     private static INamedTypeSymbol? GetSystemicType(Compilation compilation, string metadataName, string assemblyName)
@@ -192,7 +203,9 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
     {
         if (context.Node is not InvocationExpressionSyntax invocationSyntax
             || context.SemanticModel.GetOperation(invocationSyntax, context.CancellationToken) is not IInvocationOperation invocation)
+        {
             return;
+        }
 
         var method = invocation.TargetMethod;
         if (SymbolEqualityComparer.Default.Equals(method.ContainingType?.OriginalDefinition, systemicSystemContext))
@@ -206,7 +219,10 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
                     context.ReportDiagnostic(Diagnostic.Create(ImmediateWorldAccess, invocationSyntax.GetLocation(), method.Name));
                 }
                 if (IsInsideForEachRangeCallback(invocationSyntax, context.SemanticModel, systemicSystemContext, context.CancellationToken))
+                {
                     context.ReportDiagnostic(Diagnostic.Create(UnsafeRangeMutation, invocationSyntax.GetLocation()));
+                }
+
                 return;
             }
 
@@ -215,7 +231,10 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
                 var access = GetDeclaredAccess(context, systemicSystem, accessProperty, systemAccess,
                     populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray);
                 if (access.IsKnown && !access.HasWriteWorld && !access.HasDeferWorldWrites)
+                {
                     context.ReportDiagnostic(Diagnostic.Create(DeferredPopulationAccess, invocationSyntax.GetLocation()));
+                }
+
                 return;
             }
 
@@ -224,9 +243,15 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
                 var access = GetDeclaredAccess(context, systemicSystem, accessProperty, systemAccess,
                     populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray);
                 if (access.IsKnown && !access.HasWriteWorld && !access.HasDeferWorldWrites)
+                {
                     context.ReportDiagnostic(Diagnostic.Create(DeferredFactAccess, invocationSyntax.GetLocation()));
+                }
+
                 if (IsInsideForEachRangeCallback(invocationSyntax, context.SemanticModel, systemicSystemContext, context.CancellationToken))
+                {
                     context.ReportDiagnostic(Diagnostic.Create(UnsafeRangeMutation, invocationSyntax.GetLocation()));
+                }
+
                 return;
             }
         }
@@ -303,7 +328,9 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         var systemType = context.ContainingSymbol?.ContainingType;
         if (systemType is null || !systemType.AllInterfaces.Any(iface =>
                 SymbolEqualityComparer.Default.Equals(iface, systemicSystem)))
+        {
             return AccessAnalysis.Unknown;
+        }
 
         var implementation = systemType.FindImplementationForInterfaceMember(accessProperty);
         if (implementation is null || implementation.ContainingType?.TypeKind == TypeKind.Interface
@@ -314,19 +341,25 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         }
 
         if (implementation is not IPropertySymbol property)
+        {
             return AccessAnalysis.Unknown;
+        }
 
         var declaration = property.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(context.CancellationToken);
         var expression = GetAccessExpression(declaration);
         if (expression is null)
+        {
             return AccessAnalysis.Unknown;
+        }
 
         var expressionSemanticModel = ReferenceEquals(expression.SyntaxTree, context.SemanticModel.SyntaxTree)
             ? context.SemanticModel
             : GetSemanticModelForOtherTree(context.Compilation, expression.SyntaxTree);
         if (!TryGetDirectAccessItems(expression, expressionSemanticModel, context.Compilation,
                 context.CancellationToken, systemAccess, immutableArray, out var items, out var semanticModel))
+        {
             return AccessAnalysis.Unknown;
+        }
 
         var hasWriteWorld = false;
         var hasDeferredWrite = false;
@@ -371,16 +404,27 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
             {
                 var resourceExpression = item;
                 while (resourceExpression is ParenthesizedExpressionSyntax parenthesized)
+                {
                     resourceExpression = parenthesized.Expression;
+                }
+
                 if (resourceExpression is not InvocationExpressionSyntax resourceInvocation
                     || resourceInvocation.ArgumentList.Arguments.Count != 1)
+                {
                     return AccessAnalysis.Unknown;
+                }
+
                 var resourceName = semanticModel.GetConstantValue(
                     resourceInvocation.ArgumentList.Arguments[0].Expression, context.CancellationToken);
                 if (!resourceName.HasValue || resourceName.Value is not string resource)
+                {
                     return AccessAnalysis.Unknown;
+                }
+
                 if (resourceFactory.Name == "WriteResource" && resource == "$world")
+                {
                     hasWriteWorld = true;
+                }
                 // An unrelated custom resource does not make generated-column permissions unknown.
             }
             else if (symbol is IPropertySymbol generatedAccess
@@ -412,22 +456,31 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         isWrite = false;
         if (accessProperty.IsStatic == false
             || !SymbolEqualityComparer.Default.Equals(accessProperty.Type, systemAccess))
+        {
             return false;
+        }
 
         var prefix = accessProperty.Name.StartsWith("Read", StringComparison.Ordinal) ? "Read"
             : accessProperty.Name.StartsWith("Write", StringComparison.Ordinal) ? "Write"
             : null;
         if (prefix is null || accessProperty.Name.Length == prefix.Length)
+        {
             return false;
+        }
 
         var columnsType = accessProperty.ContainingType.GetTypeMembers("Columns").FirstOrDefault();
         if (columnsType is null)
+        {
             return false;
+        }
+
         var fieldName = accessProperty.Name.Substring(prefix.Length);
         var candidate = columnsType.GetMembers(fieldName).OfType<IPropertySymbol>().FirstOrDefault();
         if (candidate is null || !IsGeneratedColumnProperty(candidate, systemAccess, populationColumn,
                 doubleBufferedPopulationColumn, populationColumnKey))
+        {
             return false;
+        }
 
         columnProperty = candidate;
         isWrite = prefix == "Write";
@@ -448,7 +501,10 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         columnProperty = null!;
         isWrite = false;
         while (accessExpression is ParenthesizedExpressionSyntax parenthesized)
+        {
             accessExpression = parenthesized.Expression;
+        }
+
         if (accessExpression is not InvocationExpressionSyntax invocation
             || invocation.ArgumentList.Arguments.Count != 1
             || GetSymbol(semanticModel, invocation.ArgumentList.Arguments[0].Expression) is not IPropertySymbol keyProperty
@@ -460,7 +516,9 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
             || keyType.TypeArguments.Length != 1
             || accessMethod.TypeArguments.Length != 2
             || !SymbolEqualityComparer.Default.Equals(keyType.TypeArguments[0], accessMethod.TypeArguments[1]))
+        {
             return false;
+        }
 
         var companion = keyProperty.ContainingType;
         var defineMethod = companion.GetMembers("Define").OfType<IMethodSymbol>()
@@ -468,14 +526,18 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         if (defineMethod?.ReturnType is not INamedTypeSymbol populationType
             || populationType.TypeArguments.Length != 1
             || !SymbolEqualityComparer.Default.Equals(populationType.TypeArguments[0], accessMethod.TypeArguments[0]))
+        {
             return false;
+        }
 
         var columnsType = companion.GetTypeMembers("Columns").FirstOrDefault();
         var generatedColumn = columnsType?.GetMembers(keyProperty.Name.Substring(0, keyProperty.Name.Length - "Key".Length))
             .OfType<IPropertySymbol>().FirstOrDefault();
         if (generatedColumn is null || !IsGeneratedColumnProperty(generatedColumn, systemAccess,
                 populationColumn, doubleBufferedPopulationColumn, populationColumnKey))
+        {
             return false;
+        }
 
         columnProperty = generatedColumn;
         isWrite = accessMethod.Name == "WriteColumn";
@@ -493,25 +555,33 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         var companion = columnsType.ContainingType;
         if (columnsType.Name != "Columns" || companion is null || !companion.IsStatic
             || !companion.GetTypeMembers("Columns").Any(type => SymbolEqualityComparer.Default.Equals(type, columnsType)))
+        {
             return false;
+        }
 
         var bindExists = companion.GetMembers("Bind").OfType<IMethodSymbol>().Any(method => method.IsStatic
             && SymbolEqualityComparer.Default.Equals(method.ReturnType, columnsType));
         if (!bindExists)
+        {
             return false;
+        }
 
         if (columnProperty.Type is not INamedTypeSymbol columnType
             || !(SymbolEqualityComparer.Default.Equals(columnType.OriginalDefinition, populationColumn)
                 || SymbolEqualityComparer.Default.Equals(columnType.OriginalDefinition, doubleBufferedPopulationColumn))
             || columnType.TypeArguments.Length != 1)
+        {
             return false;
+        }
 
         var keyProperty = companion.GetMembers(columnProperty.Name + "Key").OfType<IPropertySymbol>().FirstOrDefault();
         if (keyProperty?.Type is not INamedTypeSymbol keyType
             || !SymbolEqualityComparer.Default.Equals(keyType.OriginalDefinition, populationColumnKey)
             || keyType.TypeArguments.Length != 1
             || !SymbolEqualityComparer.Default.Equals(keyType.TypeArguments[0], columnType.TypeArguments[0]))
+        {
             return false;
+        }
 
         var readAccess = companion.GetMembers("Read" + columnProperty.Name).OfType<IPropertySymbol>().FirstOrDefault();
         var writeAccess = companion.GetMembers("Write" + columnProperty.Name).OfType<IPropertySymbol>().FirstOrDefault();
@@ -534,7 +604,9 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
             || GetSymbol(semanticModel, memberAccess.Expression) is not IPropertySymbol property
             || !IsGeneratedColumnProperty(property, systemAccess, populationColumn,
                 doubleBufferedPopulationColumn, populationColumnKey))
+        {
             return false;
+        }
 
         columnProperty = property;
         return true;
@@ -560,18 +632,25 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
             || method.Name is not ("ReadAll" or "ReadRange" or "ReadCurrent" or "ReadCurrentRange"
                 or "EditRange" or "EditNext" or "EditBoth")
             || invocation.Arguments.Length == 0)
+        {
             return false;
+        }
 
         if (invocation.Arguments[invocation.Arguments.Length - 1].Value.Syntax is not ExpressionSyntax columnExpression || GetSymbol(semanticModel, columnExpression) is not IPropertySymbol property
             || !IsGeneratedColumnProperty(property, systemAccess, populationColumn,
                 doubleBufferedPopulationColumn, populationColumnKey))
+        {
             return false;
+        }
 
         isWrite = method.Name is "EditRange" or "EditNext" or "EditBoth";
         partitionRead = (method.Name is "ReadRange" or "ReadCurrent" or "ReadCurrentRange")
             && !(method.Name == "ReadCurrent" && method.Parameters.Length > 1);
         if (method.Name == "ReadAll" && method.Parameters.Length > 1)
+        {
             partitionRead = false;
+        }
+
         columnProperty = property;
         return true;
     }
@@ -579,7 +658,10 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
     private static ISymbol? GetSymbol(SemanticModel semanticModel, ExpressionSyntax expression)
     {
         while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
             expression = parenthesized.Expression;
+        }
+
         return semanticModel.GetSymbolInfo(expression).Symbol;
     }
 
@@ -599,7 +681,9 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
             || GetSymbol(context.SemanticModel, memberAccess.Expression) is not IPropertySymbol columnProperty
             || !IsGeneratedColumnProperty(columnProperty, systemAccess, populationColumn,
                 doubleBufferedPopulationColumn, populationColumnKey))
+        {
             return;
+        }
 
         var access = GetDeclaredAccess(context, systemicSystem, accessProperty, systemAccess,
             populationColumn, doubleBufferedPopulationColumn, populationColumnKey, immutableArray);
@@ -628,14 +712,18 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         AccessAnalysis access)
     {
         if (!access.IsKnown)
+        {
             return;
+        }
 
         var allowed = isWrite
             ? ContainsColumn(access.WriteColumns, columnProperty)
             : ContainsColumn(access.ReadColumns, columnProperty)
                 || (partitionRead && ContainsColumn(access.WriteColumns, columnProperty));
         if (allowed)
+        {
             return;
+        }
 
         var companionName = columnProperty.ContainingType.ContainingType.Name;
         var required = isWrite
@@ -662,20 +750,37 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
     private static SyntaxNode? GetAccessExpression(SyntaxNode? declaration)
     {
         if (declaration is not PropertyDeclarationSyntax property)
+        {
             return null;
+        }
+
         if (property.ExpressionBody is { } expressionBody)
+        {
             return expressionBody.Expression;
+        }
+
         if (property.Initializer is { } initializer)
+        {
             return initializer.Value;
+        }
+
         if (property.AccessorList is not { } accessors)
+        {
             return null;
+        }
 
         var getter = accessors.Accessors.FirstOrDefault(accessor => accessor.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.GetAccessorDeclaration));
         if (getter?.ExpressionBody is { } getterExpressionBody)
+        {
             return getterExpressionBody.Expression;
+        }
+
         if (getter?.Body is { Statements.Count: 1 } body
             && body.Statements[0] is ReturnStatementSyntax { Expression: { } returnExpression })
+        {
             return returnExpression;
+        }
+
         return null;
     }
 
@@ -697,10 +802,14 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         }
 
         if (TryGetDirectCollectionItems(expression, out items))
+        {
             return true;
+        }
 
         while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
             expression = parenthesized.Expression;
+        }
 
         if (expressionSemanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not IFieldSymbol field
             || field.DeclaredAccessibility != Accessibility.Private
@@ -734,14 +843,19 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         if (immutableArray is null || fieldType is not INamedTypeSymbol namedType
             || !SymbolEqualityComparer.Default.Equals(namedType.OriginalDefinition, immutableArray)
             || namedType.TypeArguments.Length != 1)
+        {
             return false;
+        }
+
         return SymbolEqualityComparer.Default.Equals(namedType.TypeArguments[0], systemAccess);
     }
 
     private static bool TryGetDirectCollectionItems(ExpressionSyntax expression, out ImmutableArray<ExpressionSyntax> items)
     {
         while (expression is ParenthesizedExpressionSyntax parenthesized)
+        {
             expression = parenthesized.Expression;
+        }
 
         switch (expression)
         {
@@ -782,7 +896,10 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
     {
         var declaringType = method.ContainingType?.OriginalDefinition;
         if (SymbolEqualityComparer.Default.Equals(declaringType, populationColumn))
+        {
             return method.Name is "EditRange" or "EditNext" or "EditMemory";
+        }
+
         return SymbolEqualityComparer.Default.Equals(declaringType, doubleBufferedPopulationColumn)
             && method.Name is "EditNext" or "EditNextMemory" or "EditBothBuffers" or "Swap";
     }
@@ -803,22 +920,33 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
         var callback = invocation.Ancestors().FirstOrDefault(node =>
             node is LambdaExpressionSyntax or AnonymousMethodExpressionSyntax);
         if (callback is null)
+        {
             return false;
+        }
 
         var argument = callback.Ancestors().OfType<ArgumentSyntax>().FirstOrDefault();
         if (argument?.Parent?.Parent is not InvocationExpressionSyntax forEachInvocation)
+        {
             return false;
+        }
 
         var callbackExpression = argument.Expression;
         while (callbackExpression is ParenthesizedExpressionSyntax parenthesized)
+        {
             callbackExpression = parenthesized.Expression;
+        }
+
         if (!ReferenceEquals(callbackExpression, callback))
+        {
             return false;
+        }
 
         if (semanticModel.GetSymbolInfo(forEachInvocation, cancellationToken).Symbol is not IMethodSymbol method
             || !SymbolEqualityComparer.Default.Equals(method.ContainingType?.OriginalDefinition, systemicSystemContext)
             || method.Name is not ("ForEachRange" or "ForEachPopulationRange"))
+        {
             return false;
+        }
 
         return semanticModel.GetOperation(argument, cancellationToken) is IArgumentOperation { Parameter.Ordinal: 2 };
     }
@@ -830,7 +958,10 @@ public sealed class SystemAccessAnalyzer : DiagnosticAnalyzer
     {
         var declaringType = method.ContainingType?.OriginalDefinition;
         if (SymbolEqualityComparer.Default.Equals(declaringType, populationColumn))
+        {
             return method.Name is "EditRange" or "EditNext" or "EditMemory";
+        }
+
         return SymbolEqualityComparer.Default.Equals(declaringType, doubleBufferedPopulationColumn)
             && method.Name is "EditNext" or "EditNextMemory" or "EditBothBuffers" or "Swap";
     }

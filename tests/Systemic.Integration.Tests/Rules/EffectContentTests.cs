@@ -7,7 +7,7 @@ namespace Systemic.Tests;
 public sealed class EffectContentTests
 {
     [Fact]
-    public void Merge_content_despawns_both_inputs_and_spawns_the_next_tier()
+    public void MergeContentDespawnsBothInputsAndSpawnsTheNextTier()
     {
         using var workspace = new EffectContentWorkspace();
         var content = workspace.Load();
@@ -27,7 +27,7 @@ public sealed class EffectContentTests
     }
 
     [Fact]
-    public void Hiking_buddy_content_modifies_the_actor_while_its_tag_is_present()
+    public void HikingBuddyContentModifiesTheActorWhileItsTagIsPresent()
     {
         using var workspace = new EffectContentWorkspace();
         var content = workspace.Load();
@@ -44,7 +44,7 @@ public sealed class EffectContentTests
     }
 
     [Fact]
-    public void An_upgrade_content_modifier_follows_its_rank_property()
+    public void AnUpgradeContentModifierFollowsItsRankProperty()
     {
         using var workspace = new EffectContentWorkspace();
         var content = workspace.Load();

@@ -96,10 +96,16 @@ public static class ContentReload
             foreach (var module in modules ?? [])
             {
                 if (module is null)
+                {
                     return Failure("reload.module_invalid", "game.json", "$.modules", "A reload module instance is null.");
+                }
+
                 if (!active.Modules.IsDefaultOrEmpty && active.Modules.Any(compiled => ReferenceEquals(compiled.Module, module)))
+                {
                     return Failure("reload.module_instance_reused", "game.json", "$.modules",
                         $"Module '{module.Id}' is used by the active pack; provide a fresh isolated module instance.");
+                }
+
                 registry.Add(module);
             }
         }
@@ -133,15 +139,23 @@ public static class ContentReload
 
         var diagnostics = ImmutableArray.CreateBuilder<ContentDiagnostic>();
         if (!string.Equals(active.Manifest.Id, candidate.Manifest.Id, StringComparison.Ordinal))
+        {
             diagnostics.Add(new("reload.identity_mismatch", "game.json", "$.id",
                 $"Active game ID '{active.Manifest.Id}' differs from candidate '{candidate.Manifest.Id}'."));
+        }
+
         if (active.Manifest.TickRateHz != candidate.Manifest.TickRateHz
             || active.Manifest.MaxCatchUpSteps != candidate.Manifest.MaxCatchUpSteps)
+        {
             diagnostics.Add(new("reload.clock_mismatch", "game.json", "$",
                 "The candidate changes tickRateHz or maxCatchUpSteps; a clock migration is required."));
+        }
+
         if (!IsFingerprint(candidate.ContentFingerprint))
+        {
             diagnostics.Add(new("reload.candidate_fingerprint_missing", "game.json", "$",
                 "The compiled candidate has no valid SHA-256 fingerprint."));
+        }
 
         CheckEntities(active, candidate, diagnostics);
         CheckModules(active, candidate, diagnostics);
@@ -165,12 +179,17 @@ public static class ContentReload
         {
             var next = newEntities[id];
             if (!string.Equals(oldEntity.Kind, next.Kind, StringComparison.Ordinal))
+            {
                 diagnostics.Add(new("reload.entity_mismatch", "entities.json", "$.entities",
                     $"Entity '{id}' changed kind from '{oldEntity.Kind}' to '{next.Kind}'."));
+            }
+
             if (!oldEntity.Properties.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(next.Properties.Keys)
                 || !oldEntity.Links.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(next.Links.Keys))
+            {
                 diagnostics.Add(new("reload.entity_schema_mismatch", "entities.json", "$.entities",
                     $"Entity '{id}' changed property or link names; a world migration is required."));
+            }
         }
     }
 
@@ -191,8 +210,10 @@ public static class ContentReload
         {
             var next = newById[id];
             if (module.Module.GetType() != next.Module.GetType() || module.Content.GetType() != next.Content.GetType())
+            {
                 diagnostics.Add(new("reload.modules_mismatch", "game.json", "$.modules",
                     $"Module '{id}' changed implementation or content type; an extension migration is required."));
+            }
         }
     }
 

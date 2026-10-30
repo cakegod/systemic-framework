@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using Systemic.Content;
-using Systemic.Host;
 using Systemic.Kernel;
 using Systemic.Rules;
 
@@ -9,7 +8,7 @@ namespace Systemic.Tests;
 public sealed class EffectPrimitiveTests
 {
     [Fact]
-    public void Quantity_operations_apply_in_order_without_losing_exactness()
+    public void QuantityOperationsApplyInOrderWithoutLosingExactness()
     {
         var world = new World(seed: 1, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("value", 10)));
@@ -30,7 +29,7 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
-    public void RemoveTag_drops_only_the_named_tag()
+    public void RemoveTagDropsOnlyTheNamedTag()
     {
         var world = new World(seed: 2, valueScale: 1);
         var entity = world.Add(new DataEntity(["active", "boosted"], []));
@@ -46,7 +45,7 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
-    public void Despawn_marks_the_entity_and_prune_removes_it()
+    public void DespawnMarksTheEntityAndPruneRemovesIt()
     {
         var world = new World(seed: 3, valueScale: 1);
         var doomed = world.Add(new DataEntity(["merge.candidate"], []));
@@ -65,7 +64,7 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
-    public void Transfer_moves_what_the_source_holds_and_leaves_the_rest()
+    public void TransferMovesWhatTheSourceHoldsAndLeavesTheRest()
     {
         var world = new World(seed: 4, valueScale: 1);
         var carrier = world.Add(new DataEntity([], [], ("ore", 3)));
@@ -83,7 +82,7 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
-    public void Spawn_instantiates_the_template_at_the_fact_position()
+    public void SpawnInstantiatesTheTemplateAtTheFactPosition()
     {
         var world = new World(seed: 5, valueScale: 1);
         var source = world.Add(new DataEntity([], []));
@@ -114,7 +113,7 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
-    public void Scheduled_facts_fire_only_when_the_tick_reaches_their_delay()
+    public void ScheduledFactsFireOnlyWhenTheTickReachesTheirDelay()
     {
         var world = new World(seed: 6, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("score", 0)));
@@ -136,7 +135,7 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
-    public void Action_effects_invoke_the_registered_handler_with_resolved_entities()
+    public void ActionEffectsInvokeTheRegisteredHandlerWithResolvedEntities()
     {
         var world = new World(seed: 7, valueScale: 1);
         var source = world.Add(new DataEntity(["actor"], []));
@@ -168,7 +167,7 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
-    public void Rolled_back_dispatch_does_not_leave_a_spawned_entity()
+    public void RolledBackDispatchDoesNotLeaveASpawnedEntity()
     {
         var world = new World(seed: 8, valueScale: 1);
         var source = world.Add(new DataEntity([], [], ("heat", double.MaxValue)));
@@ -192,7 +191,7 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
-    public void Content_rejects_a_spawn_that_names_an_unknown_template()
+    public void ContentRejectsASpawnThatNamesAnUnknownTemplate()
     {
         using var pack = new EffectPack(rules: """
             {
@@ -211,7 +210,7 @@ public sealed class EffectPrimitiveTests
     }
 
     [Fact]
-    public void Content_compiles_every_effect_primitive()
+    public void ContentCompilesEveryEffectPrimitive()
     {
         using var pack = new EffectPack(rules: """
             {

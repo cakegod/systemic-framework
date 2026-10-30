@@ -7,7 +7,7 @@ public sealed class WorldStateTransactionTests
     private static readonly PopulationColumnKey<int> s_key = new("transaction.value", 1, PopulationCodecs.Int32);
 
     [Fact]
-    public void Rollback_removes_role_and_required_bindings_added_to_existing_entities()
+    public void RollbackRemovesRoleAndRequiredBindingsAddedToExistingEntities()
     {
         var world = new World(1, 1);
         var entity = world.Add(new DataEntity([], []));
@@ -23,7 +23,7 @@ public sealed class WorldStateTransactionTests
     }
 
     [Fact]
-    public void Rollback_restores_roles_cleared_by_pruning_an_entity()
+    public void RollbackRestoresRolesClearedByPruningAnEntity()
     {
         var world = new World(2, 1);
         var entity = world.Add(new DataEntity([], []));
@@ -40,7 +40,7 @@ public sealed class WorldStateTransactionTests
     }
 
     [Fact]
-    public void Rolling_back_a_pending_removal_leaves_the_entity_live()
+    public void RollingBackAPendingRemovalLeavesTheEntityLive()
     {
         var world = new World(5, 1);
         var entity = world.Add(new DataEntity([], []));
@@ -58,7 +58,7 @@ public sealed class WorldStateTransactionTests
     }
 
     [Fact]
-    public void Removing_an_entity_of_another_world_is_rejected()
+    public void RemovingAnEntityOfAnotherWorldIsRejected()
     {
         var world = new World(6, 1);
         var other = new World(7, 1);
@@ -71,7 +71,7 @@ public sealed class WorldStateTransactionTests
     }
 
     [Fact]
-    public void Rolling_back_a_nested_population_definition_removes_it_and_invalidates_the_reference()
+    public void RollingBackANestedPopulationDefinitionRemovesItAndInvalidatesTheReference()
     {
         var world = new World(3, 1);
         Population<Kind> created;
@@ -89,7 +89,7 @@ public sealed class WorldStateTransactionTests
     }
 
     [Fact]
-    public void Rolling_back_a_population_restore_restores_rows_values_and_both_buffers()
+    public void RollingBackAPopulationRestoreRestoresRowsValuesAndBothBuffers()
     {
         var world = new World(4, 1);
         var population = world.DefinePopulation<Kind>(enableHandles: true);

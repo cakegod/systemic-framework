@@ -2,7 +2,6 @@ using System.Numerics;
 using System.Text.Json;
 using Systemic.Kernel;
 using Systemic.Content;
-using Systemic.Gameplay2D;
 using Systemic.Host;
 using Systemic.Rules;
 using Systemic.Tests;
@@ -21,7 +20,7 @@ public sealed class TalentPatternCoverageTests
         .Select(pattern => new object[] { pattern.Id, pattern.Mechanic, pattern.Ports });
 
     [Fact]
-    public void Anonymous_coverage_corpus_tracks_all_forty_one_audited_patterns()
+    public void AnonymousCoverageCorpusTracksAllFortyOneAuditedPatterns()
     {
         var cases = ReadCases();
 
@@ -37,7 +36,7 @@ public sealed class TalentPatternCoverageTests
 
     [Theory]
     [MemberData(nameof(PatternCases))]
-    public void Every_anonymous_pattern_resolves_to_a_working_framework_port(
+    public void EveryAnonymousPatternResolvesToAWorkingFrameworkPort(
         string id,
         string mechanic,
         string[] ports)

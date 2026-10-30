@@ -47,7 +47,11 @@ public readonly struct DeterministicRandom
         unchecked
         {
             var hash = 0xCBF29CE484222325UL;
-            foreach (var b in bytes) hash = (hash ^ b) * 0x100000001B3UL;
+            foreach (var b in bytes)
+            {
+                hash = (hash ^ b) * 0x100000001B3UL;
+            }
+
             return hash;
         }
     }
@@ -84,7 +88,11 @@ public readonly struct DeterministicRandomFactory
 
     public DeterministicRandom ForEntity(ulong entityId, ulong tick)
     {
-        if (!_initialized) throw new InvalidOperationException("The deterministic random factory is not initialized.");
+        if (!_initialized)
+        {
+            throw new InvalidOperationException("The deterministic random factory is not initialized.");
+        }
+
         return new DeterministicRandom(_seed, _systemHash, entityId, tick);
     }
 }

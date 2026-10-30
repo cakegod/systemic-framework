@@ -18,7 +18,7 @@ public sealed class DeclarativeUiEvaluationBudgetTests(ITestOutputHelper output)
 
     [Fact]
     [Trait("Category", "Performance")]
-    public void Repeated_nested_ui_evaluation_reports_release_cost_without_timing_gate()
+    public void RepeatedNestedUiEvaluationReportsReleaseCostWithoutTimingGate()
     {
         var world = new World(seed: 88, valueScale: 1) { LogicalTick = 23 };
         var shortEntity = world.Add(new DataEntity([], [], ("ore.vein.balance", 2)));

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -331,7 +332,7 @@ public sealed class MineGame : Game
                     _menu.Select(index);
                     if (clicked)
                     {
-                        var valueWidth = _font.Measure(FrameLimitText(), 2.5f);
+                        var valueWidth = PixelFont.Measure(FrameLimitText(), 2.5f);
                         var direction = _menu.Screen == MineScreen.Settings && index == 1
                             && cursor.X >= 858 - valueWidth && cursor.X < 858 - (valueWidth / 2) ? -1 : 1;
                         _menu.Activate(direction);
@@ -383,7 +384,7 @@ public sealed class MineGame : Game
         else
         {
             const string title = "SETTINGS";
-            _font.Draw(_batch, title, (ScreenWidth - _font.Measure(title, 6f)) / 2, 150, 6f, new XnaColor(255, 214, 140));
+            _font.Draw(_batch, title, (ScreenWidth - PixelFont.Measure(title, 6f)) / 2, 150, 6f, new XnaColor(255, 214, 140));
         }
 
         for (var index = 0; index < _menu.ItemCount; index++)
@@ -409,7 +410,7 @@ public sealed class MineGame : Game
             if (_menu.Screen == MineScreen.Settings && index < 2)
             {
                 var value = index == 0 ? (_menu.VSync ? "< ON >" : "< OFF >") : FrameLimitText();
-                _font.Draw(_batch, value, 858 - _font.Measure(value, 2.5f), row.Y + 22, 2.5f, color);
+                _font.Draw(_batch, value, 858 - PixelFont.Measure(value, 2.5f), row.Y + 22, 2.5f, color);
             }
         }
 
@@ -426,8 +427,8 @@ public sealed class MineGame : Game
         {
             const string hint = "UP/DOWN SELECT  LEFT/RIGHT CHANGE  ESC BACK";
             const string note = "VSYNC CAN LIMIT FPS TO DISPLAY RATE";
-            _font.Draw(_batch, hint, (ScreenWidth - _font.Measure(hint, 1.5f)) / 2, 670, 1.5f, new XnaColor(190, 202, 189));
-            _font.Draw(_batch, note, (ScreenWidth - _font.Measure(note, 1.5f)) / 2, 700, 1.5f, new XnaColor(190, 202, 189));
+            _font.Draw(_batch, hint, (ScreenWidth - PixelFont.Measure(hint, 1.5f)) / 2, 670, 1.5f, new XnaColor(190, 202, 189));
+            _font.Draw(_batch, note, (ScreenWidth - PixelFont.Measure(note, 1.5f)) / 2, 700, 1.5f, new XnaColor(190, 202, 189));
         }
     }
 
@@ -643,10 +644,10 @@ public sealed class MineGame : Game
     }
 
     private void DrawHudTextRight(string text, int right, int y, float scale, XnaColor color) =>
-        DrawHudText(text, right - _font.Measure(text, scale), y, scale, color);
+        DrawHudText(text, right - PixelFont.Measure(text, scale), y, scale, color);
 
     private void DrawHudTextCentered(string text, int y, float scale, XnaColor color) =>
-        DrawHudText(text, (ScreenWidth - _font.Measure(text, scale)) / 2, y, scale, color);
+        DrawHudText(text, (ScreenWidth - PixelFont.Measure(text, scale)) / 2, y, scale, color);
 
     private void DrawIcon(HudIcon icon, int x, int y, int size = IconSize, float opacity = 1f) =>
         _batch.Draw(_iconAtlas, new Rectangle(x, y, size, size),
@@ -674,8 +675,8 @@ public sealed class MineGame : Game
     {
         var x = s_resources.X;
         var y = s_resources.Y;
-        var dust = _simulation.Dust.ToString();
-        var scale = Math.Min(4f, (s_resources.Width - 106f) / _font.Measure(dust, 1f));
+        var dust = _simulation.Dust.ToString(CultureInfo.InvariantCulture);
+        var scale = Math.Min(4f, (s_resources.Width - 106f) / PixelFont.Measure(dust, 1f));
         DrawForgePanel(s_resources, s_brass);
         DrawIcon(HudIcon.Dust, x + 8, y + 4, 72);
         DrawHudText("DUST", x + 90, y + 18, TypeLabel, s_label);
@@ -767,7 +768,7 @@ public sealed class MineGame : Game
             DrawHudText($"{index + 1}", bounds.X + 12, bounds.Y + 10, TypeLabel, focused || ready ? s_ivory : s_keyLabel);
             DrawIcon(UpgradeIcon(kind), bounds.X + 14,
                 bounds.Y + 21 - (int)(focus * 4f) - (int)(MathF.Sin(flash * MathF.PI) * 6f));
-            DrawHudText(upgrade.Name, bounds.Center.X - (_font.Measure(upgrade.Name, TypeLabel) / 2),
+            DrawHudText(upgrade.Name, bounds.Center.X - (PixelFont.Measure(upgrade.Name, TypeLabel) / 2),
                 bounds.Y + 70, TypeLabel, focused || ready || maxed ? s_ivory : s_muted);
 
             for (var segment = 0; segment < 8; segment++)
@@ -882,7 +883,7 @@ public sealed class MineGame : Game
 
     private void DrawToast(string message)
     {
-        var width = _font.Measure(message, TypeValue) + 40;
+        var width = PixelFont.Measure(message, TypeValue) + 40;
         var y = _paused || _simulation.Won ? 264 : s_upgradeDetail.Top - 46;
         DrawForgePanel(new Rectangle((ScreenWidth - width) / 2, y, width, 32), s_brass);
         DrawHudTextCentered(message, y + 9, TypeValue, s_ivory);

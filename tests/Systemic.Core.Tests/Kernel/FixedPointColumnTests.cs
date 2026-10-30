@@ -21,7 +21,7 @@ public sealed class FixedPointColumnTests
     private const long OneRaw = 1L << 32;
 
     [Fact]
-    public void Codecs_round_trip_exact_bits_including_the_limits()
+    public void CodecsRoundTripExactBitsIncludingTheLimits()
     {
         Fixed64[] scalars = [Fixed64.FromRaw(1), Fixed64.FromRaw(-1), Fixed64.FromRaw(long.MinValue),
             Fixed64.FromRaw(long.MaxValue), Fixed64.Zero];
@@ -44,7 +44,7 @@ public sealed class FixedPointColumnTests
     }
 
     [Fact]
-    public void Fixed_columns_round_trip_through_the_population_save_state()
+    public void FixedColumnsRoundTripThroughThePopulationSaveState()
     {
         var source = new World(seed: 95, valueScale: 1);
         var sourcePopulation = source.DefinePopulation<CrowdKind>();
@@ -80,7 +80,7 @@ public sealed class FixedPointColumnTests
     }
 
     [Fact]
-    public void Movement_after_three_ticks_matches_the_exact_expected_bits()
+    public void MovementAfterThreeTicksMatchesTheExactExpectedBits()
     {
         var world = new World(seed: 96, valueScale: 1);
         var population = Create(world, 1, out var positions, out var velocities);
@@ -105,7 +105,7 @@ public sealed class FixedPointColumnTests
     }
 
     [Fact]
-    public void A_long_movement_run_stays_exact_instead_of_drifting()
+    public void ALongMovementRunStaysExactInsteadOfDrifting()
     {
         var world = new World(seed: 97, valueScale: 1);
         var population = Create(world, 1, out var positions, out var velocities);
@@ -133,7 +133,7 @@ public sealed class FixedPointColumnTests
     }
 
     [Fact]
-    public void Movement_out_of_range_fails_loudly_instead_of_saturating()
+    public void MovementOutOfRangeFailsLoudlyInsteadOfSaturating()
     {
         var world = new World(seed: 98, valueScale: 1);
         var population = Create(world, 1, out var positions, out var velocities);

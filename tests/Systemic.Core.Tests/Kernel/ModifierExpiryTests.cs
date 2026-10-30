@@ -5,7 +5,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class ModifierExpiryTests
 {
     [Fact]
-    public void Timed_modifier_expires_at_the_end_of_its_duration()
+    public void TimedModifierExpiresAtTheEndOfItsDuration()
     {
         var world = new World(seed: 1, valueScale: 1);
         world.LogicalTick = 1;
@@ -31,7 +31,7 @@ public sealed class ModifierExpiryTests
     }
 
     [Fact]
-    public void A_tick_does_not_rewrite_live_modifiers()
+    public void ATickDoesNotRewriteLiveModifiers()
     {
         var world = new World(seed: 1, valueScale: 1);
         world.LogicalTick = 1;
@@ -45,7 +45,7 @@ public sealed class ModifierExpiryTests
     }
 
     [Fact]
-    public void Advancing_live_modifiers_does_not_allocate()
+    public void AdvancingLiveModifiersDoesNotAllocate()
     {
         var world = new World(seed: 1, valueScale: 1);
         world.LogicalTick = 1;
@@ -67,7 +67,7 @@ public sealed class ModifierExpiryTests
     }
 
     [Fact]
-    public void A_clone_between_ticks_starts_new_modifiers_at_the_next_tick()
+    public void ACloneBetweenTicksStartsNewModifiersAtTheNextTick()
     {
         var world = new World(seed: 2, valueScale: 1);
         world.LogicalTick = 5;
@@ -81,7 +81,7 @@ public sealed class ModifierExpiryTests
     }
 
     [Fact]
-    public void A_rolled_back_tick_restores_the_between_ticks_phase()
+    public void ARolledBackTickRestoresTheBetweenTicksPhase()
     {
         var world = new World(seed: 3, valueScale: 1);
         world.LogicalTick = 5;
@@ -100,7 +100,7 @@ public sealed class ModifierExpiryTests
     }
 
     [Fact]
-    public void Timed_grant_stops_matching_when_it_expires()
+    public void TimedGrantStopsMatchingWhenItExpires()
     {
         var world = new World(seed: 1, valueScale: 1);
         world.LogicalTick = 1;

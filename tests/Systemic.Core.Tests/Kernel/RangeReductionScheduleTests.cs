@@ -6,11 +6,13 @@ namespace Systemic.Tests.Kernel;
 
 public sealed class RangeReductionScheduleTests
 {
+    private static readonly int[] s_expectedCounts = [16, 16];
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(4)]
-    public void Reduction_uses_fixed_logical_partitions_and_merges_them_in_index_order(int workers)
+    public void ReductionUsesFixedLogicalPartitionsAndMergesThemInIndexOrder(int workers)
     {
         string? result = null;
         using var schedule = new DeterministicSystemScheduleBuilder(workers)
@@ -28,7 +30,7 @@ public sealed class RangeReductionScheduleTests
     }
 
     [Fact]
-    public void Standalone_reduction_uses_the_scheduled_partition_boundaries()
+    public void StandaloneReductionUsesTheScheduledPartitionBoundaries()
     {
         var world = new World(1, 1);
         var context = new SystemicSystemContext(world, new RuleEngine(new CompiledRuleSet([])), tick: 1);
@@ -40,7 +42,7 @@ public sealed class RangeReductionScheduleTests
     }
 
     [Fact]
-    public void Empty_reduction_returns_the_identity_without_calling_the_mapper()
+    public void EmptyReductionReturnsTheIdentityWithoutCallingTheMapper()
     {
         var calls = 0;
         var result = 0;
@@ -56,7 +58,7 @@ public sealed class RangeReductionScheduleTests
     }
 
     [Fact]
-    public void Failed_partition_skips_merge_and_rolls_back_all_partition_writes()
+    public void FailedPartitionSkipsMergeAndRollsBackAllPartitionWrites()
     {
         var world = new World(1, 1);
         var population = world.DefinePopulation<Kind>();
@@ -69,7 +71,11 @@ public sealed class RangeReductionScheduleTests
                 static (values, partition, range) =>
                 {
                     values.EditRange(range.Start, range.Length).Fill(partition + 1);
-                    if (partition is 1 or 2) throw new InvalidOperationException($"partition {partition}");
+                    if (partition is 1 or 2)
+                    {
+                        throw new InvalidOperationException($"partition {partition}");
+                    }
+
                     return range.Length;
                 }, (left, right) => { merges++; return left + right; })))
             .Build();
@@ -82,7 +88,7 @@ public sealed class RangeReductionScheduleTests
     }
 
     [Fact]
-    public void Concurrent_systems_reduce_every_logical_partition_without_nested_worker_dispatch()
+    public void ConcurrentSystemsReduceEveryLogicalPartitionWithoutNestedWorkerDispatch()
     {
         var results = new int[2];
         var builder = new DeterministicSystemScheduleBuilder(2);
@@ -97,7 +103,7 @@ public sealed class RangeReductionScheduleTests
         using var schedule = builder.Build();
         schedule.Execute(new World(1, 1), 1);
 
-        Assert.Equal(new[] { 16, 16 }, results);
+        Assert.Equal(s_expectedCounts, results);
     }
 
     private readonly struct Kind : IPopulationKind

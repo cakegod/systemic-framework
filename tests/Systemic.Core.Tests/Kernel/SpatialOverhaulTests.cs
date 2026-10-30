@@ -6,7 +6,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class SpatialOverhaulTests
 {
     [Fact]
-    public void Nearest_queries_respect_wrapped_seams_inclusive_radius_filters_and_ties()
+    public void NearestQueriesRespectWrappedSeamsInclusiveRadiusFiltersAndTies()
     {
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), 3, wrapX: true, wrapY: true);
         var snapshot = grid.Rebuild([new(10, 5), new(0, 5), new(1, 5), new(9, 5), new(5, 5)]);
@@ -29,7 +29,7 @@ public sealed class SpatialOverhaulTests
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public void Nearest_and_k_nearest_match_brute_force_across_boundaries(bool wrapX, bool wrapY)
+    public void NearestAndKNearestMatchBruteForceAcrossBoundaries(bool wrapX, bool wrapY)
     {
         var random = new Random(41831);
         var positions = new Vector2[93];
@@ -73,7 +73,7 @@ public sealed class SpatialOverhaulTests
     }
 
     [Fact]
-    public void Nearest_queries_handle_empty_and_invalid_inputs_and_stale_snapshots()
+    public void NearestQueriesHandleEmptyAndInvalidInputsAndStaleSnapshots()
     {
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), 3);
         grid.Rebuild([]);
@@ -112,7 +112,7 @@ public sealed class SpatialOverhaulTests
     }
 
     [Fact]
-    public void Wrapped_radius_and_bounds_include_both_stored_endpoints_without_duplicates()
+    public void WrappedRadiusAndBoundsIncludeBothStoredEndpointsWithoutDuplicates()
     {
         Vector2[] positions = [new(0, 0), new(10, 0), new(0, 10), new(10, 10), new(9, 0), new(1, 0)];
         var bounds = new Bounds2(5, 5, 5, 5);
@@ -144,7 +144,7 @@ public sealed class SpatialOverhaulTests
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public void Radius_and_bounds_match_independent_oracles_for_edges_and_outside_centers(bool wrapX, bool wrapY)
+    public void RadiusAndBoundsMatchIndependentOraclesForEdgesAndOutsideCenters(bool wrapX, bool wrapY)
     {
         var random = new Random(7781);
         var positions = new Vector2[70];
@@ -191,7 +191,7 @@ public sealed class SpatialOverhaulTests
     }
 
     [Fact]
-    public void Rebuilding_from_a_nearest_filter_rejects_the_stale_query()
+    public void RebuildingFromANearestFilterRejectsTheStaleQuery()
     {
         var grid = new PopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), 2);
         grid.Rebuild([Vector2.One]);
@@ -205,7 +205,7 @@ public sealed class SpatialOverhaulTests
     }
 
     [Fact]
-    public void Incremental_moves_removals_and_additions_match_a_rebuild_with_sparse_stable_ids()
+    public void IncrementalMovesRemovalsAndAdditionsMatchARebuildWithSparseStableIds()
     {
         var bounds = new Bounds2(5, 5, 5, 5);
         var incremental = new IncrementalPopulationSpatialGrid2D(bounds, 3, wrapX: true, wrapY: true);
@@ -263,7 +263,7 @@ public sealed class SpatialOverhaulTests
     }
 
     [Fact]
-    public void Incremental_updates_are_immediately_visible_and_invalid_mutations_preserve_state()
+    public void IncrementalUpdatesAreImmediatelyVisibleAndInvalidMutationsPreserveState()
     {
         var grid = new IncrementalPopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), 2, wrapX: true);
         grid.Add(40, new Vector2(1, 5));
@@ -299,7 +299,7 @@ public sealed class SpatialOverhaulTests
     }
 
     [Fact]
-    public void Incremental_grid_rejects_invalid_bounds_and_cell_sizes()
+    public void IncrementalGridRejectsInvalidBoundsAndCellSizes()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new IncrementalPopulationSpatialGrid2D(new Bounds2(0, 0, 0, 1), 1));
@@ -312,7 +312,7 @@ public sealed class SpatialOverhaulTests
     }
 
     [Fact]
-    public void Mutating_an_index_from_a_nearest_filter_rejects_the_stale_query()
+    public void MutatingAnIndexFromANearestFilterRejectsTheStaleQuery()
     {
         var grid = new IncrementalPopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), 2);
         grid.Add(0, Vector2.One);
@@ -326,7 +326,7 @@ public sealed class SpatialOverhaulTests
     }
 
     [Fact]
-    public void Incremental_nearest_ties_keep_smallest_ids_regardless_of_add_order()
+    public void IncrementalNearestTiesKeepSmallestIdsRegardlessOfAddOrder()
     {
         var grid = new IncrementalPopulationSpatialGrid2D(new Bounds2(5, 5, 5, 5), 3, wrapX: true);
         grid.Add(50, new Vector2(10, 5));
@@ -347,7 +347,7 @@ public sealed class SpatialOverhaulTests
     }
 
     [Fact]
-    public void Nearest_queries_use_caller_storage_without_query_allocations()
+    public void NearestQueriesUseCallerStorageWithoutQueryAllocations()
     {
         Vector2[] positions = [new(1, 1), new(2, 2), new(3, 3), new(4, 4)];
         var bounds = new Bounds2(5, 5, 5, 5);

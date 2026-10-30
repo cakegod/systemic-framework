@@ -30,3 +30,25 @@ systemic_determinism = relaxed
 # as unread (CS9113).
 [src/Systemic.Kernel/ActionHandlerAttribute.cs]
 dotnet_diagnostic.IDE0290.severity = none
+
+# Analysis baseline.
+#
+# The tree builds with zero warnings at the level pinned in Directory.Build.props, and the
+# rules below are errors, so this file is a ratchet: a new violation fails the build instead of
+# joining a backlog. There are no suppressed diagnostics in this repository. A rule is only
+# promoted here once the tree satisfies it, which is what keeps the gate honest.
+[*.cs]
+# Errors: each one names a defect that ships silently and breaks a determinism, save, or
+# resource guarantee.
+dotnet_diagnostic.CA1001.severity = error   # A disposable field makes the owner disposable.
+dotnet_diagnostic.CA1064.severity = error   # Exceptions must be public.
+dotnet_diagnostic.CA1816.severity = error   # Dispose calls SuppressFinalize.
+dotnet_diagnostic.CA2012.severity = error   # A ValueTask is awaited once.
+dotnet_diagnostic.CA2013.severity = error   # ReferenceEquals on a value type is always false.
+dotnet_diagnostic.CA2014.severity = error   # stackalloc inside a loop overflows the stack.
+dotnet_diagnostic.CA2021.severity = error   # Cast/OfType across unrelated types throws.
+dotnet_diagnostic.CA2022.severity = error   # An inexact stream read truncates save data.
+
+# Errors: style the build enforces, so the IDE, `dotnet format` and CI cannot disagree.
+dotnet_diagnostic.IDE0005.severity = error   # Unnecessary using directive.
+dotnet_diagnostic.IDE0011.severity = error   # Braces on every block.

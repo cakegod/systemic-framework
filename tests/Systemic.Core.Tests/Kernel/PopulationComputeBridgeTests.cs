@@ -5,9 +5,9 @@ namespace Systemic.Tests.Kernel;
 public sealed class PopulationComputeBridgeTests
 {
     [Fact]
-    public async Task Reference_backend_moves_agents_and_reduces_positions_in_stable_integer_units()
+    public async Task ReferenceBackendMovesAgentsAndReducesPositionsInStableIntegerUnits()
     {
-        IPopulationComputeBackend backend = new CpuPopulationComputeBackend();
+        var backend = new CpuPopulationComputeBackend();
         PopulationComputeAgent[] input =
         [
             new(new((Fixed64)1, (Fixed64)2), new((Fixed64)3, (Fixed64)(-2))),
@@ -26,7 +26,7 @@ public sealed class PopulationComputeBridgeTests
     }
 
     [Fact]
-    public async Task Reference_backend_preserves_destination_on_failure_and_supports_overlapping_buffers()
+    public async Task ReferenceBackendPreservesDestinationOnFailureAndSupportsOverlappingBuffers()
     {
         var backend = new CpuPopulationComputeBackend();
         var overflow = new[] { new PopulationComputeAgent(new(Fixed64.FromRaw(long.MaxValue), Fixed64.Zero),
@@ -49,7 +49,7 @@ public sealed class PopulationComputeBridgeTests
     }
 
     [Fact]
-    public void Stable_lod_assigns_each_agent_exactly_one_tick_per_period()
+    public void StableLodAssignsEachAgentExactlyOneTickPerPeriod()
     {
         for (ulong id = 0; id < 200; id++)
         {

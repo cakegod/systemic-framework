@@ -8,7 +8,7 @@ namespace Systemic.Tests.Content;
 public sealed class CoreOnlyContentTests
 {
     [Fact]
-    public void Core_schema_errors_report_the_source_file_and_json_path()
+    public void CoreSchemaErrorsReportTheSourceFileAndJsonPath()
     {
         using var pack = CoreOnlyPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -27,7 +27,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public void Core_schema_json_pointer_escapes_slash_and_tilde_in_property_names()
+    public void CoreSchemaJsonPointerEscapesSlashAndTildeInPropertyNames()
     {
         using var pack = CoreOnlyPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -41,7 +41,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public void Core_schema_json_path_escapes_control_characters_in_property_names()
+    public void CoreSchemaJsonPathEscapesControlCharactersInPropertyNames()
     {
         using var pack = CoreOnlyPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -58,7 +58,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public void Core_only_pack_without_visuals_or_ui_loads_and_runs_rules()
+    public void CoreOnlyPackWithoutVisualsOrUiLoadsAndRunsRules()
     {
         using var pack = CoreOnlyPack.Create();
 
@@ -74,7 +74,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public void Module_context_rejects_symlinks_that_escape_the_pack_root()
+    public void ModuleContextRejectsSymlinksThatEscapeThePackRoot()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -106,7 +106,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public void Module_schema_cache_rejects_conflicting_text_for_the_same_key()
+    public void ModuleSchemaCacheRejectsConflictingTextForTheSameKey()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -135,7 +135,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public void Module_json_read_reports_the_content_file_and_parse_path()
+    public void ModuleJsonReadReportsTheContentFileAndParsePath()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);
@@ -159,7 +159,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public void Unused_rule_fragments_reject_unknown_condition_and_effect_kinds()
+    public void UnusedRuleFragmentsRejectUnknownConditionAndEffectKinds()
     {
         using var pack = CoreOnlyPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -190,7 +190,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public void Unused_rule_fragments_require_fields_for_each_condition_and_effect_kind()
+    public void UnusedRuleFragmentsRequireFieldsForEachConditionAndEffectKind()
     {
         using var pack = CoreOnlyPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -239,7 +239,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public static void Selected_rule_fragment_accepts_all_supported_condition_and_effect_kinds()
+    public static void SelectedRuleFragmentAcceptsAllSupportedConditionAndEffectKinds()
     {
         using var pack = CoreOnlyPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -274,7 +274,7 @@ public sealed class CoreOnlyContentTests
     }
 
     [Fact]
-    public void Declared_module_without_a_registered_loader_reports_its_manifest_path()
+    public void DeclaredModuleWithoutARegisteredLoaderReportsItsManifestPath()
     {
         using var pack = CoreOnlyPack.Create();
         var gamePath = Path.Combine(pack.Root, "game.json");

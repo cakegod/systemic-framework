@@ -7,7 +7,7 @@ namespace Systemic.Tests.Save;
 public sealed class RuleStatePersistenceTests
 {
     [Fact]
-    public void A_pending_delayed_fact_survives_save_and_load()
+    public void APendingDelayedFactSurvivesSaveAndLoad()
     {
         using var workspace = new RuleJsonWorkspace(
             rules: """
@@ -45,7 +45,7 @@ public sealed class RuleStatePersistenceTests
     }
 
     [Fact]
-    public void An_active_cooldown_survives_save_and_load()
+    public void AnActiveCooldownSurvivesSaveAndLoad()
     {
         using var workspace = new RuleJsonWorkspace(
             rules: """

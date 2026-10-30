@@ -9,7 +9,7 @@ namespace Systemic.GlowGarden.Tests;
 public sealed class GardenRollbackTests
 {
     [Fact]
-    public void Save_load_restores_progression_clock_populations_and_future_simulation()
+    public void SaveLoadRestoresProgressionClockPopulationsAndFutureSimulation()
     {
         using var original = GardenHost.Create(42);
         Assert.True(original.Simulation.ToggleTalent(Talent.Seedstorm));
@@ -36,7 +36,7 @@ public sealed class GardenRollbackTests
     }
 
     [Fact]
-    public void Failed_tick_restores_garden_owned_state_as_well_as_the_world()
+    public void FailedTickRestoresGardenOwnedStateAsWellAsTheWorld()
     {
         var builder = GardenHost.CreateBuilder(GardenHost.ContentDirectory, 42);
         var simulation = new GardenSimulation(builder.World);

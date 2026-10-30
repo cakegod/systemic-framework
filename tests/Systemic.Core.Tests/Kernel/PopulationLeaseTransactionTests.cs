@@ -7,7 +7,7 @@ public sealed class PopulationLeaseTransactionTests
     private static readonly PopulationColumnKey<int> s_key = new("lease.value", 1, PopulationCodecs.Int32);
 
     [Fact]
-    public void Lease_guards_structure_buffer_roles_and_world_lifetime_until_disposed()
+    public void LeaseGuardsStructureBufferRolesAndWorldLifetimeUntilDisposed()
     {
         var world = new World(1, 1);
         var population = world.DefinePopulation<Kind>();
@@ -45,7 +45,7 @@ public sealed class PopulationLeaseTransactionTests
     }
 
     [Fact]
-    public void Active_lease_prevents_commit_or_rollback_until_released()
+    public void ActiveLeasePreventsCommitOrRollbackUntilReleased()
     {
         var world = new World(2, 1);
         var population = world.DefinePopulation<Kind>();
@@ -66,7 +66,7 @@ public sealed class PopulationLeaseTransactionTests
     }
 
     [Fact]
-    public void Lease_rejects_a_column_from_another_population()
+    public void LeaseRejectsAColumnFromAnotherPopulation()
     {
         var first = new World(3, 1).DefinePopulation<Kind>();
         var second = new World(4, 1).DefinePopulation<Kind>();
@@ -84,7 +84,7 @@ public sealed class PopulationLeaseTransactionTests
     }
 
     [Fact]
-    public void Multiple_leases_must_all_close_before_structure_changes()
+    public void MultipleLeasesMustAllCloseBeforeStructureChanges()
     {
         var population = new World(5, 1).DefinePopulation<Kind>();
         population.AddRange(1);
@@ -100,7 +100,7 @@ public sealed class PopulationLeaseTransactionTests
     }
 
     [Fact]
-    public void Lease_blocks_structural_edits_from_another_thread()
+    public void LeaseBlocksStructuralEditsFromAnotherThread()
     {
         var population = new World(6, 1).DefinePopulation<Kind>();
         population.AddRange(1);

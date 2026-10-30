@@ -7,7 +7,7 @@ namespace Systemic.Tests;
 public sealed class FactPipelineTests
 {
     [Fact]
-    public void Declared_payloads_travel_through_emitted_and_scheduled_facts()
+    public void DeclaredPayloadsTravelThroughEmittedAndScheduledFacts()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), """
@@ -89,7 +89,7 @@ public sealed class FactPipelineTests
     }
 
     [Fact]
-    public void Rejects_payload_values_that_do_not_match_the_declared_field()
+    public void RejectsPayloadValuesThatDoNotMatchTheDeclaredField()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """
@@ -115,7 +115,7 @@ public sealed class FactPipelineTests
     }
 
     [Fact]
-    public void Rejects_duplicate_payload_keys_with_a_content_diagnostic()
+    public void RejectsDuplicatePayloadKeysWithAContentDiagnostic()
     {
         using var pack = TestPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "rules.json"), """

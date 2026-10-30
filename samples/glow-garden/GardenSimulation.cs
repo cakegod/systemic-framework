@@ -103,7 +103,10 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
 
         // Population state is restored by the host after all schemas have been registered.
         // In particular, do not consume the saved draw stream while constructing a restored game.
-        if (restoring) return;
+        if (restoring)
+        {
+            return;
+        }
 
         // Pods start across the whole garden rather than ringed around the colony, so feeding grounds
         // are spread out and workers have to travel and forage between them.
@@ -118,18 +121,26 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                 spot = new Vector2(
                     margin + ((column + 0.2f + (NextFloat() * 0.6f)) * ((Width - (2 * margin)) / 3)),
                     margin + ((row + 0.2f + (NextFloat() * 0.6f)) * ((Height - (2 * margin)) / 3)));
-                if (!Obstacles.IsBlocked(spot)) break;
+                if (!Obstacles.IsBlocked(spot))
+                {
+                    break;
+                }
             }
 
             if (Obstacles.IsBlocked(spot)
                 && !Obstacles.TryFindFreePosition(spot, null, 0, out spot))
+            {
                 throw new InvalidOperationException("The garden has no free position for an initial plant.");
+            }
 
             _plants.Add(new(_nextPlantId++, spot, NextFloat()));
         }
 
         // A larger garden needs a larger founding colony, or the first harvests take minutes.
-        for (var i = 0; i < StartingWorkers; i++) _creatures.Add(new(_nextCreatureId++, i < 3 ? CreatureKind.Burstling : CreatureKind.Gatherer, Colony, 0, 0, false));
+        for (var i = 0; i < StartingWorkers; i++)
+        {
+            _creatures.Add(new(_nextCreatureId++, i < 3 ? CreatureKind.Burstling : CreatureKind.Gatherer, Colony, 0, 0, false));
+        }
     }
 
     public string Id => "glow-garden";
@@ -216,10 +227,18 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                 var values = access.ReadRange(simulation._motes.Columns.Value);
                 simulation._consumedMotes.Clear();
                 for (var row = values.Length - 1; row >= 0; row--)
-                    if (values[row] <= 0) simulation._consumedMotes.Add(row);
+                {
+                    if (values[row] <= 0)
+                    {
+                        simulation._consumedMotes.Add(row);
+                    }
+                }
             });
 
-        foreach (var row in _consumedMotes) _motes.RemoveAt(row);
+        foreach (var row in _consumedMotes)
+        {
+            _motes.RemoveAt(row);
+        }
     }
 
     private readonly List<int> _consumedMotes = new(MaxMotes);
@@ -259,7 +278,11 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
             _plantGrid.QueryRadius(position, radius, scratch);
             foreach (var row in scratch)
             {
-                if (growth[row] < 1) continue;
+                if (growth[row] < 1)
+                {
+                    continue;
+                }
+
                 var distance = Vector2.DistanceSquared(position, positions[row]);
                 if (distance < best)
                 {
@@ -268,8 +291,16 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                 }
             }
 
-            if (found >= 0) return found;
-            if (radius >= maxRadius) return -1;
+            if (found >= 0)
+            {
+                return found;
+            }
+
+            if (radius >= maxRadius)
+            {
+                return -1;
+            }
+
             radius = MathF.Min(radius * 2, maxRadius);
         }
     }
@@ -289,7 +320,11 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
             _moteGrid.QueryRadius(position, radius, scratch);
             foreach (var row in scratch)
             {
-                if (values[row] <= 0) continue;
+                if (values[row] <= 0)
+                {
+                    continue;
+                }
+
                 var distance = Vector2.DistanceSquared(position, positions[row]);
                 if (distance < best)
                 {
@@ -298,8 +333,16 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                 }
             }
 
-            if (found >= 0) return found;
-            if (radius >= maxRadius) return -1;
+            if (found >= 0)
+            {
+                return found;
+            }
+
+            if (radius >= maxRadius)
+            {
+                return -1;
+            }
+
             radius = MathF.Min(radius * 2, maxRadius);
         }
     }
@@ -393,7 +436,9 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
             {
                 var plants = access.EditRange(state.Columns.Growth);
                 for (var row = 0; row < plants.Length; row++)
+                {
                     plants[row] = MathF.Min(1, plants[row] + state.Growth);
+                }
             });
     }
 
@@ -456,8 +501,14 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
         if ((tick + id) % (20 + (id & 31)) == 0)
         {
             heading += (Noise(tick, id, 1) - 0.5f) * 3.2f;
-            if (heading > MathF.PI) heading -= MathF.Tau;
-            else if (heading < -MathF.PI) heading += MathF.Tau;
+            if (heading > MathF.PI)
+            {
+                heading -= MathF.Tau;
+            }
+            else if (heading < -MathF.PI)
+            {
+                heading += MathF.Tau;
+            }
         }
 
         var next = position + (new Vector2(MathF.Cos(heading), MathF.Sin(heading)) * speed);
@@ -536,8 +587,10 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                         position, simulation._tickScoutRadius, t_plantRows ??= new(256), plantGrowth, plants);
                     var nearby = target >= 0;
                     if (!nearby && waiting >= simulation._tickPatience)
+                    {
                         target = simulation.FindNearestRipe(
                             position, MaximumSearchRadius, t_plantRows ??= new(256), plantGrowth, plants);
+                    }
 
                     if (target < 0)
                     {
@@ -547,7 +600,11 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                             next = Move(position, position + (trail * 16f), scoutSpeed);
                             heading = MathF.Atan2(trail.Y, trail.X);
                         }
-                        else next = simulation.Wander(tick, ids[offset], position, scoutSpeed, ref heading);
+                        else
+                        {
+                            next = simulation.Wander(tick, ids[offset], position, scoutSpeed, ref heading);
+                        }
+
                         waiting++;
                     }
                     else
@@ -570,8 +627,10 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                     position, simulation._tickScoutRadius, t_moteRows ??= new(256), moteValues, motes);
                 var nearby = target >= 0;
                 if (!nearby && waiting >= simulation._tickPatience && carried[offset] == 0)
+                {
                     target = simulation.FindNearestMote(
                         position, MaximumSearchRadius, t_moteRows ??= new(256), moteValues, motes);
+                }
 
                 if (carried[offset] >= simulation._tickCapacity || (carried[offset] > 0 && target < 0))
                 {
@@ -612,7 +671,11 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                 // Stop hugging the thicket and try a fresh direction: a worker should never keep
                 // pressing into the same edge, and re-aiming also breaks endless boundary loops.
                 heading += 2.1f;
-                if (heading > MathF.PI) heading -= MathF.Tau;
+                if (heading > MathF.PI)
+                {
+                    heading -= MathF.Tau;
+                }
+
                 side = 0;
                 legal = simulation.Obstacles.Steer(position, simulation.Wander(tick, ids[offset], position, scoutSpeed, ref heading), ref side);
                 stall = 0;
@@ -628,7 +691,11 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
             simulation._decidedStalls[row] = stall;
             simulation._decidedSides[row] = side;
 
-            if (mode == IntentNone) continue;
+            if (mode == IntentNone)
+            {
+                continue;
+            }
+
             if (mode == IntentBurst && target >= 0 && Vector2.DistanceSquared(legal, plants[target]) < 16)
             {
                 simulation._decidedCooldowns[row] = simulation._tickCooldown;
@@ -680,7 +747,11 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
                     var mote = _intentTargets[row];
                     var moteState = _motes[mote];
                     var value = moteState.Value;
-                    if (value <= 0) break;
+                    if (value <= 0)
+                    {
+                        break;
+                    }
+
                     _creatures[row] = _creatures[row] with { CarriedGlow = _resolvedCarried[row] + value };
                     _motes[mote] = moteState with { Value = 0 };
                     // Pickups keep refreshing the route while there is still food at the far end,
@@ -703,7 +774,10 @@ public sealed partial class GardenSimulation : ISystemicSystem, ISystemicTransac
     private void BurstPlant(int index, Impact? impact = null, Vector2? anchor = null)
     {
         var p = _plants[index];
-        if (p.Growth < 1) return;
+        if (p.Growth < 1)
+        {
+            return;
+        }
 
         _plants[index] = p with
         {

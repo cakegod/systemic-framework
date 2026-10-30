@@ -54,14 +54,20 @@ public sealed partial class GardenSimulation
 
     private static void ValidateKind(CreatureKind kind)
     {
-        if (kind is not (CreatureKind.Burstling or CreatureKind.Gatherer)) throw new ArgumentOutOfRangeException(nameof(kind));
+        if (kind is not (CreatureKind.Burstling or CreatureKind.Gatherer))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind));
+        }
     }
 
     public bool Hire(CreatureKind kind)
     {
         var price = HirePrice(kind);
 
-        if (_creatures.Count(c => !c.IsCopy) >= MaxWorkers || Glow < price) return false;
+        if (_creatures.Count(c => !c.IsCopy) >= MaxWorkers || Glow < price)
+        {
+            return false;
+        }
 
         CaptureCommandRollback();
         Glow -= price;
@@ -71,7 +77,11 @@ public sealed partial class GardenSimulation
 
     public bool Buy(UpgradeKind kind, bool bulk = false)
     {
-        if (Rank(kind) >= 25 || Glow < Price(kind)) return false;
+        if (Rank(kind) >= 25 || Glow < Price(kind))
+        {
+            return false;
+        }
+
         CaptureCommandRollback();
         var bought = false;
 
@@ -79,7 +89,10 @@ public sealed partial class GardenSimulation
         {
             var price = Price(kind);
 
-            if (Rank(kind) >= 25 || Glow < price) break;
+            if (Rank(kind) >= 25 || Glow < price)
+            {
+                break;
+            }
 
             Glow -= price;
             _spent[(int)Tree(kind)] += price;
@@ -96,9 +109,18 @@ public sealed partial class GardenSimulation
         var index = TreeIndex(tree);
         var refund = _spent[index];
 
-        if (refund != 0) CaptureCommandRollback();
+        if (refund != 0)
+        {
+            CaptureCommandRollback();
+        }
 
-        foreach (var kind in Enum.GetValues<UpgradeKind>()) if (Tree(kind) == tree) _ranks[(int)kind] = 0;
+        foreach (var kind in Enum.GetValues<UpgradeKind>())
+        {
+            if (Tree(kind) == tree)
+            {
+                _ranks[(int)kind] = 0;
+            }
+        }
 
         _spent[index] = 0;
         Glow += refund;

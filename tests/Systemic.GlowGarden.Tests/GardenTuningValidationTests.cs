@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using GlowGarden;
@@ -10,7 +9,7 @@ namespace Systemic.GlowGarden.Tests;
 public sealed class GardenTuningValidationTests
 {
     [Fact]
-    public void Invalid_tuning_reports_the_source_property_during_host_construction()
+    public void InvalidTuningReportsTheSourcePropertyDuringHostConstruction()
     {
         WithContent(directory =>
         {
@@ -23,7 +22,7 @@ public sealed class GardenTuningValidationTests
     }
 
     [Fact]
-    public void Unknown_properties_fractional_integer_and_missing_required_tag_are_rejected()
+    public void UnknownPropertiesFractionalIntegerAndMissingRequiredTagAreRejected()
     {
         WithContent(directory =>
         {
@@ -42,7 +41,7 @@ public sealed class GardenTuningValidationTests
     }
 
     [Fact]
-    public void Missing_tuning_uses_validated_default_and_runtime_uses_cached_typed_values()
+    public void MissingTuningUsesValidatedDefaultAndRuntimeUsesCachedTypedValues()
     {
         WithContent(directory =>
         {
@@ -79,7 +78,10 @@ public sealed class GardenTuningValidationTests
         try
         {
             foreach (var file in Directory.GetFiles(GardenHost.ContentDirectory))
+            {
                 File.Copy(file, Path.Combine(directory, Path.GetFileName(file)));
+            }
+
             action(directory);
         }
         finally { Directory.Delete(directory, recursive: true); }

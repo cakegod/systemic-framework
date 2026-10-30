@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Diagnostics;
 using Systemic.Kernel;
 using Systemic.Rules;
@@ -24,7 +23,7 @@ public sealed class SystemicBudgetTests(ITestOutputHelper output)
     /// </remarks>
     [Fact]
     [Trait("Category", "Diagnostic")]
-    public void Fifty_thousand_products_and_one_thousand_reactive_actors_report_timings()
+    public void FiftyThousandProductsAndOneThousandReactiveActorsReportTimings()
     {
         var world = new World(seed: 71, valueScale: 1, spatialCellSize: 24);
         var spatialQueries = new List<int>[ActorCount];

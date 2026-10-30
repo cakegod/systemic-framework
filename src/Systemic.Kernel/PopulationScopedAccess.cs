@@ -216,16 +216,23 @@ public readonly ref struct PopulationAccessScope<TKind> where TKind : IPopulatio
     private readonly void Validate()
     {
         if (_lifetime is null)
+        {
             throw new InvalidOperationException("The population access scope is uninitialized.");
+        }
+
         _lifetime.Validate(_generation);
     }
 
     private readonly void ValidateColumn(PopulationColumnBase column)
     {
         if (_lease is not null)
+        {
             _lease.ValidateScopedColumn(column);
+        }
         else
+        {
             _population!.ValidateScopedColumn(column);
+        }
     }
 }
 
@@ -245,7 +252,10 @@ public readonly struct PopulationAccessGuard
     public void Validate()
     {
         if (_lifetime is null)
+        {
             throw new InvalidOperationException("The population access guard is uninitialized.");
+        }
+
         _lifetime.Validate(_generation);
     }
 }
@@ -291,7 +301,10 @@ internal sealed class PopulationScopeLifetime
             {
                 var dependency = _dependencies[index];
                 lock (dependency.World.TransactionGate)
+                {
                     dependency.ExitScope(IsParallel, _group);
+                }
+
                 _dependencies[index] = null!;
             }
 
@@ -309,12 +322,16 @@ internal sealed class PopulationScopeLifetime
     public void RegisterDependency(PopulationStorage storage)
     {
         if (ReferenceEquals(_storage, storage))
+        {
             return;
+        }
 
         for (var index = 0; index < _dependencyCount; index++)
         {
             if (ReferenceEquals(_dependencies[index], storage))
+            {
                 return;
+            }
         }
 
         lock (storage.World.TransactionGate)
@@ -323,7 +340,10 @@ internal sealed class PopulationScopeLifetime
             try
             {
                 if (_dependencyCount == _dependencies.Length)
+                {
                     Array.Resize(ref _dependencies, checked(_dependencies.Length * 2));
+                }
+
                 _dependencies[_dependencyCount++] = storage;
             }
             catch
@@ -360,12 +380,17 @@ internal sealed class PopulationScopeLifetime
         if (write)
         {
             if (!declaredWrite)
+            {
                 throw Undeclared(column, "write");
+            }
+
             return;
         }
 
         if (IsParallel && declaredWrite && wholePopulation && !currentBuffer)
+        {
             throw new InvalidOperationException($"Parallel population scopes cannot read the full single-buffered column '{column.Id}' when it is writable; use ReadRange for the assigned rows.");
+        }
 
         if (read || (currentBuffer && declaredWrite))
         {
@@ -390,7 +415,9 @@ internal sealed class PopulationScopeLifetime
 
         var (read, _) = FindAccess<TKind>(column.Id);
         if (!read)
+        {
             throw Undeclared(column, "read from another population");
+        }
     }
 
     private (bool Read, bool Write) FindAccess<TKind>(string columnId)
@@ -404,18 +431,27 @@ internal sealed class PopulationScopeLifetime
             const string prefix = "population:";
             const string separator = "/column:";
             if (!resource.StartsWith(prefix, StringComparison.Ordinal))
+            {
                 continue;
+            }
+
             resource = resource[prefix.Length..];
             if (!resource.StartsWith(TKind.Id.AsSpan(), StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             resource = resource[TKind.Id.Length..];
             if (!resource.StartsWith(separator, StringComparison.Ordinal))
+            {
                 continue;
+            }
 
             resource = resource[separator.Length..];
             if (!resource.SequenceEqual(columnId.AsSpan()))
+            {
                 continue;
+            }
 
             read |= item.Mode == SystemAccessMode.Read;
             write |= item.Mode == SystemAccessMode.Write;

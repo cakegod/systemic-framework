@@ -5,7 +5,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class TagQueryTests
 {
     [Fact]
-    public void Returns_only_entities_that_carry_the_tag()
+    public void ReturnsOnlyEntitiesThatCarryTheTag()
     {
         var world = new World(seed: 1, valueScale: 1);
         var first = world.Add(new DataEntity(["bolt"], []));
@@ -19,7 +19,7 @@ public sealed class TagQueryTests
     }
 
     [Fact]
-    public void Rejects_a_missing_tag_name()
+    public void RejectsAMissingTagName()
     {
         var world = new World(seed: 1, valueScale: 1);
 
@@ -27,7 +27,7 @@ public sealed class TagQueryTests
     }
 
     [Fact]
-    public void Refreshes_after_a_tag_changes()
+    public void RefreshesAfterATagChanges()
     {
         var world = new World(seed: 1, valueScale: 1);
         var entity = world.Add(new DataEntity([], []));
@@ -39,7 +39,7 @@ public sealed class TagQueryTests
     }
 
     [Fact]
-    public void Live_count_follows_a_tag_added_after_the_count_was_queried()
+    public void LiveCountFollowsATagAddedAfterTheCountWasQueried()
     {
         var world = new World(seed: 3, valueScale: 1);
         var entity = world.Add(new DataEntity([], []));
@@ -52,7 +52,7 @@ public sealed class TagQueryTests
     }
 
     [Fact]
-    public void Live_count_follows_a_tag_grant_after_the_count_was_queried()
+    public void LiveCountFollowsATagGrantAfterTheCountWasQueried()
     {
         var world = new World(seed: 4, valueScale: 1);
         var entity = world.Add(new DataEntity([], []));
@@ -64,7 +64,7 @@ public sealed class TagQueryTests
     }
 
     [Fact]
-    public void A_rollback_drops_every_cached_tag_bitset_not_only_the_one_read_next()
+    public void ARollbackDropsEveryCachedTagBitsetNotOnlyTheOneReadNext()
     {
         var world = new World(seed: 2, valueScale: 1);
         var population = world.DefinePopulation<TwoTagKind>(enableHandles: true);
@@ -91,7 +91,7 @@ public sealed class TagQueryTests
     }
 
     [Fact]
-    public void Cached_tag_queries_do_not_accumulate_across_world_changes()
+    public void CachedTagQueriesDoNotAccumulateAcrossWorldChanges()
     {
         var world = new World(seed: 1, valueScale: 1);
         for (var index = 0; index < 32; index++)
@@ -109,7 +109,7 @@ public sealed class TagQueryTests
     }
 
     [Fact]
-    public void Repeated_queries_do_not_allocate()
+    public void RepeatedQueriesDoNotAllocate()
     {
         var world = new World(seed: 1, valueScale: 1);
         for (var index = 0; index < 64; index++)
@@ -128,7 +128,7 @@ public sealed class TagQueryTests
     }
 
     [Fact]
-    public void Concurrent_tag_queries_share_one_rebuild_of_the_index()
+    public void ConcurrentTagQueriesShareOneRebuildOfTheIndex()
     {
         for (var repetition = 0; repetition < 20; repetition++)
         {

@@ -5,7 +5,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class ModifierPrimitiveTests
 {
     [Fact]
-    public void Min_and_max_modifiers_clamp_the_effective_value()
+    public void MinAndMaxModifiersClampTheEffectiveValue()
     {
         var world = new World(seed: 1, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("value", 2)));
@@ -18,7 +18,7 @@ public sealed class ModifierPrimitiveTests
     }
 
     [Fact]
-    public void Two_sources_stack_and_one_source_replaces_only_itself()
+    public void TwoSourcesStackAndOneSourceReplacesOnlyItself()
     {
         var world = new World(seed: 2, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("value", 10)));
@@ -33,7 +33,7 @@ public sealed class ModifierPrimitiveTests
     }
 
     [Fact]
-    public void A_rank_aware_modifier_reads_the_rank_property_at_read_time()
+    public void ARankAwareModifierReadsTheRankPropertyAtReadTime()
     {
         var world = new World(seed: 3, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("rank", 3), ("rate", 2)));
@@ -47,7 +47,7 @@ public sealed class ModifierPrimitiveTests
     }
 
     [Fact]
-    public void A_rank_aware_modifier_with_a_missing_rank_contributes_nothing()
+    public void ARankAwareModifierWithAMissingRankContributesNothing()
     {
         var world = new World(seed: 4, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("rate", 2)));
@@ -59,7 +59,7 @@ public sealed class ModifierPrimitiveTests
     }
 
     [Fact]
-    public void A_timed_rank_aware_modifier_disappears_with_its_duration()
+    public void ATimedRankAwareModifierDisappearsWithItsDuration()
     {
         var world = new World(seed: 5, valueScale: 1);
         world.LogicalTick = 1;

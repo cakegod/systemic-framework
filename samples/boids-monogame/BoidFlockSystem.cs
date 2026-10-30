@@ -387,7 +387,10 @@ public sealed class BoidFlockSystem : ISystemicSystem, ISystemicReusableTransact
         ObjectDisposedException.ThrowIf(_disposed, this);
         _predatorTargetBeforeStep = _predatorTargetFoodIndex;
         if (context.IsScheduledExecution)
+        {
             context.OnRollback(_restorePredatorTarget);
+        }
+
         StepCore(context.World, context);
     }
 

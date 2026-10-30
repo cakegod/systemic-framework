@@ -276,7 +276,11 @@ public sealed class DeterministicSystemSchedule : IDisposable
                     {
                         RunWave(wave, world, tick);
                         ThrowFirstFailure(wave);
-                        foreach (var node in wave) _contexts[node.Order].ReleasePopulationLeases();
+                        foreach (var node in wave)
+                        {
+                            _contexts[node.Order].ReleasePopulationLeases();
+                        }
+
                         FlushDeferredPopulationCommands(wave);
                         foreach (var node in wave)
                         {
@@ -411,7 +415,10 @@ public sealed class DeterministicSystemSchedule : IDisposable
 
         if (ordered is not null)
         {
-            foreach (var commands in ordered) commands.FlushAtBarrier();
+            foreach (var commands in ordered)
+            {
+                commands.FlushAtBarrier();
+            }
         }
     }
 
@@ -696,10 +703,15 @@ public sealed class ScheduledSystemContext
     {
         var world = _world ?? throw new InvalidOperationException("The system is not executing.");
         if (Environment.CurrentManagedThreadId != _executionThreadId || Volatile.Read(ref _dispatchingRanges) != 0)
+        {
             throw new InvalidOperationException("Borrow populations before dispatching range workers.");
+        }
+
         ArgumentNullException.ThrowIfNull(population);
         if (!ReferenceEquals(population.World, world))
+        {
             throw new ArgumentException("The population belongs to a different world.", nameof(population));
+        }
 
         var lease = population.Borrow();
         try
@@ -728,13 +740,21 @@ public sealed class ScheduledSystemContext
     {
         var world = _world ?? throw new InvalidOperationException("The system is not executing.");
         if (Environment.CurrentManagedThreadId != _executionThreadId || Volatile.Read(ref _dispatchingRanges) != 0)
+        {
             throw new InvalidOperationException("Create deferred population buffers before dispatching range workers.");
+        }
+
         if (!_canDeferPopulation)
+        {
             throw new InvalidOperationException("Deferred population commands require declared World write access.");
+        }
+
         ArgumentNullException.ThrowIfNull(population);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
         if (!ReferenceEquals(population.World, world))
+        {
             throw new ArgumentException("The population belongs to a different world.", nameof(population));
+        }
 
         var buffers = new PopulationCommandBuffer<TKind>[partitionCount];
         for (var index = 0; index < partitionCount; index++)
@@ -809,11 +829,15 @@ public sealed class ScheduledSystemContext
         ArgumentNullException.ThrowIfNull(executeRange);
         var world = _world ?? throw new InvalidOperationException("The system is not executing.");
         if (!ReferenceEquals(lease.WorldIdentity, world))
+        {
             throw new ArgumentException("The population lease belongs to a different world.", nameof(lease));
+        }
 
         var rowCount = lease.Count;
         if (rowCount == 0)
+        {
             return;
+        }
 
         BeginRangeDispatch();
         try
@@ -852,7 +876,9 @@ public sealed class ScheduledSystemContext
         ArgumentNullException.ThrowIfNull(executeRange);
         var world = _world ?? throw new InvalidOperationException("The system is not executing.");
         if (!ReferenceEquals(population.World, world))
+        {
             throw new ArgumentException("The population belongs to a different world.", nameof(population));
+        }
 
         BeginRangeDispatch();
         var populationLeased = false;
@@ -861,7 +887,9 @@ public sealed class ScheduledSystemContext
             var rowCount = population.BeginScheduledRangeAccess();
             populationLeased = true;
             if (rowCount == 0)
+            {
                 return;
+            }
 
             var key = (typeof(TKind), typeof(TState));
             if (!_populationRangeBatches.TryGetValue(key, out var existing))
@@ -878,7 +906,10 @@ public sealed class ScheduledSystemContext
         finally
         {
             if (populationLeased)
+            {
                 population.EndScheduledRangeAccess();
+            }
+
             Volatile.Write(ref _dispatchingRanges, 0);
         }
     }
@@ -902,7 +933,10 @@ public sealed class ScheduledSystemContext
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partitionCount);
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(merge);
-        if (rowCount == 0) return identity;
+        if (rowCount == 0)
+        {
+            return identity;
+        }
 
         BeginRangeDispatch();
         try
@@ -936,7 +970,9 @@ public sealed class ScheduledSystemContext
     {
         if (_world is null || Environment.CurrentManagedThreadId != _executionThreadId
             || Interlocked.CompareExchange(ref _dispatchingRanges, 1, 0) != 0)
+        {
             throw new InvalidOperationException("Range dispatch belongs to the executing system thread and cannot be nested.");
+        }
     }
 
     internal void Prepare(World world, int tick, int workerCount, ImmutableArray<SystemAccess> access)
@@ -959,14 +995,20 @@ public sealed class ScheduledSystemContext
 
     internal void ReleasePopulationLeases()
     {
-        foreach (var lease in _populationLeases) lease.Dispose();
+        foreach (var lease in _populationLeases)
+        {
+            lease.Dispose();
+        }
+
         _populationLeases.Clear();
     }
 
     internal void EndScheduledSystemAccess()
     {
         if (!_systemAccessEntered)
+        {
             return;
+        }
 
         _world!.ExitScheduledSystem(_previousSystemWorld, _previousSystemAccess);
         _systemAccessEntered = false;
@@ -979,7 +1021,11 @@ public sealed class ScheduledSystemContext
         try
         {
             ReleasePopulationLeases();
-            foreach (var commands in _deferredPopulationCommands) commands.Deactivate();
+            foreach (var commands in _deferredPopulationCommands)
+            {
+                commands.Deactivate();
+            }
+
             _deferredPopulationCommands.Clear();
             _commands.Deactivate();
         }
@@ -1112,11 +1158,16 @@ public sealed class ScheduledSystemContext
                 var previousLength = _lifetimes.Length;
                 Array.Resize(ref _lifetimes, partitionCount);
                 for (var index = previousLength; index < partitionCount; index++)
+                {
                     _lifetimes[index] = new PopulationScopeLifetime();
+                }
             }
 
             if (_failures.Length < partitionCount)
+            {
                 Array.Resize(ref _failures, partitionCount);
+            }
+
             Array.Clear(_failures, 0, partitionCount);
         }
 
@@ -1129,9 +1180,14 @@ public sealed class ScheduledSystemContext
             try
             {
                 if (_population is { } population)
+                {
                     generation = population.BeginScheduledRangeScope(range, lifetime, _access, _group);
+                }
                 else
+                {
                     generation = _lease!.BeginScopedAccess(range, lifetime, _access, parallel: true, _group);
+                }
+
                 scopeStarted = true;
                 var scope = _population is { } owner
                     ? new PopulationAccessScope<TKind>(owner, lifetime, generation)
@@ -1147,9 +1203,13 @@ public sealed class ScheduledSystemContext
                 if (scopeStarted)
                 {
                     if (_population is { } population)
+                    {
                         population.EndScheduledRangeScope(lifetime, generation, _group);
+                    }
                     else
+                    {
                         _lease!.EndScopedAccess(lifetime, generation, parallel: true, _group);
+                    }
                 }
             }
         }
@@ -1157,7 +1217,9 @@ public sealed class ScheduledSystemContext
         public void ThrowFirstFailure()
         {
             for (var partition = 0; partition < Count; partition++)
+            {
                 _failures[partition]?.Throw();
+            }
         }
     }
 
@@ -1177,8 +1239,15 @@ public sealed class ScheduledSystemContext
             _rowCount = rowCount;
             _map = map;
             Count = partitionCount;
-            if (_results.Length < Count) Array.Resize(ref _results, Count);
-            if (_failures.Length < Count) Array.Resize(ref _failures, Count);
+            if (_results.Length < Count)
+            {
+                Array.Resize(ref _results, Count);
+            }
+
+            if (_failures.Length < Count)
+            {
+                Array.Resize(ref _failures, Count);
+            }
         }
 
         public void Execute(int partition)
@@ -1197,8 +1266,16 @@ public sealed class ScheduledSystemContext
 
         public TResult Merge(TResult identity, Func<TResult, TResult, TResult> merge)
         {
-            for (var partition = 0; partition < Count; partition++) _failures[partition]?.Throw();
-            for (var partition = 0; partition < Count; partition++) identity = merge(identity, _results[partition]);
+            for (var partition = 0; partition < Count; partition++)
+            {
+                _failures[partition]?.Throw();
+            }
+
+            for (var partition = 0; partition < Count; partition++)
+            {
+                identity = merge(identity, _results[partition]);
+            }
+
             return identity;
         }
 

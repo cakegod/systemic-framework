@@ -1,4 +1,3 @@
-using System.Threading;
 using Systemic.Kernel;
 
 namespace Systemic.Tests.Kernel;
@@ -6,7 +5,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class DeterministicSystemScheduleTests
 {
     [Fact]
-    public void Independent_systems_run_in_parallel()
+    public void IndependentSystemsRunInParallel()
     {
         using var barrier = new Barrier(2);
         var builder = new DeterministicSystemScheduleBuilder(workerCount: 2);
@@ -22,7 +21,7 @@ public sealed class DeterministicSystemScheduleTests
     [Theory]
     [InlineData(1)]
     [InlineData(4)]
-    public void Deferred_world_writes_are_visible_at_dependency_barriers_and_deterministic(int workers)
+    public void DeferredWorldWritesAreVisibleAtDependencyBarriersAndDeterministic(int workers)
     {
         var world = new World(seed: 1, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("amount", 0)));
@@ -44,7 +43,7 @@ public sealed class DeterministicSystemScheduleTests
     }
 
     [Fact]
-    public void Deferred_entity_metadata_links_modifiers_and_grants_apply_at_the_barrier()
+    public void DeferredEntityMetadataLinksModifiersAndGrantsApplyAtTheBarrier()
     {
         var world = new World(seed: 1, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("amount", 5)));
@@ -69,7 +68,7 @@ public sealed class DeterministicSystemScheduleTests
     }
 
     [Fact]
-    public void Scheduled_world_commands_cannot_flush_manually_to_another_world()
+    public void ScheduledWorldCommandsCannotFlushManuallyToAnotherWorld()
     {
         var scheduledWorld = new World(seed: 1, valueScale: 1);
         var otherWorld = new World(seed: 2, valueScale: 1);
@@ -88,7 +87,7 @@ public sealed class DeterministicSystemScheduleTests
     }
 
     [Fact]
-    public void Failure_after_a_barrier_rolls_back_all_world_writes()
+    public void FailureAfterABarrierRollsBackAllWorldWrites()
     {
         var world = new World(seed: 1, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("amount", 0)));
@@ -107,7 +106,7 @@ public sealed class DeterministicSystemScheduleTests
     [Theory]
     [InlineData(1)]
     [InlineData(4)]
-    public void Row_partitions_cover_each_row_once_independent_of_worker_count(int workers)
+    public void RowPartitionsCoverEachRowOnceIndependentOfWorkerCount(int workers)
     {
         var values = new int[257];
         var system = new TestSystem("rows", [SystemAccess.WriteResource("rows")], context =>
@@ -123,7 +122,7 @@ public sealed class DeterministicSystemScheduleTests
     }
 
     [Fact]
-    public void Warmed_schedule_and_row_dispatch_do_not_allocate_on_the_simulation_thread()
+    public void WarmedScheduleAndRowDispatchDoNotAllocateOnTheSimulationThread()
     {
         const int warmupTicks = 200;
         const int measuredTicks = 20;
@@ -147,7 +146,7 @@ public sealed class DeterministicSystemScheduleTests
     }
 
     [Fact]
-    public void Disposed_schedule_rejects_more_work()
+    public void DisposedScheduleRejectsMoreWork()
     {
         using var schedule = new DeterministicSystemScheduleBuilder(workerCount: 2)
             .Add(new TestSystem("rows", [SystemAccess.ReadResource("rows")], static _ => { }))
@@ -161,7 +160,7 @@ public sealed class DeterministicSystemScheduleTests
     }
 
     [Fact]
-    public void Scheduled_context_command_buffers_expire_after_execution()
+    public void ScheduledContextCommandBuffersExpireAfterExecution()
     {
         var world = new World(seed: 1, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("amount", 0)));
@@ -182,7 +181,7 @@ public sealed class DeterministicSystemScheduleTests
     }
 
     [Fact]
-    public void Command_writer_from_an_earlier_tick_stays_expired_during_the_next_tick()
+    public void CommandWriterFromAnEarlierTickStaysExpiredDuringTheNextTick()
     {
         var world = new World(seed: 1, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("amount", 0)));
@@ -208,7 +207,7 @@ public sealed class DeterministicSystemScheduleTests
     }
 
     [Fact]
-    public void Duplicate_system_ids_are_rejected_before_execution()
+    public void DuplicateSystemIdsAreRejectedBeforeExecution()
     {
         var builder = new DeterministicSystemScheduleBuilder();
         builder.Add(new TestSystem("same", [SystemAccess.ReadResource("a")], static _ => { }));

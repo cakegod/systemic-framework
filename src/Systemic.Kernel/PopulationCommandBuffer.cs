@@ -67,7 +67,10 @@ public sealed class PopulationCommandBuffer<TKind> : IDeferredPopulationCommands
         EnsureCapacity(ref _removals, removalCapacity);
         EnsureCapacity(ref _resolvedRows, removalCapacity);
         // A scheduled buffer is filled before the barrier, where structural changes are forbidden.
-        if (!_scheduled) _population.Reserve(checked(_population.Count + spawnCapacity));
+        if (!_scheduled)
+        {
+            _population.Reserve(checked(_population.Count + spawnCapacity));
+        }
     }
 
     /// <summary>Queues values to append as initialized rows at flush time.</summary>
@@ -104,7 +107,11 @@ public sealed class PopulationCommandBuffer<TKind> : IDeferredPopulationCommands
     public PopulationCommandResult Flush()
     {
         EnsureActive();
-        if (_scheduled) throw new InvalidOperationException("Scheduled population commands flush only at their barrier.");
+        if (_scheduled)
+        {
+            throw new InvalidOperationException("Scheduled population commands flush only at their barrier.");
+        }
+
         return FlushCore();
     }
 
@@ -153,7 +160,10 @@ public sealed class PopulationCommandBuffer<TKind> : IDeferredPopulationCommands
     {
         EnsureActive();
         if (source is not PopulationCommandBuffer<TKind> other || !ReferenceEquals(_population, other._population))
+        {
             throw new InvalidOperationException("Deferred command buffers must target the same population.");
+        }
+
         other.EnsureActive();
         var spawnCount = checked(_spawnCount + other._spawnCount);
         var removalCount = checked(_removalCount + other._removalCount);
@@ -176,7 +186,11 @@ public sealed class PopulationCommandBuffer<TKind> : IDeferredPopulationCommands
 
     private void EnsureActive()
     {
-        if (!_active) throw new InvalidOperationException("The scheduled population command buffer has expired.");
+        if (!_active)
+        {
+            throw new InvalidOperationException("The scheduled population command buffer has expired.");
+        }
+
         _population.EnsureActive();
     }
 

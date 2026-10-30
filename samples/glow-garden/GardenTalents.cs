@@ -84,7 +84,11 @@ public sealed partial class GardenSimulation
         }
         else
         {
-            if (ActiveTalentCount >= _tuning.TalentSlots) return false;
+            if (ActiveTalentCount >= _tuning.TalentSlots)
+            {
+                return false;
+            }
+
             CaptureCommandRollback();
             _garden.AddTag(tag);
         }
@@ -94,7 +98,10 @@ public sealed partial class GardenSimulation
     /// <summary>Register with the host builder. Rules select intents; only successful commits enqueue them.</summary>
     public void ObserveFact(SimulationFact fact, SimulationFactEmitter emitter)
     {
-        if (fact.SourceId != _garden.Id) return;
+        if (fact.SourceId != _garden.Id)
+        {
+            return;
+        }
         // Keep subpixel simulation coordinates for the local reaction; the fact bridge stores a
         // stable integer-pixel snapshot for rules, replay, aggregation, and presentation.
         var impact = _publishingImpact
@@ -103,7 +110,11 @@ public sealed partial class GardenSimulation
                 : _world.TryGetSpatialBounds(fact.TargetId, out var bounds)
                     ? new Impact(new Vector2(bounds.X, bounds.Y))
                     : null);
-        if (impact is not { } anchor) return;
+        if (impact is not { } anchor)
+        {
+            return;
+        }
+
         Talent? talent = fact.Type switch
         {
             "garden.talent.echo" => Talent.Echo,
@@ -114,10 +125,16 @@ public sealed partial class GardenSimulation
             "garden.talent.clone" => Talent.Clone,
             _ => null
         };
-        if (talent is not { } selected) return;
+        if (talent is not { } selected)
+        {
+            return;
+        }
         // Enqueue immediately: the domain drain runs at the end of the step, before the
         // host's outer transaction commits, so deferred commit callbacks would arrive too late.
-        if (_talentIntents.Count < MaxTalentIntents) _talentIntents.Enqueue(new(selected, anchor));
+        if (_talentIntents.Count < MaxTalentIntents)
+        {
+            _talentIntents.Enqueue(new(selected, anchor));
+        }
     }
 
     private void Publish(string type, double amount = 0, Impact? impact = null)
@@ -141,7 +158,9 @@ public sealed partial class GardenSimulation
         var delay = seed ? _tuning.SeedstormDelay : _tuning.EchoDelay;
         var expiry = Math.Max(delay, seed ? _tuning.SeedstormExpiry : _tuning.EchoExpiry);
         if (_pending.Count < MaxPendingImpacts)
+        {
             _pending.Add(new(position, Tick + delay, Tick + expiry, seed));
+        }
     }
 
     private void StepTalents()
@@ -153,9 +172,18 @@ public sealed partial class GardenSimulation
                 var expiries = access.ReadRange(simulation._creatures.Columns.CopyExpiryTick);
                 simulation._expiredCopies.Clear();
                 for (var row = copies.Length - 1; row >= 0; row--)
-                    if (copies[row] && expiries[row] <= simulation.Tick) simulation._expiredCopies.Add(row);
+                {
+                    if (copies[row] && expiries[row] <= simulation.Tick)
+                    {
+                        simulation._expiredCopies.Add(row);
+                    }
+                }
             });
-        foreach (var row in _expiredCopies) _creatures.RemoveAt(row);
+        foreach (var row in _expiredCopies)
+        {
+            _creatures.RemoveAt(row);
+        }
+
         for (var i = 0; i < _pending.Count;)
         {
             var impact = _pending[i];
@@ -179,8 +207,14 @@ public sealed partial class GardenSimulation
                     Publish("garden.combo", impact: new Impact(impact.Position));
                     _pending.RemoveAt(i);
                 }
-                else if (Tick >= impact.ExpiryTick) _pending.RemoveAt(i);
-                else i++;
+                else if (Tick >= impact.ExpiryTick)
+                {
+                    _pending.RemoveAt(i);
+                }
+                else
+                {
+                    i++;
+                }
             }
         }
     }
@@ -214,19 +248,29 @@ public sealed partial class GardenSimulation
                     simulation._creatureGrid.QueryRadius(position, callbackState.Radius, simulation._nearbyCreatures);
                     foreach (var row in simulation._nearbyCreatures)
                     {
-                        if ((CreatureKind)creatureKinds[row] != CreatureKind.Gatherer || carriedGlow[row] >= capacity) continue;
+                        if ((CreatureKind)creatureKinds[row] != CreatureKind.Gatherer || carriedGlow[row] >= capacity)
+                        {
+                            continue;
+                        }
+
                         var distance = Vector2.DistanceSquared(position, creaturePositions[row]);
                         if (distance > 0 && distance < best) { target = row; best = distance; }
                     }
                     if (target >= 0)
+                    {
                         motePositions[mote] = Move(position, creaturePositions[target], callbackState.Pull);
+                    }
                 }
             });
     }
 
     private void SpawnCopy(Vector2 position)
     {
-        if (CopyCount >= MaxCopies) return;
+        if (CopyCount >= MaxCopies)
+        {
+            return;
+        }
+
         var id = _nextCreatureId++;
         _creatures.Add(new(id, CreatureKind.Burstling, position, 0, 15, true));
         _creatures.WithAccess(new PopulationRange(_creatures.Count - 1, 1),
@@ -269,7 +313,10 @@ public sealed partial class GardenSimulation
                         }
 
                         if (!Obstacles.IsBlocked(spot)
-                            && Vector2.DistanceSquared(spot, impact.Position) >= minimum * minimum) break;
+                            && Vector2.DistanceSquared(spot, impact.Position) >= minimum * minimum)
+                        {
+                            break;
+                        }
                     }
                     if ((Obstacles.IsBlocked(spot)
                             || Vector2.DistanceSquared(spot, impact.Position) < minimum * minimum)
@@ -300,7 +347,11 @@ public sealed partial class GardenSimulation
 
     private void ApplyChain(Impact impact)
     {
-        if (impact.Reaction is not { } reaction || impact.Depth >= 3) return;
+        if (impact.Reaction is not { } reaction || impact.Depth >= 3)
+        {
+            return;
+        }
+
         var radius = _tuning.ChainRadius;
         var limit = Math.Min(_tuning.ChainBursts, MaxReactionBursts);
         var state = new ChainState(this, impact, reaction, radius, limit);
@@ -315,10 +366,18 @@ public sealed partial class GardenSimulation
                 simulation._plantGrid.QueryRadius(callbackState.Impact.Position, callbackState.Radius, simulation._reactionPlants);
                 foreach (var row in simulation._reactionPlants)
                 {
-                    if (callbackState.Reaction.Bursts >= callbackState.Limit) break;
+                    if (callbackState.Reaction.Bursts >= callbackState.Limit)
+                    {
+                        break;
+                    }
+
                     var position = positions[row];
                     if (growth[row] < 1
-                        || Vector2.DistanceSquared(callbackState.Impact.Position, position) > callbackState.Radius * callbackState.Radius) continue;
+                        || Vector2.DistanceSquared(callbackState.Impact.Position, position) > callbackState.Radius * callbackState.Radius)
+                    {
+                        continue;
+                    }
+
                     callbackState.Reaction.Bursts++;
                     simulation._reactionBursts.Add((row, position));
                 }
@@ -333,15 +392,27 @@ public sealed partial class GardenSimulation
 
     private void ApplyBounce(Impact impact)
     {
-        if (impact.Reaction is not { AllowBounce: true, Bounced: false } reaction) return;
+        if (impact.Reaction is not { AllowBounce: true, Bounced: false } reaction)
+        {
+            return;
+        }
+
         var target = NearestRipe(impact.Position, _tuning.ProjectileRadius);
-        if (target < 0) return;
+        if (target < 0)
+        {
+            return;
+        }
+
         var position = _plants[target].Position;
         BurstPlant(target, anchor: position);
         reaction.Bounced = true;
         for (var row = 0; row < _creatures.Count; row++)
         {
-            if (_creatures[row].Id != reaction.CreatureId) continue;
+            if (_creatures[row].Id != reaction.CreatureId)
+            {
+                continue;
+            }
+
             _creatures[row] = _creatures[row] with { Position = position, LeapProgress = 1 };
             break;
         }

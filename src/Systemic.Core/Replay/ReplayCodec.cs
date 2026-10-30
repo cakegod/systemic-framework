@@ -49,7 +49,10 @@ public static class ReplayCodec
     {
         ArgumentNullException.ThrowIfNull(json);
         if (json.Length > MaximumArtifactBytes || Encoding.UTF8.GetByteCount(json) > MaximumArtifactBytes)
+        {
             throw new ArgumentException("Replay exceeds the 64 MiB UTF-8 limit.", nameof(json));
+        }
+
         try
         {
             using var document = JsonDocument.Parse(json);
@@ -86,25 +89,42 @@ public static class ReplayCodec
         ArgumentNullException.ThrowIfNull(artifact);
         if (artifact.Version != 1 || artifact.InitialTick < 0 || !ReplayStateHash.Valid(artifact.ContentFingerprint)
             || !ReplayStateHash.Valid(artifact.InitialStateHash) || artifact.Ticks.IsDefault || artifact.Ticks.Length > 1_000_000)
+        {
             throw new ArgumentException("Replay metadata is invalid.", nameof(artifact));
+        }
+
         var tick = artifact.InitialTick;
         foreach (var item in artifact.Ticks)
         {
             if (item is null || tick == int.MaxValue || item.Tick != ++tick || !ReplayStateHash.Valid(item.StateHash)
                 || item.Inputs.IsDefault || item.Inputs.Length > 65_536 || item.Inputs.Any(input => input is null))
+            {
                 throw new ArgumentException("Replay ticks must be contiguous and contain valid bounded inputs and hashes.", nameof(artifact));
+            }
         }
     }
 
     private static void RequireFields(JsonElement element, params string[] fields)
     {
-        if (element.ValueKind != JsonValueKind.Object) throw new ArgumentException("Replay field must be an object.");
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            throw new ArgumentException("Replay field must be an object.");
+        }
+
         var allowed = new HashSet<string>(fields, StringComparer.Ordinal);
         var found = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in element.EnumerateObject())
+        {
             if (!allowed.Contains(property.Name) || !found.Add(property.Name))
+            {
                 throw new ArgumentException($"Unknown or duplicate replay property '{property.Name}'.");
-        if (found.Count != allowed.Count) throw new ArgumentException("Replay object is missing a required property.");
+            }
+        }
+
+        if (found.Count != allowed.Count)
+        {
+            throw new ArgumentException("Replay object is missing a required property.");
+        }
     }
 
     private sealed class BoundedMemoryStream(long maximumLength) : MemoryStream
@@ -130,7 +150,9 @@ public static class ReplayCodec
         private void EnsureCapacityFor(int count)
         {
             if (count > maximumLength - Length)
+            {
                 throw new ArgumentException("Replay exceeds the 64 MiB UTF-8 limit.");
+            }
         }
     }
 }

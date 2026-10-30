@@ -9,7 +9,7 @@ namespace Systemic.GlowGarden.Tests;
 public sealed class GardenPresentationTests
 {
     [Fact]
-    public void Debug_system_stats_are_cached_and_refreshed_after_one_simulation_second()
+    public void DebugSystemStatsAreCachedAndRefreshedAfterOneSimulationSecond()
     {
         var type = typeof(GardenUi).Assembly.GetType("GlowGarden.GardenTickDiagnostics");
         Assert.NotNull(type);
@@ -38,7 +38,7 @@ public sealed class GardenPresentationTests
     }
 
     [Fact]
-    public void Diagnostics_report_stream_drops_rejections_and_display_evictions()
+    public void DiagnosticsReportStreamDropsRejectionsAndDisplayEvictions()
     {
         var stream = new PresentationCueStream(new PresentationCueStreamOptions
         {
@@ -58,7 +58,7 @@ public sealed class GardenPresentationTests
     }
 
     [Fact]
-    public void Debug_wave_report_names_immutable_schedule_waves()
+    public void DebugWaveReportNamesImmutableScheduleWaves()
     {
         var waves = System.Collections.Immutable.ImmutableArray.Create(
             System.Collections.Immutable.ImmutableArray.Create("plants", "workers"),
@@ -68,7 +68,7 @@ public sealed class GardenPresentationTests
     }
 
     [Fact]
-    public void Game_exposes_its_schedule_as_stable_immutable_wave_names()
+    public void GameExposesItsScheduleAsStableImmutableWaveNames()
     {
         using var host = GardenHost.Create(17);
 
@@ -81,7 +81,7 @@ public sealed class GardenPresentationTests
     }
 
     [Fact]
-    public void Garden_viewport_fits_the_whole_world_inside_the_drawing_panel()
+    public void GardenViewportFitsTheWholeWorldInsideTheDrawingPanel()
     {
         var viewport = GardenGame.CreateViewport();
         var topLeft = viewport.WorldToScreen(new Point2(0, 0));
@@ -95,7 +95,7 @@ public sealed class GardenPresentationTests
     }
 
     [Fact]
-    public void Texture_cache_flushes_before_disposal_and_evicts_the_least_recently_used()
+    public void TextureCacheFlushesBeforeDisposalAndEvictsTheLeastRecentlyUsed()
     {
         using var cache = new GardenTextureCache<string, FakeTexture>(2);
         var a = new FakeTexture();
@@ -122,7 +122,7 @@ public sealed class GardenPresentationTests
     }
 
     [Fact]
-    public void Failed_flush_keeps_the_existing_texture_alive()
+    public void FailedFlushKeepsTheExistingTextureAlive()
     {
         using var cache = new GardenTextureCache<string, FakeTexture>(1);
         var existing = new FakeTexture();

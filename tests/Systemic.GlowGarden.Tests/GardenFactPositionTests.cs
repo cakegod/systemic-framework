@@ -8,7 +8,7 @@ namespace Systemic.GlowGarden.Tests;
 public sealed class GardenFactPositionTests
 {
     [Fact]
-    public void Impact_facts_use_explicit_rounded_position_while_reactions_keep_exact_position()
+    public void ImpactFactsUseExplicitRoundedPositionWhileReactionsKeepExactPosition()
     {
         var builder = GardenHost.CreateBuilder(GardenHost.ContentDirectory, 17);
         var model = new GardenSimulation(builder.World);

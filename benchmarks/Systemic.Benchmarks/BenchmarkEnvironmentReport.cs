@@ -39,7 +39,11 @@ internal static class BenchmarkEnvironmentReport
             }
 
             var fields = mount[0].Split(' ');
-            if (fields.Length < 5) throw new InvalidDataException("Malformed cgroup mount information.");
+            if (fields.Length < 5)
+            {
+                throw new InvalidDataException("Malformed cgroup mount information.");
+            }
+
             var mountRoot = Unescape(fields[3]);
             var mountPath = Path.GetFullPath(Unescape(fields[4]));
             var current = ResolveV2Path(mountRoot, mountPath, membership);
@@ -49,7 +53,11 @@ internal static class BenchmarkEnvironmentReport
                 Console.WriteLine($"cgroup path=\"{current}\" cpuMax=\"{ReadSmallFile(Path.Combine(current, "cpu.max"))}\" "
                     + $"cpusetEffective=\"{ReadSmallFile(Path.Combine(current, "cpuset.cpus.effective"))}\" "
                     + $"memoryMax=\"{ReadSmallFile(Path.Combine(current, "memory.max"))}\"");
-                if (current == mountPath) break;
+                if (current == mountPath)
+                {
+                    break;
+                }
+
                 current = Path.GetDirectoryName(current) ?? throw new InvalidDataException("Invalid cgroup path.");
             }
         }
@@ -66,7 +74,11 @@ internal static class BenchmarkEnvironmentReport
     internal static string ResolveV2Path(string mountRoot, string mountPath, string membership)
     {
         mountPath = Path.GetFullPath(mountPath);
-        if (membership == "/") return mountPath;
+        if (membership == "/")
+        {
+            return mountPath;
+        }
+
         if (mountRoot != "/" && membership != mountRoot
             && !membership.StartsWith(mountRoot + "/", StringComparison.Ordinal))
         {

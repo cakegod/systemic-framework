@@ -82,8 +82,14 @@ public sealed class GardenGame : Game
         _pixel.SetData([Color.White]);
         _disc = new(GraphicsDevice, 32, 32);
         var pixels = new Color[1024];
-        for (var y = 0; y < 32; y++) for (var x = 0; x < 32; x++)
-            pixels[y * 32 + x] = Vector2.Distance(new(x + .5f, y + .5f), new(16)) <= 16 ? Color.White : Color.Transparent;
+        for (var y = 0; y < 32; y++)
+        {
+            for (var x = 0; x < 32; x++)
+            {
+                pixels[y * 32 + x] = Vector2.Distance(new(x + .5f, y + .5f), new(16)) <= 16 ? Color.White : Color.Transparent;
+            }
+        }
+
         _disc.SetData(pixels);
         _frame = new(GraphicsDevice, 1280, 800);
         _terrain = BuildTerrain();
@@ -186,7 +192,11 @@ public sealed class GardenGame : Game
     }
     private void RefreshTerrain()
     {
-        if (_terrain is null) return;
+        if (_terrain is null)
+        {
+            return;
+        }
+
         var previous = _terrain;
         _terrain = BuildTerrain();
         previous.Dispose();
@@ -227,16 +237,56 @@ public sealed class GardenGame : Game
     {
         var keyboard = Keyboard.GetState();
         bool Pressed(Keys key) => keyboard.IsKeyDown(key) && !_previous.IsKeyDown(key);
-        if (Pressed(Keys.Escape)) Exit();
-        if (Pressed(Keys.Space)) TogglePause();
-        if (Pressed(Keys.F)) CycleSpeed();
-        if (Pressed(Keys.R)) Restart();
-        if (Pressed(Keys.F5)) SaveGarden();
-        if (Pressed(Keys.F9)) LoadGarden();
-        if (Pressed(Keys.F3)) DebugOverlayEnabled = !DebugOverlayEnabled;
-        if (Pressed(Keys.Home)) _viewport = CreateViewport();
-        if (Pressed(Keys.PageUp)) _viewport = _viewport.WithZoom(Math.Min(4, _viewport.Zoom * 1.25f));
-        if (Pressed(Keys.PageDown)) _viewport = _viewport.WithZoom(Math.Max(1, _viewport.Zoom / 1.25f));
+        if (Pressed(Keys.Escape))
+        {
+            Exit();
+        }
+
+        if (Pressed(Keys.Space))
+        {
+            TogglePause();
+        }
+
+        if (Pressed(Keys.F))
+        {
+            CycleSpeed();
+        }
+
+        if (Pressed(Keys.R))
+        {
+            Restart();
+        }
+
+        if (Pressed(Keys.F5))
+        {
+            SaveGarden();
+        }
+
+        if (Pressed(Keys.F9))
+        {
+            LoadGarden();
+        }
+
+        if (Pressed(Keys.F3))
+        {
+            DebugOverlayEnabled = !DebugOverlayEnabled;
+        }
+
+        if (Pressed(Keys.Home))
+        {
+            _viewport = CreateViewport();
+        }
+
+        if (Pressed(Keys.PageUp))
+        {
+            _viewport = _viewport.WithZoom(Math.Min(4, _viewport.Zoom * 1.25f));
+        }
+
+        if (Pressed(Keys.PageDown))
+        {
+            _viewport = _viewport.WithZoom(Math.Max(1, _viewport.Zoom / 1.25f));
+        }
+
         var panX = (keyboard.IsKeyDown(Keys.L) ? 1 : 0) - (keyboard.IsKeyDown(Keys.J) ? 1 : 0);
         var panY = (keyboard.IsKeyDown(Keys.K) ? 1 : 0) - (keyboard.IsKeyDown(Keys.I) ? 1 : 0);
         if (panX != 0 || panY != 0)
@@ -245,18 +295,56 @@ public sealed class GardenGame : Game
             _viewport = _viewport.WithCamera(new Point2(_viewport.CameraCenter.X + panX * distance,
                 _viewport.CameraCenter.Y + panY * distance));
         }
-        if (Pressed(Keys.X)) Bulk = !Bulk;
-        if (Pressed(Keys.B)) Host.Simulation.Hire(CreatureKind.Burstling);
-        if (Pressed(Keys.G)) Host.Simulation.Hire(CreatureKind.Gatherer);
-        if (Pressed(Keys.C)) Host.Simulation.ResetTree(UpgradeTree.Creatures);
-        if (Pressed(Keys.M)) Host.Simulation.ResetTree(UpgradeTree.MagicGrowth);
+        if (Pressed(Keys.X))
+        {
+            Bulk = !Bulk;
+        }
+
+        if (Pressed(Keys.B))
+        {
+            Host.Simulation.Hire(CreatureKind.Burstling);
+        }
+
+        if (Pressed(Keys.G))
+        {
+            Host.Simulation.Hire(CreatureKind.Gatherer);
+        }
+
+        if (Pressed(Keys.C))
+        {
+            Host.Simulation.ResetTree(UpgradeTree.Creatures);
+        }
+
+        if (Pressed(Keys.M))
+        {
+            Host.Simulation.ResetTree(UpgradeTree.MagicGrowth);
+        }
+
         Keys[] upgradeKeys = [Keys.D1, Keys.D2, Keys.D3, Keys.D4, Keys.D5];
         Keys[] talentKeys = [Keys.Q, Keys.W, Keys.E, Keys.A, Keys.S, Keys.D];
-        for (var i = 0; i < 5; i++) if (Pressed(upgradeKeys[i])) Host.Simulation.Buy((UpgradeKind)i, Bulk);
-        for (var i = 0; i < 6; i++) if (Pressed(talentKeys[i])) Host.Simulation.ToggleTalent((Talent)i);
+        for (var i = 0; i < 5; i++)
+        {
+            if (Pressed(upgradeKeys[i]))
+            {
+                Host.Simulation.Buy((UpgradeKind)i, Bulk);
+            }
+        }
+
+        for (var i = 0; i < 6; i++)
+        {
+            if (Pressed(talentKeys[i]))
+            {
+                Host.Simulation.ToggleTalent((Talent)i);
+            }
+        }
+
         _previous = keyboard;
         GumService.Default.Update(gameTime);
-        if (!Paused) Host.Game.Advance(TimeSpan.FromTicks(gameTime.ElapsedGameTime.Ticks * Speed));
+        if (!Paused)
+        {
+            Host.Game.Advance(TimeSpan.FromTicks(gameTime.ElapsedGameTime.Ticks * Speed));
+        }
+
         _cueWindow.Pump(Host.Game.PresentationCues(), Host.Simulation.Tick);
         _ui.Refresh();
         base.Update(gameTime);
@@ -271,8 +359,15 @@ public sealed class GardenGame : Game
     {
         var radius = screenRadius / _viewport.Scale;
         var visible = _viewport.IsVisible(new Bounds2(position.X, position.Y, radius, radius));
-        if (visible) _visibleObjects++;
-        else _culledObjects++;
+        if (visible)
+        {
+            _visibleObjects++;
+        }
+        else
+        {
+            _culledObjects++;
+        }
+
         return visible;
     }
 
@@ -282,11 +377,17 @@ public sealed class GardenGame : Game
         var age = tick - cue.Tick;
         if (age < 0 || !Host.Game.TrySamplePresentation(cue, age, out var frame)
             || !Host.Game.TryGetPresentationTimeline(cue.TimelineId, out var timeline)
-            || !_cueRecipes.TryGetValue(timeline.VisualRecipeId, out var recipe)) return;
+            || !_cueRecipes.TryGetValue(timeline.VisualRecipeId, out var recipe))
+        {
+            return;
+        }
 
         var effectRadius = Math.Abs(frame.Scale) * (Math.Max(recipe.CanvasWidth, recipe.CanvasHeight) / 2f + 30)
             * _viewport.Scale + 2;
-        if (!IsVisible(new System.Numerics.Vector2(frame.Position.X, frame.Position.Y), effectRadius)) return;
+        if (!IsVisible(new System.Numerics.Vector2(frame.Position.X, frame.Position.Y), effectRadius))
+        {
+            return;
+        }
 
         var state = frame.VisualState ?? string.Empty;
         var key = (recipe.Id, state);
@@ -299,7 +400,10 @@ public sealed class GardenGame : Game
                 var pixels = new Color[buffer.Width * buffer.Height];
                 var rgba = buffer.Pixels.Span;
                 for (var i = 0; i < pixels.Length; i++)
+                {
                     pixels[i] = new Color(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2], rgba[i * 4 + 3]);
+                }
+
                 result.SetData(pixels);
                 return result;
             }, FlushCueBatch);
@@ -310,7 +414,11 @@ public sealed class GardenGame : Game
         _batch.Draw(texture, center, null, Color.White * opacity, 0f,
             new Vector2(texture.Width / 2f, texture.Height / 2f), _viewport.Scale * frame.Scale, SpriteEffects.None, 0f);
 
-        if (cue.ParticleCount == 0 || recipe.Palette.IsDefaultOrEmpty) return;
+        if (cue.ParticleCount == 0 || recipe.Palette.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
         var spark = ColorFromHex(recipe.Palette[^1]) * opacity;
         for (var i = 0; i < cue.ParticleCount; i++)
         {
@@ -357,7 +465,11 @@ public sealed class GardenGame : Game
             _viewport.Scale * 4f, SpriteEffects.None, 0f);
         _batch.End();
         var model = Host.Simulation;
-        if (DebugOverlayEnabled) DrawDebugGrid(model);
+        if (DebugOverlayEnabled)
+        {
+            DrawDebugGrid(model);
+        }
+
         _batch.Begin(samplerState: SamplerState.PointClamp, rasterizerState: _gardenClipState);
         _visibleObjects = 0;
         _culledObjects = 0;
@@ -366,7 +478,11 @@ public sealed class GardenGame : Game
         for (var i = 0; i < 190; i++)
         {
             var position = new System.Numerics.Vector2((16 + i * 137 % 782) / .42f, (36 + i * 73 % 475) / .42f);
-            if (!IsVisible(position, 4 * zoom)) continue;
+            if (!IsVisible(position, 4 * zoom))
+            {
+                continue;
+            }
+
             var p = At(position);
             Line(p, p + new Vector2(1.5f, -3) * zoom, zoom, new Color(27, 63, 58));
         }
@@ -379,7 +495,11 @@ public sealed class GardenGame : Game
         }
         foreach (var plant in model.Plants)
         {
-            if (!IsVisible(plant.Position, 16 * zoom)) continue;
+            if (!IsVisible(plant.Position, 16 * zoom))
+            {
+                continue;
+            }
+
             var p = At(plant.Position);
             Disc(p + new Vector2(0, 4) * zoom, 8 * zoom, new Color(8, 24, 31));
             Line(p + new Vector2(0, 3) * zoom, p - new Vector2(0, 9) * zoom, 2 * zoom, new Color(74, 118, 84));
@@ -389,35 +509,57 @@ public sealed class GardenGame : Game
         }
         foreach (var mote in model.Motes)
         {
-            if (!IsVisible(mote.Position, 3 * zoom)) continue;
+            if (!IsVisible(mote.Position, 3 * zoom))
+            {
+                continue;
+            }
+
             var p = At(mote.Position);
             Disc(p, 3 * zoom, new Color(91, 92, 43, 70));
             Disc(p, 1.2f * zoom, new Color(255, 231, 139));
         }
         foreach (var creature in model.Creatures)
         {
-            if (!IsVisible(creature.Position, 22 * zoom)) continue;
+            if (!IsVisible(creature.Position, 22 * zoom))
+            {
+                continue;
+            }
+
             var ground = At(creature.Position);
             var p = ground - new Vector2(0, MathF.Sin(creature.LeapProgress * MathF.PI) * 12 * zoom);
             Disc(ground + new Vector2(0, 2.5f) * zoom, 3 * zoom, new Color(6, 22, 27));
-            if (creature.LeapProgress > 0) Line(ground, p, zoom, new Color(119, 91, 113));
+            if (creature.LeapProgress > 0)
+            {
+                Line(ground, p, zoom, new Color(119, 91, 113));
+            }
+
             var color = creature.Kind == CreatureKind.Burstling ? new Color(208, 125, 157) : new Color(113, 194, 187);
             Disc(p, (creature.IsCopy ? 2.5f : 3.5f) * zoom, creature.IsCopy ? new Color(166, 150, 221) : color);
             Disc(p + new Vector2(-1.2f, -1.2f) * zoom, 0.7f * zoom, Color.White);
             Disc(p + new Vector2(1.2f, -1.2f) * zoom, 0.7f * zoom, Color.White);
             for (var i = 0; i < Math.Min(creature.CarriedGlow, 12); i++)
+            {
                 Disc(p + new Vector2((i % 4 - 1.5f) * 1.8f, 5 + i / 4 * 1.8f) * zoom, 0.9f * zoom, new Color(255, 222, 127));
+            }
         }
         foreach (var impact in model.PendingImpacts)
         {
-            if (!IsVisible(impact.Position, (Math.Max(0, impact.DueTick - model.Tick) + 3) * zoom)) continue;
+            if (!IsVisible(impact.Position, (Math.Max(0, impact.DueTick - model.Tick) + 3) * zoom))
+            {
+                continue;
+            }
+
             var p = At(impact.Position);
             Disc(p - new Vector2(0, Math.Max(0, impact.DueTick - model.Tick)) * zoom, 2.5f * zoom, impact.IsSeed ? new Color(148, 224, 133) : new Color(189, 155, 239));
             Disc(p, 1.2f * zoom, new Color(86, 104, 111));
         }
         _batch.End();
         BeginCueBatch();
-        foreach (var cue in _cueWindow.Cues) DrawCue(cue, model.Tick);
+        foreach (var cue in _cueWindow.Cues)
+        {
+            DrawCue(cue, model.Tick);
+        }
+
         _batch.End();
         GraphicsDevice.ScissorRectangle = previousScissor;
         GumService.Default.Draw();
@@ -432,11 +574,17 @@ public sealed class GardenGame : Game
         if (_options.VerifyRender && _frames == 121)
         {
             if (_visibleObjects == 0 || _culledObjects == 0)
+            {
                 throw new InvalidOperationException("Zoomed render did not exercise viewport culling.");
+            }
+
             var pixels = new Color[1280 * 800];
             _frame.GetData(pixels);
             if (pixels[(300 * 1280) + 830] != new Color(13, 34, 38))
+            {
                 throw new InvalidOperationException("Garden rendering escaped the viewport clip.");
+            }
+
             _viewport = CreateViewport();
         }
         if (_options.VerifyRender && _frames == 480)
@@ -446,14 +594,28 @@ public sealed class GardenGame : Game
             int Variety(Rectangle region)
             {
                 var colors = new HashSet<uint>();
-                for (var y = region.Top; y < region.Bottom; y++) for (var x = region.Left; x < region.Right; x++) colors.Add(pixels[y * 1280 + x].PackedValue);
+                for (var y = region.Top; y < region.Bottom; y++)
+                {
+                    for (var x = region.Left; x < region.Right; x++)
+                    {
+                        colors.Add(pixels[y * 1280 + x].PackedValue);
+                    }
+                }
+
                 return colors.Count;
             }
             var gardenColors = Variety(new(20, 150, 800, 490));
             var uiColors = Variety(new(850, 120, 410, 670));
             if (model.BurstCount == 0 || model.BankedGlow == 0)
+            {
                 throw new InvalidOperationException("Render scenario did not produce and bank Glow.");
-            if (gardenColors < 10 || uiColors < 10) throw new InvalidOperationException($"Blank render: garden={gardenColors}, UI={uiColors}");
+            }
+
+            if (gardenColors < 10 || uiColors < 10)
+            {
+                throw new InvalidOperationException($"Blank render: garden={gardenColors}, UI={uiColors}");
+            }
+
             if (_options.Screenshot != null)
             {
                 using var file = File.Create(_options.Screenshot);
@@ -515,7 +677,10 @@ internal sealed class GardenTextureCache<TKey, TTexture> : IDisposable where TKe
     {
         ArgumentNullException.ThrowIfNull(create);
         ArgumentNullException.ThrowIfNull(flush);
-        if (TryGet(key, out var cached)) return cached;
+        if (TryGet(key, out var cached))
+        {
+            return cached;
+        }
 
         if (_entries.Count == _capacity)
         {
@@ -533,7 +698,11 @@ internal sealed class GardenTextureCache<TKey, TTexture> : IDisposable where TKe
 
     public void Dispose()
     {
-        foreach (var entry in _recent) entry.Texture.Dispose();
+        foreach (var entry in _recent)
+        {
+            entry.Texture.Dispose();
+        }
+
         _entries.Clear();
         _recent.Clear();
     }

@@ -4,12 +4,14 @@ namespace Systemic.Tests.Kernel;
 
 public sealed class WorldWriteScheduleTests
 {
+    private static readonly int[] s_expectedRows = [1, 1, 1, 1];
+
     [Theory]
     [InlineData(true, true)]
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(false, false)]
-    public void WriteWorld_runs_alone_even_when_the_other_system_does_not_access_world(
+    public void WriteWorldRunsAloneEvenWhenTheOtherSystemDoesNotAccessWorld(
         bool worldFirst, bool otherHasAccess)
     {
         using var secondStarted = new ManualResetEventSlim();
@@ -47,7 +49,7 @@ public sealed class WorldWriteScheduleTests
     }
 
     [Fact]
-    public void WriteWorld_system_can_still_use_all_workers_for_ranges()
+    public void WriteWorldSystemCanStillUseAllWorkersForRanges()
     {
         using var barrier = new Barrier(4);
         var rows = new int[4];
@@ -63,7 +65,7 @@ public sealed class WorldWriteScheduleTests
 
         schedule.Execute(new World(1, 1), 1);
 
-        Assert.Equal(new[] { 1, 1, 1, 1 }, rows);
+        Assert.Equal(s_expectedRows, rows);
     }
 
     private sealed class TestSystem(string id, IReadOnlyList<SystemAccess> access,

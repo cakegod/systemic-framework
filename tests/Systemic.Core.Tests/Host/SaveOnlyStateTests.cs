@@ -9,7 +9,7 @@ namespace Systemic.Tests.Host;
 public sealed class SaveOnlyStateTests
 {
     [Fact]
-    public void Save_only_extension_is_not_snapshotted_each_tick()
+    public void SaveOnlyExtensionIsNotSnapshottedEachTick()
     {
         var extension = new SaveOnlyExtension();
         using var game = new SystemicGameBuilder(EmptyContent(), new World(seed: 1, valueScale: 1))
@@ -22,7 +22,7 @@ public sealed class SaveOnlyStateTests
     }
 
     [Fact]
-    public void Ordinary_stateful_extension_is_still_snapshotted_each_tick()
+    public void OrdinaryStatefulExtensionIsStillSnapshottedEachTick()
     {
         var extension = new SnapshotExtension();
         using var game = new SystemicGameBuilder(EmptyContent(), new World(seed: 1, valueScale: 1))
@@ -41,15 +41,15 @@ public sealed class SaveOnlyStateTests
     {
         public int Captures { get; private set; }
 
+        public JsonElement Restored { get; private set; }
+
         public JsonElement CaptureState()
         {
             Captures++;
             return JsonSerializer.SerializeToElement(0);
         }
 
-        public void RestoreState(JsonElement state)
-        {
-        }
+        public void RestoreState(JsonElement state) => Restored = state;
     }
 
     private sealed class SaveOnlyExtension : CountingExtension, ISaveOnlyStateExtension

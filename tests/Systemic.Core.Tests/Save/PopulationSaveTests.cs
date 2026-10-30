@@ -83,7 +83,7 @@ public sealed class PopulationSaveTests
     }
 
     [Fact]
-    public void Save_includes_populations_defined_after_the_host_was_built()
+    public void SaveIncludesPopulationsDefinedAfterTheHostWasBuilt()
     {
         using var pack = CoreOnlyPack.Create();
         var content = ContentPackLoader.Load(pack.Root);

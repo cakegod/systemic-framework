@@ -11,25 +11,25 @@ namespace Systemic.Tests.Kernel;
 public sealed class RollbackPropertyTests
 {
     [Fact]
-    public void Rollback_restores_world_state_after_any_command_sequence()
+    public void RollbackRestoresWorldStateAfterAnyCommandSequence()
     {
         Check.One(Config.QuickThrowOnFailure, Prop.ForAll<int[]>(RestoresState));
     }
 
     [Fact]
-    public void Commit_keeps_changes_for_a_committed_tick()
+    public void CommitKeepsChangesForACommittedTick()
     {
         Check.One(Config.QuickThrowOnFailure, Prop.ForAll<int[]>(KeepsCommittedState));
     }
 
     [Fact]
-    public void Rollback_restores_population_state_after_any_row_sequence()
+    public void RollbackRestoresPopulationStateAfterAnyRowSequence()
     {
         Check.One(Config.QuickThrowOnFailure, Prop.ForAll<int[]>(RestoresPopulationState));
     }
 
     [Fact]
-    public void Commit_keeps_population_state_for_a_committed_tick()
+    public void CommitKeepsPopulationStateForACommittedTick()
     {
         Check.One(Config.QuickThrowOnFailure, Prop.ForAll<int[]>(KeepsCommittedPopulationState));
     }
@@ -38,14 +38,14 @@ public sealed class RollbackPropertyTests
     // capture, row capture interleaving that reordered the undo journal. These sequences mix range
     // writes with structural edits and compare every derived lookup, not only column values.
     [Fact]
-    public void Rollback_restores_derived_population_state_after_any_mixed_sequence()
+    public void RollbackRestoresDerivedPopulationStateAfterAnyMixedSequence()
     {
         Check.One(Config.QuickThrowOnFailure, Prop.ForAll<int[], int[]>((first, second) =>
             RestoresDerivedPopulationState([.. first, .. second])));
     }
 
     [Fact]
-    public void Commit_keeps_derived_population_state_for_a_committed_tick()
+    public void CommitKeepsDerivedPopulationStateForACommittedTick()
     {
         Check.One(Config.QuickThrowOnFailure, Prop.ForAll<int[], int[]>((first, second) =>
             KeepsCommittedDerivedPopulationState([.. first, .. second])));
@@ -353,7 +353,7 @@ public sealed class RollbackPropertyTests
     private static string DescribePopulation(World world, Population<RollbackCrowdKind> population)
     {
         var text = new StringBuilder();
-        text.Append("count:").Append(population.Count).Append(";");
+        text.Append("count:").Append(population.Count).Append(';');
         for (var row = 0; row < population.Count; row++)
         {
             text.Append("row:").Append(row)

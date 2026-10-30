@@ -15,7 +15,7 @@ public sealed class PopulationRowJournalTests
         new("journal.values", 1, PopulationCodecs.Int32);
 
     [Fact]
-    public void A_sparse_row_write_journals_one_row_instead_of_a_page()
+    public void ASparseRowWriteJournalsOneRowInsteadOfAPage()
     {
         var world = new World(seed: 81, valueScale: 1);
         var population = world.DefinePopulation<TaggedKind>();
@@ -36,7 +36,7 @@ public sealed class PopulationRowJournalTests
     }
 
     [Fact]
-    public void A_sparse_row_write_still_rolls_back()
+    public void ASparseRowWriteStillRollsBack()
     {
         var world = new World(seed: 82, valueScale: 1);
         var population = world.DefinePopulation<TaggedKind>();
@@ -58,7 +58,7 @@ public sealed class PopulationRowJournalTests
     }
 
     [Fact]
-    public void A_page_capture_after_a_row_capture_still_restores_the_pre_transaction_state()
+    public void APageCaptureAfterARowCaptureStillRestoresThePreTransactionState()
     {
         var world = new World(seed: 83, valueScale: 1);
         var population = world.DefinePopulation<TaggedKind>();
@@ -80,7 +80,7 @@ public sealed class PopulationRowJournalTests
     }
 
     [Fact]
-    public void A_full_row_range_edit_still_captures_pages()
+    public void AFullRowRangeEditStillCapturesPages()
     {
         var world = new World(seed: 84, valueScale: 1);
         var population = world.DefinePopulation<TaggedKind>();
@@ -100,7 +100,7 @@ public sealed class PopulationRowJournalTests
     }
 
     [Fact]
-    public void A_row_capture_after_a_page_capture_is_journaled_after_it()
+    public void ARowCaptureAfterAPageCaptureIsJournaledAfterIt()
     {
         var world = new World(seed: 85, valueScale: 1);
         var population = world.DefinePopulation<TaggedKind>();

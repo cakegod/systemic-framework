@@ -10,7 +10,7 @@ namespace Systemic.Tests.Host;
 public sealed class SystemicGameTransactionalStateTests
 {
     [Fact]
-    public void Failed_tick_restores_registered_system_state_automatically()
+    public void FailedTickRestoresRegisteredSystemStateAutomatically()
     {
         var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
             new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));
@@ -24,7 +24,7 @@ public sealed class SystemicGameTransactionalStateTests
     }
 
     [Fact]
-    public void Host_reports_failing_system_and_keeps_bounded_timing_and_budget_statistics()
+    public void HostReportsFailingSystemAndKeepsBoundedTimingAndBudgetStatistics()
     {
         var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
             new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));
@@ -47,7 +47,7 @@ public sealed class SystemicGameTransactionalStateTests
     }
 
     [Fact]
-    public void Rollback_failure_preserves_the_original_system_failure()
+    public void RollbackFailurePreservesTheOriginalSystemFailure()
     {
         var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
             new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));
@@ -61,7 +61,7 @@ public sealed class SystemicGameTransactionalStateTests
     }
 
     [Fact]
-    public void Foreign_commit_callback_failure_reports_a_rolled_back_tick()
+    public void ForeignCommitCallbackFailureReportsARolledBackTick()
     {
         var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
             new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));
@@ -77,7 +77,7 @@ public sealed class SystemicGameTransactionalStateTests
     }
 
     [Fact]
-    public void Commit_callback_failure_on_this_tick_is_reported_as_committed()
+    public void CommitCallbackFailureOnThisTickIsReportedAsCommitted()
     {
         var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
             new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));
@@ -93,7 +93,7 @@ public sealed class SystemicGameTransactionalStateTests
     }
 
     [Fact]
-    public void Rollback_callback_failure_preserves_the_original_system_failure()
+    public void RollbackCallbackFailurePreservesTheOriginalSystemFailure()
     {
         var content = new ContentPack("", new GameManifest("test", "Test", 30, 4),
             new CompiledRuleSet([]), new CompiledEntities(ImmutableArray<EntityDefinition>.Empty));

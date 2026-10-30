@@ -7,7 +7,7 @@ namespace Systemic.Tests.Presentation;
 public sealed class PresentationContentModuleTests
 {
     [Fact]
-    public void Declared_presentation_module_compiles_content_and_registers_timeline_runtime()
+    public void DeclaredPresentationModuleCompilesContentAndRegistersTimelineRuntime()
     {
         using var pack = PresentationPack.Create();
         var content = ContentPackLoader.Load(pack.Root,
@@ -22,7 +22,7 @@ public sealed class PresentationContentModuleTests
     }
 
     [Fact]
-    public void Presentation_schema_errors_report_owning_file_and_json_path()
+    public void PresentationSchemaErrorsReportOwningFileAndJsonPath()
     {
         using var pack = PresentationPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "visuals.json"), """
@@ -41,7 +41,7 @@ public sealed class PresentationContentModuleTests
     [Theory]
     [InlineData("\"visuals\": \"visuals.json\", ", "", "$.modules.systemic.presentation.visuals")]
     [InlineData("\"visuals\": \"visuals.json\"", "\"visuals\": 7", "$.modules['systemic.presentation'].visuals")]
-    public void Missing_or_wrong_type_visuals_file_key_reports_manifest_diagnostic(
+    public void MissingOrWrongTypeVisualsFileKeyReportsManifestDiagnostic(
         string original, string replacement, string expectedPath)
     {
         using var pack = PresentationPack.Create();
@@ -64,7 +64,7 @@ public sealed class PresentationContentModuleTests
         "$.entities[0].visualRecipeId")]
     [InlineData("{\"schemaVersion\":2,\"archetypes\":[{\"id\":\"visual.prop\",\"kind\":\"prop\",\"visualRecipeId\":\"missing.recipe\"}],\"entities\":[{\"id\":\"actor\",\"archetype\":\"visual.prop\"}]}",
         "$.archetypes[0].visualRecipeId")]
-    public void Unknown_entity_visual_recipe_reports_its_original_source_field(string entitiesJson, string expectedPath)
+    public void UnknownEntityVisualRecipeReportsItsOriginalSourceField(string entitiesJson, string expectedPath)
     {
         using var pack = PresentationPack.Create();
         File.WriteAllText(Path.Combine(pack.Root, "entities.json"), entitiesJson);

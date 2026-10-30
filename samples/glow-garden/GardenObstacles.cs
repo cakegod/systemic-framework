@@ -38,7 +38,11 @@ internal sealed class GardenObstacles
                 var value = (SampleNoise(x, y, CoarseCell, seed, 0x9E3779B97F4A7C15UL) * 0.74f)
                     + (SampleNoise(x, y, FineCell, seed, 0xD1B54A32D192ED03UL) * 0.26f);
                 var clearance = Vector2.Distance(new Vector2(x, y), keepClear);
-                if (clearance < clearRadius) value *= clearance / clearRadius;
+                if (clearance < clearRadius)
+                {
+                    value *= clearance / clearRadius;
+                }
+
                 _field[(row * _columns) + column] = value;
             }
         }
@@ -71,13 +75,25 @@ internal sealed class GardenObstacles
         {
             for (var column = 0; column < _columns; column++)
             {
-                if (IsBlocked(column, row)) continue;
+                if (IsBlocked(column, row))
+                {
+                    continue;
+                }
+
                 var candidate = new Vector2(
                     MathF.Min((column + 0.5f) * Resolution, _width),
                     MathF.Min((row + 0.5f) * Resolution, _height));
-                if (origin is { } parent && Vector2.DistanceSquared(candidate, parent) < minimumSquared) continue;
+                if (origin is { } parent && Vector2.DistanceSquared(candidate, parent) < minimumSquared)
+                {
+                    continue;
+                }
+
                 var distance = Vector2.DistanceSquared(candidate, preferred);
-                if (distance >= bestDistance) continue;
+                if (distance >= bestDistance)
+                {
+                    continue;
+                }
+
                 position = candidate;
                 bestDistance = distance;
                 found = true;
@@ -109,24 +125,38 @@ internal sealed class GardenObstacles
 
         var delta = to - from;
         var length = delta.Length();
-        if (length < 0.0001f) return from;
+        if (length < 0.0001f)
+        {
+            return from;
+        }
+
         var desired = delta / length;
 
         // Commit to one side of the thicket and deviate by increasing angles until a step is clear.
         // The angle is measured from the wanted direction rather than from the field gradient, so the
         // choice stays stable while the worker traces the edge instead of reversing every tick.
-        if (side == 0) side = ChooseSide(from, desired, length);
+        if (side == 0)
+        {
+            side = ChooseSide(from, desired, length);
+        }
+
         foreach (var degrees in s_deviations)
         {
             var candidate = from + (Rotate(desired, side * degrees * DegreesPerRadian) * length);
-            if (!IsBlocked(candidate) && ClearPath(from, candidate)) return candidate;
+            if (!IsBlocked(candidate) && ClearPath(from, candidate))
+            {
+                return candidate;
+            }
         }
 
         side = -side;
         foreach (var degrees in s_deviations)
         {
             var candidate = from + (Rotate(desired, side * degrees * DegreesPerRadian) * length);
-            if (!IsBlocked(candidate) && ClearPath(from, candidate)) return candidate;
+            if (!IsBlocked(candidate) && ClearPath(from, candidate))
+            {
+                return candidate;
+            }
         }
 
         var slid = Constrain(from, to);
@@ -136,7 +166,11 @@ internal sealed class GardenObstacles
     private int ChooseSide(Vector2 from, Vector2 desired, float length)
     {
         var left = from + (Rotate(desired, 60 * DegreesPerRadian) * length);
-        if (!IsBlocked(left)) return 1;
+        if (!IsBlocked(left))
+        {
+            return 1;
+        }
+
         var right = from + (Rotate(desired, -60 * DegreesPerRadian) * length);
         return IsBlocked(right) ? 1 : -1;
     }
@@ -162,7 +196,9 @@ internal sealed class GardenObstacles
         var centre = new Vector2((column + 0.5f) * Resolution, (row + 0.5f) * Resolution);
         var toCentre = centre - from;
         if (toCentre.LengthSquared() > 0.25f)
+        {
             return from + (Vector2.Normalize(toCentre) * MathF.Min(step, MathF.Sqrt(toCentre.LengthSquared())));
+        }
 
         var best = from;
         var bestScore = float.MinValue;
@@ -173,16 +209,32 @@ internal sealed class GardenObstacles
         {
             var nextColumn = column + offsetColumn;
             var nextRow = row + offsetRow;
-            if (!InBounds(nextColumn, nextRow) || IsBlocked(nextColumn, nextRow)) continue;
+            if (!InBounds(nextColumn, nextRow) || IsBlocked(nextColumn, nextRow))
+            {
+                continue;
+            }
+
             var target = new Vector2((nextColumn + 0.5f) * Resolution, (nextRow + 0.5f) * Resolution);
             var direction = target - from;
             var distanceSquared = direction.LengthSquared();
-            if (distanceSquared < 0.0001f) continue;
+            if (distanceSquared < 0.0001f)
+            {
+                continue;
+            }
+
             var distance = MathF.Sqrt(distanceSquared);
             var candidate = from + (direction * (MathF.Min(step, distance) / distance));
-            if (IsBlocked(candidate) || !ClearPath(from, candidate)) continue;
+            if (IsBlocked(candidate) || !ClearPath(from, candidate))
+            {
+                continue;
+            }
+
             var score = Vector2.Dot(Vector2.Normalize(direction), desired);
-            if (score <= bestScore) continue;
+            if (score <= bestScore)
+            {
+                continue;
+            }
+
             bestScore = score;
             best = candidate;
         }
@@ -212,7 +264,10 @@ internal sealed class GardenObstacles
         if (!float.IsFinite(from.X) || !float.IsFinite(from.Y)
             || !float.IsFinite(to.X) || !float.IsFinite(to.Y)
             || from.X < 0 || from.X > _width || from.Y < 0 || from.Y > _height
-            || to.X < 0 || to.X > _width || to.Y < 0 || to.Y > _height) return false;
+            || to.X < 0 || to.X > _width || to.Y < 0 || to.Y > _height)
+        {
+            return false;
+        }
 
         var column = Math.Clamp((int)(from.X / Resolution), 0, _columns - 1);
         var row = Math.Clamp((int)(from.Y / Resolution), 0, _rows - 1);
@@ -225,11 +280,26 @@ internal sealed class GardenObstacles
 
         // Cell squares are treated as closed: a segment on a grid line touches both adjacent
         // cells, and a segment starting at a corner touches all four cells at that point.
-        if (onVerticalBoundary && column > 0 && IsBlocked(column - 1, row)) return false;
-        if (onHorizontalBoundary && row > 0 && IsBlocked(column, row - 1)) return false;
+        if (onVerticalBoundary && column > 0 && IsBlocked(column - 1, row))
+        {
+            return false;
+        }
+
+        if (onHorizontalBoundary && row > 0 && IsBlocked(column, row - 1))
+        {
+            return false;
+        }
+
         if (onVerticalBoundary && onHorizontalBoundary && column > 0 && row > 0
-            && IsBlocked(column - 1, row - 1)) return false;
-        if (IsBlockedAlongPath()) return false;
+            && IsBlocked(column - 1, row - 1))
+        {
+            return false;
+        }
+
+        if (IsBlockedAlongPath())
+        {
+            return false;
+        }
 
         var stepX = Math.Sign(deltaX);
         var stepY = Math.Sign(deltaY);
@@ -246,7 +316,10 @@ internal sealed class GardenObstacles
         {
             var crossesX = stepX != 0 && nextX <= absoluteX;
             var crossesY = stepY != 0 && nextY <= absoluteY;
-            if (!crossesX && !crossesY) break;
+            if (!crossesX && !crossesY)
+            {
+                break;
+            }
 
             // Comparing products avoids division and gives an exact corner comparison for the
             // single-precision input coordinates (their products fit in double precision).
@@ -254,23 +327,39 @@ internal sealed class GardenObstacles
             if (compare < 0)
             {
                 column += stepX;
-                if (IsBlockedAlongPath()) return false;
+                if (IsBlockedAlongPath())
+                {
+                    return false;
+                }
+
                 nextX += Resolution;
             }
             else if (compare > 0)
             {
                 row += stepY;
-                if (IsBlockedAlongPath()) return false;
+                if (IsBlockedAlongPath())
+                {
+                    return false;
+                }
+
                 nextY += Resolution;
             }
             else
             {
                 // At a corner, the segment touches both side cells before entering the diagonal
                 // cell. Reject either side so movement cannot cut between two touching walls.
-                if (IsBlocked(column + stepX, row) || IsBlocked(column, row + stepY)) return false;
+                if (IsBlocked(column + stepX, row) || IsBlocked(column, row + stepY))
+                {
+                    return false;
+                }
+
                 column += stepX;
                 row += stepY;
-                if (IsBlocked(column, row)) return false;
+                if (IsBlocked(column, row))
+                {
+                    return false;
+                }
+
                 nextX += Resolution;
                 nextY += Resolution;
             }
@@ -286,10 +375,22 @@ internal sealed class GardenObstacles
     /// <summary>Moves along the unblocked axis when the direct step enters a thicket, so motes hug the edge.</summary>
     internal Vector2 Constrain(Vector2 from, Vector2 to)
     {
-        if (IsBlocked(from)) return from;
-        if (!IsBlocked(to) && ClearPath(from, to)) return to;
+        if (IsBlocked(from))
+        {
+            return from;
+        }
+
+        if (!IsBlocked(to) && ClearPath(from, to))
+        {
+            return to;
+        }
+
         var slideX = new Vector2(to.X, from.Y);
-        if (!IsBlocked(slideX) && ClearPath(from, slideX)) return slideX;
+        if (!IsBlocked(slideX) && ClearPath(from, slideX))
+        {
+            return slideX;
+        }
+
         var slideY = new Vector2(from.X, to.Y);
         return IsBlocked(slideY) || !ClearPath(from, slideY) ? from : slideY;
     }
@@ -315,7 +416,11 @@ internal sealed class GardenObstacles
                 }
             }
 
-            if (pocket < 0) return;
+            if (pocket < 0)
+            {
+                return;
+            }
+
             Carve(pocket, NearestReachable(pocket, reachable));
         }
     }
@@ -340,9 +445,17 @@ internal sealed class GardenObstacles
 
         void Visit(int column, int row)
         {
-            if (column < 0 || column >= _columns || row < 0 || row >= _rows) return;
+            if (column < 0 || column >= _columns || row < 0 || row >= _rows)
+            {
+                return;
+            }
+
             var cell = (row * _columns) + column;
-            if (reachable[cell] || _field[cell] >= CoverageThreshold) return;
+            if (reachable[cell] || _field[cell] >= CoverageThreshold)
+            {
+                return;
+            }
+
             reachable[cell] = true;
             queue.Enqueue(cell);
         }
@@ -356,12 +469,20 @@ internal sealed class GardenObstacles
         var bestDistance = float.MaxValue;
         for (var cell = 0; cell < _field.Length; cell++)
         {
-            if (!reachable[cell]) continue;
+            if (!reachable[cell])
+            {
+                continue;
+            }
+
             var column = cell % _columns;
             var row = cell / _columns;
             var distance = ((column - pocketColumn) * (column - pocketColumn))
                 + ((row - pocketRow) * (row - pocketRow));
-            if (distance >= bestDistance) continue;
+            if (distance >= bestDistance)
+            {
+                continue;
+            }
+
             best = cell;
             bestDistance = distance;
         }
@@ -385,7 +506,11 @@ internal sealed class GardenObstacles
             Open(column, row);
             Open(column + 1, row);
             Open(column, row + 1);
-            if (column == targetColumn && row == targetRow) return;
+            if (column == targetColumn && row == targetRow)
+            {
+                return;
+            }
+
             var doubled = 2 * error;
             if (doubled > -deltaRow)
             {
@@ -403,7 +528,11 @@ internal sealed class GardenObstacles
 
     private void Open(int column, int row)
     {
-        if (column < 0 || column >= _columns || row < 0 || row >= _rows) return;
+        if (column < 0 || column >= _columns || row < 0 || row >= _rows)
+        {
+            return;
+        }
+
         _field[(row * _columns) + column] = 0;
     }
 

@@ -5,7 +5,7 @@ namespace Systemic.Tests.Kernel;
 public sealed class WorldCommitCallbackTransactionTests
 {
     [Fact]
-    public void Commit_callback_failure_is_distinct_and_leaves_changes_committed()
+    public void CommitCallbackFailureIsDistinctAndLeavesChangesCommitted()
     {
         var world = new World(1, 1);
         var population = world.DefinePopulation<Kind>();
@@ -27,7 +27,7 @@ public sealed class WorldCommitCallbackTransactionTests
     }
 
     [Fact]
-    public void Rollback_callback_failure_remains_a_rollback_failure()
+    public void RollbackCallbackFailureRemainsARollbackFailure()
     {
         var world = new World(1, 1);
         using var transaction = world.BeginTransaction();

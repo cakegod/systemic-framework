@@ -1,3 +1,4 @@
+using System.Globalization;
 using Systemic.Kernel;
 using Systemic.Rules;
 
@@ -5,8 +6,14 @@ namespace Systemic.Tests.Rules;
 
 public sealed class TypedSimulationFactTests
 {
+    private static readonly string[] s_expectedKeys = ["a", "flag", "number", "z"];
+
+    private static readonly int[] s_expectedDepths = [0, 1, 2];
+
+    private static readonly string[] s_expectedTypes = ["hit", "chain", "done"];
+
     [Fact]
-    public void Typed_identifier_matches_authored_rules_and_emitted_facts_keep_position_and_payload()
+    public void TypedIdentifierMatchesAuthoredRulesAndEmittedFactsKeepPositionAndPayload()
     {
         var payload = new SimulationFactPayload([
             new("variant", SimulationFactValue.FromText("spark")),
@@ -23,7 +30,7 @@ public sealed class TypedSimulationFactTests
 
         Assert.Equal(3, trace.Result.FactsProcessed);
         Assert.Equal(2, trace.Result.RulesMatched);
-        Assert.Equal(new[] { "hit", "chain", "done" }, trace.Facts.Select(f => f.Fact.Type));
+        Assert.Equal(s_expectedTypes, trace.Facts.Select(f => f.Fact.Type));
         Assert.Equal(new FactTypeId("hit"), trace.Facts[0].Fact.TypeId);
         Assert.Equal(new FactTypeId("chain"), trace.Facts[1].Fact.TypeId);
         Assert.All(trace.Facts, item =>
@@ -34,11 +41,11 @@ public sealed class TypedSimulationFactTests
             Assert.Equal(1, item.Fact.SourceId);
             Assert.Equal(2, item.Fact.TargetId);
         });
-        Assert.Equal(new[] { 0, 1, 2 }, trace.Facts.Select(f => f.Fact.Depth));
+        Assert.Equal(s_expectedDepths, trace.Facts.Select(f => f.Fact.Depth));
     }
 
     [Fact]
-    public void Identifiers_are_validated_and_compare_ordinally()
+    public void IdentifiersAreValidatedAndCompareOrdinally()
     {
         Assert.Throws<ArgumentException>(() => new FactTypeId(" "));
         Assert.Throws<ArgumentNullException>(() => new FactTypeId(null!));
@@ -48,7 +55,7 @@ public sealed class TypedSimulationFactTests
     }
 
     [Fact]
-    public void Payload_is_canonical_and_copies_the_input()
+    public void PayloadIsCanonicalAndCopiesTheInput()
     {
         var values = new[]
         {
@@ -60,7 +67,7 @@ public sealed class TypedSimulationFactTests
         var payload = new SimulationFactPayload(values);
         values[0] = new("z", SimulationFactValue.FromText("changed"));
 
-        Assert.Equal(new[] { "a", "flag", "number", "z" }, payload.Entries.Select(entry => entry.Key));
+        Assert.Equal(s_expectedKeys, payload.Entries.Select(entry => entry.Key));
         Assert.True(payload.TryGetValue("z", out var text));
         Assert.Equal(SimulationFactValue.FromText("fire"), text);
         Assert.True(payload.TryGetValue("a", out var integer));
@@ -69,7 +76,7 @@ public sealed class TypedSimulationFactTests
     }
 
     [Fact]
-    public void Payload_rejects_unbounded_or_invalid_values()
+    public void PayloadRejectsUnboundedOrInvalidValues()
     {
         Assert.Throws<ArgumentException>(() => new SimulationFactPayload([
             new("same", SimulationFactValue.FromInteger(1)), new("same", SimulationFactValue.FromInteger(2))]));
@@ -77,7 +84,7 @@ public sealed class TypedSimulationFactTests
         Assert.Throws<ArgumentException>(() => new SimulationFactPayload([new(new string('k', 65), SimulationFactValue.FromInteger(1))]));
         Assert.Throws<ArgumentException>(() => new SimulationFactPayload([new("bad", default)]));
         Assert.Throws<ArgumentException>(() => new SimulationFactPayload(
-            Enumerable.Range(0, 17).Select(i => new SimulationFactPayloadEntry(i.ToString(), SimulationFactValue.FromInteger(i)))));
+            Enumerable.Range(0, 17).Select(i => new SimulationFactPayloadEntry(i.ToString(CultureInfo.InvariantCulture), SimulationFactValue.FromInteger(i)))));
         Assert.Throws<ArgumentOutOfRangeException>(() => SimulationFactValue.FromText(new string('x', 257)));
         Assert.Throws<ArgumentOutOfRangeException>(() => SimulationFactValue.FromNumber(double.NaN));
         Assert.Throws<ArgumentOutOfRangeException>(() => SimulationFactValue.FromNumber(double.PositiveInfinity));

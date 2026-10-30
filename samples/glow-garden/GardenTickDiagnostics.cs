@@ -30,17 +30,29 @@ public sealed class GardenTickDiagnostics
 
     public static string FormatWaves(ImmutableArray<ImmutableArray<string>> waves)
     {
-        if (waves.IsDefaultOrEmpty) return "Waves: none";
+        if (waves.IsDefaultOrEmpty)
+        {
+            return "Waves: none";
+        }
+
         var text = new StringBuilder("Waves: ");
         var displayedWaves = Math.Min(MaximumDisplayedWaves, waves.Length);
         for (var index = 0; index < displayedWaves; index++)
         {
-            if (index > 0) text.Append("  |  ");
+            if (index > 0)
+            {
+                text.Append("  |  ");
+            }
+
             text.Append(index).Append(": ");
             var displayedSystems = Math.Min(MaximumDisplayedSystemsPerWave, waves[index].Length);
             for (var systemIndex = 0; systemIndex < displayedSystems; systemIndex++)
             {
-                if (systemIndex > 0) text.Append(", ");
+                if (systemIndex > 0)
+                {
+                    text.Append(", ");
+                }
+
                 text.Append(waves[index][systemIndex]);
             }
             if (waves[index].Length > displayedSystems)
@@ -60,19 +72,27 @@ public sealed class GardenTickDiagnostics
     private static string Format(IReadOnlyList<SystemTickStats> stats)
     {
         ArgumentNullException.ThrowIfNull(stats);
-        if (stats.Count == 0) return "No system ticks measured.";
+        if (stats.Count == 0)
+        {
+            return "No system ticks measured.";
+        }
+
         var text = new StringBuilder("System ms: ");
         var count = Math.Min(MaximumDisplayedSystems, stats.Count);
         for (var index = 0; index < count; index++)
         {
-            if (index > 0) text.Append("  |  ");
+            if (index > 0)
+            {
+                text.Append("  |  ");
+            }
+
             var item = stats[index];
             text.Append(item.SystemId)
                 .Append(" last ").Append(Milliseconds(item.Last))
                 .Append(" mean ").Append(Milliseconds(item.Mean))
                 .Append(" p95 ").Append(Milliseconds(item.P95))
                 .Append(" max ").Append(Milliseconds(item.Max))
-                .Append(" ").Append(item.AllocatedBytes.ToString("N0", CultureInfo.InvariantCulture)).Append(" B")
+                .Append(' ').Append(item.AllocatedBytes.ToString("N0", CultureInfo.InvariantCulture)).Append(" B")
                 .Append(" budget exceeded ").Append(item.BudgetExceededCount.ToString(CultureInfo.InvariantCulture));
         }
 

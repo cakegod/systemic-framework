@@ -79,9 +79,15 @@ public static class DeterministicColumnKernels
                 highSum += high;
             }
             for (var lane = 0; lane < Vector<long>.Count; lane++)
+            {
                 result += lowSum[lane] + highSum[lane];
+            }
         }
-        for (; index < values.Length; index++) result += values[index];
+        for (; index < values.Length; index++)
+        {
+            result += values[index];
+        }
+
         return result;
     }
 
@@ -89,7 +95,10 @@ public static class DeterministicColumnKernels
         where T : unmanaged, IBinaryInteger<T>
     {
         if (left.Length != right.Length)
+        {
             throw new ArgumentException("Input column lengths must match.", nameof(right));
+        }
+
         ValidateDestination(left.Length, destination.Length);
         ValidateBinary(left, right, subtract);
         var target = destination[..left.Length];
@@ -125,7 +134,10 @@ public static class DeterministicColumnKernels
                 var b = new Vector<T>(right.Slice(index, width));
                 var result = subtract ? a - b : a + b;
                 var overflow = subtract ? (a ^ b) & (a ^ result) : (a ^ result) & (b ^ result);
-                if (Vector.LessThanAny(overflow, Vector<T>.Zero)) throw new OverflowException();
+                if (Vector.LessThanAny(overflow, Vector<T>.Zero))
+                {
+                    throw new OverflowException();
+                }
             }
         }
         for (; index < left.Length; index++)
@@ -149,7 +161,9 @@ public static class DeterministicColumnKernels
             }
         }
         for (; index < left.Length; index++)
+        {
             destination[index] = subtract ? unchecked(left[index] - right[index]) : unchecked(left[index] + right[index]);
+        }
     }
 
     private static void ValidateMultiply(ReadOnlySpan<int> values, int factor)
@@ -168,10 +182,15 @@ public static class DeterministicColumnKernels
                 high *= factor64;
                 if (Vector.LessThanAny(low, min) || Vector.GreaterThanAny(low, max)
                     || Vector.LessThanAny(high, min) || Vector.GreaterThanAny(high, max))
+                {
                     throw new OverflowException();
+                }
             }
         }
-        for (; index < values.Length; index++) _ = checked(values[index] * factor);
+        for (; index < values.Length; index++)
+        {
+            _ = checked(values[index] * factor);
+        }
     }
 
     private static void WriteMultiply(ReadOnlySpan<int> values, int factor, Span<int> destination)
@@ -182,15 +201,22 @@ public static class DeterministicColumnKernels
             var width = Vector<int>.Count;
             var multiplier = new Vector<int>(factor);
             for (; index <= values.Length - width; index += width)
+            {
                 (new Vector<int>(values.Slice(index, width)) * multiplier).CopyTo(destination.Slice(index, width));
+            }
         }
-        for (; index < values.Length; index++) destination[index] = unchecked(values[index] * factor);
+        for (; index < values.Length; index++)
+        {
+            destination[index] = unchecked(values[index] * factor);
+        }
     }
 
     private static void ValidateDestination(int inputLength, int destinationLength)
     {
         if (destinationLength < inputLength)
+        {
             throw new ArgumentException("The destination is shorter than the input column.", "destination");
+        }
     }
 
     private static bool RequiresTemporary<T>(ReadOnlySpan<T> source, Span<T> destination) where T : unmanaged
