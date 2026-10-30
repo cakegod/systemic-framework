@@ -2,7 +2,7 @@
 override Systemic.Presentation.UiActionResult.Equals(object? obj) -> bool
 override Systemic.Presentation.UiActionResult.GetHashCode() -> int
 override Systemic.Presentation.UiActionResult.ToString() -> string!
-static Systemic.Presentation.PresentationGameExtensions.InvokeUiAction(this Systemic.Host.SystemicGame! game, string! layoutId, string! actionId, int? choiceOwnerEntityId = null) -> Systemic.Presentation.UiActionResult!
+static Systemic.Presentation.PresentationGameExtensions.InvokeUiAction(this Systemic.Host.SystemicGame! game, string! layoutId, string! actionId, int choiceOwnerEntityId) -> Systemic.Presentation.UiActionResult!
 static Systemic.Presentation.UiActionResult.operator !=(Systemic.Presentation.UiActionResult? left, Systemic.Presentation.UiActionResult? right) -> bool
 static Systemic.Presentation.UiActionResult.operator ==(Systemic.Presentation.UiActionResult? left, Systemic.Presentation.UiActionResult? right) -> bool
 Systemic.Presentation.UiActionResult

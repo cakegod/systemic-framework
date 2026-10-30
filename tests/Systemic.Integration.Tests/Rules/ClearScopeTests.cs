@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Systemic.Content;
 using Systemic.Host;
 using Systemic.Rules;
@@ -64,6 +65,29 @@ public sealed class ClearScopeTests
 
         Assert.Contains(restored.World.Entities, entity => entity.HasTag("scope.run"));
         Assert.Contains(restored.World.Entities, entity => entity.HasTag("scope.meta"));
+
+        // Re-saving the restored world must reproduce the original world section exactly: the codec's
+        // canonical JSON and checksum make that a stronger claim than counting entities. Extension
+        // state is excluded because a rebuilt game registers a fresh clock and rule history.
+        using var reloaded = new SystemicGameBuilder(content, restored).Build();
+        Assert.Equal(JsonNode.Parse(saved)!["world"]!.ToJsonString(),
+            JsonNode.Parse(codec.Save(reloaded))!["world"]!.ToJsonString());
+    }
+
+    [Fact]
+    public void ClearScopeRejectsASubjectBecauseItAddressesTheWholeScope()
+    {
+        using var workspace = new ClearScopeWorkspace();
+
+        var error = Assert.Throws<ContentPackException>(() => workspace.Load("""
+            { "schemaVersion": 2, "rules": [
+              { "id": "run.reset", "on": "run.reset", "priority": 0,
+                "effects": [{ "kind": "clearScope", "tag": "scope.run", "subject": "target" }] }
+            ] }
+            """));
+
+        Assert.Contains("content.schema_invalid", error.Message, StringComparison.Ordinal);
+        Assert.Contains("rules.json", error.Message, StringComparison.Ordinal);
     }
 }
 
@@ -71,7 +95,7 @@ internal sealed class ClearScopeWorkspace : IDisposable
 {
     public string Root { get; } = Directory.CreateTempSubdirectory("systemic-clear-scope-").FullName;
 
-    public ContentPack Load()
+    public ContentPack Load(string? rules = null)
     {
         File.WriteAllText(Path.Combine(Root, "game.json"), """
             { "schemaVersion": 3, "id": "sample.clear-scope", "name": "Clear scope",
@@ -84,7 +108,7 @@ internal sealed class ClearScopeWorkspace : IDisposable
               { "id": "scope.summon", "kind": "product", "tags": ["scope.session"], "properties": { "life": 1 } }
             ] }
             """);
-        File.WriteAllText(Path.Combine(Root, "rules.json"), """
+        File.WriteAllText(Path.Combine(Root, "rules.json"), rules ?? """
             { "schemaVersion": 2, "rules": [
               { "id": "run.reset", "on": "run.reset", "priority": 0,
                 "effects": [{ "kind": "clearScope", "tag": "scope.run" }] },

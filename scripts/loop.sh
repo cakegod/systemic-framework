@@ -2,9 +2,15 @@
 # Local verification loop.
 #
 # Fast path (inner loop): builds only the test project and its dependencies with analyzers
-# off, then runs one test class without rebuilding. Roughly 10s cold, 2s warm.
+# off, then runs one test class without rebuilding. Measured here at 2.6s build and 2.6s test
+# when the tree is warm. Formatting is deliberately not part of this path: a scoped format
+# verify costs about 16s and a solution-wide one about 78s, which is 75 percent of an iteration.
 #
 #   scripts/loop.sh tests/Systemic.Integration.Tests QueryConditionTests
+#
+# Format check only, scoped to the files this branch changes (opt in when you want it):
+#
+#   scripts/loop.sh --format [project]
 #
 # Full gate (before a commit): whole-solution build with analyzers, every test, formatting.
 #
@@ -12,6 +18,18 @@
 set -euo pipefail
 
 project="${1:-tests/Systemic.Integration.Tests}"
+
+if [ "$project" = "--format" ]; then
+    target="${2:-tests/Systemic.Integration.Tests}"
+    mapfile -t changed < <(git diff --name-only --diff-filter=ACM origin/main -- '*.cs')
+    if [ "${#changed[@]}" -eq 0 ]; then
+        echo 'loop: no changed C# files to format'
+        exit 0
+    fi
+
+    dotnet format "$target" --verify-no-changes --no-restore --include "${changed[@]}"
+    exit
+fi
 
 if [ "$project" = "--full" ]; then
     dotnet build Systemic.sln --configuration Release
@@ -27,12 +45,4 @@ if [ -n "$filter" ]; then
     dotnet test "$project" --configuration Release --no-build --filter "FullyQualifiedName~$filter"
 else
     dotnet test "$project" --configuration Release --no-build
-fi
-
-# Format only the files this branch changes, inside the project being iterated. A solution-wide
-# verify spends nearly all of its time loading projects: measured here at 78 seconds, against about
-# 16 for this scoped check, which still catches the file actually being edited.
-mapfile -t changed < <(git diff --name-only --diff-filter=ACM origin/main -- '*.cs')
-if [ "${#changed[@]}" -gt 0 ]; then
-    dotnet format "$project" --verify-no-changes --no-restore --include "${changed[@]}"
 fi

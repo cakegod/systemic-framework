@@ -48,11 +48,57 @@ public sealed class UiActionTests
         WriteContent(pack.Root, AdjustHeatRule, "<<buy>>");
         var content = ContentPackLoader.Load(pack.Root,
             new ContentModuleRegistry().Add(new PresentationContentModule()));
-        var game = new SystemicGameBuilder(content, content.CreateWorld(seed: 24, valueScale: 1)).Build();
+        var materialized = content.CreateWorld(seed: 24, valueScale: 1);
+        var game = new SystemicGameBuilder(content, materialized).Build();
 
-        var exception = Assert.Throws<KeyNotFoundException>(() => game.InvokeUiAction("hud", "ui.missing"));
+        var exception = Assert.Throws<KeyNotFoundException>(() =>
+            game.InvokeUiAction("hud", "ui.missing", materialized.EntityIds["actor"]));
 
         Assert.Contains("ui.missing", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InvokeUiActionReportsUnhandledWhenNoRuleMatchesTheAction()
+    {
+        using var pack = PresentationPack.Create();
+        WriteContent(pack.Root, """
+            { "schemaVersion": 2, "rules": [
+              { "id": "ui.other", "on": "ui.other", "priority": 0,
+                "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "heat", "amount": 1 }] }
+            ] }
+            """, "<<buy>>");
+        var content = ContentPackLoader.Load(pack.Root,
+            new ContentModuleRegistry().Add(new PresentationContentModule()));
+        var materialized = content.CreateWorld(seed: 26, valueScale: 1);
+        var game = new SystemicGameBuilder(content, materialized).Build();
+
+        var result = game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"]);
+
+        Assert.False(result.Handled);
+        Assert.False(result.RolledBack);
+        Assert.Equal(2, game.EvaluateUi("hud").Children[0].NumberValue);
+    }
+
+    [Fact]
+    public void InvokeUiActionReportsUnhandledWhenTheRuleConditionFails()
+    {
+        using var pack = PresentationPack.Create();
+        WriteContent(pack.Root, """
+            { "schemaVersion": 2, "rules": [
+              { "id": "ui.buy", "on": "ui.buy", "priority": 0,
+                "when": [{ "kind": "hasTag", "subject": "target", "tag": "missing" }],
+                "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "heat", "amount": 1 }] } ] }
+            """, "<<buy>>");
+        var content = ContentPackLoader.Load(pack.Root,
+            new ContentModuleRegistry().Add(new PresentationContentModule()));
+        var materialized = content.CreateWorld(seed: 26, valueScale: 1);
+        var game = new SystemicGameBuilder(content, materialized).Build();
+
+        var result = game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"]);
+
+        Assert.False(result.Handled);
+        Assert.False(result.RolledBack);
+        Assert.Equal(2, game.EvaluateUi("hud").Children[0].NumberValue);
     }
 
     [Fact]

@@ -60,13 +60,18 @@ public static class PresentationGameExtensions
 
     /// <summary>
     /// Publishes a UI action as one fact, so a click travels the same deterministic dispatch path
-    /// as any other event. The action must be declared by the layout it is invoked on.
+    /// as any other event. The action must be declared by the layout it is invoked on, and the
+    /// owning entity is required so a rule authored on the action id has a subject.
     /// </summary>
+    /// <remarks>
+    /// <see cref="UiActionResult.Handled"/> is true only when at least one rule matched, so a layout
+    /// that declares an action no rule listens for reports <c>false</c> instead of a silent success.
+    /// </remarks>
     public static UiActionResult InvokeUiAction(
         this SystemicGame game,
         string layoutId,
         string actionId,
-        int? choiceOwnerEntityId = null)
+        int choiceOwnerEntityId)
     {
         ArgumentNullException.ThrowIfNull(game);
         ArgumentNullException.ThrowIfNull(actionId);
@@ -81,10 +86,10 @@ public static class PresentationGameExtensions
 
         // The action id is the fact type, the owning choice entity is both source and target, and the
         // button's buy amount travels on the fact, so a rule can scale by the quantity the player
-        // chose. Without an owner the fact addresses no entity, so only global rules react.
-        var ownerId = choiceOwnerEntityId ?? 0;
-        var dispatch = game.Publish(new SimulationFact(actionId, ownerId, ownerId, Amount: node.Amount ?? 0));
-        return new UiActionResult(layoutId, actionId, Handled: true, dispatch.RolledBack);
+        // chose. The owner is required: a fact aimed at entity 0 would match no entity-addressed rule.
+        var dispatch = game.Publish(new SimulationFact(actionId, choiceOwnerEntityId, choiceOwnerEntityId,
+            Amount: node.Amount ?? 0));
+        return new UiActionResult(layoutId, actionId, Handled: dispatch.RulesMatched > 0, dispatch.RolledBack);
     }
 
     private static UiNode? FindAction(UiNode node, string actionId)

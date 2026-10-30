@@ -13,6 +13,7 @@
     "layout": { "type": "object", "additionalProperties": false, "required": ["id", "root"],
       "properties": { "id": { "$ref": "#/$defs/id" }, "root": { "$ref": "#/$defs/node" } } },
     "node": { "type": "object", "additionalProperties": false, "required": ["type"],
+      "description": "A toggle node reads its binding as a boolean: a value above 0.5 is on. A button may carry a buy amount.",
       "properties": {
         "type": { "type": "string" },
         "text": { "type": "string" },

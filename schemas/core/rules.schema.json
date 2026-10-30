@@ -177,7 +177,13 @@
         { "if": { "properties": { "kind": { "const": "spawn" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["template"] } },
         { "if": { "properties": { "kind": { "const": "schedule" } }, "required": ["kind"] }, "then": { "required": ["event", "delayTicks"] } },
         { "if": { "properties": { "kind": { "const": "action" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["action"] } },
-        { "if": { "properties": { "kind": { "const": "clearScope" } }, "required": ["kind"] }, "then": { "required": ["tag"] } }
+        { "if": { "properties": { "kind": { "const": "clearScope" } }, "required": ["kind"] },
+          "then": { "required": ["tag"],
+            "not": { "anyOf": [
+              { "required": ["subject"] },
+              { "required": ["row"] },
+              { "required": ["factRow"] }
+            ] } } }
       ]
     }
   }
