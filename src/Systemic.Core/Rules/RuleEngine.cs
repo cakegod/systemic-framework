@@ -123,11 +123,6 @@ public sealed class RuleEngine
     private const int MaximumCooldownEntries = 100_000;
     private readonly List<ScheduledFactEntry> _scheduled = [];
     private long _scheduledSequence;
-    // The world and due tick the engine last expired timed state for, so a fast-forward expires state
-    // that online stepping would have removed before the fact ran. The world is part of the cache key
-    // because rollback netcode dispatches the same engine into cloned worlds.
-    private World? _modifierExpiredWorld;
-    private int _modifierExpiredTick = int.MinValue;
     private readonly Dictionary<(string Rule, int Source, int Target), int> _lastRuleFire = [];
     private readonly List<CooldownChange> _cooldownChanges = [];
     private bool _factBudgetExceeded;
@@ -1968,14 +1963,12 @@ public sealed class RuleEngine
                 // Expire timed state as of the tick before the fact, so an effect stays active through
                 // its last tick exactly as it does when the clock advances one tick at a time. The
                 // clock is already at the later tick, so the due tick decides, not the previous one.
-                if (dueTick > 0 && (dueTick != _modifierExpiredTick
-                    || !ReferenceEquals(world, _modifierExpiredWorld)))
+                if (dueTick > 0 && dueTick != expiredTick)
                 {
                     world.LogicalTick = dueTick - 1;
                     world.AdvanceModifiers();
                     world.LogicalTick = dueTick;
-                    _modifierExpiredWorld = world;
-                    _modifierExpiredTick = dueTick;
+                    expiredTick = dueTick;
                 }
 
                 Dispatch(world, due.Fact, beforeEachFact);
@@ -2044,7 +2037,6 @@ public sealed class RuleEngine
 
         _scheduled.Clear();
         _scheduledSequence = 0;
-        _modifierExpiredTick = int.MinValue;
         foreach (var state in restored)
         {
             var fact = new SimulationFact(state.Type, state.SourceId, state.TargetId, state.Depth, state.Amount,
