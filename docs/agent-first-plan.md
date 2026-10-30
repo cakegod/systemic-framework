@@ -365,7 +365,7 @@ aggregate, and formula conditions. The next slice is 1.4 effects.
 | 1.7 | Time: tick, schedule, delay, cooldown, and deterministic fast-forward | Eight hours of fast-forward matches online within one percent |
 | 1.8 | Generic UI binding: lists, toggles, costs, cooldowns, tooltips, buy amounts, and actions | A choice list and an upgrade list use the same widgets |
 | 1.9 | Generic save: scopes, state graph, migration, content fingerprint | Save and load across a reset and a content change |
-| 1.10 | Pattern pack: producer, upgrade, talent, merge, prestige, worker, offline, status, unlock, all content | Each pattern has a minimal example and a test |
+| 1.10 | Pattern pack: producer, upgrade, talent, merge, prestige, worker, offline, status, unlock | Eight fragments each with a minimal example and a test; offline is host catch-up over the same rules, with no offline content |
 | 1.11 | Port all 41 talents as tags and rules, one file per group plus default | 41/41, each at most 12 behavior lines, zero C# |
 | 1.12 | One headless test per talent, positive and negative | 41 tests green; each names the talent |
 | 1.13 | Asset DSL: primitives, outline, shading, gradient, dither, symmetry, parts, frames, atlas metadata | The target recipe compiles |

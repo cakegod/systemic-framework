@@ -1,24 +1,28 @@
 {
   "schemaVersion": 2,
   "rules": [],
-  "schedules": [
-    {
-      "id": "pattern.producer.pulse",
-      "event": "pattern.produce",
-      "everyTicks": 60,
-      "sourceEntityId": "pattern.drill",
-      "targetEntityId": "pattern.ore"
-    }
-  ],
-  "bundles": [
-    { "id": "pattern.talent.echo", "enabledByTag": "pattern.talent.echo" }
+  "facts": [
+    { "id": "pattern.produce" },
+    { "id": "pattern.buy.upgrade" },
+    { "id": "pattern.merge" },
+    { "id": "pattern.prestige" },
+    { "id": "pattern.prestige.settled" },
+    { "id": "pattern.workers.worked" },
+    { "id": "pattern.status.apply" },
+    { "id": "pattern.unlock" }
   ],
   "fragments": [
     {
       "id": "pattern.producer",
+      "schedules": [
+        {
+          "id": "pattern.producer.pulse", "event": "pattern.produce", "everyTicks": 60,
+          "sourceEntityId": "pattern.drill", "targetEntityId": "pattern.ore"
+        }
+      ],
       "rules": [
         {
-          "id": "pattern.producer.produces", "on": "pattern.produce", "priority": 10,
+          "id": "produces", "on": "pattern.produce", "priority": 10,
           "when": [
             { "kind": "hasTag", "subject": "source", "tag": "pattern.producer" },
             { "kind": "hasTag", "subject": "target", "tag": "pattern.resource" }
@@ -29,7 +33,7 @@
           ]
         },
         {
-          "id": "pattern.producer.ranked-rate", "on": "pattern.produce", "priority": 5,
+          "id": "ranked-rate", "on": "pattern.produce", "priority": 5,
           "when": [
             { "kind": "hasTag", "subject": "source", "tag": "pattern.producer" },
             { "kind": "expression", "expression": "source.rate >= 2" }
@@ -42,8 +46,12 @@
       "id": "pattern.upgrade",
       "rules": [
         {
-          "id": "pattern.upgrade.buys", "on": "pattern.buy.upgrade", "priority": 10,
-          "when": [{ "kind": "propertyAtLeast", "subject": "source", "property": "balance", "value": 5 }],
+          "id": "buys", "on": "pattern.buy.upgrade", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "pattern.currency" },
+            { "kind": "hasTag", "subject": "target", "tag": "pattern.producer" },
+            { "kind": "propertyAtLeast", "subject": "source", "property": "balance", "value": 5 }
+          ],
           "effects": [
             { "kind": "adjustProperty", "subject": "source", "property": "balance", "amount": -5 },
             { "kind": "adjustProperty", "subject": "target", "property": "rank", "amount": 1 },
@@ -57,9 +65,12 @@
     },
     {
       "id": "pattern.talent",
+      "bundles": [
+        { "id": "pattern.talent.echo", "enabledByTag": "pattern.talent.echo" }
+      ],
       "rules": [
         {
-          "id": "pattern.talent.echo.boost", "on": "pattern.produce", "bundle": "pattern.talent.echo",
+          "id": "echo.boost", "on": "pattern.produce", "bundle": "pattern.talent.echo",
           "priority": 20,
           "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 2 }]
         }
@@ -69,13 +80,31 @@
       "id": "pattern.merge",
       "rules": [
         {
-          "id": "pattern.merge.combines", "on": "pattern.merge", "priority": 10,
+          "id": "tier-one", "on": "pattern.merge", "priority": 10,
           "when": [
             { "kind": "hasTag", "subject": "source", "tag": "pattern.mergeable" },
-            { "kind": "hasTag", "subject": "target", "tag": "pattern.mergeable" }
+            { "kind": "hasTag", "subject": "target", "tag": "pattern.mergeable" },
+            { "kind": "expression", "expression": "source.id != target.id" },
+            { "kind": "expression", "expression": "source.tier == target.tier" },
+            { "kind": "expression", "expression": "source.tier == 1" }
           ],
           "effects": [
             { "kind": "spawn", "subject": "target", "template": "pattern.fruit.high" },
+            { "kind": "despawn", "subject": "source" },
+            { "kind": "despawn", "subject": "target" }
+          ]
+        },
+        {
+          "id": "tier-two", "on": "pattern.merge", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "pattern.mergeable" },
+            { "kind": "hasTag", "subject": "target", "tag": "pattern.mergeable" },
+            { "kind": "expression", "expression": "source.id != target.id" },
+            { "kind": "expression", "expression": "source.tier == target.tier" },
+            { "kind": "expression", "expression": "source.tier == 2" }
+          ],
+          "effects": [
+            { "kind": "spawn", "subject": "target", "template": "pattern.fruit.top" },
             { "kind": "despawn", "subject": "source" },
             { "kind": "despawn", "subject": "target" }
           ]
@@ -86,15 +115,23 @@
       "id": "pattern.prestige",
       "rules": [
         {
-          "id": "pattern.prestige.grants", "on": "pattern.prestige", "priority": 20,
+          "id": "grants", "on": "pattern.prestige", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "scope.run" },
+            { "kind": "hasTag", "subject": "target", "tag": "scope.meta" },
+            { "kind": "propertyAtLeast", "subject": "source", "property": "earned", "value": 10 }
+          ],
           "effects": [
-            { "kind": "transfer", "subject": "source", "property": "earned", "amount": 10, "targetProperty": "shards" },
+            {
+              "kind": "transfer", "subject": "source", "property": "earned",
+              "targetProperty": "shards", "basisPoints": 1000
+            },
             { "kind": "adjustProperty", "subject": "target", "property": "prestiges", "amount": 1 },
             { "kind": "emitEvent", "event": "pattern.prestige.settled" }
           ]
         },
         {
-          "id": "pattern.prestige.clears", "on": "pattern.prestige.settled", "priority": 10,
+          "id": "clears", "on": "pattern.prestige.settled", "priority": 10,
           "effects": [{ "kind": "clearScope", "tag": "scope.run" }]
         }
       ]
@@ -103,8 +140,17 @@
       "id": "pattern.worker",
       "rules": [
         {
-          "id": "pattern.worker.paid", "on": "pattern.workers.worked", "priority": 10,
-          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 1 }]
+          "id": "paid", "on": "pattern.workers.worked", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "factRow": "sample.pattern-pack.worker", "tag": "pattern.worker" },
+            { "kind": "expression", "expression": "event.amount >= 1" }
+          ],
+          "effects": [
+            {
+              "kind": "adjustProperty", "factRow": "sample.pattern-pack.worker",
+              "property": "mined", "amount": 1
+            }
+          ]
         }
       ]
     },
@@ -112,7 +158,7 @@
       "id": "pattern.status",
       "rules": [
         {
-          "id": "pattern.status.haste", "on": "pattern.status.apply", "priority": 10,
+          "id": "haste", "on": "pattern.status.apply", "priority": 10,
           "effects": [
             {
               "kind": "setModifier", "subject": "target", "property": "rate", "operation": "multiply",
@@ -126,22 +172,13 @@
       "id": "pattern.unlock",
       "rules": [
         {
-          "id": "pattern.unlock.opens", "on": "pattern.unlock", "priority": 10,
+          "id": "opens", "on": "pattern.unlock", "priority": 10,
           "effects": [{ "kind": "addTag", "subject": "target", "tag": "pattern.unlocked" }]
         },
         {
-          "id": "pattern.unlock.produces", "on": "pattern.produce", "priority": 30,
+          "id": "produces", "on": "pattern.produce", "priority": 30,
           "when": [{ "kind": "hasTag", "subject": "source", "tag": "pattern.unlocked" }],
           "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 1 }]
-        }
-      ]
-    },
-    {
-      "id": "pattern.offline",
-      "rules": [
-        {
-          "id": "pattern.offline.catch-up", "on": "pattern.offline.catchup", "priority": 10,
-          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 60 }]
         }
       ]
     }
@@ -154,7 +191,6 @@
     "pattern.prestige",
     "pattern.worker",
     "pattern.status",
-    "pattern.unlock",
-    "pattern.offline"
+    "pattern.unlock"
   ]
 }

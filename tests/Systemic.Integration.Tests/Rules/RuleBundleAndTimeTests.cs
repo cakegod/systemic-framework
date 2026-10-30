@@ -192,6 +192,161 @@ public sealed class RuleBundleAndTimeTests
         Assert.Equal(0, world.EffectiveProperty(actor, "score"));
     }
 
+    [Fact]
+    public void AFragmentCarriesTheBundleAndScheduleItsRulesNeed()
+    {
+        using var workspace = new RuleJsonWorkspace(
+            rules: """
+                {
+                  "schemaVersion": 2,
+                  "rules": [],
+                  "fragments": [
+                    {
+                      "id": "pattern.producer",
+                      "schedules": [{ "id": "pattern.producer.pulse", "event": "produce", "everyTicks": 2,
+                        "targetEntityId": "actor.machine" }],
+                      "bundles": [{ "id": "pattern.producer.boost", "enabledByTag": "pattern.producer.boost" }],
+                      "rules": [
+                        { "id": "pattern.producer.produces", "on": "produce", "priority": 0,
+                          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "score", "amount": 1 }] },
+                        { "id": "pattern.producer.boosted", "on": "produce", "priority": 1,
+                          "bundle": "pattern.producer.boost",
+                          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "score", "amount": 2 }] }
+                      ]
+                    }
+                  ],
+                  "useFragments": ["pattern.producer"]
+                }
+                """,
+            entities: """
+                {
+                  "schemaVersion": 2,
+                  "entities": [ { "id": "actor.machine", "kind": "prop", "tags": ["pattern.producer.boost"],
+                    "properties": { "score": 0 } } ]
+                }
+                """);
+        var content = workspace.Load();
+
+        // Copying the fragment alone keeps the pulse and the bundle that its rules depend on.
+        Assert.Single(content.Rules.Schedules);
+        Assert.Equal("pattern.producer.boost", content.Rules.Bundles["pattern.producer.boost"]);
+
+        var materialized = content.CreateWorld(seed: 7, valueScale: 1);
+        var world = materialized.World;
+        var machine = world.ById(materialized.EntityIds["actor.machine"])!;
+        var engine = new RuleEngine(content.Rules);
+        machine.RemoveTag("pattern.producer.boost");
+
+        engine.Dispatch(world, new SimulationFact("produce", machine.Id, machine.Id));
+        Assert.Equal(1, world.EffectiveProperty(machine, "score"));
+
+        machine.AddTag("pattern.producer.boost");
+        engine.Dispatch(world, new SimulationFact("produce", machine.Id, machine.Id));
+        Assert.Equal(4, world.EffectiveProperty(machine, "score"));
+    }
+
+    [Fact]
+    public void ATransferShareMovesWholeBasisPointsAndKeepsTheRest()
+    {
+        using var workspace = new RuleJsonWorkspace(
+            rules: """
+                {
+                  "schemaVersion": 2,
+                  "rules": [
+                    { "id": "bank.deposit", "on": "bank.deposit", "priority": 0,
+                      "effects": [{ "kind": "transfer", "subject": "source", "property": "earned",
+                        "targetProperty": "shards", "basisPoints": 2900 }] }
+                  ]
+                }
+                """,
+            entities: """
+                {
+                  "schemaVersion": 2,
+                  "entities": [
+                    { "id": "bank.run", "kind": "prop", "properties": { "earned": 100 } },
+                    { "id": "bank.meta", "kind": "prop", "properties": { "shards": 0 } }
+                  ]
+                }
+                """);
+        var content = workspace.Load();
+        var materialized = content.CreateWorld(seed: 8, valueScale: 1);
+        var world = materialized.World;
+        var run = world.ById(materialized.EntityIds["bank.run"])!;
+        var meta = world.ById(materialized.EntityIds["bank.meta"])!;
+        var engine = new RuleEngine(content.Rules);
+
+        engine.Dispatch(world, new SimulationFact("bank.deposit", run.Id, meta.Id));
+
+        // 2,900 basis points of 100 is 29 whole shards. The same share as the binary fraction 0.29
+        // would round down to 28, which is why the primitive takes an integer share.
+        Assert.Equal(29, world.EffectiveProperty(meta, "shards"));
+        Assert.Equal(71, world.EffectiveProperty(run, "earned"));
+    }
+
+    [Theory]
+    [InlineData("""{ "kind": "transfer", "subject": "source", "property": "earned", "targetProperty": "shards", "basisPoints": 0 }""")]
+    [InlineData("""{ "kind": "transfer", "subject": "source", "property": "earned", "targetProperty": "shards", "basisPoints": 10001 }""")]
+    [InlineData("""{ "kind": "transfer", "subject": "source", "property": "earned", "targetProperty": "shards", "amount": 1, "basisPoints": 100 }""")]
+    public void ATransferShareOutsideTheContractIsRejectedAtLoad(string effect)
+    {
+        using var workspace = new RuleJsonWorkspace(
+            rules: $$"""
+                {
+                  "schemaVersion": 2,
+                  "rules": [
+                    { "id": "bank.deposit", "on": "bank.deposit", "priority": 0,
+                      "effects": [{{effect}}] }
+                  ]
+                }
+                """,
+            entities: """
+                {
+                  "schemaVersion": 2,
+                  "entities": [
+                    { "id": "bank.run", "kind": "prop", "properties": { "earned": 100 } },
+                    { "id": "bank.meta", "kind": "prop", "properties": { "shards": 0 } }
+                  ]
+                }
+                """);
+
+        var error = Assert.Throws<ContentPackException>(() => workspace.Load());
+
+        Assert.Contains("effects[0]", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AFragmentCannotUseAnotherFragmentsBundle()
+    {
+        using var workspace = new RuleJsonWorkspace(
+            rules: """
+                {
+                  "schemaVersion": 2,
+                  "rules": [],
+                  "fragments": [
+                    { "id": "pattern.one",
+                      "bundles": [{ "id": "pattern.one.boost", "enabledByTag": "pattern.one.boost" }],
+                      "rules": [] },
+                    { "id": "pattern.two", "rules": [
+                      { "id": "borrow", "on": "pulse", "priority": 0, "bundle": "pattern.one.boost",
+                        "effects": [{ "kind": "adjustProperty", "subject": "target",
+                                       "property": "score", "amount": 1 }] }
+                    ] }
+                  ],
+                  "useFragments": ["pattern.one", "pattern.two"]
+                }
+                """,
+            entities: """
+                {
+                  "schemaVersion": 2,
+                  "entities": [{ "id": "actor.one", "kind": "actor", "properties": { "score": 0 } }]
+                }
+                """);
+
+        var error = Assert.Throws<ContentPackException>(() => workspace.Load());
+
+        Assert.Contains("does not declare", error.Message, StringComparison.Ordinal);
+    }
+
     private static (World World, RuleEngine Engine, Entity Score) CreateDelayedChain()
     {
         var world = new World(seed: 4, valueScale: 1);

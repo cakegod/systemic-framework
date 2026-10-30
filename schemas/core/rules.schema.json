@@ -84,6 +84,8 @@
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "rules": { "type": "array", "maxItems": 16384, "items": { "$ref": "#/$defs/rule" } },
+        "schedules": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/schedule" } },
+        "bundles": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/bundle" } },
         "useFragments": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/id" } }
       }
     },
@@ -153,6 +155,7 @@
         "property": { "type": "string", "pattern": "\\S" },
         "targetProperty": { "type": "string", "pattern": "\\S" },
         "amount": { "type": "number" },
+        "basisPoints": { "type": "integer", "minimum": 1, "maximum": 10000 },
         "quantity": { "enum": ["add", "set", "multiply", "min", "max"] },
         "tag": { "type": "string", "pattern": "\\S" },
         "event": { "$ref": "#/$defs/id" },
@@ -173,7 +176,12 @@
         { "if": { "properties": { "kind": { "const": "removeTag" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["tag"] } },
         { "if": { "properties": { "kind": { "const": "emitEvent" } }, "required": ["kind"] }, "then": { "required": ["event"] } },
         { "if": { "properties": { "kind": { "const": "despawn" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm" } },
-        { "if": { "properties": { "kind": { "const": "transfer" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["property", "amount"] } },
+        { "if": { "properties": { "kind": { "const": "transfer" } }, "required": ["kind"] },
+          "then": { "$ref": "#/$defs/subjectForm", "required": ["property"],
+            "oneOf": [
+              { "required": ["amount"], "not": { "required": ["basisPoints"] } },
+              { "required": ["basisPoints"], "not": { "required": ["amount"] } }
+            ] } },
         { "if": { "properties": { "kind": { "const": "spawn" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["template"] } },
         { "if": { "properties": { "kind": { "const": "schedule" } }, "required": ["kind"] }, "then": { "required": ["event", "delayTicks"] } },
         { "if": { "properties": { "kind": { "const": "action" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["action"] } },

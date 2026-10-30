@@ -1837,8 +1837,13 @@ public sealed class RuleEngine
             return;
         }
 
-        // A transfer moves what is there and no more, so content never has to guard the amount.
-        var moved = Math.Min(effect.Value, Math.Max(available, 0));
+        // A transfer moves what is there and no more, so content never has to guard the amount. A
+        // share scales with the source in whole basis points, then floors: 2,900 basis points of 100
+        // is 29, where the binary fraction 0.29 would round down to 28.
+        var movable = double.IsFinite(available) ? Math.Max(available, 0) : 0;
+        var moved = effect.ShareBasisPoints is { } basisPoints
+            ? (double)Math.Floor((decimal)movable * basisPoints / 10_000m)
+            : Math.Min(effect.Value, movable);
         if (moved <= 0)
         {
             return;
