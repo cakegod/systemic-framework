@@ -1345,6 +1345,16 @@ public sealed class RuleEngine
 
                 if (query.Formula is { } formula)
                 {
+                    // A count or sum has a value without a distance: the origin or the matches may
+                    // have no bounds. An expression cannot carry that missing distance as a number,
+                    // so a formula that reads it fails here instead of aborting the whole dispatch.
+                    // Formulas that never mention query.nearest still run.
+                    if (!double.IsFinite(result.NearestDistance)
+                        && formula.ReferencesNumber("query.nearest"))
+                    {
+                        return false;
+                    }
+
                     if (!formula.EvaluateBoolean(new QueryExpressionScope(world, fact, this, result)))
                     {
                         return false;

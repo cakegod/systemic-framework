@@ -52,6 +52,21 @@ public sealed class CompiledExpression
 
     internal int MaximumEventWindowTicks { get; }
 
+    /// <summary>Gets whether the expression reads one named number from its scope.</summary>
+    internal bool ReferencesNumber(string name)
+    {
+        foreach (var instruction in _instructions)
+        {
+            if (instruction.Code == ExpressionOpCode.ReadNumber
+                && string.Equals(instruction.Text, name, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public double EvaluateNumber(IExpressionScope scope)
     {
         var value = Evaluate(scope);

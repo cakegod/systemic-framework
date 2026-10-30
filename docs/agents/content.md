@@ -132,7 +132,9 @@ expression values such as `tick` and `source.<property>`.
 The spatial filter uses the selected origin entity's bounds. An entity without bounds
 matches no range query. `limit` applies after ordering. A non-count aggregate over an
 empty selection fails the condition, so `query.matched` distinguishes zero from a
-real zero sum.
+real zero sum. An origin or a match without bounds has no distance, so a formula that
+reads `query.nearest` fails the condition instead of aborting the dispatch; formulas
+that read only `query.count` or `query.value` still run.
 
 ## Effects
 
