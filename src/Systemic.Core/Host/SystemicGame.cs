@@ -899,7 +899,10 @@ public sealed class SystemicGame : IDisposable
         DispatchDeferredFacts();
         // Delayed facts belong to the tick that reached their due tick, with the same observers and
         // the same enclosing transaction as any other fact this tick dispatches.
-        _contentRules.DispatchDue(World, CombineFactObservers(null));
+        if (_contentRules.HasScheduledFacts)
+        {
+            _contentRules.DispatchDue(World, CombineFactObservers(null));
+        }
 
         World.AdvanceModifiers();
     }

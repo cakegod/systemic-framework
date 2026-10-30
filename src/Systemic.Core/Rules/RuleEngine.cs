@@ -1873,6 +1873,9 @@ public sealed class RuleEngine
             _scheduledSequence++, scheduled));
     }
 
+    /// <summary>Gets whether any delayed fact is waiting.</summary>
+    internal bool HasScheduledFacts => _scheduled.Count > 0;
+
     /// <summary>Dispatches the scheduled facts whose delay has elapsed at the world's logical tick.</summary>
     /// <param name="world">World whose logical tick decides which facts are due.</param>
     /// <returns>The number of facts dispatched.</returns>
