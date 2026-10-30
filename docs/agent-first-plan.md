@@ -2,6 +2,7 @@
 
 Status: Phase 0 complete; Phase 1 in progress  
 Date: 2026-10-30  
+Execution checklist: [phase-1-checklist.md](phase-1-checklist.md)
 Scope: one developer, one repository, no external users.  
 Target: Gnorp-like and Idle Colony-like games built from general mechanics, plus a second game with different mechanics to prove the framework did not bake the genre in.
 
@@ -350,7 +351,8 @@ Goal: the rule model can express producers, upgrades, talents, merges, prestige,
 Started 2026-10-30: 1.1 audit is recorded in
 [`phase-1-incremental-audit.md`](phase-1-incremental-audit.md). 1.2 is implemented for
 declared facts with typed payloads, including payloads on emitted and scheduled facts.
-The next slice is 1.3 queries.
+1.3 is implemented as a bounded entity selector with tag, property, spatial, nearest,
+aggregate, and formula conditions. The next slice is 1.4 effects.
 
 | ID | Work | Acceptance evidence |
 | --- | --- | --- |

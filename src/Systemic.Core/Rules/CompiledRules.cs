@@ -107,6 +107,7 @@ public enum RuleConditionKind
     PropertyAtLeast,
     Expression,
     Chance,
+    Query,
 }
 
 public enum RuleEffectKind
@@ -149,6 +150,14 @@ public readonly record struct RuleCondition(
         }
 
         return new(RuleConditionKind.Expression, RuleSubject.Target, string.Empty, 0, formula);
+    }
+
+    internal CompiledQuery? Query { get; init; }
+
+    internal static RuleCondition FromQuery(CompiledQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        return new(RuleConditionKind.Query, RuleSubject.Target, string.Empty, 0) { Query = query };
     }
 }
 
@@ -224,8 +233,9 @@ public sealed class CompiledRuleSet
         _byEvent = Rules.GroupBy(rule => rule.EventType, StringComparer.Ordinal)
             .ToImmutableDictionary(group => group.Key, group => group.ToImmutableArray(), StringComparer.Ordinal);
         var formulas = Rules.SelectMany(rule => rule.Conditions)
-            .Where(condition => condition.Formula is not null)
-            .Select(condition => condition.Formula!)
+            .SelectMany(condition => condition.Formula is { } formula ? [formula]
+                : condition.Query?.Formula is { } queryFormula ? [queryFormula]
+                : Array.Empty<CompiledExpression>())
             .ToArray();
         EventTypes = [.. formulas.SelectMany(formula => formula.EventTypes)
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];

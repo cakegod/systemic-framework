@@ -246,6 +246,10 @@ public sealed class RuleEngine
                     case RuleConditionKind.HasTag:
                         BindTag(world, rowBindings, rule, condition.Subject, condition.Name);
                         break;
+                    case RuleConditionKind.Query:
+                        throw new InvalidOperationException(
+                            $"Rule '{rule.Id}' applies a query condition to {condition.Subject}; "
+                            + "queries select entities and cannot be addressed to a population row.");
                     default:
                         throw new InvalidOperationException(
                             $"Rule '{rule.Id}' uses a {condition.Kind} condition on {condition.Subject}; "
@@ -1217,6 +1221,30 @@ public sealed class RuleEngine
     {
         foreach (var condition in rule.Conditions)
         {
+            if (condition.Kind == RuleConditionKind.Query)
+            {
+                if (condition.Query is not { } query)
+                {
+                    throw new InvalidOperationException($"Rule '{rule.Id}' has a query condition without a compiled query.");
+                }
+
+                var result = EntityQueryEvaluator.Evaluate(world, query, fact);
+                if (query.Formula is { } formula)
+                {
+                    if (!formula.EvaluateBoolean(new QueryExpressionScope(world, fact, this, result)))
+                    {
+                        return false;
+                    }
+                }
+                else if (!result.HasValue
+                    || !EntityQueryEvaluator.Compare(result.Value, query.Threshold, query.Comparison))
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
             if (condition.Kind == RuleConditionKind.Expression)
             {
                 var scope = new WorldExpressionScope(world, fact, this);

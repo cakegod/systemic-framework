@@ -2,6 +2,12 @@
 
 Use conventional commit messages.
 
+## Current goal
+
+Finish Phase 1 from `docs/agent-first-plan.md`. Track every item in
+`docs/phase-1-checklist.md`. Do not start Phase 2 until G1 passes. Each unchecked item
+is a TDD slice: failing test first, smallest implementation to green, then refactor.
+
 ## Build and test
 
 ```sh

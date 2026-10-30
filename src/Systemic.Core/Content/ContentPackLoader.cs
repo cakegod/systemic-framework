@@ -293,7 +293,7 @@ public static partial class ContentPackLoader
         foreach (var source in expandedRules)
         {
             var rule = source.Rule;
-            var rulePath = source.Path;                var ruleId = source.Prefix is { } prefix ? $"{prefix}.{(string)rule.IdValue}" : (string)rule.IdValue;
+            var rulePath = source.Path; var ruleId = source.Prefix is { } prefix ? $"{prefix}.{(string)rule.IdValue}" : (string)rule.IdValue;
             Require(ids.Add(ruleId), $"Duplicate rule id '{ruleId}'.", $"{rulePath}.id");
             var eventType = (string)rule.On;
             if (factsDeclared)
@@ -357,6 +357,9 @@ public static partial class ContentPackLoader
                                 $"Rule '{ruleId}' chance probability must be between 0 and 1.",
                                 $"{conditionPath}.probability");
                             conditions.Add(RuleCondition.Chance(probability.GetValueOrDefault()));
+                            break;
+                        case "query":
+                            conditions.Add(RuleCondition.FromQuery(CompileQuery(ruleId, condition, conditionPath)));
                             break;
                         default:
                             throw new ContentPackException($"Rule '{ruleId}' uses unknown condition '{conditionKind}'.", $"{conditionPath}.kind");
@@ -493,7 +496,8 @@ public static partial class ContentPackLoader
                     ? CompilePayload(sourcePayload, $"{schedulePath}.payload", scheduledFact)
                     : null;
                 schedules.Add(new RuleScheduleDefinition(scheduleId, scheduleEvent, everyTicks,
-                    offsetTicks, sourceEntityId, targetEntityId, amount) { Payload = schedulePayload });
+                    offsetTicks, sourceEntityId, targetEntityId, amount)
+                { Payload = schedulePayload });
 
                 void ValidateScheduledEntity(string? entityId, string field)
                 {
@@ -515,6 +519,112 @@ public static partial class ContentPackLoader
         {
             Facts = [.. facts.OrderBy(fact => fact.Id, StringComparer.Ordinal)],
         };
+    }
+
+    private static CompiledQuery CompileQuery(string ruleId, RulesContentFile.Condition condition,
+        string conditionPath)
+    {
+        var source = condition.SelectorValue;
+        Require(source is not null, $"Rule '{ruleId}' query requires selector.", $"{conditionPath}.selector");
+        var selectorSource = source!.Value;
+        var tag = selectorSource.Tag?.GetString();
+        var property = selectorSource.Property?.GetString();
+        var propertyComparisonName = selectorSource.PropertyComparison?.GetString();
+        var propertyValue = selectorSource.PropertyValue is { } propertyThreshold
+            ? (double)propertyThreshold
+            : (double?)null;
+        var radius = selectorSource.Radius is { } authoredRadius ? (double)authoredRadius : (double?)null;
+        var orderName = selectorSource.Order?.GetString();
+        var limit = selectorSource.Limit is { } authoredLimit ? (int)authoredLimit : 0;
+        var origin = selectorSource.Origin is { } originValue
+            ? ParseSubject(originValue.GetString(), null, null,
+                $"Rule '{ruleId}' query selector", $"{conditionPath}.selector.origin")
+            : RuleSubject.Source;
+
+        Require(property is not null || propertyComparisonName is null,
+            $"Rule '{ruleId}' selector propertyComparison requires property.", $"{conditionPath}.selector.property");
+        Require(propertyValue is null || property is not null,
+            $"Rule '{ruleId}' selector propertyValue requires property.", $"{conditionPath}.selector.propertyValue");
+        Require(radius is not { } authoredRadiusValue || double.IsFinite(authoredRadiusValue) && authoredRadiusValue > 0,
+            $"Rule '{ruleId}' selector radius must be positive and finite.", $"{conditionPath}.selector.radius");
+        Require(limit is >= 0 and <= 10_000,
+            $"Rule '{ruleId}' selector limit must be between 0 and 10,000.", $"{conditionPath}.selector.limit");
+        var propertyComparison = propertyComparisonName switch
+        {
+            null => QueryComparison.AtLeast,
+            "atLeast" => QueryComparison.AtLeast,
+            "atMost" => QueryComparison.AtMost,
+            "equals" => QueryComparison.Equals,
+            _ => throw new ContentPackException(
+                $"Rule '{ruleId}' selector has unknown property comparison '{propertyComparisonName}'.",
+                $"{conditionPath}.selector.propertyComparison"),
+        };
+        var order = orderName switch
+        {
+            null or "id" => QueryOrder.EntityId,
+            "nearest" => QueryOrder.Nearest,
+            _ => throw new ContentPackException(
+                $"Rule '{ruleId}' selector has unknown order '{orderName}'.",
+                $"{conditionPath}.selector.order"),
+        };
+        var selector = new EntitySelector(tag, property, propertyComparison,
+            propertyValue.GetValueOrDefault(), radius, origin, order, limit);
+
+        var aggregateName = condition.Aggregate?.GetString();
+        Require(aggregateName is not null,
+            $"Rule '{ruleId}' query requires aggregate.", $"{conditionPath}.aggregate");
+        var aggregate = aggregateName switch
+        {
+            "count" => QueryAggregateKind.Count,
+            "sum" => QueryAggregateKind.Sum,
+            "min" => QueryAggregateKind.Minimum,
+            "max" => QueryAggregateKind.Maximum,
+            "average" => QueryAggregateKind.Average,
+            "nearest" => QueryAggregateKind.NearestDistance,
+            _ => throw new ContentPackException(
+                $"Rule '{ruleId}' has unknown query aggregate '{aggregateName}'.", $"{conditionPath}.aggregate"),
+        };
+        var aggregateProperty = condition.AggregateProperty?.GetString();
+        Require(aggregate is QueryAggregateKind.Count or QueryAggregateKind.NearestDistance
+            || !string.IsNullOrWhiteSpace(aggregateProperty),
+            $"Rule '{ruleId}' {aggregateName} aggregate requires aggregateProperty.",
+            $"{conditionPath}.aggregateProperty");
+
+        var formulaSource = condition.Formula?.GetString();
+        CompiledExpression? formula = null;
+        if (formulaSource is not null)
+        {
+            try
+            {
+                formula = ExpressionCompiler.Compile(formulaSource);
+            }
+            catch (ExpressionCompileException exception)
+            {
+                throw new ContentPackException(
+                    $"Rule '{ruleId}' query formula is invalid: {exception.Message}",
+                    $"{conditionPath}.formula");
+            }
+
+            Require(formula.ResultKind == ExpressionResultKind.Boolean,
+                $"Rule '{ruleId}' query formula must produce a boolean.", $"{conditionPath}.formula");
+        }
+
+        var comparisonName = condition.Comparison?.GetString();
+        var threshold = condition.Value is { } authoredThreshold ? (double)authoredThreshold : (double?)null;
+        Require(formula is not null || comparisonName is not null && threshold is { } value && double.IsFinite(value),
+            $"Rule '{ruleId}' query requires formula or comparison and value.", $"{conditionPath}.comparison");
+        var comparison = comparisonName switch
+        {
+            null => QueryComparison.AtLeast,
+            "atLeast" => QueryComparison.AtLeast,
+            "atMost" => QueryComparison.AtMost,
+            "equals" => QueryComparison.Equals,
+            _ => throw new ContentPackException(
+                $"Rule '{ruleId}' has unknown query comparison '{comparisonName}'.",
+                $"{conditionPath}.comparison"),
+        };
+        return new CompiledQuery(selector, aggregate, aggregateProperty, comparison,
+            threshold.GetValueOrDefault(), formula);
     }
 
     private static SimulationFactPayload? CompilePayload(

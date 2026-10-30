@@ -138,6 +138,7 @@ The samples are references and diagnostics. They are not the target architecture
 ## Documentation
 
 - [Agent-first plan](docs/agent-first-plan.md) is the current direction and gates.
+- [Phase 1 checklist](docs/phase-1-checklist.md) tracks every remaining composition and asset item.
 - [Incremental audit](docs/phase-1-incremental-audit.md) records the Phase 1.1 freeze and pattern mapping.
 - [Agent recipes](docs/agents) cover the run, content, asset, and save loops.
 - [Framework guides](docs/index.md) cover the system context, populations, and analyzers.

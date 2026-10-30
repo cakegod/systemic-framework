@@ -93,7 +93,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["hasTag", "propertyAtLeast", "expression", "chance"] },
+        "kind": { "enum": ["hasTag", "propertyAtLeast", "expression", "chance", "query"] },
         "subject": { "$ref": "#/$defs/subject" },
         "row": { "$ref": "#/$defs/rowSubject" },
         "factRow": { "$ref": "#/$defs/id" },
@@ -101,14 +101,35 @@
         "property": { "type": "string", "pattern": "\\S" },
         "value": { "type": "number" },
         "expression": { "type": "string", "pattern": "\\S" },
-        "probability": { "type": "number", "minimum": 0, "maximum": 1 }
+        "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "selector": { "$ref": "#/$defs/selector" },
+        "aggregate": { "enum": ["count", "sum", "min", "max", "average", "nearest"] },
+        "aggregateProperty": { "type": "string", "pattern": "\\S" },
+        "comparison": { "enum": ["atLeast", "atMost", "equals"] },
+        "formula": { "type": "string", "pattern": "\\S" }
       },
       "allOf": [
         { "if": { "properties": { "kind": { "const": "hasTag" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["tag"] } },
         { "if": { "properties": { "kind": { "const": "propertyAtLeast" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["property", "value"] } },
         { "if": { "properties": { "kind": { "const": "expression" } }, "required": ["kind"] }, "then": { "required": ["expression"] } },
-        { "if": { "properties": { "kind": { "const": "chance" } }, "required": ["kind"] }, "then": { "required": ["probability"] } }
+        { "if": { "properties": { "kind": { "const": "chance" } }, "required": ["kind"] }, "then": { "required": ["probability"] } },
+        { "if": { "properties": { "kind": { "const": "query" } }, "required": ["kind"] },
+          "then": { "required": ["selector", "aggregate"], "anyOf": [{ "required": ["formula"] }, { "required": ["comparison", "value"] }] } }
       ]
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tag": { "type": "string", "pattern": "\\S" },
+        "property": { "type": "string", "pattern": "\\S" },
+        "propertyComparison": { "enum": ["atLeast", "atMost", "equals"] },
+        "propertyValue": { "type": "number" },
+        "origin": { "$ref": "#/$defs/subject" },
+        "radius": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000000 },
+        "order": { "enum": ["id", "nearest"] },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 10000 }
+      }
     },
     "effect": {
       "type": "object", "additionalProperties": false,

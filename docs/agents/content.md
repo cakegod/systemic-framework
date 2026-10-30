@@ -78,6 +78,41 @@ are content errors with a path to the offending value.
 - `propertyAtLeast`: subject property meets a threshold.
 - `expression`: bounded arithmetic over properties and event aggregates.
 - `chance`: seeded probability.
+- `query`: selects entities by tag, property, radius, or nearest order, then tests an aggregate.
+
+## Query entities
+
+A query condition selects live entities and derives a count, sum, minimum, maximum,
+average, or nearest distance. The selector is bounded and deterministic. Results are
+ordered by entity ID unless `order` is `nearest`.
+
+```json
+{
+  "kind": "query",
+  "selector": {
+    "tag": "housing",
+    "property": "built",
+    "propertyComparison": "atLeast",
+    "propertyValue": 1,
+    "origin": "source",
+    "radius": 8,
+    "order": "nearest",
+    "limit": 4
+  },
+  "aggregate": "sum",
+  "aggregateProperty": "built",
+  "formula": "query.value >= 7 && query.count > 0"
+}
+```
+
+Use `comparison` and `value` instead of `formula` for a simple threshold. A formula can
+read `query.count`, `query.value`, `query.nearest`, and `query.matched`, plus the normal
+expression values such as `tick` and `source.<property>`.
+
+The spatial filter uses the selected origin entity's bounds. An entity without bounds
+matches no range query. `limit` applies after ordering. A non-count aggregate over an
+empty selection fails the condition, so `query.matched` distinguishes zero from a
+real zero sum.
 
 ## Effects
 
