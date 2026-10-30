@@ -333,6 +333,8 @@ static int ValidateProject(string directory, bool json)
     var incremental = pack.Modules.Select(module => module.Content).OfType<IncrementalModuleContent>().SingleOrDefault();
     var presentation = pack.Modules.Select(module => module.Content).OfType<PresentationModuleContent>().SingleOrDefault();
     var gameplay2D = pack.Modules.Select(module => module.Content).OfType<Gameplay2DContent>().SingleOrDefault();
+    // The state hash needs a live host, and a command that owns one must stop its workers before it returns.
+    using var host = HeadlessSystemicHost.Create(pack, 1);
     var result = new
     {
         ok = true,
@@ -350,7 +352,7 @@ static int ValidateProject(string directory, bool json)
         bindings = presentation?.Catalog.Bindings.Length ?? 0,
         gameplay2DActors = gameplay2D?.Actors.Count ?? 0,
         gameplay2DStatuses = gameplay2D?.Statuses.Count ?? 0,
-        stateHash = StateHash(HeadlessSystemicHost.Create(pack, 1)),
+        stateHash = StateHash(host),
     };
     if (json)
     {
@@ -483,7 +485,7 @@ static void WriteSample(StreamWriter writer, HeadlessSystemicHost host, int tick
 static int DumpProject(string directory, bool json)
 {
     var pack = LoadPack(directory);
-    var host = HeadlessSystemicHost.Create(pack, 1);
+    using var host = HeadlessSystemicHost.Create(pack, 1);
     var entities = host.Game.World.Entities.OrderBy(entity => entity.Id).Select(entity => new
     {
         id = entity.Id,
@@ -519,7 +521,7 @@ static int SaveProject(string directory, string output, int ticks, int seed, boo
     }
 
     var pack = LoadPack(directory);
-    var host = HeadlessSystemicHost.Create(pack, seed);
+    using var host = HeadlessSystemicHost.Create(pack, seed);
     host.RunTicks(ticks);
     var fullPath = Path.GetFullPath(output);
     Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -543,7 +545,7 @@ static int LoadProject(string directory, string savePath, bool json)
 {
     var pack = LoadPack(directory);
     var jsonText = File.ReadAllText(Path.GetFullPath(savePath));
-    var host = HeadlessSystemicHost.Restore(pack, jsonText);
+    using var host = HeadlessSystemicHost.Restore(pack, jsonText);
     var result = new
     {
         ok = true,
@@ -605,7 +607,7 @@ static int ReplayRecord(string directory, string output, int ticks, int seed, bo
     }
 
     var pack = LoadPack(directory);
-    var host = HeadlessSystemicHost.Create(pack, seed);
+    using var host = HeadlessSystemicHost.Create(pack, seed);
     var target = new HostReplayTarget(host, static (_, _) =>
         throw new InvalidOperationException("This pack has no replay input mapping."));
     var recorder = new ReplayRecorder(target);
@@ -637,7 +639,7 @@ static int ReplayVerify(string directory, string replayPath, bool json)
 {
     var pack = LoadPack(directory);
     var artifact = ReplayCodec.Deserialize(File.ReadAllText(Path.GetFullPath(replayPath)));
-    var host = HeadlessSystemicHost.Create(pack, artifact.Seed);
+    using var host = HeadlessSystemicHost.Create(pack, artifact.Seed);
     var target = new HostReplayTarget(host, static (_, _) =>
         throw new InvalidOperationException("This pack has no replay input mapping."));
     var verification = ReplayRunner.Verify(artifact, target);
