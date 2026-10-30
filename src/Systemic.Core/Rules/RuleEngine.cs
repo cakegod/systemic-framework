@@ -1680,7 +1680,9 @@ public sealed class RuleEngine
             var scopeTag = effect.Name;
             foreach (var scoped in world.Entities)
             {
-                if (!scoped.ToRemove && scoped.HasTag(scopeTag))
+                // A granted tag is part of the scope too: World.HasTag reads both the entity mask and
+                // the grant table, so a reset cannot leave a granted scope tag behind.
+                if (!scoped.ToRemove && world.HasTag(scoped, scopeTag))
                 {
                     world.Remove(scoped);
                 }

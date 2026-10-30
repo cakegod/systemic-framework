@@ -392,7 +392,6 @@ Systemic.Presentation.UiNode.Bind.get -> string?
 Systemic.Presentation.UiNode.Bind.init -> void
 Systemic.Presentation.UiNode.Children.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!>
 Systemic.Presentation.UiNode.Children.init -> void
-Systemic.Presentation.UiNode.Deconstruct(out string! Type, out string? Text, out string? Bind, out string? Action, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!> Children, out double? Minimum, out double? Maximum, out string? VisualRecipeId) -> void
 Systemic.Presentation.UiNode.Equals(Systemic.Presentation.UiNode? other) -> bool
 Systemic.Presentation.UiNode.Maximum.get -> double?
 Systemic.Presentation.UiNode.Maximum.init -> void
@@ -402,7 +401,6 @@ Systemic.Presentation.UiNode.Text.get -> string?
 Systemic.Presentation.UiNode.Text.init -> void
 Systemic.Presentation.UiNode.Type.get -> string!
 Systemic.Presentation.UiNode.Type.init -> void
-Systemic.Presentation.UiNode.UiNode(string! Type, string? Text, string? Bind, string? Action, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!> Children, double? Minimum = null, double? Maximum = null, string? VisualRecipeId = null) -> void
 Systemic.Presentation.UiNode.VisualRecipeId.get -> string?
 Systemic.Presentation.UiNode.VisualRecipeId.init -> void
 Systemic.Presentation.UiNodeState
@@ -411,7 +409,6 @@ Systemic.Presentation.UiNodeState.Action.get -> string?
 Systemic.Presentation.UiNodeState.Action.init -> void
 Systemic.Presentation.UiNodeState.Children.get -> System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!>
 Systemic.Presentation.UiNodeState.Children.init -> void
-Systemic.Presentation.UiNodeState.Deconstruct(out string! Type, out string? Text, out string? Action, out string? VisualRecipeId, out bool HasValue, out double? NumberValue, out string? TextValue, out double? Progress, out string? VisualState, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children) -> void
 Systemic.Presentation.UiNodeState.Equals(Systemic.Presentation.UiNodeState? other) -> bool
 Systemic.Presentation.UiNodeState.HasValue.get -> bool
 Systemic.Presentation.UiNodeState.HasValue.init -> void
@@ -425,7 +422,6 @@ Systemic.Presentation.UiNodeState.TextValue.get -> string?
 Systemic.Presentation.UiNodeState.TextValue.init -> void
 Systemic.Presentation.UiNodeState.Type.get -> string!
 Systemic.Presentation.UiNodeState.Type.init -> void
-Systemic.Presentation.UiNodeState.UiNodeState(string! Type, string? Text, string? Action, string? VisualRecipeId, bool HasValue, double? NumberValue, string? TextValue, double? Progress, string? VisualState, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children) -> void
 Systemic.Presentation.UiNodeState.VisualRecipeId.get -> string?
 Systemic.Presentation.UiNodeState.VisualRecipeId.init -> void
 Systemic.Presentation.UiNodeState.VisualState.get -> string?

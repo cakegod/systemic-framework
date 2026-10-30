@@ -11,8 +11,7 @@
 #   scripts/loop.sh --full
 #
 # Formatting, on its own. Not part of the gate: a solution-wide check loads every project and costs
-# about 78 seconds, and this branch touches seven projects, so a per-project check at about 16
-# seconds each would cost more than the load it avoids.
+# about 78 seconds, so formatting is scoped to the files this branch touches.
 #
 #   scripts/loop.sh --format
 #
@@ -25,8 +24,15 @@ set -euo pipefail
 phase() { echo "loop: ${SECONDS:-0}s $*"; }
 
 format_changed() {
+    local listed
+    # A failed diff must not look like "nothing changed".
+    if ! listed=$(git diff --name-only --diff-filter=ACMR origin/main -- '*.cs'); then
+        echo 'loop: cannot diff against origin/main; fetch it and retry' >&2
+        return 1
+    fi
+
     local -a changed=()
-    mapfile -t changed < <(git diff --name-only --diff-filter=ACM origin/main -- '*.cs')
+    mapfile -t changed < <(printf '%s\n' "$listed" | grep -v '^$' || true)
     if [ "${#changed[@]}" -eq 0 ]; then
         echo 'loop: no changed C# files to format'
         return 0
@@ -80,9 +86,20 @@ case "$project" in
         ;;
     --full)
         SECONDS=0
-        mapfile -t suites < <(dotnet sln Systemic.sln list \
+        listed=''
+        if ! listed=$(dotnet sln Systemic.sln list); then
+            echo 'loop: cannot list the solution; refusing to report a green gate' >&2
+            exit 1
+        fi
+
+        mapfile -t suites < <(printf '%s\n' "$listed" \
             | grep -E '^tests/.*\.Tests\.csproj$' \
-            | grep -v -F -e Systemic.Boids.Tests -e Systemic.GlowGarden.Tests -e Systemic.PixelMine.Tests)
+            | grep -v -F -e Systemic.Boids.Tests -e Systemic.GlowGarden.Tests -e Systemic.PixelMine.Tests || true)
+        if [ "${#suites[@]}" -eq 0 ]; then
+            echo 'loop: the solution listed no framework test suites' >&2
+            exit 1
+        fi
+
         # One invocation per suite: it builds the framework projects the suite references, with
         # analyzers on, and runs it. A separate whole-solution build would add the sample games
         # and a second pass over the same projects.
@@ -90,7 +107,7 @@ case "$project" in
             phase "build and test $(basename "$suite" .csproj)"
             dotnet test "$suite" --configuration Release
         done
-        phase 'done, gate green (scripts/loop.sh --format before a commit)'
+        phase "done, ${#suites[@]} suites green (scripts/loop.sh --format before a commit)"
         exit
         ;;
     --samples)

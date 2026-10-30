@@ -26,8 +26,8 @@ public sealed class PresentationContentModule : ISystemicContentModule
 }
 
 /// <summary>
-/// The outcome of invoking an authored UI action. <see cref="Handled"/> is true when the action
-/// was declared by the layout and published; <see cref="RolledBack"/> mirrors the dispatch result.
+/// The outcome of invoking an authored UI action. <see cref="Handled"/> is true when at least one
+/// rule matched the published fact; <see cref="RolledBack"/> mirrors the dispatch result.
 /// </summary>
 public sealed record UiActionResult(string LayoutId, string ActionId, bool Handled, bool RolledBack);
 
@@ -67,47 +67,66 @@ public static class PresentationGameExtensions
     /// <see cref="UiActionResult.Handled"/> is true only when at least one rule matched, so a layout
     /// that declares an action no rule listens for reports <c>false</c> instead of a silent success.
     /// </remarks>
+    /// <param name="amount">
+    /// The buy amount of the node the player clicked, read from <see cref="UiNodeState.Amount"/>. It is
+    /// required when the layout declares the same action more than once with different amounts.
+    /// </param>
     public static UiActionResult InvokeUiAction(
         this SystemicGame game,
         string layoutId,
         string actionId,
-        int choiceOwnerEntityId)
+        int choiceOwnerEntityId,
+        int? amount = null)
     {
         ArgumentNullException.ThrowIfNull(game);
         ArgumentNullException.ThrowIfNull(actionId);
+        if (amount is < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(amount));
+        }
 
         var layout = game.PresentationContent().Ui.Layouts.FirstOrDefault(candidate => candidate.Id == layoutId)
             ?? throw new KeyNotFoundException($"UI layout '{layoutId}' is not part of this content pack.");
-        if (FindAction(layout.Root, actionId) is not { } node)
+        var declared = new List<UiNode>();
+        FindActions(layout.Root, actionId, declared);
+        if (declared.Count == 0)
         {
             throw new KeyNotFoundException(
                 $"UI layout '{layoutId}' does not declare the action '{actionId}'.");
         }
 
+        // A layout may offer the same action at several amounts, such as "Buy x1" and "Buy x10". The
+        // renderer knows which node the player clicked, so it passes that node's amount instead of
+        // letting the first matching node in the tree decide for every button.
+        var authored = declared.Where(node => node.Amount is not null).Select(node => node.Amount!.Value).Distinct().ToArray();
+        var resolved = amount ?? (authored.Length switch
+        {
+            0 => 0,
+            1 => authored[0],
+            _ => throw new ArgumentException(
+                $"UI layout '{layoutId}' declares '{actionId}' at more than one amount; pass the clicked node's amount.",
+                nameof(amount)),
+        });
+
         // The action id is the fact type, the owning choice entity is both source and target, and the
-        // button's buy amount travels on the fact, so a rule can scale by the quantity the player
-        // chose. The owner is required: a fact aimed at entity 0 would match no entity-addressed rule.
+        // buy amount travels on the fact, so a rule can scale by the quantity the player chose. The
+        // owner is required: a fact aimed at entity 0 would match no entity-addressed rule.
         var dispatch = game.Publish(new SimulationFact(actionId, choiceOwnerEntityId, choiceOwnerEntityId,
-            Amount: node.Amount ?? 0));
+            Amount: resolved));
         return new UiActionResult(layoutId, actionId, Handled: dispatch.RulesMatched > 0, dispatch.RolledBack);
     }
 
-    private static UiNode? FindAction(UiNode node, string actionId)
+    private static void FindActions(UiNode node, string actionId, List<UiNode> found)
     {
         if (string.Equals(node.Action, actionId, StringComparison.Ordinal))
         {
-            return node;
+            found.Add(node);
         }
 
         foreach (var child in node.Children)
         {
-            if (FindAction(child, actionId) is { } found)
-            {
-                return found;
-            }
+            FindActions(child, actionId, found);
         }
-
-        return null;
     }
 
     public static long AllocateActorVisualId(this SystemicGame game) => game.Presentation().AllocateActorVisualId();

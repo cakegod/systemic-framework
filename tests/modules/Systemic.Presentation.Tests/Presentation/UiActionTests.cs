@@ -121,6 +121,31 @@ public sealed class UiActionTests
         Assert.Equal(10, captured);
     }
 
+    [Fact]
+    public void TwoBuyAmountsRequireTheClickedAmountAndUseItOnTheFact()
+    {
+        using var pack = PresentationPack.Create();
+        WriteContent(pack.Root, CaptureRule, """
+            { "type": "button", "text": "Buy", "action": "ui.buy", "amount": 1 },
+            { "type": "button", "text": "Buy x10", "action": "ui.buy", "amount": 10 }
+            """);
+        var content = ContentPackLoader.Load(pack.Root,
+            new ContentModuleRegistry().Add(new PresentationContentModule()));
+        var materialized = content.CreateWorld(seed: 27, valueScale: 1);
+        var captured = new List<double>();
+        var game = new SystemicGameBuilder(content, materialized)
+            .AddRuleAction("capture", (in RuleActionContext context) => captured.Add(context.Fact.Amount))
+            .Build();
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"]));
+        Assert.Contains("amount", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+        game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"], amount: 10);
+
+        Assert.Equal([10d], captured);
+    }
+
     private static void WriteContent(string root, string rules, string button)
     {
         var buttonJson = button == "<<buy>>"

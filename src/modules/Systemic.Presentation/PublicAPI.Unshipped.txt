@@ -1,8 +1,12 @@
 #nullable enable
+*REMOVED*Systemic.Presentation.UiNode.Deconstruct(out string! Type, out string? Text, out string? Bind, out string? Action, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!> Children, out double? Minimum, out double? Maximum, out string? VisualRecipeId) -> void
+*REMOVED*Systemic.Presentation.UiNode.UiNode(string! Type, string? Text, string? Bind, string? Action, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!> Children, double? Minimum = null, double? Maximum = null, string? VisualRecipeId = null) -> void
+*REMOVED*Systemic.Presentation.UiNodeState.Deconstruct(out string! Type, out string? Text, out string? Action, out string? VisualRecipeId, out bool HasValue, out double? NumberValue, out string? TextValue, out double? Progress, out string? VisualState, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children) -> void
+*REMOVED*Systemic.Presentation.UiNodeState.UiNodeState(string! Type, string? Text, string? Action, string? VisualRecipeId, bool HasValue, double? NumberValue, string? TextValue, double? Progress, string? VisualState, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children) -> void
 override Systemic.Presentation.UiActionResult.Equals(object? obj) -> bool
 override Systemic.Presentation.UiActionResult.GetHashCode() -> int
 override Systemic.Presentation.UiActionResult.ToString() -> string!
-static Systemic.Presentation.PresentationGameExtensions.InvokeUiAction(this Systemic.Host.SystemicGame! game, string! layoutId, string! actionId, int choiceOwnerEntityId) -> Systemic.Presentation.UiActionResult!
+static Systemic.Presentation.PresentationGameExtensions.InvokeUiAction(this Systemic.Host.SystemicGame! game, string! layoutId, string! actionId, int choiceOwnerEntityId, int? amount = null) -> Systemic.Presentation.UiActionResult!
 static Systemic.Presentation.UiActionResult.operator !=(Systemic.Presentation.UiActionResult? left, Systemic.Presentation.UiActionResult? right) -> bool
 static Systemic.Presentation.UiActionResult.operator ==(Systemic.Presentation.UiActionResult? left, Systemic.Presentation.UiActionResult? right) -> bool
 Systemic.Presentation.UiActionResult
@@ -26,9 +30,11 @@ Systemic.Presentation.UiNode.Tooltip.init -> void
 Systemic.Presentation.UiNode.UiNode(string! Type, string? Text, string? Bind, string? Action, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!> Children, double? Minimum = null, double? Maximum = null, string? VisualRecipeId = null, string? Tooltip = null, int? Amount = null) -> void
 Systemic.Presentation.UiNodeState.Amount.get -> int?
 Systemic.Presentation.UiNodeState.Amount.init -> void
-Systemic.Presentation.UiNodeState.Deconstruct(out string! Type, out string? Text, out string? Action, out string? VisualRecipeId, out bool HasValue, out double? NumberValue, out string? TextValue, out double? Progress, out string? VisualState, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children, out string? Tooltip, out int? Amount, out bool IsOn) -> void
+Systemic.Presentation.UiNodeState.Deconstruct(out string! Type, out string? Text, out string? Action, out string? VisualRecipeId, out bool HasValue, out double? NumberValue, out string? TextValue, out double? Progress, out string? VisualState, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children, out string? Tooltip, out int? Amount, out bool IsOn, out int? ItemEntityId) -> void
 Systemic.Presentation.UiNodeState.IsOn.get -> bool
 Systemic.Presentation.UiNodeState.IsOn.init -> void
+Systemic.Presentation.UiNodeState.ItemEntityId.get -> int?
+Systemic.Presentation.UiNodeState.ItemEntityId.init -> void
 Systemic.Presentation.UiNodeState.Tooltip.get -> string?
 Systemic.Presentation.UiNodeState.Tooltip.init -> void
-Systemic.Presentation.UiNodeState.UiNodeState(string! Type, string? Text, string? Action, string? VisualRecipeId, bool HasValue, double? NumberValue, string? TextValue, double? Progress, string? VisualState, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children, string? Tooltip = null, int? Amount = null, bool IsOn = false) -> void
+Systemic.Presentation.UiNodeState.UiNodeState(string! Type, string? Text, string? Action, string? VisualRecipeId, bool HasValue, double? NumberValue, string? TextValue, double? Progress, string? VisualState, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children, string? Tooltip = null, int? Amount = null, bool IsOn = false, int? ItemEntityId = null) -> void

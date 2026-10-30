@@ -55,7 +55,8 @@ public sealed record UiNodeState(
     ImmutableArray<UiNodeState> Children,
     string? Tooltip = null,
     int? Amount = null,
-    bool IsOn = false);
+    bool IsOn = false,
+    int? ItemEntityId = null);
 
 /// <summary>Evaluates declarative UI bindings into immutable data for engine adapters to render.</summary>
 public static class DeclarativeUiEvaluator
@@ -64,11 +65,24 @@ public static class DeclarativeUiEvaluator
     {
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(context);
-        return EvaluateNode(layout.Root, context, UiBindingPlan.For(layout).Root);
+        return EvaluateNode(layout.Root, context, UiBindingPlan.For(layout).Root, new UiEvaluationBudget());
     }
 
-    private static UiNodeState EvaluateNode(UiNode node, UiBindingContext context, UiBindingNodePlan plan)
+    /// <summary>The most nodes one layout may expand to, so nested lists cannot multiply without bound.</summary>
+    private const int MaximumEvaluatedNodes = 16_384;
+
+    private static UiNodeState EvaluateNode(
+        UiNode node,
+        UiBindingContext context,
+        UiBindingNodePlan plan,
+        UiEvaluationBudget budget)
     {
+        if (++budget.Nodes > MaximumEvaluatedNodes)
+        {
+            throw new InvalidOperationException(
+                $"UI evaluation exceeded {MaximumEvaluatedNodes} nodes; nested lists must not multiply.");
+        }
+
         var descriptor = plan.Binding;
         if (node.Type == "list" && descriptor is { Kind: UiBindingKind.List, ValuePath: { } listTag })
         {
@@ -84,12 +98,12 @@ public static class DeclarativeUiEvaluator
                         continue;
                     }
 
-                    items.Add(EvaluateNode(node.Children[0], context.WithItem(entity.Id), plan.Children[0]));
+                    items.Add(EvaluateNode(node.Children[0], context.WithItem(entity.Id), plan.Children[0], budget));
                 }
             }
 
             return new UiNodeState(node.Type, node.Text, node.Action, node.VisualRecipeId, false, null, null,
-                null, null, items.ToImmutable(), node.Tooltip, node.Amount);
+                null, null, items.ToImmutable(), node.Tooltip, node.Amount, ItemEntityId: context.ItemEntityId);
         }
 
         var value = descriptor is null ? default : Resolve(context, descriptor);
@@ -104,15 +118,17 @@ public static class DeclarativeUiEvaluator
         var children = ImmutableArray.CreateBuilder<UiNodeState>(node.Children.Length);
         for (var index = 0; index < node.Children.Length; index++)
         {
-            children.Add(EvaluateNode(node.Children[index], context, plan.Children[index]));
+            children.Add(EvaluateNode(node.Children[index], context, plan.Children[index], budget));
         }
 
         // A toggle reads one binding as a boolean threshold, so the same provider that feeds a
         // choice list also drives the switch without a second binding kind.
         var isOn = node.Type == "toggle" && value.Number is > 0.5;
+        // The item ID travels with every node rendered inside a list item, so a renderer can attach a
+        // button click to the entity that produced it without repeating the list query.
         return new UiNodeState(node.Type, node.Text, node.Action, node.VisualRecipeId, value.HasValue,
             value.Number, value.Text, progress, ResolveVisualState(node, descriptor, context),
-            children.MoveToImmutable(), node.Tooltip, node.Amount, isOn);
+            children.MoveToImmutable(), node.Tooltip, node.Amount, isOn, context.ItemEntityId);
     }
 
     private static string? ResolveVisualState(UiNode node, UiBindingDescriptor? descriptor, UiBindingContext context)
@@ -226,6 +242,11 @@ public static class DeclarativeUiEvaluator
 
         value = default;
         return false;
+    }
+
+    private sealed class UiEvaluationBudget
+    {
+        public int Nodes { get; set; }
     }
 
     private readonly record struct BindingValue(bool HasValue, double? Number, string? Text)
