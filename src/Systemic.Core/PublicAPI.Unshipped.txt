@@ -36,5 +36,83 @@ Systemic.Rules.RuleEffect.Payload.get -> Systemic.Rules.SimulationFactPayload?
 Systemic.Rules.RuleEffect.Payload.init -> void
 Systemic.Rules.RuleScheduleDefinition.Payload.get -> Systemic.Rules.SimulationFactPayload?
 Systemic.Rules.RuleScheduleDefinition.Payload.init -> void
+~override Systemic.Rules.RuleActionContext.Equals(object obj) -> bool
+override Systemic.Rules.RuleActionContext.GetHashCode() -> int
+~override Systemic.Rules.RuleActionContext.ToString() -> string
+override Systemic.Rules.SpawnTemplate.Equals(object? obj) -> bool
+override Systemic.Rules.SpawnTemplate.GetHashCode() -> int
+override Systemic.Rules.SpawnTemplate.ToString() -> string!
+static Systemic.Rules.RuleActionContext.operator !=(Systemic.Rules.RuleActionContext left, Systemic.Rules.RuleActionContext right) -> bool
+static Systemic.Rules.RuleActionContext.operator ==(Systemic.Rules.RuleActionContext left, Systemic.Rules.RuleActionContext right) -> bool
+static Systemic.Rules.RuleEffect.AdjustProperty(Systemic.Rules.RuleSubject subject, string! property, double amount, Systemic.Rules.QuantityOperation quantity) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.Despawn(Systemic.Rules.RuleSubject subject) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.InvokeAction(string! actionName, Systemic.Rules.RuleSubject subject) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.RemoveTag(Systemic.Rules.RuleSubject subject, string! tag) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.Schedule(string! eventType, int delayTicks, Systemic.Rules.SimulationFactPayload? payload = null) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.Spawn(Systemic.Rules.RuleSubject subject, Systemic.Rules.SpawnTemplate! template) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.Transfer(Systemic.Rules.RuleSubject subject, string! property, string! targetProperty, double amount) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.SpawnTemplate.operator !=(Systemic.Rules.SpawnTemplate? left, Systemic.Rules.SpawnTemplate? right) -> bool
+static Systemic.Rules.SpawnTemplate.operator ==(Systemic.Rules.SpawnTemplate? left, Systemic.Rules.SpawnTemplate? right) -> bool
+Systemic.Rules.CompiledRuleSet.Actions.get -> System.Collections.Immutable.ImmutableDictionary<string!, Systemic.Rules.RuleActionHandler!>!
+Systemic.Rules.CompiledRuleSet.Actions.init -> void
+Systemic.Rules.CompiledRuleSet.Templates.get -> System.Collections.Immutable.ImmutableDictionary<string!, Systemic.Rules.SpawnTemplate!>!
+Systemic.Rules.CompiledRuleSet.Templates.init -> void
+Systemic.Rules.QuantityOperation
+Systemic.Rules.QuantityOperation.Add = 0 -> Systemic.Rules.QuantityOperation
+Systemic.Rules.QuantityOperation.Max = 4 -> Systemic.Rules.QuantityOperation
+Systemic.Rules.QuantityOperation.Min = 3 -> Systemic.Rules.QuantityOperation
+Systemic.Rules.QuantityOperation.Multiply = 2 -> Systemic.Rules.QuantityOperation
+Systemic.Rules.QuantityOperation.Set = 1 -> Systemic.Rules.QuantityOperation
+Systemic.Rules.RuleActionContext
+Systemic.Rules.RuleActionContext.Deconstruct(out Systemic.Kernel.World! World, out Systemic.Rules.SimulationFact Fact, out Systemic.Kernel.Entity? Source, out Systemic.Kernel.Entity? Target, out Systemic.Rules.RuleEffect Effect) -> void
+Systemic.Rules.RuleActionContext.Effect.get -> Systemic.Rules.RuleEffect
+Systemic.Rules.RuleActionContext.Effect.init -> void
+Systemic.Rules.RuleActionContext.Equals(Systemic.Rules.RuleActionContext other) -> bool
+Systemic.Rules.RuleActionContext.Fact.get -> Systemic.Rules.SimulationFact
+Systemic.Rules.RuleActionContext.Fact.init -> void
+Systemic.Rules.RuleActionContext.RuleActionContext(Systemic.Kernel.World! World, Systemic.Rules.SimulationFact Fact, Systemic.Kernel.Entity? Source, Systemic.Kernel.Entity? Target, Systemic.Rules.RuleEffect Effect) -> void
+Systemic.Rules.RuleActionContext.RuleActionContext() -> void
+Systemic.Rules.RuleActionContext.Source.get -> Systemic.Kernel.Entity?
+Systemic.Rules.RuleActionContext.Source.init -> void
+Systemic.Rules.RuleActionContext.Target.get -> Systemic.Kernel.Entity?
+Systemic.Rules.RuleActionContext.Target.init -> void
+Systemic.Rules.RuleActionContext.World.get -> Systemic.Kernel.World!
+Systemic.Rules.RuleActionContext.World.init -> void
+Systemic.Rules.RuleActionHandler
+Systemic.Rules.RuleEffect.ActionName.get -> string?
+Systemic.Rules.RuleEffect.ActionName.init -> void
+Systemic.Rules.RuleEffect.DelayTicks.get -> int
+Systemic.Rules.RuleEffect.DelayTicks.init -> void
+Systemic.Rules.RuleEffect.Destination.get -> Systemic.Rules.RuleSubject?
+Systemic.Rules.RuleEffect.Destination.init -> void
+Systemic.Rules.RuleEffectKind.Despawn = 5 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffectKind.InvokeAction = 9 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffectKind.RemoveTag = 4 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffectKind.Schedule = 8 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffectKind.Spawn = 7 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffectKind.Transfer = 6 -> Systemic.Rules.RuleEffectKind
+Systemic.Rules.RuleEffect.Quantity.get -> Systemic.Rules.QuantityOperation
+Systemic.Rules.RuleEffect.Quantity.init -> void
+Systemic.Rules.RuleEffect.TargetProperty.get -> string?
+Systemic.Rules.RuleEffect.TargetProperty.init -> void
+Systemic.Rules.RuleEffect.Template.get -> Systemic.Rules.SpawnTemplate?
+Systemic.Rules.RuleEffect.Template.init -> void
+Systemic.Rules.RuleEngine.DispatchDue(Systemic.Kernel.World! world) -> int
+Systemic.Rules.SpawnTemplate
+Systemic.Rules.SpawnTemplate.Capabilities.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Rules.SpawnTemplate.Capabilities.init -> void
+Systemic.Rules.SpawnTemplate.<Clone>$() -> Systemic.Rules.SpawnTemplate!
+Systemic.Rules.SpawnTemplate.Deconstruct(out string! Id, out System.Collections.Immutable.ImmutableArray<string!> Tags, out System.Collections.Immutable.ImmutableArray<string!> Capabilities, out System.Collections.Immutable.ImmutableDictionary<string!, double>! Properties, out Systemic.Kernel.Bounds2? SpatialBounds) -> void
+Systemic.Rules.SpawnTemplate.Equals(Systemic.Rules.SpawnTemplate? other) -> bool
+Systemic.Rules.SpawnTemplate.Id.get -> string!
+Systemic.Rules.SpawnTemplate.Id.init -> void
+Systemic.Rules.SpawnTemplate.Properties.get -> System.Collections.Immutable.ImmutableDictionary<string!, double>!
+Systemic.Rules.SpawnTemplate.Properties.init -> void
+Systemic.Rules.SpawnTemplate.SpatialBounds.get -> Systemic.Kernel.Bounds2?
+Systemic.Rules.SpawnTemplate.SpatialBounds.init -> void
+Systemic.Rules.SpawnTemplate.SpawnTemplate(string! Id, System.Collections.Immutable.ImmutableArray<string!> Tags, System.Collections.Immutable.ImmutableArray<string!> Capabilities, System.Collections.Immutable.ImmutableDictionary<string!, double>! Properties, Systemic.Kernel.Bounds2? SpatialBounds = null) -> void
+Systemic.Rules.SpawnTemplate.Tags.get -> System.Collections.Immutable.ImmutableArray<string!>
+Systemic.Rules.SpawnTemplate.Tags.init -> void
+virtual Systemic.Rules.RuleActionHandler.Invoke(in Systemic.Rules.RuleActionContext context) -> void
 Systemic.Rules.RuleConditionKind.Query = 4 -> Systemic.Rules.RuleConditionKind
 Systemic.Host.HeadlessSystemicHost.Dispose() -> void

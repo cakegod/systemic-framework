@@ -135,14 +135,19 @@
       "type": "object", "additionalProperties": false,
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["adjustProperty", "setModifier", "addTag", "emitEvent"] },
+        "kind": { "enum": ["adjustProperty", "setModifier", "addTag", "removeTag", "emitEvent", "despawn", "transfer", "spawn", "schedule", "action"] },
         "subject": { "$ref": "#/$defs/subject" },
         "row": { "$ref": "#/$defs/rowSubject" },
         "factRow": { "$ref": "#/$defs/id" },
         "property": { "type": "string", "pattern": "\\S" },
+        "targetProperty": { "type": "string", "pattern": "\\S" },
         "amount": { "type": "number" },
+        "quantity": { "enum": ["add", "set", "multiply", "min", "max"] },
         "tag": { "type": "string", "pattern": "\\S" },
         "event": { "$ref": "#/$defs/id" },
+        "template": { "$ref": "#/$defs/id" },
+        "action": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$" },
+        "delayTicks": { "type": "integer", "minimum": 1, "maximum": 1000000 },
         "operation": { "enum": ["add", "multiply", "set"] },
         "value": { "type": "number" },
         "stage": { "enum": ["foundation", "standard", "additive", "multiplicative", "override", "final"] },
@@ -153,7 +158,13 @@
         { "if": { "properties": { "kind": { "const": "adjustProperty" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["property", "amount"] } },
         { "if": { "properties": { "kind": { "const": "setModifier" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["property", "operation", "value"] } },
         { "if": { "properties": { "kind": { "const": "addTag" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["tag"] } },
-        { "if": { "properties": { "kind": { "const": "emitEvent" } }, "required": ["kind"] }, "then": { "required": ["event"] } }
+        { "if": { "properties": { "kind": { "const": "removeTag" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["tag"] } },
+        { "if": { "properties": { "kind": { "const": "emitEvent" } }, "required": ["kind"] }, "then": { "required": ["event"] } },
+        { "if": { "properties": { "kind": { "const": "despawn" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm" } },
+        { "if": { "properties": { "kind": { "const": "transfer" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["property", "amount"] } },
+        { "if": { "properties": { "kind": { "const": "spawn" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["template"] } },
+        { "if": { "properties": { "kind": { "const": "schedule" } }, "required": ["kind"] }, "then": { "required": ["event", "delayTicks"] } },
+        { "if": { "properties": { "kind": { "const": "action" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["action"] } }
       ]
     }
   }
