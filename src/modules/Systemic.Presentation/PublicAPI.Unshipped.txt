@@ -18,3 +18,17 @@ Systemic.Presentation.UiActionResult.LayoutId.init -> void
 Systemic.Presentation.UiActionResult.RolledBack.get -> bool
 Systemic.Presentation.UiActionResult.RolledBack.init -> void
 Systemic.Presentation.UiActionResult.UiActionResult(string! LayoutId, string! ActionId, bool Handled, bool RolledBack) -> void
+Systemic.Presentation.UiNode.Amount.get -> int?
+Systemic.Presentation.UiNode.Amount.init -> void
+Systemic.Presentation.UiNode.Deconstruct(out string! Type, out string? Text, out string? Bind, out string? Action, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!> Children, out double? Minimum, out double? Maximum, out string? VisualRecipeId, out string? Tooltip, out int? Amount) -> void
+Systemic.Presentation.UiNode.Tooltip.get -> string?
+Systemic.Presentation.UiNode.Tooltip.init -> void
+Systemic.Presentation.UiNode.UiNode(string! Type, string? Text, string? Bind, string? Action, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNode!> Children, double? Minimum = null, double? Maximum = null, string? VisualRecipeId = null, string? Tooltip = null, int? Amount = null) -> void
+Systemic.Presentation.UiNodeState.Amount.get -> int?
+Systemic.Presentation.UiNodeState.Amount.init -> void
+Systemic.Presentation.UiNodeState.Deconstruct(out string! Type, out string? Text, out string? Action, out string? VisualRecipeId, out bool HasValue, out double? NumberValue, out string? TextValue, out double? Progress, out string? VisualState, out System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children, out string? Tooltip, out int? Amount, out bool IsOn) -> void
+Systemic.Presentation.UiNodeState.IsOn.get -> bool
+Systemic.Presentation.UiNodeState.IsOn.init -> void
+Systemic.Presentation.UiNodeState.Tooltip.get -> string?
+Systemic.Presentation.UiNodeState.Tooltip.init -> void
+Systemic.Presentation.UiNodeState.UiNodeState(string! Type, string? Text, string? Action, string? VisualRecipeId, bool HasValue, double? NumberValue, string? TextValue, double? Progress, string? VisualState, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children, string? Tooltip = null, int? Amount = null, bool IsOn = false) -> void

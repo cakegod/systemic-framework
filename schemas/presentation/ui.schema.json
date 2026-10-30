@@ -18,6 +18,8 @@
         "text": { "type": "string" },
         "bind": { "type": "string" },
         "action": { "$ref": "#/$defs/id" },
+        "tooltip": { "type": "string", "maxLength": 256 },
+        "amount": { "type": "integer", "minimum": 1, "maximum": 1000000 },
         "minimum": { "type": "number" },
         "maximum": { "type": "number" },
         "visualRecipeId": { "$ref": "#/$defs/id" },

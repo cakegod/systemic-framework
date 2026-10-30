@@ -38,7 +38,9 @@ public sealed record UiNode(
     ImmutableArray<UiNode> Children,
     double? Minimum = null,
     double? Maximum = null,
-    string? VisualRecipeId = null);
+    string? VisualRecipeId = null,
+    string? Tooltip = null,
+    int? Amount = null);
 
 public sealed record CompiledVisuals(ImmutableArray<VisualRecipe> Recipes);
 

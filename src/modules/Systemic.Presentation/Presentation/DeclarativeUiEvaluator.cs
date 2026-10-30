@@ -52,7 +52,10 @@ public sealed record UiNodeState(
     string? TextValue,
     double? Progress,
     string? VisualState,
-    ImmutableArray<UiNodeState> Children);
+    ImmutableArray<UiNodeState> Children,
+    string? Tooltip = null,
+    int? Amount = null,
+    bool IsOn = false);
 
 /// <summary>Evaluates declarative UI bindings into immutable data for engine adapters to render.</summary>
 public static class DeclarativeUiEvaluator
@@ -86,7 +89,7 @@ public static class DeclarativeUiEvaluator
             }
 
             return new UiNodeState(node.Type, node.Text, node.Action, node.VisualRecipeId, false, null, null,
-                null, null, items.ToImmutable());
+                null, null, items.ToImmutable(), node.Tooltip, node.Amount);
         }
 
         var value = descriptor is null ? default : Resolve(context, descriptor);
@@ -104,8 +107,12 @@ public static class DeclarativeUiEvaluator
             children.Add(EvaluateNode(node.Children[index], context, plan.Children[index]));
         }
 
+        // A toggle reads one binding as a boolean threshold, so the same provider that feeds a
+        // choice list also drives the switch without a second binding kind.
+        var isOn = node.Type == "toggle" && value.Number is > 0.5;
         return new UiNodeState(node.Type, node.Text, node.Action, node.VisualRecipeId, value.HasValue,
-            value.Number, value.Text, progress, ResolveVisualState(node, descriptor, context), children.MoveToImmutable());
+            value.Number, value.Text, progress, ResolveVisualState(node, descriptor, context),
+            children.MoveToImmutable(), node.Tooltip, node.Amount, isOn);
     }
 
     private static string? ResolveVisualState(UiNode node, UiBindingDescriptor? descriptor, UiBindingContext context)
