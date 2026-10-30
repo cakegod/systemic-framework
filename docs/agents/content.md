@@ -139,6 +139,7 @@ that read only `query.count` or `query.value` still run.
 ## Effects
 
 - `adjustProperty`: change a numeric property. `quantity` picks how: `add` (default), `set`, `multiply`, `min`, or `max`.
+- `clearScope`: despawn every entity carrying the given scope tag, for example `scope.run`, and leave the other scopes intact.
 - `setModifier`: typed, staged, optionally timed modifier. `operation` is `add`, `multiply`, `set`, `min`, or `max`. Add `fromProperty` to make the amount follow another property at read time, which is how an upgrade rank drives its own effects.
 - `addTag`, `removeTag`: change an entity's tags.
 - `emitEvent`: dispatch another fact immediately.

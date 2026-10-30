@@ -146,7 +146,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["kind"],
       "properties": {
-        "kind": { "enum": ["adjustProperty", "setModifier", "addTag", "removeTag", "emitEvent", "despawn", "transfer", "spawn", "schedule", "action"] },
+        "kind": { "enum": ["adjustProperty", "setModifier", "addTag", "removeTag", "emitEvent", "despawn", "transfer", "spawn", "schedule", "action", "clearScope"] },
         "subject": { "$ref": "#/$defs/subject" },
         "row": { "$ref": "#/$defs/rowSubject" },
         "factRow": { "$ref": "#/$defs/id" },
@@ -176,7 +176,8 @@
         { "if": { "properties": { "kind": { "const": "transfer" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["property", "amount"] } },
         { "if": { "properties": { "kind": { "const": "spawn" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["template"] } },
         { "if": { "properties": { "kind": { "const": "schedule" } }, "required": ["kind"] }, "then": { "required": ["event", "delayTicks"] } },
-        { "if": { "properties": { "kind": { "const": "action" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["action"] } }
+        { "if": { "properties": { "kind": { "const": "action" } }, "required": ["kind"] }, "then": { "$ref": "#/$defs/subjectForm", "required": ["action"] } },
+        { "if": { "properties": { "kind": { "const": "clearScope" } }, "required": ["kind"] }, "then": { "required": ["tag"] } }
       ]
     }
   }

@@ -489,6 +489,12 @@ public static partial class ContentPackLoader
                             effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
                         effects.Add(RuleEffect.Despawn(despawnSubject));
                         break;
+                    case "clearScope":
+                        var scopeTag = effect.Tag?.GetString();
+                        Require(!string.IsNullOrWhiteSpace(scopeTag),
+                            $"Rule '{ruleId}' clearScope requires tag.", $"{effectPath}.tag");
+                        effects.Add(RuleEffect.ClearScope(scopeTag!));
+                        break;
                     case "transfer":
                         var transferProperty = effect.Property?.GetString();
                         var transferTargetProperty = effect.TargetProperty?.GetString() ?? transferProperty;

@@ -1672,6 +1672,23 @@ public sealed class RuleEngine
             return;
         }
 
+        // A scope clear addresses a tag across the whole world, so like a schedule it runs before
+        // the subject lookup: a reset fact has no single entity to resolve. Entities are visited in
+        // array order, which is creation order, so the removal set is deterministic.
+        if (effect.Kind == RuleEffectKind.ClearScope)
+        {
+            var scopeTag = effect.Name;
+            foreach (var scoped in world.Entities)
+            {
+                if (!scoped.ToRemove && scoped.HasTag(scopeTag))
+                {
+                    world.Remove(scoped);
+                }
+            }
+
+            return;
+        }
+
         if (effect.Subject.AddressesRow)
         {
             int slot;

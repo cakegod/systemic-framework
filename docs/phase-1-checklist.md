@@ -6,7 +6,7 @@ Gate G1: 41/41 talents are general rules and tags, with zero framework genre typ
 pattern pack covers producer, upgrade, merge, prestige, and worker with tests.
 `Systemic.Incremental` stays frozen, and no new genre API is added.
 
-Status: 1.1 through 1.8 are complete. 1.9 is the next slice. Every unchecked item below
+Status: 1.1 through 1.9 are complete. 1.10 is the next slice. Every unchecked item below
 is a TDD slice: failing test first, smallest implementation to green, then refactor.
 
 ## Execution rules
@@ -31,7 +31,7 @@ is a TDD slice: failing test first, smallest implementation to green, then refac
 | 1.6 | Rules and rule bundles: guards, priority, while conditions, enable and disable, deterministic order | `RuleBundleAndTimeTests` proves a talent tag enables a bundle and a timed grant expires it; rule order is priority then ID, asserted in `RuleEngineTests` | 1.4, 1.5 | done |
 | 1.7 | Time: tick, schedule, delay, cooldown, and deterministic fast-forward | `RuleBundleAndTimeTests` covers a cooldown window and eight hours (1,728,000 ticks) of fast-forward, which matches online exactly | 1.4, 1.5 | done |
 | 1.8 | Generic UI binding: lists, toggles, costs, cooldowns, tooltips, buy amounts, actions | `AChoiceListAndAnUpgradeListShareTheSameWidgetTemplate` repeats one template per tagged entity; `UiWidgetTests` covers the toggle threshold, the tooltip, the buy amount, and rejection of an amount on a non-button; `UiActionTests` covers dispatch and an undeclared action | 1.5, 1.6 | done |
-| 1.9 | Generic save: scopes, state graph, migration, content fingerprint | Save and load across a reset and a content change; a migration test covers the old schema | 1.6, 1.7 | pending |
+| 1.9 | Generic save: scopes, state graph, migration, content fingerprint | `ClearScopeTests` saves, clears a scope through a rule, and restores the cleared entities from that save; `SystemicSaveExtensionTests` covers sequential migrations and rejects a missing step; every document carries a content fingerprint | 1.6, 1.7 | done |
 | 1.10 | Pattern pack: producer, upgrade, talent, merge, prestige, worker, offline, status, unlock | Each pattern has a minimal content example and a test; no pattern names a framework type | 1.4, 1.5, 1.6, 1.7, 1.9 | pending |
 | 1.11 | Port all 41 talents as tags and rules, one file per group plus default | 41/41 talents authored as content; each at most 12 behavior lines; zero C# | 1.3, 1.4, 1.5, 1.6, 1.10 | pending |
 | 1.12 | One headless test per talent, positive and negative | 41 tests green; every test names its talent and asserts both the enabled and disabled case | 1.11 | pending |
@@ -51,14 +51,6 @@ is a TDD slice: failing test first, smallest implementation to green, then refac
 6. 1.11 and 1.12 talents, one group at a time, with tests in the same change.
 7. 1.13 to 1.16 assets, while the talent pack is reviewed in batches.
 8. Run G1 from a clean clone and record the commands.
-
-## Open blocker for 1.9
-
-1.9 cannot be tested across a reset until a general `clearScope` effect exists: nothing in the
-rule vocabulary clears one scope while preserving another, and the only scopes in the tree today
-are expression scopes and transaction scopes. That is a general primitive belonging with the
-1.4 effects, not a change to the save codec, so 1.9 stays open until the primitive lands and is
-proven by two different mechanics.
 
 ## Stop rules
 
