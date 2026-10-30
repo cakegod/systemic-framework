@@ -1,0 +1,301 @@
+{
+  "schemaVersion": 2,
+  "rules": [],
+  "facts": [
+    { "id": "talent.strike" },
+    { "id": "talent.tick" },
+    { "id": "talent.build" },
+    { "id": "talent.hit" },
+    { "id": "talent.launch" },
+    { "id": "talent.pickup" },
+    { "id": "talent.reset" },
+    { "id": "talent.offline" },
+    { "id": "talent.combo" },
+    { "id": "talent.spend" },
+    { "id": "talent.drone" }
+  ],
+  "fragments": [
+    {
+      "id": "talents.default",
+      "rules": [
+        {
+          "id": "motivation", "on": "talent.strike", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.default.motivation" }],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "target", "property": "damage", "amount": 2 },
+            { "kind": "adjustProperty", "subject": "target", "property": "comboChance", "amount": 0.05 }
+          ]
+        },
+        {
+          "id": "hiking-buddy", "on": "talent.strike", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.default.hiking-buddy" }],
+          "effects": [
+            { "kind": "spawn", "subject": "target", "template": "actor.hiking-friend" },
+            { "kind": "adjustProperty", "subject": "target", "property": "yield", "amount": -1 }
+          ]
+        },
+        {
+          "id": "runner-backstop", "on": "talent.tick", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.default.runner-backstop" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "speed", "amount": 1 }]
+        },
+        {
+          "id": "extra-housing", "on": "talent.build", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "talent.default.extra-housing" },
+            { "kind": "expression", "expression": "target.buildCount >= 3" }
+          ],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "housing", "amount": 1 }]
+        },
+        {
+          "id": "bathe-in-fire", "on": "talent.hit", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "talent.default.bathe-in-fire" },
+            { "kind": "expression", "expression": "target.heat >= 1" }
+          ],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "damage", "amount": 3 }]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-1",
+      "rules": [
+        {
+          "id": "strength-in-numbers", "on": "talent.strike", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "talent.g1.strength-in-numbers" },
+            { "kind": "expression", "expression": "target.housing >= 2" }
+          ],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "damage", "amount": 3 }]
+        },
+        {
+          "id": "popcorn", "on": "talent.strike", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g1.popcorn" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "comboChance", "amount": 0.1 }]
+        },
+        {
+          "id": "bullet-breath", "on": "talent.strike", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g1.bullet-breath" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "damage", "amount": 5 }]
+        },
+        {
+          "id": "superhot", "on": "talent.hit", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g1.superhot" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "heat", "amount": 1 }]
+        },
+        {
+          "id": "timeshift-delivery", "on": "talent.tick", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g1.timeshift-delivery" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "rate", "amount": 1 }]
+        },
+        {
+          "id": "explosive-exposition", "on": "talent.hit", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g1.explosive-exposition" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "comboPower", "amount": 1 }]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-2",
+      "rules": [
+        {
+          "id": "inspiration", "on": "talent.tick", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g2.inspiration" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "inspiration", "amount": 1 }]
+        },
+        {
+          "id": "gatling-balloon", "on": "talent.strike", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g2.gatling-balloon" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "rate", "amount": 1 }]
+        },
+        {
+          "id": "the-flow", "on": "talent.tick", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g2.the-flow" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "comboChance", "amount": 0.05 }]
+        },
+        {
+          "id": "bigger-pile", "on": "talent.pickup", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g2.bigger-pile" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "capacity", "amount": 2 }]
+        },
+        {
+          "id": "the-higher-the-pile", "on": "talent.pickup", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "talent.g2.the-higher-the-pile" },
+            { "kind": "expression", "expression": "target.capacity >= 2" }
+          ],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "yield", "amount": 1 }]
+        },
+        {
+          "id": "notes", "on": "talent.strike", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g2.notes" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "notes", "amount": 1 }]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-3",
+      "rules": [
+        {
+          "id": "prestige-expedience", "on": "talent.reset", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g3.prestige-expedience" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "prestigeGain", "amount": 1 }]
+        },
+        {
+          "id": "future-to-the-back", "on": "talent.offline", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g3.future-to-the-back" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "offlineGain", "amount": 1 }]
+        },
+        {
+          "id": "project-constellation", "on": "talent.launch", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g3.project-constellation" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "rocketPower", "amount": 2 }]
+        },
+        {
+          "id": "supershatter", "on": "talent.hit", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g3.supershatter" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "crit", "amount": 0.05 }]
+        },
+        {
+          "id": "return-to-sender", "on": "talent.hit", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "talent.g3.return-to-sender" },
+            { "kind": "expression", "expression": "target.shield >= 1" }
+          ],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "damage", "amount": 1 }]
+        },
+        {
+          "id": "descent-of-the-king", "on": "talent.reset", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "talent.g3.descent-of-the-king" },
+            { "kind": "expression", "expression": "target.shards >= 10" }
+          ],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "multiplier", "amount": 1 }]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-4",
+      "rules": [
+        {
+          "id": "zybellium-mastery", "on": "talent.tick", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g4.zybellium-mastery" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "multiplier", "amount": 1 }]
+        },
+        {
+          "id": "rocket-gatler", "on": "talent.launch", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g4.rocket-gatler" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "rockets", "amount": 1 }]
+        },
+        {
+          "id": "frostfire", "on": "talent.hit", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g4.frostfire" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "heat", "amount": -1 }]
+        },
+        {
+          "id": "infinite-reverberation", "on": "talent.combo", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g4.infinite-reverberation" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "comboPower", "amount": 1 }]
+        },
+        {
+          "id": "deals", "on": "talent.spend", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g4.deals" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "buildCost", "amount": -1 }]
+        },
+        {
+          "id": "reclamation-mitigation", "on": "talent.reset", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g4.reclamation-mitigation" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "shards", "amount": 5 }]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-5",
+      "rules": [
+        {
+          "id": "new-building", "on": "talent.build", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g5.new-building" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "housing", "amount": 1 }]
+        },
+        {
+          "id": "combo-power", "on": "talent.combo", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g5.combo-power" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "comboPower", "amount": 2 }]
+        },
+        {
+          "id": "arrows-last-hurrah", "on": "talent.strike", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "talent.g5.arrows-last-hurrah" },
+            { "kind": "expression", "expression": "target.damage >= 10" }
+          ],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "damage", "amount": 5 }]
+        },
+        {
+          "id": "dont-eat-that", "on": "talent.pickup", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g5.dont-eat-that" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "vulnerability", "amount": -1 }]
+        },
+        {
+          "id": "drone-target", "on": "talent.drone", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g5.drone-target" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "dronePower", "amount": 1 }]
+        },
+        {
+          "id": "vulnerability-empowerment", "on": "talent.hit", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "talent.g5.vulnerability-empowerment" },
+            { "kind": "expression", "expression": "target.vulnerability >= 1" }
+          ],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "damage", "amount": 2 }]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-6",
+      "rules": [
+        {
+          "id": "multiplier-growth", "on": "talent.tick", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g6.multiplier-growth" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "multiplier", "amount": 1 }]
+        },
+        {
+          "id": "pocket-rocket-timeshift-retainment", "on": "talent.offline", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g6.pocket-rocket-timeshift-retainment" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "rocketPower", "amount": 1 }]
+        },
+        {
+          "id": "agitated-zybe", "on": "talent.hit", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g6.agitated-zybe" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "damage", "amount": 1 }]
+        },
+        {
+          "id": "gnorpcalibur-unleashed", "on": "talent.strike", "priority": 10,
+          "when": [
+            { "kind": "hasTag", "subject": "source", "tag": "talent.g6.gnorpcalibur-unleashed" },
+            { "kind": "expression", "expression": "target.notes >= 1" }
+          ],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "crit", "amount": 0.1 }]
+        },
+        {
+          "id": "modern-warfare", "on": "talent.drone", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g6.modern-warfare" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "dronePower", "amount": 2 }]
+        },
+        {
+          "id": "drone-capacity", "on": "talent.drone", "priority": 10,
+          "when": [{ "kind": "hasTag", "subject": "source", "tag": "talent.g6.drone-capacity" }],
+          "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "drones", "amount": 1 }]
+        }
+      ]
+    }
+  ],
+  "useFragments": [
+    "talents.default",
+    "talents.group-1",
+    "talents.group-2",
+    "talents.group-3",
+    "talents.group-4",
+    "talents.group-5",
+    "talents.group-6"
+  ]
+}

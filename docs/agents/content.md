@@ -188,7 +188,7 @@ schedule IDs are not prefixed, and a fragment must declare every bundle its own 
 | --- | --- |
 | Producer | A schedule inside the fragment emits `pattern.produce`; a rule adds to the target's balance |
 | Upgrade | A purchase fact spends currency, raises `rank` on a producer, and a modifier follows that rank |
-| Talent | A rule bundle enabled by a tag, so one tag adds behaviour and removing it stops it. Points, groups, the choice entity, and the free pick are authored in 1.11 |
+| Talent | A rule bundle enabled by a tag, so one tag adds behaviour and removing it stops it. `samples/talent-pack` carries the 41 choice entities with group, unlock, cost, and free metadata; selection rules are a later composition slice |
 | Merge | Two distinct subjects of the same tier despawn and the next tier spawns in their place |
 | Prestige | A transfer of `basisPoints` of the run's earnings pays the meta entity, then `clearScope` removes the run entities and the unspent remainder with them |
 | Worker | Rows carry a tag and a `mined` column; a system publishes one row fact per live worker and one rule credits that row's column when `event.amount` is at least one |
