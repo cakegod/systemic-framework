@@ -275,6 +275,44 @@ public sealed class PresentationPipelineTests
         Assert.Equal([("module.owner", 101, 4), ("module.owner", 202, 9)], provider.Calls);
     }
 
+    [Fact]
+    public void A_choice_list_and_an_upgrade_list_share_the_same_widget_template()
+    {
+        var world = new World(seed: 91, valueScale: 1);
+        world.Add(new DataEntity(["ui.choice"], [], ("cost", 5), ("progress", 0.5)));
+        world.Add(new DataEntity(["ui.choice"], [], ("cost", 7), ("progress", 0.25)));
+        world.Add(new DataEntity(["ui.upgrade"], [], ("cost", 9), ("progress", 0.75)));
+        var layout = new UiLayout("lists", new UiNode("column", null, null, null,
+        [
+            ItemList("ui.choice"),
+            ItemList("ui.upgrade")
+        ]));
+
+        var state = DeclarativeUiEvaluator.Evaluate(layout, new UiBindingContext(world, new Dictionary<string, int>()));
+
+        var choices = state.Children[0];
+        var upgrades = state.Children[1];
+        Assert.Equal(2, choices.Children.Length);
+        Assert.Single(upgrades.Children);
+        Assert.All(choices.Children, item => Assert.Equal(item.Children[0].Type, upgrades.Children[0].Children[0].Type));
+        Assert.Equal(5, choices.Children[0].Children[0].NumberValue);
+        Assert.Equal(7, choices.Children[1].Children[0].NumberValue);
+        Assert.Equal(0.5, choices.Children[0].Children[1].Progress);
+        Assert.Equal(0.25, choices.Children[1].Children[1].Progress);
+        Assert.Equal(9, upgrades.Children[0].Children[0].NumberValue);
+        Assert.Equal(0.75, upgrades.Children[0].Children[1].Progress);
+    }
+
+    private static UiNode ItemList(string tag) =>
+        new("list", null, $"list.tag:{tag}", null,
+        [
+            new UiNode("row", null, null, null,
+            [
+                new UiNode("value", null, "item.cost", null, []),
+                new UiNode("bar", null, "item.progress", null, [], 0, 1)
+            ])
+        ]);
+
     private static VisualRecipe Recipe(ImportedAssetMode importedMode) =>
         new("visual.hybrid", "actor", 11, 2, 1, ["#ff0000"],
             [new VisualLayer("rect", 0, 0, 0, 1, 1, 0)],

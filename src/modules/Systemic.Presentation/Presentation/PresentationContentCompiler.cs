@@ -288,7 +288,7 @@ internal static class PresentationContentCompiler
     {
         Require(depth <= 32, $"UI layout '{layoutId}' exceeds the maximum nesting depth of 32.", fieldPath);
         Require(++budget.Count <= 16_384, "ui.json exceeds the 16,384-node limit.", fieldPath);
-        Require(node.Type is "column" or "row" or "text" or "value" or "bar" or "button" or "icon",
+        Require(node.Type is "column" or "row" or "text" or "value" or "bar" or "button" or "icon" or "list",
             $"UI layout '{layoutId}' has unknown node type '{node.Type}'.", $"{fieldPath}.type");
         if (node.Type == "button")
         {
@@ -320,6 +320,14 @@ internal static class PresentationContentCompiler
         {
             Require(node.Minimum is null && node.Maximum is null,
                 $"UI node '{node.Type}' in '{layoutId}' cannot define a numeric range.", fieldPath);
+        }
+
+        if (node.Type == "list")
+        {
+            Require(bindingDescriptor is { Kind: UiBindingKind.List, ValuePath: { Length: > 0 } },
+                $"UI list in '{layoutId}' requires a list.tag: binding.", $"{fieldPath}.bind");
+            Require(node.Children is { Length: 1 },
+                $"UI list in '{layoutId}' requires exactly one child template.", $"{fieldPath}.children");
         }
 
         var visualRecipeId = node.VisualRecipeId;
@@ -363,8 +371,10 @@ internal static class PresentationContentCompiler
         ContentModuleContext context,
         IReadOnlyDictionary<string, EntityDefinition> entitiesById)
     {
-        if (binding.Kind == UiBindingKind.Selection)
+        if (binding.Kind is UiBindingKind.Selection or UiBindingKind.List or UiBindingKind.Item)
         {
+            // A list tag and an item path are checked against the live world at evaluation time, and
+            // the item template is shared by every tag that renders through it.
             return;
         }
 

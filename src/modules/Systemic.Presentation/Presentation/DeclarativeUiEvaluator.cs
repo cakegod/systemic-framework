@@ -34,6 +34,12 @@ public sealed class UiBindingContext
     public IReadOnlyList<ISystemicUiBindingProvider> Providers { get; }
     public int? ChoiceOwnerEntityId { get; }
     internal SystemicUiBindingContext ProviderContext { get; }
+
+    /// <summary>Gets the entity one list item is evaluated against, when this context is an item scope.</summary>
+    internal int? ItemEntityId { get; init; }
+
+    internal UiBindingContext WithItem(int entityId) =>
+        new(World, EntityIds, Selection, EventFact, Providers, ChoiceOwnerEntityId) { ItemEntityId = entityId };
 }
 
 public sealed record UiNodeState(
@@ -61,6 +67,28 @@ public static class DeclarativeUiEvaluator
     private static UiNodeState EvaluateNode(UiNode node, UiBindingContext context, UiBindingNodePlan plan)
     {
         var descriptor = plan.Binding;
+        if (node.Type == "list" && descriptor is { Kind: UiBindingKind.List, ValuePath: { } listTag })
+        {
+            // The authored template repeats once per live entity carrying the tag, in ascending entity
+            // ID order, so a choice list and an upgrade list render through the same node tree.
+            var items = ImmutableArray.CreateBuilder<UiNodeState>();
+            if (node.Children.Length == 1)
+            {
+                foreach (var entity in context.World.Entities)
+                {
+                    if (entity.ToRemove || !context.World.HasTag(entity, listTag))
+                    {
+                        continue;
+                    }
+
+                    items.Add(EvaluateNode(node.Children[0], context.WithItem(entity.Id), plan.Children[0]));
+                }
+            }
+
+            return new UiNodeState(node.Type, node.Text, node.Action, node.VisualRecipeId, false, null, null,
+                null, null, items.ToImmutable());
+        }
+
         var value = descriptor is null ? default : Resolve(context, descriptor);
         double? progress = null;
         if (node.Type == "bar" && value.Number is { } number)
@@ -116,6 +144,23 @@ public static class DeclarativeUiEvaluator
             && double.IsFinite(selectionValue))
         {
             return BindingValue.FromNumber(selectionValue);
+        }
+
+        if (binding.Kind == UiBindingKind.Item && context.ItemEntityId is { } itemId
+            && context.World.ById(itemId) is { } item)
+        {
+            var itemPath = binding.ValuePath!;
+            if (itemPath.StartsWith("tag.", StringComparison.Ordinal))
+            {
+                return BindingValue.FromNumber(
+                    context.World.HasTag(item, itemPath["tag.".Length..]) ? 1 : 0);
+            }
+
+            if (context.World.TryGetEffectiveProperty(item, itemPath, out var itemValue)
+                && double.IsFinite(itemValue))
+            {
+                return BindingValue.FromNumber(itemValue);
+            }
         }
 
         if (binding.Kind == UiBindingKind.Event && context.EventFact is { } fact)

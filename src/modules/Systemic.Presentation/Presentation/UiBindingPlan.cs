@@ -11,6 +11,8 @@ internal enum UiBindingKind
     Selection,
     Event,
     Choice,
+    List,
+    Item,
 }
 
 internal readonly record struct UiWorldBindingCandidate(string EntityPath, string MemberPath, string? Tag);
@@ -84,6 +86,17 @@ internal static class UiBindingParser
         if (TryParsePrefixedPath(binding, "event.", out var eventPath))
         {
             return new UiBindingDescriptor(binding, UiBindingKind.Event, eventPath);
+        }
+
+        if (binding.StartsWith("list.tag:", StringComparison.Ordinal)
+            && binding.Length > "list.tag:".Length)
+        {
+            return new UiBindingDescriptor(binding, UiBindingKind.List, binding["list.tag:".Length..]);
+        }
+
+        if (TryParsePrefixedPath(binding, "item.", out var itemPath))
+        {
+            return new UiBindingDescriptor(binding, UiBindingKind.Item, itemPath);
         }
 
         if (TryParsePrefixedPath(binding, "choice.", out var choicePath))
