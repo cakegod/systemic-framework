@@ -430,4 +430,23 @@ public sealed class CompiledRuleSet
 
     public ImmutableArray<CompiledRule> ForEvent(string eventType) =>
         _byEvent.TryGetValue(eventType, out var rules) ? rules : [];
+
+    /// <summary>Returns a copy of this rule set with the supplied game actions merged in.</summary>
+    /// <param name="actions">Action handlers keyed by the name rules invoke.</param>
+    /// <remarks>
+    /// A loaded pack has no action handlers, because handlers are code. A host registers them through
+    /// this copy instead of rebuilding the rule set, so facts, templates, bundles, and event windows
+    /// stay exactly as the loader compiled them.
+    /// </remarks>
+    public CompiledRuleSet WithActions(IReadOnlyDictionary<string, RuleActionHandler> actions)
+    {
+        ArgumentNullException.ThrowIfNull(actions);
+        return new CompiledRuleSet(Rules, Schedules)
+        {
+            Facts = Facts,
+            Templates = Templates,
+            Bundles = Bundles,
+            Actions = Actions.SetItems(actions),
+        };
+    }
 }

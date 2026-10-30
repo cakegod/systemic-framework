@@ -126,3 +126,5 @@ Systemic.Rules.RuleEffect.SourceProperty.get -> string?
 Systemic.Rules.RuleEffect.SourceProperty.init -> void
 Systemic.Rules.RuleConditionKind.Query = 4 -> Systemic.Rules.RuleConditionKind
 Systemic.Host.HeadlessSystemicHost.Dispose() -> void
+Systemic.Host.SystemicGameBuilder.AddRuleAction(string! name, Systemic.Rules.RuleActionHandler! handler) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Rules.CompiledRuleSet.WithActions(System.Collections.Generic.IReadOnlyDictionary<string!, Systemic.Rules.RuleActionHandler!>! actions) -> Systemic.Rules.CompiledRuleSet!

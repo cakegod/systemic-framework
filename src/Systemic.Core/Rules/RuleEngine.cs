@@ -965,6 +965,8 @@ public sealed class RuleEngine
             throw new InvalidOperationException("RuleEngine does not support nested or concurrent dispatches.");
         }
 
+        // Declared before the try so the catch can restore the queue when a system or action throws.
+        var batchScheduledStart = _scheduled.Count;
         _dispatchActive = true;
         try
         {
@@ -976,7 +978,6 @@ public sealed class RuleEngine
             var cutOff = false;
             string? cutoffReason = null;
             var rolledBack = false;
-            var batchScheduledStart = _scheduled.Count;
             _cooldownChanges.Clear();
             for (var index = 0; index < facts.Length; index++)
             {
@@ -1021,8 +1022,16 @@ public sealed class RuleEngine
 
             return new RuleDispatchResult(factsProcessed, rulesMatched, effectsApplied, cutOff, cutoffReason, rolledBack);
         }
+        catch
+        {
+            // A throwing system or action leaves the batch unfinished, so undo the engine state it
+            // recorded before the exception reached the host.
+            RestoreEngineState(batchScheduledStart, 0);
+            throw;
+        }
         finally
         {
+            _cooldownChanges.Clear();
             _batchTransaction = null;
             _activeTransaction = null;
             _dispatchActive = false;
@@ -1040,6 +1049,8 @@ public sealed class RuleEngine
             throw new InvalidOperationException("RuleEngine does not support nested or concurrent dispatches.");
         }
 
+        var scheduledBefore = _scheduled.Count;
+        var cooldownBefore = _cooldownChanges.Count;
         _dispatchActive = true;
         _dispatchGeneration = checked(_dispatchGeneration + 1);
         _factBudgetExceeded = false;
@@ -1049,8 +1060,16 @@ public sealed class RuleEngine
         {
             return DispatchCoreActive(world, initialFact, beforeEachFact, trace);
         }
+        catch
+        {
+            // An action can throw mid-fact. Engine tables the dispatch added are not committed then,
+            // because the world transaction has not seen them.
+            RestoreEngineState(scheduledBefore, cooldownBefore);
+            throw;
+        }
         finally
         {
+            _cooldownChanges.Clear();
             _dispatchActive = false;
             _activeTransaction = null;
         }
@@ -1236,12 +1255,7 @@ public sealed class RuleEngine
         {
             // Delayed facts are engine state, not world state, so a rolled-back dispatch has to drop
             // the ones it queued itself. Otherwise a failed tick would leave work for a later tick.
-            if (_scheduled.Count > scheduledCount)
-            {
-                _scheduled.RemoveRange(scheduledCount, _scheduled.Count - scheduledCount);
-            }
-
-            RestoreCooldowns();
+            RestoreEngineState(scheduledCount, 0);
 
             _activeTransaction = null;
             transaction.Rollback();
@@ -1997,6 +2011,29 @@ public sealed class RuleEngine
         foreach (var key in expired)
         {
             _lastRuleFire.Remove(key);
+        }
+    }
+
+    private void RestoreEngineState(int scheduledStart, int cooldownChangeStart)
+    {
+        if (_scheduled.Count > scheduledStart)
+        {
+            _scheduled.RemoveRange(scheduledStart, _scheduled.Count - scheduledStart);
+        }
+
+        while (_cooldownChanges.Count > cooldownChangeStart)
+        {
+            var change = _cooldownChanges[^1];
+            if (change.HadPrevious)
+            {
+                _lastRuleFire[change.Key] = change.Previous;
+            }
+            else
+            {
+                _lastRuleFire.Remove(change.Key);
+            }
+
+            _cooldownChanges.RemoveAt(_cooldownChanges.Count - 1);
         }
     }
 
