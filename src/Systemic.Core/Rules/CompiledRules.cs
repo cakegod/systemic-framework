@@ -319,14 +319,14 @@ public readonly record struct RuleEffect(
         new(RuleEffectKind.SetModifier, subject, property, value, operation, stage, durationTicks);
 
     /// <summary>Creates a modifier whose amount follows another property, such as an upgrade rank.</summary>
-    public static RuleEffect SetModifier(
+    public static RuleEffect SetModifierFromProperty(
         RuleSubject subject,
         string property,
         ModifierOperation operation,
         double value,
         string sourceProperty,
-        ModifierStage stage = ModifierStage.Standard,
-        int durationTicks = -1)
+        ModifierStage stage,
+        int durationTicks)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceProperty);
         return new RuleEffect(RuleEffectKind.SetModifier, subject, property, value, operation, stage,

@@ -444,7 +444,7 @@ public static partial class ContentPackLoader
                         effects.Add(fromProperty is null
                             ? RuleEffect.SetModifier(modifierSubject, modifierProperty!, operation,
                                 modifierValue.GetValueOrDefault(), stage, durationTicks)
-                            : RuleEffect.SetModifier(modifierSubject, modifierProperty!, operation,
+                            : RuleEffect.SetModifierFromProperty(modifierSubject, modifierProperty!, operation,
                                 modifierValue.GetValueOrDefault(), fromProperty, stage, durationTicks));
                         break;
                     case "addTag":

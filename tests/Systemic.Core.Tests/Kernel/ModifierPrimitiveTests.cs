@@ -38,7 +38,8 @@ public sealed class ModifierPrimitiveTests
         var world = new World(seed: 3, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("rank", 3), ("rate", 2)));
 
-        world.SetModifier("upgrade", entity, "rate", ModifierOperation.Add, 1, sourceProperty: "rank");
+        world.SetModifierFromProperty("upgrade", entity, "rate", ModifierOperation.Add, 1, "rank", -1, 0,
+            ModifierStage.Standard);
         Assert.Equal(5, world.EffectiveProperty(entity, "rate"));
 
         Assert.True(entity.TrySetProperty(world, "rank", 5));
@@ -51,7 +52,8 @@ public sealed class ModifierPrimitiveTests
         var world = new World(seed: 4, valueScale: 1);
         var entity = world.Add(new DataEntity([], [], ("rate", 2)));
 
-        world.SetModifier("upgrade", entity, "rate", ModifierOperation.Add, 1, sourceProperty: "rank");
+        world.SetModifierFromProperty("upgrade", entity, "rate", ModifierOperation.Add, 1, "rank", -1, 0,
+            ModifierStage.Standard);
 
         Assert.Equal(2, world.EffectiveProperty(entity, "rate"));
     }
@@ -63,8 +65,8 @@ public sealed class ModifierPrimitiveTests
         world.LogicalTick = 1;
         var entity = world.Add(new DataEntity([], [], ("rank", 2), ("rate", 2)));
 
-        world.SetModifier("buff", entity, "rate", ModifierOperation.Add, 1, sourceProperty: "rank",
-            remainingTicks: 2);
+        world.SetModifierFromProperty("buff", entity, "rate", ModifierOperation.Add, 1, "rank", 2, 0,
+            ModifierStage.Standard);
         Assert.Equal(4, world.EffectiveProperty(entity, "rate"));
 
         world.LogicalTick = 3;

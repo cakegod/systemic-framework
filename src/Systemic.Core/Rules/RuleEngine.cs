@@ -1616,8 +1616,8 @@ public sealed class RuleEngine
             case RuleEffectKind.SetModifier:
                 if (effect.SourceProperty is { } sourceProperty)
                 {
-                    world.SetModifier(ruleId, entity, effect.Name, effect.Operation, effect.Value,
-                        sourceProperty, effect.DurationTicks, stage: effect.Stage);
+                    world.SetModifierFromProperty(ruleId, entity, effect.Name, effect.Operation, effect.Value,
+                        sourceProperty, effect.DurationTicks, 0, effect.Stage);
                 }
                 else
                 {

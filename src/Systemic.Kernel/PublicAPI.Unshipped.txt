@@ -7,4 +7,4 @@ Systemic.Kernel.ModifierOperation.Max = 4 -> Systemic.Kernel.ModifierOperation
 Systemic.Kernel.ModifierOperation.Min = 3 -> Systemic.Kernel.ModifierOperation
 Systemic.Kernel.PropertyModifier.SourceProperty.get -> string?
 Systemic.Kernel.PropertyModifier.SourceProperty.init -> void
-Systemic.Kernel.World.SetModifier(string! source, Systemic.Kernel.Entity! entity, string! property, Systemic.Kernel.ModifierOperation operation, double value, string! sourceProperty, int remainingTicks = -1, int priority = 0, Systemic.Kernel.ModifierStage stage = Systemic.Kernel.ModifierStage.Standard) -> void
+Systemic.Kernel.World.SetModifierFromProperty(string! source, Systemic.Kernel.Entity! entity, string! property, Systemic.Kernel.ModifierOperation operation, double value, string! sourceProperty, int remainingTicks, int priority, Systemic.Kernel.ModifierStage stage) -> void

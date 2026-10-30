@@ -238,7 +238,7 @@ public sealed class SystemicSaveCodec
                 var remainingTicks = RemainingFromExpiry(modifier.ExpiryTick, world.LogicalTick);
                 if (modifier.SourceProperty is { } sourceProperty)
                 {
-                    world.SetModifier(modifier.Source, world.ById(modifier.EntityId)!, modifier.Property,
+                    world.SetModifierFromProperty(modifier.Source, world.ById(modifier.EntityId)!, modifier.Property,
                         modifier.Operation, modifier.Value, sourceProperty, remainingTicks,
                         modifier.Priority, modifier.Stage);
                 }

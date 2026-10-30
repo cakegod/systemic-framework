@@ -1676,16 +1676,16 @@ public sealed class World
     /// <param name="priority">Order within the same stage.</param>
     /// <param name="stage">When the modifier applies relative to other stages.</param>
     /// <remarks>A modifier that names a missing property contributes zero rather than failing a read.</remarks>
-    public void SetModifier(
+    public void SetModifierFromProperty(
         string source,
         Entity entity,
         string property,
         ModifierOperation operation,
         double value,
         string sourceProperty,
-        int remainingTicks = -1,
-        int priority = 0,
-        ModifierStage stage = ModifierStage.Standard) =>
+        int remainingTicks,
+        int priority,
+        ModifierStage stage) =>
         SetModifierCore(source, entity, property, operation, value, sourceProperty, remainingTicks, priority, stage);
 
     private void SetModifierCore(
