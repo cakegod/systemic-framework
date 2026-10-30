@@ -49,14 +49,14 @@ For host systems, `Order` sorts registration before the schedule is built. It se
 | You need to | Use |
 | --- | --- |
 | Run a tick system in a Core host | `ISystemicSystem` + `SystemicGameBuilder.AddSystem`; declare `Access` so compatible systems share a wave |
-| Drive Kernel without content, rules or the host | `IScheduledKernelSystem` + `DeterministicSystemScheduleBuilder` |
+| Drive Kernel without content or the host | `IScheduledKernelSystem` + `DeterministicSystemScheduleBuilder` |
 | Read population rows outside an access callback (rendering, UI, tests) | the generated `<Schema>Population.Snapshot(population, range, buffer)` |
 | Read a few rows inside a system | `WithAccess` + `ReadCurrent`/`ReadRange` |
 | Write disjoint rows from parallel partitions | `ForEachPopulationRange` + `Columns.WriteRange(ref access)` |
 | Change World state this tick | `Commands` (deferred, shared wave) then `ApplyDeferredCommands()` in a standalone harness |
 | Remove an entity | `Commands.Remove(entityId)` in a system, or `World.Remove(entity)` outside the schedule |
 | Emit a fact other systems may observe this tick | `Publish` (immediate, needs `WriteWorld`) |
-| Emit a fact only rules and observers need | `DeferFact` (needs `DeferWorldWrites`, shared wave) |
+| Emit a fact only other systems and observers need | `DeferFact` (needs `DeferWorldWrites`, shared wave) |
 
 Immediate World operations are the only way to make a change visible to another system in the same tick. They require `WriteWorld`, which excludes every other system from the wave. When the change can wait until the tick ends, queue it through `Commands` and keep a shared wave.
 
