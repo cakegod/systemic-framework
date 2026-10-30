@@ -171,3 +171,24 @@ that read only `query.count` or `query.value` still run.
 Row subjects accept property adjustments, tags, and modifiers. Spawn, despawn, transfer, schedule, and actions address entities, because a population row has no world position, no removal lifetime, and no entity to hand an action.
 
 If a mechanic cannot be expressed, add a general primitive or a game action. Do not add a genre noun to the framework.
+
+## Copy a pattern
+
+`samples/pattern-pack` is a content-only reference for nine mechanics. Each is a rule fragment in
+`rules.json`, listed in `useFragments`, so a game copies the fragment it needs and changes the IDs.
+
+| Pattern | Composition |
+| --- | --- |
+| Producer | A schedule emits `pattern.produce`; a rule adds to the target's balance |
+| Upgrade | A purchase fact spends currency, raises `rank`, and a modifier follows that rank |
+| Talent | A rule bundle enabled by a tag, so one tag adds behaviour and removing it stops it |
+| Merge | Two subject entities despawn and a higher tier spawns in their place |
+| Prestige | A grant rule pays the meta entity, then `clearScope` removes the run entities |
+| Worker | One population row per worker; a system publishes a fact per row and one rule pays it |
+| Status | A timed `setModifier` that expires after its duration |
+| Unlock | A rule adds a tag, and other rules read that tag |
+| Offline | A catch-up fact that grants elapsed production in one dispatch |
+
+The pack has no UI and no assets: it proves the rule vocabulary, not a game. Validate it with
+`systemic validate samples/pattern-pack`. Its tests live in `tests/Systemic.PatternPack.Tests`, one
+per pattern, each asserting the active and the inactive case.

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "entities": [
+    { "id": "pattern.ore", "kind": "resource", "tags": ["pattern.resource"], "properties": { "balance": 0 } },
+    { "id": "pattern.shards", "kind": "resource", "tags": ["pattern.currency"], "properties": { "balance": 10 } },
+    {
+      "id": "pattern.drill", "kind": "prop", "tags": ["pattern.producer", "scope.run"],
+      "properties": { "rate": 1, "rank": 0, "produced": 0 }
+    },
+    { "id": "pattern.unlock-switch", "kind": "prop", "tags": ["scope.run"], "properties": { "opened": 0 } },
+    {
+      "id": "pattern.fruit.low", "kind": "product", "tags": ["pattern.fruit", "pattern.mergeable"],
+      "properties": { "tier": 1 }, "bounds": { "x": 4, "y": 0, "halfWidth": 1, "halfHeight": 1 }
+    },
+    {
+      "id": "pattern.fruit.low2", "kind": "product", "tags": ["pattern.fruit", "pattern.mergeable"],
+      "properties": { "tier": 1 }, "bounds": { "x": 8, "y": 0, "halfWidth": 1, "halfHeight": 1 }
+    },
+    {
+      "id": "pattern.fruit.high", "kind": "product", "tags": ["pattern.fruit"],
+      "properties": { "tier": 2 }, "bounds": { "x": 0, "y": 0, "halfWidth": 1, "halfHeight": 1 }
+    },
+    { "id": "pattern.run", "kind": "prop", "tags": ["scope.run"], "properties": { "earned": 25 } },
+    { "id": "pattern.meta", "kind": "prop", "tags": ["scope.meta"], "properties": { "shards": 0, "prestiges": 0 } },
+    { "id": "pattern.worker.lead", "kind": "prop", "tags": ["pattern.worker.lead"], "properties": { "rate": 2 } }
+  ]
+}
