@@ -247,6 +247,36 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
+    public void An_average_of_opposite_huge_values_is_their_real_mean()
+    {
+        using var pack = TestPack.Create();
+        WriteEntities(pack, """
+            { "schemaVersion": 2, "entities": [
+              { "id": "worker.a", "kind": "actor", "tags": ["worker"], "properties": { "energy": 1e308 } },
+              { "id": "worker.b", "kind": "actor", "tags": ["worker"], "properties": { "energy": -1e308 } },
+              { "id": "actor.owner", "kind": "actor", "properties": { "score": 0 } }
+            ] }
+            """);
+        WriteRules(pack, """
+            { "schemaVersion": 2, "rules": [
+              { "id": "worker.balance", "on": "contact", "priority": 0,
+                "when": [{ "kind": "query", "selector": { "tag": "worker" },
+                  "aggregate": "average", "aggregateProperty": "energy",
+                  "comparison": "equals", "value": 0 }],
+                "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "score", "amount": 1 }] }
+            ] }
+            """);
+        var content = SystemicTestContent.Load(pack.Root);
+        var materialized = content.CreateWorld(seed: 1, valueScale: 1);
+        var owner = materialized.World.ById(materialized.EntityIds["actor.owner"])!;
+
+        var result = new RuleEngine(content.Rules).Dispatch(materialized.World,
+            new SimulationFact("contact", owner.Id, owner.Id));
+
+        Assert.Equal(1, result.RulesMatched);
+    }
+
+    [Fact]
     public void A_formula_reading_a_missing_distance_does_not_throw()
     {
         using var pack = TestPack.Create();
