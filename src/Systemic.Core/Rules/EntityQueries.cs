@@ -140,7 +140,18 @@ internal static class EntityQueryEvaluator
                 return false;
             }
 
-            world.QuerySpatialNearby(center, (float)radius, results);
+            try
+            {
+                world.QuerySpatialNearby(center, (float)radius, results);
+            }
+            catch (Exception exception)
+                when (exception is ArgumentOutOfRangeException or InvalidOperationException)
+            {
+                // The index refuses a box wider than its cell budget. An authored radius is a content
+                // decision, so fall back to a scan instead of failing during dispatch.
+                CollectWithinRadius(world, center, (float)radius, results);
+            }
+
             return true;
         }
 
@@ -168,6 +179,23 @@ internal static class EntityQueryEvaluator
         }
 
         return true;
+    }
+
+    private static void CollectWithinRadius(World world, Point2 center, float radius, List<int> results)
+    {
+        var limit = (double)radius * radius;
+        foreach (var entity in world.Entities)
+        {
+            if (entity.ToRemove || !world.TryGetSpatialBounds(entity.Id, out _))
+            {
+                continue;
+            }
+
+            if (DistanceSquared(world, entity.Id, center) <= limit)
+            {
+                results.Add(entity.Id);
+            }
+        }
     }
 
     private static void Filter(World world, EntitySelector selector, List<int> candidates)

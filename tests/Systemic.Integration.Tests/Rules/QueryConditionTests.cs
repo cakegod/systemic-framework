@@ -162,6 +162,34 @@ public sealed class QueryConditionTests
     }
 
     [Fact]
+    public void A_range_wider_than_the_spatial_index_still_matches()
+    {
+        using var pack = TestPack.Create();
+        WriteEntities(pack, """
+            { "schemaVersion": 2, "entities": [
+              { "id": "housing.near", "kind": "prop", "tags": ["housing"], "bounds": { "x": 3, "y": 0, "halfWidth": 1, "halfHeight": 1 } },
+              { "id": "actor.owner", "kind": "actor", "bounds": { "x": 0, "y": 0, "halfWidth": 1, "halfHeight": 1 }, "properties": { "score": 0 } }
+            ] }
+            """);
+        WriteRules(pack, """
+            { "schemaVersion": 2, "rules": [
+              { "id": "housing.wide", "on": "contact", "priority": 0,
+                "when": [{ "kind": "query", "selector": { "tag": "housing", "origin": "source", "radius": 5000 },
+                  "aggregate": "count", "comparison": "equals", "value": 1 }],
+                "effects": [{ "kind": "adjustProperty", "subject": "target", "property": "score", "amount": 1 }] }
+            ] }
+            """);
+        var content = SystemicTestContent.Load(pack.Root);
+        var materialized = content.CreateWorld(seed: 1, valueScale: 1);
+        var owner = materialized.World.ById(materialized.EntityIds["actor.owner"])!;
+
+        var result = new RuleEngine(content.Rules).Dispatch(materialized.World,
+            new SimulationFact("contact", owner.Id, owner.Id));
+
+        Assert.Equal(1, result.RulesMatched);
+    }
+
+    [Fact]
     public void An_empty_selection_cannot_pass_a_formula()
     {
         using var pack = TestPack.Create();
