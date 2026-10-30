@@ -1,3 +1,40 @@
 #nullable enable
 
 Systemic.Content.ContentTuningSchema.ParseEntity(System.ReadOnlyMemory<byte> entitiesJson, string! sourceFile, string! entityId, Systemic.Content.EntityDefinition? merged) -> Systemic.Content.TuningDocument!
+override Systemic.Rules.FactDefinition.Equals(object? obj) -> bool
+override Systemic.Rules.FactDefinition.GetHashCode() -> int
+override Systemic.Rules.FactDefinition.ToString() -> string!
+~override Systemic.Rules.FactFieldDefinition.Equals(object obj) -> bool
+override Systemic.Rules.FactFieldDefinition.GetHashCode() -> int
+~override Systemic.Rules.FactFieldDefinition.ToString() -> string
+static Systemic.Rules.FactDefinition.operator !=(Systemic.Rules.FactDefinition? left, Systemic.Rules.FactDefinition? right) -> bool
+static Systemic.Rules.FactDefinition.operator ==(Systemic.Rules.FactDefinition? left, Systemic.Rules.FactDefinition? right) -> bool
+static Systemic.Rules.FactFieldDefinition.operator !=(Systemic.Rules.FactFieldDefinition left, Systemic.Rules.FactFieldDefinition right) -> bool
+static Systemic.Rules.FactFieldDefinition.operator ==(Systemic.Rules.FactFieldDefinition left, Systemic.Rules.FactFieldDefinition right) -> bool
+static Systemic.Rules.RuleEffect.Emit(string! eventType, Systemic.Rules.SimulationFactPayload? payload) -> Systemic.Rules.RuleEffect
+Systemic.Rules.CompiledRuleSet.Facts.get -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.FactDefinition!>
+Systemic.Rules.CompiledRuleSet.Facts.init -> void
+Systemic.Rules.FactDefinition
+Systemic.Rules.FactDefinition.<Clone>$() -> Systemic.Rules.FactDefinition!
+Systemic.Rules.FactDefinition.Deconstruct(out string! Id, out System.Collections.Immutable.ImmutableArray<Systemic.Rules.FactFieldDefinition> Fields) -> void
+Systemic.Rules.FactDefinition.Equals(Systemic.Rules.FactDefinition? other) -> bool
+Systemic.Rules.FactDefinition.FactDefinition(string! Id, System.Collections.Immutable.ImmutableArray<Systemic.Rules.FactFieldDefinition> Fields) -> void
+Systemic.Rules.FactDefinition.Fields.get -> System.Collections.Immutable.ImmutableArray<Systemic.Rules.FactFieldDefinition>
+Systemic.Rules.FactDefinition.Fields.init -> void
+Systemic.Rules.FactDefinition.Id.get -> string!
+Systemic.Rules.FactDefinition.Id.init -> void
+Systemic.Rules.FactFieldDefinition
+Systemic.Rules.FactFieldDefinition.Deconstruct(out string! Key, out Systemic.Rules.SimulationFactValueKind Kind) -> void
+Systemic.Rules.FactFieldDefinition.Equals(Systemic.Rules.FactFieldDefinition other) -> bool
+Systemic.Rules.FactFieldDefinition.FactFieldDefinition(string! Key, Systemic.Rules.SimulationFactValueKind Kind) -> void
+Systemic.Rules.FactFieldDefinition.FactFieldDefinition() -> void
+Systemic.Rules.FactFieldDefinition.Key.get -> string!
+Systemic.Rules.FactFieldDefinition.Key.init -> void
+Systemic.Rules.FactFieldDefinition.Kind.get -> Systemic.Rules.SimulationFactValueKind
+Systemic.Rules.FactFieldDefinition.Kind.init -> void
+Systemic.Rules.RuleEffect.Payload.get -> Systemic.Rules.SimulationFactPayload?
+Systemic.Rules.RuleEffect.Payload.init -> void
+Systemic.Rules.RuleScheduleDefinition.Payload.get -> Systemic.Rules.SimulationFactPayload?
+Systemic.Rules.RuleScheduleDefinition.Payload.init -> void
+Systemic.Rules.RuleConditionKind.Query = 4 -> Systemic.Rules.RuleConditionKind
+Systemic.Host.HeadlessSystemicHost.Dispose() -> void

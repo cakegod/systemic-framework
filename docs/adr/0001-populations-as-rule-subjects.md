@@ -2,7 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-10-28
-- Gate: D1 in `docs/framework-remediation-plan.md`
+- Gate: D1 in `docs/agent-first-plan.md`
+- Note: the million-agent target in this record is historical; the decision about populations as rule subjects still applies.
 
 ## Context
 

@@ -65,7 +65,8 @@ internal sealed class ScheduledEventSystem : ISystemicSystem
                 continue;
             }
 
-            context.Publish(new SimulationFact(schedule.EventType, sourceId, targetId, Amount: schedule.Amount));
+            context.Publish(new SimulationFact(schedule.EventType, sourceId, targetId, Amount: schedule.Amount,
+                Payload: schedule.Payload));
         }
     }
 

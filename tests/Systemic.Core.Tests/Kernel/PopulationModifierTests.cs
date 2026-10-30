@@ -6,6 +6,7 @@ namespace Systemic.Tests.Kernel;
 /// Row modifiers are a fixed inline slot block, so a row pays for them once and never allocates to
 /// gain one. The slot key comes from the schema, which is what makes a saved block readable.
 /// </summary>
+[Collection(AllocationMeasurementCollection.Name)]
 public sealed class PopulationModifierTests
 {
     private static readonly PopulationColumnKey<int> s_healthKey =

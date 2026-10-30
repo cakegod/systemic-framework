@@ -1,150 +1,159 @@
-# Systemic game framework
+<div align="center">
+
+# Systemic
 
 [![Quality gates](https://github.com/cakegod/systemic-framework/actions/workflows/quality-gates.yml/badge.svg)](https://github.com/cakegod/systemic-framework/actions/workflows/quality-gates.yml)
+![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
 
-Systemic is a .NET framework for games that need a deterministic simulation. It separates the simulation from optional game modules and engine adapters, so a Core-only game can load entities, run rules, tick and save without referencing incremental gameplay, presentation or 2D gameplay assemblies. The same seed and inputs produce the same world state, save document and replay hash.
+</div>
 
-## Requirements
+Systemic is a .NET framework for deterministic, content-driven games. The current target is small-scope incremental and colony games, with agents, producers, upgrades, merges, and prestige expressed as content patterns over general primitives.
 
-- .NET SDK 10, since the projects target `net10.0`
-- Python 3 for the API documentation check
-- A display with SDL/OpenGL support for the MonoGame and SDL samples
+The framework does not ship a Talent, Merge, Prestige, Upgrade, or Producer subsystem. A talent is a tag plus rules. A merge is a rule over two entities. Prestige is a rule over a reset fact. The composition layer is the point. See the [agent-first plan](docs/agent-first-plan.md) for the full direction.
 
-## Installation
+## Phase 0
 
-The framework is not published as a NuGet package. Clone the repository and build it from source:
+Phase 0 is the agent loop:
+
+- Create a playable pack from a template.
+- Validate it, run it headless, fast-forward it, save it, load it, and verify it.
+- Record and verify a deterministic replay.
+- Render procedural visual recipes to a contact sheet and an atlas.
+- Do all of it with `--json` and stable exit codes.
+
+That loop is implemented. Phase 1 has started with declared facts: a fact can name a typed payload, and emitted and scheduled facts carry it through the same dispatch path. The [Incremental audit](docs/phase-1-incremental-audit.md) freezes the old module and maps its behaviour to general patterns. Queries, the broader effect set, and the 41-talent pack are next.
+
+## Quick start
+
+Requires the .NET 10 SDK.
 
 ```sh
 git clone https://github.com/cakegod/systemic-framework.git
 cd systemic-framework
-dotnet build Systemic.sln --configuration Release
+./bootstrap.sh
 ```
 
-A game references `src/Systemic.Core/Systemic.Core.csproj` and any optional module under `src/modules` that it uses. Projects under `samples/` inherit the Kernel generator reference from [`samples/Directory.Build.targets`](samples/Directory.Build.targets); projects elsewhere add it explicitly.
+The bootstrap builds the solution, creates a temporary game, validates it, runs it, verifies it, and simulates ten seconds.
 
-## Usage
-
-The CLI validates content packs, prints rule traces and serves a local preview:
+To work on a game:
 
 ```sh
-dotnet run --project src/tools/Systemic.Cli -- validate samples/systemic-sandbox
-dotnet run --project src/tools/Systemic.Cli -- trace samples/incremental-quarry incremental.production quarry.ember-source quarry.ore
-dotnet run --project src/tools/Systemic.Cli -- preview samples/incremental-quarry
+dotnet run --project src/tools/Systemic.Cli -- new my-game
+dotnet run --project src/tools/Systemic.Cli -- run my-game --ticks 600
+dotnet run --project src/tools/Systemic.Cli -- verify my-game --ticks 600
+dotnet run --project src/tools/Systemic.Cli -- simulate my-game --seconds 3600 --csv artifacts/simulate.csv
 ```
 
-`preview` serves a read-only page until you press Ctrl+C. `watch` revalidates a pack when its files change, and `new <directory>` creates a minimal project.
+`new` writes a valid pack with a resource, a generator, a scheduled rule, a declarative HUD, and three procedural recipes. It is a game loop, not an empty manifest.
+
+## CLI
+
+| Command | Purpose |
+| --- | --- |
+| `new <dir>` | Create the playable template |
+| `validate <dir>` | Validate schemas, references, and content |
+| `run <dir> --ticks N` | Step the headless host |
+| `simulate <dir> --seconds N --csv path` | Fast-forward and write a balance CSV |
+| `dump <dir>` | Print entities, properties, and the state hash |
+| `save <dir> --out path` | Run and write a checksummed save |
+| `load <dir> --save path` | Restore a save |
+| `verify <dir> --ticks N` | Run twice, restore a save, and compare hashes |
+| `replay record <dir> --out path` | Record a replay |
+| `replay verify <dir> --save path` | Verify a replay tick by tick |
+| `assets sheet <dir> --out path` | Render a labeled contact sheet |
+| `assets validate <dir>` | Check every visual recipe |
+| `assets atlas <dir> --out path --manifest path` | Pack recipes into an atlas |
+
+Every command except `watch` and `preview` accepts `--json`. Exit codes are `0` success, `1` content error, `2` usage, `3` runtime, and `4` verification mismatch.
+
+Errors use a stable envelope:
+
+```json
+{
+  "ok": false,
+  "code": "content.invalid",
+  "message": "Content pack directory does not exist: /tmp/missing"
+}
+```
+
+The envelope also carries diagnostic details with `file`, `path`, `line`, and `column` when content loading produced them.
+
+## Content
+
+A pack has three required files:
+
+- `game.json`: manifest, tick rate, file paths, and optional modules.
+- `entities.json`: entities, tags, numeric properties, links, and visual recipe IDs.
+- `rules.json`: facts, schedules, rules, conditions, effects, and fragments.
+
+Optional declarative presentation lives in `ui.json`, `visuals.json`, and `presentation.json`. The schemas are in `schemas/`, and every diagnostic names the file and JSON path.
+
+A schedule and a rule are enough to express a producer:
+
+```json
+{
+  "schemaVersion": 2,
+  "schedules": [
+    {
+      "id": "demo.pulse",
+      "event": "demo.tick",
+      "everyTicks": 60,
+      "sourceEntityId": "actor.generator",
+      "targetEntityId": "resource.energy"
+    }
+  ],
+  "rules": [
+    {
+      "id": "demo.produce",
+      "on": "demo.tick",
+      "priority": 0,
+      "when": [{ "kind": "hasTag", "subject": "source", "tag": "generator" }],
+      "effects": [
+        { "kind": "adjustProperty", "subject": "target", "property": "balance", "amount": 1 }
+      ]
+    }
+  ]
+}
+```
+
+## Determinism
+
+The host runs fixed ticks. The simulation uses seeded random streams and integer or fixed-point state. The same seed, content fingerprint, and inputs produce the same save state and replay hash.
+
+`verify` checks that two fresh runs finish with the same hash and that a save restores to that hash. Use `replay record` and `replay verify` to compare replay hashes on every tick. A mismatch exits with code 4.
 
 ## Samples
 
-- `samples/systemic-sandbox` is a Core-only pack for rule authoring, with no optional module files.
-- `samples/incremental-quarry` composes the Incremental, Presentation and Gameplay2D modules. Validate or preview it with the CLI commands above.
-- [MonoGame boids](samples/boids-monogame/README.md) runs 100,000 boids on the scheduled path: `dotnet run --configuration Release --project samples/boids-monogame/Boids.MonoGame.csproj`
-- [Glow Garden](samples/glow-garden/README.md) is an incremental colony simulation on MonoGame and Gum: `dotnet run --project samples/glow-garden -c Release`
-- [Molecule swarm](samples/molecule-swarm/README.md) is a tower defense against a growing swarm: `dotnet run --configuration Release --project samples/molecule-swarm -- --autoplay`
-- [Pixel mine](samples/pixel-mine/README.md) is a playable mine of ten million pixels: `dotnet run --configuration Release --project samples/pixel-mine/PixelMine.csproj`
-- [Crowd million](samples/crowd-million/README.md) is a content-only pack used by the crowd benchmark.
+| Sample | Shows | Run |
+| --- | --- | --- |
+| [`systemic-sandbox`](samples/systemic-sandbox) | A Core-only pack with rules | `validate samples/systemic-sandbox` |
+| [`incremental-quarry`](samples/incremental-quarry) | Incremental, Presentation and Gameplay2D composed in one pack | `preview samples/incremental-quarry` |
+| [`boids-monogame`](samples/boids-monogame/README.md) | 100,000 boids on the scheduled path | `dotnet run -c Release --project samples/boids-monogame/Boids.MonoGame.csproj` |
+| [`glow-garden`](samples/glow-garden/README.md) | A playable incremental colony | `dotnet run -c Release --project samples/glow-garden` |
+| [`pixel-mine`](samples/pixel-mine/README.md) | A playable procedural mine | `dotnet run -c Release --project samples/pixel-mine/PixelMine.csproj` |
+| [`molecule-swarm`](samples/molecule-swarm/README.md) | A tower defense against a growing swarm | `dotnet run -c Release --project samples/molecule-swarm -- --autoplay` |
 
-## Project layout
+The samples are references and diagnostics. They are not the target architecture. The million-row crowd and ten-million-pixel benchmarks remain in the repository as headroom checks, not release gates.
 
-- `src/Systemic.Kernel` contains world state, deterministic transactions, queries, modifiers, populations, spatial grids and random state.
-- `src/Systemic.Core` contains content loading, rules, hosting, save contracts, replay and module registration. It references Kernel only.
-- `src/modules/Systemic.Incremental` contains resources, producers, upgrades, advancement choices and their runtime.
-- `src/modules/Systemic.Presentation` contains visual recipes, UI layouts, timelines, cue state and local preview tools.
-- `src/modules/Systemic.Gameplay2D` contains engine-neutral actor, projectile, navigation, spatial targeting and timed status primitives.
-- `src/tools/Systemic.Cli` composes all built-in modules for authoring and preview workflows.
-- `tests` holds unit, integration and process tests for each boundary. `benchmarks/Systemic.Benchmarks` contains the performance gates, and `docs` contains the API guides, ADRs and analyzer reference.
+## Documentation
 
-Each module references Core and Kernel only. Modules never reference sibling modules. A game registers only the module implementations it uses; the CLI registers all built-in modules.
-
-## Author content
-
-Every project has a `game.json` manifest at schema version 3. Core requires the `entities` and `rules` paths. Optional content is declared under the module ID that owns it: Quarry, for example, declares `systemic.incremental`, `systemic.presentation` and `systemic.gameplay2d`, while a Core-only project omits `modules` entirely. A declared module without a registered loader fails with a diagnostic at its manifest entry.
-
-Core entity visual references are opaque IDs, and the Presentation module validates and resolves them. Cross-module identifiers use Core's generic reference catalog, so modules can validate links without project references to each other. Choice icon assignments are presentation content keyed by choice ID.
-
-The Incremental module compiles resource balances, producers, upgrades, actor roles and advancement choices. Its runtime handles production and choice commands. Choice groups can be registered for multiple owners and persist through module extension state.
-
-The Presentation module compiles bounded pixel recipes, imported asset composition, UI layouts and fact timelines, and its rasterizer produces RGBA buffers for actors and effects. Timeline cues publish only after the enclosing fact transaction commits, and rollback suppresses them. The preview exposes layouts, icons, bars and timeline bindings without placing renderer dependencies in the simulation.
-
-The Gameplay2D module compiles actor blueprints and status profiles, and provides deterministic spawning, movement, expiry, spatial target selection, resource transfer and timed status primitives. Hosts add domain rules through Core's generic system and extension contracts.
-
-## Host and save state
-
-`SystemicGame` and `HeadlessSystemicHost` provide fixed-step execution, deterministic facts, rule traces and save operations. Each `ISystemicSystem.Step` call receives one `SystemicSystemContext` for host and Kernel operations: read-only World access, deferred World commands, rule dispatch, registered services, population leases, range work and rollback hooks. Register a system with `SystemicGameBuilder.AddSystem` and declare its resource and generated-column access through `ISystemicSystem.Access`. Systems with undeclared access use the conservative exclusive `SystemAccess.WriteWorld` default. A system that only queues World commands declares `SystemAccess.DeferWorldWrites` and shares its wave with readers and other buffered writers. The [system context guide](docs/api/system-context.md) and [population and scheduling guide](docs/api/populations-and-scheduling.md) describe the contracts in full.
-
-`SystemicSaveCodec` writes versioned, checksummed world state plus opaque stateful-extension data. The current schema is v6, and a version 5 document migrates by dropping the retired typed event engine's counters. Version 4 and earlier are rejected; version 4 has no migration because it stored modifier durations where version 5 stores absolute expiry ticks. Explicit sequential migrations can upgrade supported v5-and-later documents when the schema advances. Core does not serialize module-specific DTOs directly.
-
-## Population simulation
-
-The Kernel supports dense, row-oriented populations for large visual swarms. Annotate an unmanaged partial struct with `[PopulationSchema("stable.id", version)]` and its fields with `[PopulationColumn("column.id")]`; the generator produces typed column bindings, stable column keys, access declarations and range initialization. Generated schemas work with `PopulationCommandBuffer<TKind>` for transactional batched spawns and removals.
-
-Reference Kernel normally and configure `Systemic.Kernel.Generator` as an analyzer with `OutputItemType="Analyzer"` and `ReferenceOutputAssembly="false"`. The analyzer also provides the determinism and system-access diagnostics described in the [analyzer reference](docs/api/analyzers.md).
-
-```csharp
-[PopulationSchema("game.projectiles", 1)]
-partial struct Projectile
-{
-    [PopulationColumn("position", DoubleBuffered = true)] public Vector2 Position;
-    [PopulationColumn("velocity", DoubleBuffered = true)] public Vector2 Velocity;
-    [PopulationColumn("lifetime")] public float Lifetime;
-}
-
-var projectiles = ProjectilePopulation.Define(world);
-var columns = ProjectilePopulation.Bind(projectiles);
-var commands = new PopulationCommandBuffer<Projectile>(projectiles);
-commands.Reserve(spawnCapacity: 1_000, removalCapacity: 1_000);
-commands.Spawn(newProjectiles);
-commands.Flush(); // removals resolve first; additions are initialized as one batch
-```
-
-Row-addressed rules are the crowd tier. A content rule names the population row its fact is about with `factRow`, and `RuleEngine.EvaluateRowEvent` evaluates one event's rules against every row of a population in a single scope: no fact per row, and a leading tag condition reads one packed bit per row instead of the row's mask word. `PopulationSink` collapses rows crossing a threshold into one row-addressed fact. [`samples/crowd-million`](samples/crowd-million/README.md) is a content-only pack for that path. The crowd gate holds one million rows, each evaluating the authored rule every tick with staggered movement, to the simulation's 10 ms share of a 30 Hz frame: 500 ticks after 200 warm-up measure p50 2.8 to 3.3 ms and p95 3.2 to 3.9 ms with zero bytes allocated. A hand-written schema declares its tags and modifier properties through `IPopulationKind`, and `enableHandles: true` lets a fact carry a generation-checked row reference.
-
-`PopulationSpatialGrid2D` builds a dense fixed-bounds 2D grid from position spans. Its short-lived snapshots expose stable exact-radius and bounds queries using caller-owned buffers, and a capped candidate query supports systems that intentionally limit per-row work. Reserve grid rows and query buffers before stepping to avoid warmed allocations.
-
-`SystemicGameBuilder.AddSystem` places each host system in the same deterministic access-declared schedule. Systems are sorted by `Order`, and equal orders retain registration order before scheduling. Conflicting systems preserve this priority, while compatible systems may share a concurrent wave; `SystemAccess.WriteWorld` runs alone. `ISystemicSystem.Access` names World and generated population-column reads and writes. `SystemicSystemContext.ForEachRange` assigns non-overlapping row ranges to workers, and `ReduceRanges` merges partitions in their specified order. A schedule reuses its worker threads across ticks, chooses at most four by default, and is disposed with `SystemicGame`. Kernel-only users can build a lower-level schedule from `IScheduledKernelSystem` with `DeterministicSystemScheduleBuilder`.
-
-Systems must honor every access declaration and write only to their assigned rows. Use `SystemAccess.DeferWorldWrites` for deferred population commands or `SystemAccess.WriteWorld` when a system needs immediate World access, rule dispatch or event dispatch. `SystemicSystemContext.OnRollback` restores external state when a scheduled tick fails. The analyzer catches several direct access and callback violations, but it does not prove whole-program safety; see its [scope and limitations](docs/api/analyzers.md#analysis-boundaries).
-
-Borrow contexts only during the system call. Submit World commands and rollback hooks from the system body; range callbacks write disjoint population slices. Command writers record their execution and reject later use. Cache rollback delegates when you need allocation-free ticks.
+- [Agent-first plan](docs/agent-first-plan.md) is the current direction and gates.
+- [Phase 1 checklist](docs/phase-1-checklist.md) tracks every remaining composition and asset item.
+- [Incremental audit](docs/phase-1-incremental-audit.md) records the Phase 1.1 freeze and pattern mapping.
+- [Agent recipes](docs/agents) cover the run, content, asset, and save loops.
+- [Framework guides](docs/index.md) cover the system context, populations, and analyzers.
+- [ADRs](docs/adr/0001-populations-as-rule-subjects.md) record the population and expression decisions.
 
 ## Verify
 
-Run the test suite, the formatting checks and the API documentation check from the repository root:
-
 ```sh
+dotnet build Systemic.sln --configuration Release
 dotnet test Systemic.sln --configuration Release
-dotnet format Systemic.sln --verify-no-changes
-python3 docs/check_api_xml_docs.py --configuration Release
+dotnet test tests/Systemic.Cli.Tests --configuration Release
 ```
 
-The two `dotnet format` severity passes, the docfx build and the allocation gates also run in CI; see [`.github/workflows`](.github/workflows). Save-format snapshots are checked in as Verify `*.verified.json` files next to their tests. A failure writes a `*.received.json` diff, which git ignores. The full v6 save document is one snapshot, so a wire-format change is reviewed as a diff instead of through scattered assertions.
+The CLI tests create a template, run it, verify it, and check the JSON error envelope. The full suite also covers populations, rules, saves, replays, and the samples.
 
-## Benchmarks
+## Scope
 
-The strict gate runner in `benchmarks/Systemic.Benchmarks` measures reusable workloads:
-
-```sh
-dotnet run -c Release --project benchmarks/Systemic.Benchmarks -- --gate --scenario all --warmup-ticks 1000 --ticks 500 --repeat 3 --workers 1 --max-tick-ms 5 --tick-log artifacts/kernel.csv
-```
-
-It records every measured tick, reports mean, p50, p95, p99 and maximum, and fails if any tick reaches the budget. Kernel scenarios must allocate nothing. `--scenario content` gates 2,000 actors through the entity and rule path at 5 ms with a 4 KiB per-tick allocation budget, which is the only place a frame-time claim is asserted; a wall-clock budget inside the parallel test suite measures the machine rather than the code. `--scenario crowd` gates one million rows against the simulation's 10 ms share of a 30 Hz frame, with a 10 ms budget and zero allocation. `--agents` sets the row count and `--content-root` selects the pack. `--workers` accepts a fixed count; omit it to use the capped machine default. `reactive-query` and `reactive-dispatch` isolate the two stages of the combined actor workload.
-
-`--spatial` measures the three spatial grids on one scene: the unbounded entity index, the rebuilt population grid and the incremental population grid. It cross-checks every radius and bounds query against a brute-force oracle and fails on a parity mismatch or an allocation inside a query:
-
-```sh
-dotnet run -c Release --project benchmarks/Systemic.Benchmarks -- --spatial --iterations 60 --repeat 3
-```
-
-All three grids share `SpatialGrid`'s cell arithmetic, axis windows, wrap rules and ascending result order; they differ only in storage.
-
-The performance target is an Intel Core i5-6200U-class low-power CPU (2 cores, 4 threads, circa 2015 and 2016), with a strict per-tick limit below 5 ms and zero warmed allocations. The available runner is an AMD EPYC 9V74, with benchmark containers capped at two CPUs for a rough core-count comparison. That does not model the target's clock, cache or hyper-threading behavior, so it cannot certify the laptop. The Boids sample's `--strict-budget` headless command measures the full 100,000-boid scheduled path under the same gate. BenchmarkDotNet cases cover grid, scheduler, transaction and reactive query costs. The anonymized behavior matrix is in `tests/Systemic.Integration.Tests/Fixtures/talent-pattern-coverage.json`.
-
-## License
-
-This repository does not include a license file yet, so the default copyright rules apply. Ask the maintainer before reusing the code outside this project.
-
-## Contributors and contact
-
-Systemic is maintained by Fábio Rodrigues Sousa ([@cakegod](https://github.com/cakegod)). Open an issue or a pull request in this repository. The [contributor graph](https://github.com/cakegod/systemic-framework/graphs/contributors) lists everyone who has contributed.
-
-The projects target .NET 10. Core uses `Corvus.Text.Json.Validator` for JSON Schema validation, and the CLI uses `System.CommandLine`; neither introduces an engine dependency. Games consume the framework as a library and supply their own engine adapter, so no engine type is a dependency of the framework.
+This is a personal project. No license is granted for reuse. There is no package, support promise, or external API compatibility commitment.

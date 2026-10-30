@@ -2,7 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-10-28
-- Gate: D2 in `docs/framework-remediation-plan.md`
+- Gate: D2 in `docs/agent-first-plan.md`
+- Note: the language stays frozen; the phase plan around it is historical.
 
 ## Context
 

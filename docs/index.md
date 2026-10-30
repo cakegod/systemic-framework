@@ -1,6 +1,6 @@
 # Systemic Framework API
 
-These guides describe the framework paths system authors use most often. They start at the host system context, then follow population data through access declarations, leases, range work, and scheduled changes.
+The [agent-first plan](agent-first-plan.md) is the current delivery plan. These guides describe the framework paths system authors use most often. They start at the host system context, then follow population data through access declarations, leases, range work, and scheduled changes.
 
 ## Guides
 

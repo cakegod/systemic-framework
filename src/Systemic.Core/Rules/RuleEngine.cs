@@ -246,6 +246,10 @@ public sealed class RuleEngine
                     case RuleConditionKind.HasTag:
                         BindTag(world, rowBindings, rule, condition.Subject, condition.Name);
                         break;
+                    case RuleConditionKind.Query:
+                        throw new InvalidOperationException(
+                            $"Rule '{rule.Id}' applies a query condition to {condition.Subject}; "
+                            + "queries select entities and cannot be addressed to a population row.");
                     default:
                         throw new InvalidOperationException(
                             $"Rule '{rule.Id}' uses a {condition.Kind} condition on {condition.Subject}; "
@@ -1217,6 +1221,37 @@ public sealed class RuleEngine
     {
         foreach (var condition in rule.Conditions)
         {
+            if (condition.Kind == RuleConditionKind.Query)
+            {
+                if (condition.Query is not { } query)
+                {
+                    throw new InvalidOperationException($"Rule '{rule.Id}' has a query condition without a compiled query.");
+                }
+
+                var result = EntityQueryEvaluator.Evaluate(world, query, fact);
+                // A selection with nothing to aggregate has no value: a formula must not read it as
+                // zero and pass, which would run effects for a query that matched nothing.
+                if (!result.HasValue)
+                {
+                    return false;
+                }
+
+                if (query.Formula is { } formula)
+                {
+                    if (!formula.EvaluateBoolean(new QueryExpressionScope(world, fact, this, result)))
+                    {
+                        return false;
+                    }
+                }
+                else if (!result.HasValue
+                    || !EntityQueryEvaluator.Compare(result.Value, query.Threshold, query.Comparison))
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
             if (condition.Kind == RuleConditionKind.Expression)
             {
                 var scope = new WorldExpressionScope(world, fact, this);
@@ -1508,7 +1543,7 @@ public sealed class RuleEngine
             // The row reference travels with the reaction, so a later fact still names the same row
             // and can detect that the row despawned in between.
             EnqueueFact(new SimulationFact(effect.Name, fact.SourceId, fact.TargetId, fact.Depth + 1,
-                fact.Amount, fact.Position, fact.Payload, fact.Row));
+                fact.Amount, fact.Position, effect.Payload ?? fact.Payload, fact.Row));
             return;
         }
 
