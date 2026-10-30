@@ -67,9 +67,14 @@ public static class PresentationGameExtensions
     /// <see cref="UiActionResult.Handled"/> is true only when at least one rule matched, so a layout
     /// that declares an action no rule listens for reports <c>false</c> instead of a silent success.
     /// </remarks>
+    /// <param name="game">The game whose presentation content declares the layout.</param>
+    /// <param name="layoutId">The layout that declares <paramref name="actionId"/>.</param>
+    /// <param name="actionId">The declared action ID, published as the fact type.</param>
+    /// <param name="choiceOwnerEntityId">The entity that owns the click; it becomes both fact subjects.</param>
     /// <param name="amount">
-    /// The buy amount of the node the player clicked, read from <see cref="UiNodeState.Amount"/>. It is
-    /// required when the layout declares the same action more than once with different amounts.
+    /// The amount of the node the player clicked, read from <see cref="UiNodeState.Amount"/> (0 when the
+    /// button carries none). It is required when the layout offers the action at more than one amount,
+    /// and it must be one of the amounts the layout offers.
     /// </param>
     public static UiActionResult InvokeUiAction(
         this SystemicGame game,
@@ -95,18 +100,20 @@ public static class PresentationGameExtensions
                 $"UI layout '{layoutId}' does not declare the action '{actionId}'.");
         }
 
-        // A layout may offer the same action at several amounts, such as "Buy x1" and "Buy x10". The
-        // renderer knows which node the player clicked, so it passes that node's amount instead of
-        // letting the first matching node in the tree decide for every button.
-        var authored = declared.Where(node => node.Amount is not null).Select(node => node.Amount!.Value).Distinct().ToArray();
-        var resolved = amount ?? (authored.Length switch
-        {
-            0 => 0,
-            1 => authored[0],
-            _ => throw new ArgumentException(
+        // A layout may offer the same action at several amounts, such as "Buy x1" and "Buy x10", or at
+        // an amount and none. The renderer knows which node the player clicked, so it passes that
+        // node's amount instead of letting one matching node in the tree decide for every button.
+        var offered = declared.Select(node => node.Amount ?? 0).Distinct().ToArray();
+        var resolved = amount ?? (offered.Length == 1
+            ? offered[0]
+            : throw new ArgumentException(
                 $"UI layout '{layoutId}' declares '{actionId}' at more than one amount; pass the clicked node's amount.",
-                nameof(amount)),
-        });
+                nameof(amount)));
+        if (!offered.Contains(resolved))
+        {
+            throw new ArgumentException(
+                $"UI layout '{layoutId}' does not declare '{actionId}' at amount {resolved}.", nameof(amount));
+        }
 
         // The action id is the fact type, the owning choice entity is both source and target, and the
         // buy amount travels on the fact, so a rule can scale by the quantity the player chose. The

@@ -141,9 +141,39 @@ public sealed class UiActionTests
             game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"]));
         Assert.Contains("amount", exception.Message, StringComparison.OrdinalIgnoreCase);
 
+        var unsupported = Assert.Throws<ArgumentException>(() =>
+            game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"], amount: 5));
+        Assert.Contains("amount", unsupported.Message, StringComparison.OrdinalIgnoreCase);
+
         game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"], amount: 10);
 
         Assert.Equal([10d], captured);
+    }
+
+    [Fact]
+    public void AnActionOfferedWithAndWithoutAnAmountRequiresTheClickedAmount()
+    {
+        using var pack = PresentationPack.Create();
+        WriteContent(pack.Root, CaptureRule, """
+            { "type": "button", "text": "Buy", "action": "ui.buy" },
+            { "type": "button", "text": "Buy x10", "action": "ui.buy", "amount": 10 }
+            """);
+        var content = ContentPackLoader.Load(pack.Root,
+            new ContentModuleRegistry().Add(new PresentationContentModule()));
+        var materialized = content.CreateWorld(seed: 28, valueScale: 1);
+        var captured = new List<double>();
+        var game = new SystemicGameBuilder(content, materialized)
+            .AddRuleAction("capture", (in RuleActionContext context) => captured.Add(context.Fact.Amount))
+            .Build();
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"]));
+        Assert.Contains("amount", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+        game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"], amount: 0);
+        game.InvokeUiAction("hud", "ui.buy", materialized.EntityIds["actor"], amount: 10);
+
+        Assert.Equal([0d, 10d], captured);
     }
 
     private static void WriteContent(string root, string rules, string button)
