@@ -24,6 +24,13 @@ internal readonly struct WorldExpressionScope(
             return fact.Depth;
         }
 
+        // Identity is a number a rule can compare, so content can refuse a fact that names the same
+        // entity twice without a dedicated "distinct" primitive.
+        if (name is "source.id" or "target.id")
+        {
+            return name == "source.id" ? fact.SourceId : fact.TargetId;
+        }
+
         if (TryReadSubjectProperty(name, "source.", fact.SourceId, out var value)
             || TryReadSubjectProperty(name, "target.", fact.TargetId, out value))
         {

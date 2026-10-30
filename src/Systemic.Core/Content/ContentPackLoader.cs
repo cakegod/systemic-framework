@@ -265,6 +265,7 @@ public static partial class ContentPackLoader
         }
 
         var expandedRules = new List<(RulesContentFile.Rule Rule, string Path, string? Prefix)>();
+        var usedFragments = new List<(RulesContentFile.Fragment Fragment, string Path)>();
         if (file.UseFragments is { } usedFragmentIds)
         {
             for (var useIndex = 0; useIndex < usedFragmentIds.GetArrayLength(); useIndex++)
@@ -277,6 +278,8 @@ public static partial class ContentPackLoader
                 {
                     expandedRules.Add((fragmentRules[ruleIndex], $"{fragmentPaths[fragmentId]}.rules[{ruleIndex}]", fragmentId));
                 }
+
+                usedFragments.Add((fragment, fragmentPaths[fragmentId]));
             }
         }
 
@@ -291,24 +294,40 @@ public static partial class ContentPackLoader
         var rules = ImmutableArray.CreateBuilder<CompiledRule>(expandedRules.Count);
         var spawnTemplates = new Dictionary<string, SpawnTemplate>(StringComparer.Ordinal);
         var bundles = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (file.Bundles is { } sourceBundles)
+        foreach (var (bundle, bundlePath) in CollectBundles(file, usedFragments))
         {
-            for (var bundleIndex = 0; bundleIndex < sourceBundles.GetArrayLength(); bundleIndex++)
+            var bundleId = (string)bundle.IdValue;
+            var enabledByTag = (string)bundle.EnabledByTag;
+            Require(!string.IsNullOrWhiteSpace(enabledByTag),
+                $"Bundle '{bundleId}' requires enabledByTag.", $"{bundlePath}.enabledByTag");
+            Require(bundles.TryAdd(bundleId, enabledByTag!),
+                $"Duplicate bundle id '{bundleId}'.", $"{bundlePath}.id");
+        }
+
+        // A fragment must declare the bundles its own rules reference. Otherwise copying the
+        // fragment yields a rule whose bundle lives in whatever file it came from, which is the
+        // failure the fragment wiring exists to prevent.
+        var fragmentBundleOwners = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (fragment, _) in usedFragments)
+        {
+            if (fragment.Bundles is not { } fragmentBundles)
             {
-                var bundle = sourceBundles[bundleIndex];
-                var bundlePath = $"$.bundles[{bundleIndex}]";
-                var bundleId = (string)bundle.IdValue;
-                var enabledByTag = (string)bundle.EnabledByTag;
-                Require(!string.IsNullOrWhiteSpace(enabledByTag),
-                    $"Bundle '{bundleId}' requires enabledByTag.", $"{bundlePath}.enabledByTag");
-                Require(bundles.TryAdd(bundleId, enabledByTag!),
-                    $"Duplicate bundle id '{bundleId}'.", $"{bundlePath}.id");
+                continue;
+            }
+
+            for (var bundleIndex = 0; bundleIndex < fragmentBundles.GetArrayLength(); bundleIndex++)
+            {
+                fragmentBundleOwners[(string)fragmentBundles[bundleIndex].IdValue] = (string)fragment.IdValue;
             }
         }
+
         foreach (var source in expandedRules)
         {
             var rule = source.Rule;
-            var rulePath = source.Path; var ruleId = source.Prefix is { } prefix ? $"{prefix}.{(string)rule.IdValue}" : (string)rule.IdValue;
+            var rulePath = source.Path;
+            var ruleId = source.Prefix is { } prefix
+                ? $"{prefix}.{(string)rule.IdValue}"
+                : (string)rule.IdValue;
             Require(ids.Add(ruleId), $"Duplicate rule id '{ruleId}'.", $"{rulePath}.id");
             var eventType = (string)rule.On;
             var bundleName = rule.Bundle?.GetString();
@@ -316,6 +335,13 @@ public static partial class ContentPackLoader
             {
                 Require(bundles.ContainsKey(bundleName),
                     $"Rule '{ruleId}' references unknown bundle '{bundleName}'.", $"{rulePath}.bundle");
+                if (source.Prefix is { } owningFragment)
+                {
+                    Require(fragmentBundleOwners.TryGetValue(bundleName, out var owner)
+                        && string.Equals(owner, owningFragment, StringComparison.Ordinal),
+                        $"Rule '{ruleId}' references bundle '{bundleName}', which fragment '{owningFragment}' does not declare; a fragment carries its own bundles.",
+                        $"{rulePath}.bundle");
+                }
             }
 
             var cooldownTicks = rule.CooldownTicks is { } cooldownValue ? (int)cooldownValue : 0;
@@ -501,17 +527,30 @@ public static partial class ContentPackLoader
                         var transferAmount = effect.Amount is { } transferAmountValue
                             ? (double)transferAmountValue
                             : (double?)null;
+                        var transferShare = effect.BasisPoints is { } shareValue
+                            ? (int)shareValue
+                            : (int?)null;
                         var transferSubject = ParseSubject(effect.SubjectValue?.GetString(), effect.Row,
                             effect.FactRow?.GetString(), $"Rule '{ruleId}' effect", $"{effectPath}.subject");
                         Require(!string.IsNullOrWhiteSpace(transferProperty),
                             $"Rule '{ruleId}' transfer requires property.", $"{effectPath}.property");
                         Require(!string.IsNullOrWhiteSpace(transferTargetProperty),
                             $"Rule '{ruleId}' transfer requires targetProperty.", $"{effectPath}.targetProperty");
-                        Require(transferAmount is { } finiteTransferAmount && double.IsFinite(finiteTransferAmount)
-                            && finiteTransferAmount >= 0,
+                        Require((transferAmount is not null) != (transferShare is not null),
+                            $"Rule '{ruleId}' transfer requires amount or basisPoints, but not both.",
+                            $"{effectPath}.amount");
+                        Require(transferAmount is not { } authoredTransferAmount
+                            || double.IsFinite(authoredTransferAmount) && authoredTransferAmount >= 0,
                             $"Rule '{ruleId}' transfer amount must be zero or more.", $"{effectPath}.amount");
-                        effects.Add(RuleEffect.Transfer(transferSubject, transferProperty!,
-                            transferTargetProperty!, transferAmount.GetValueOrDefault()));
+                        Require(transferShare is not { } authoredTransferShare
+                            || authoredTransferShare is > 0 and <= 10_000,
+                            $"Rule '{ruleId}' transfer basisPoints must be between 1 and 10,000.",
+                            $"{effectPath}.basisPoints");
+                        effects.Add(transferShare is { } share
+                            ? RuleEffect.TransferShare(transferSubject, transferProperty!,
+                                transferTargetProperty!, share)
+                            : RuleEffect.Transfer(transferSubject, transferProperty!,
+                                transferTargetProperty!, transferAmount.GetValueOrDefault()));
                         break;
                     case "spawn":
                         var templateId = effect.Template?.GetString();
@@ -600,56 +639,51 @@ public static partial class ContentPackLoader
         var entityIds = entities?.Definitions.Select(definition => definition.Id)
             .ToHashSet(StringComparer.Ordinal);
         var scheduleIds = new HashSet<string>(StringComparer.Ordinal);
-        var schedules = ImmutableArray.CreateBuilder<RuleScheduleDefinition>(
-            file.Schedules is { } scheduled ? scheduled.GetArrayLength() : 0);
-        if (file.Schedules is { } sourceSchedules)
+        var scheduleSources = CollectSchedules(file, usedFragments);
+        var schedules = ImmutableArray.CreateBuilder<RuleScheduleDefinition>(scheduleSources.Count);
+        foreach (var (schedule, schedulePath) in scheduleSources)
         {
-            for (var index = 0; index < sourceSchedules.GetArrayLength(); index++)
+            var scheduleId = (string)schedule.IdValue;
+            var scheduleEvent = (string)schedule.Event;
+            var everyTicks = (int)schedule.EveryTicks;
+            var offsetTicks = schedule.OffsetTicks is { } offset ? (int)offset : 0;
+            var amount = schedule.Amount is { } scheduleAmount ? (double)scheduleAmount : 0;
+            var sourceEntityId = schedule.SourceEntityId?.GetString();
+            var targetEntityId = schedule.TargetEntityId?.GetString();
+            Require(scheduleIds.Add(scheduleId), $"Duplicate schedule id '{scheduleId}'.", $"{schedulePath}.id");
+            Require(offsetTicks < everyTicks,
+                $"Schedule '{scheduleId}' offsetTicks must be less than everyTicks.",
+                $"{schedulePath}.offsetTicks");
+            Require(double.IsFinite(amount), $"Schedule '{scheduleId}' amount must be finite.",
+                $"{schedulePath}.amount");
+            ValidateScheduledEntity(sourceEntityId, "sourceEntityId");
+            ValidateScheduledEntity(targetEntityId, "targetEntityId");
+            FactDefinition? scheduledFact = null;
+            if (factsDeclared)
             {
-                var schedule = sourceSchedules[index];
-                var schedulePath = $"$.schedules[{index}]";
-                var scheduleId = (string)schedule.IdValue;
-                var scheduleEvent = (string)schedule.Event;
-                var everyTicks = (int)schedule.EveryTicks;
-                var offsetTicks = schedule.OffsetTicks is { } offset ? (int)offset : 0;
-                var amount = schedule.Amount is { } scheduleAmount ? (double)scheduleAmount : 0;
-                var sourceEntityId = schedule.SourceEntityId?.GetString();
-                var targetEntityId = schedule.TargetEntityId?.GetString();
-                Require(scheduleIds.Add(scheduleId), $"Duplicate schedule id '{scheduleId}'.", $"{schedulePath}.id");
-                Require(offsetTicks < everyTicks,
-                    $"Schedule '{scheduleId}' offsetTicks must be less than everyTicks.",
-                    $"{schedulePath}.offsetTicks");
-                Require(double.IsFinite(amount), $"Schedule '{scheduleId}' amount must be finite.",
-                    $"{schedulePath}.amount");
-                ValidateScheduledEntity(sourceEntityId, "sourceEntityId");
-                ValidateScheduledEntity(targetEntityId, "targetEntityId");
-                FactDefinition? scheduledFact = null;
-                if (factsDeclared)
+                Require(factDefinitions.TryGetValue(scheduleEvent, out scheduledFact),
+                    $"Schedule '{scheduleId}' emits undeclared fact '{scheduleEvent}'.",
+                    $"{schedulePath}.event");
+            }
+
+            var schedulePayload = schedule.Payload is { } sourcePayload
+                ? CompilePayload(sourcePayload, $"{schedulePath}.payload", scheduledFact)
+                : null;
+            schedules.Add(new RuleScheduleDefinition(scheduleId, scheduleEvent, everyTicks,
+                offsetTicks, sourceEntityId, targetEntityId, amount)
+            { Payload = schedulePayload });
+
+            void ValidateScheduledEntity(string? entityId, string field)
+            {
+                if (entityId is null)
                 {
-                    Require(factDefinitions.TryGetValue(scheduleEvent, out scheduledFact),
-                        $"Schedule '{scheduleId}' emits undeclared fact '{scheduleEvent}'.",
-                        $"{schedulePath}.event");
+                    return;
                 }
 
-                var schedulePayload = schedule.Payload is { } sourcePayload
-                    ? CompilePayload(sourcePayload, $"{schedulePath}.payload", scheduledFact)
-                    : null;
-                schedules.Add(new RuleScheduleDefinition(scheduleId, scheduleEvent, everyTicks,
-                    offsetTicks, sourceEntityId, targetEntityId, amount)
-                { Payload = schedulePayload });
-
-                void ValidateScheduledEntity(string? entityId, string field)
+                if (entityIds is not null)
                 {
-                    if (entityId is null)
-                    {
-                        return;
-                    }
-
-                    if (entityIds is not null)
-                    {
-                        Require(entityIds.Contains(entityId),
-                            $"Schedule '{scheduleId}' references unknown entity '{entityId}'.", $"{schedulePath}.{field}");
-                    }
+                    Require(entityIds.Contains(entityId),
+                        $"Schedule '{scheduleId}' references unknown entity '{entityId}'.", $"{schedulePath}.{field}");
                 }
             }
         }
@@ -660,6 +694,64 @@ public static partial class ContentPackLoader
             Templates = spawnTemplates.ToImmutableDictionary(StringComparer.Ordinal),
             Bundles = bundles.ToImmutableDictionary(StringComparer.Ordinal),
         };
+    }
+
+    // A fragment carries the wiring its rules need. A schedule or bundle left at file level is
+    // invisible to a game that copies one fragment, which produces rules that silently never fire.
+    private static List<(RulesContentFile.Bundle Bundle, string Path)> CollectBundles(
+        RulesContentFile file, List<(RulesContentFile.Fragment Fragment, string Path)> usedFragments)
+    {
+        var sources = new List<(RulesContentFile.Bundle Bundle, string Path)>();
+        if (file.Bundles is { } fileBundles)
+        {
+            for (var index = 0; index < fileBundles.GetArrayLength(); index++)
+            {
+                sources.Add((fileBundles[index], $"$.bundles[{index}]"));
+            }
+        }
+
+        foreach (var (fragment, fragmentPath) in usedFragments)
+        {
+            if (fragment.Bundles is not { } fragmentBundles)
+            {
+                continue;
+            }
+
+            for (var index = 0; index < fragmentBundles.GetArrayLength(); index++)
+            {
+                sources.Add((fragmentBundles[index], $"{fragmentPath}.bundles[{index}]"));
+            }
+        }
+
+        return sources;
+    }
+
+    private static List<(RulesContentFile.Schedule Schedule, string Path)> CollectSchedules(
+        RulesContentFile file, List<(RulesContentFile.Fragment Fragment, string Path)> usedFragments)
+    {
+        var sources = new List<(RulesContentFile.Schedule Schedule, string Path)>();
+        if (file.Schedules is { } fileSchedules)
+        {
+            for (var index = 0; index < fileSchedules.GetArrayLength(); index++)
+            {
+                sources.Add((fileSchedules[index], $"$.schedules[{index}]"));
+            }
+        }
+
+        foreach (var (fragment, fragmentPath) in usedFragments)
+        {
+            if (fragment.Schedules is not { } fragmentSchedules)
+            {
+                continue;
+            }
+
+            for (var index = 0; index < fragmentSchedules.GetArrayLength(); index++)
+            {
+                sources.Add((fragmentSchedules[index], $"{fragmentPath}.schedules[{index}]"));
+            }
+        }
+
+        return sources;
     }
 
     private static CompiledQuery CompileQuery(string ruleId, RulesContentFile.Condition condition,

@@ -127,6 +127,7 @@ The host runs fixed ticks. The simulation uses seeded random streams and integer
 | Sample | Shows | Run |
 | --- | --- | --- |
 | [`systemic-sandbox`](samples/systemic-sandbox) | A Core-only pack with rules | `validate samples/systemic-sandbox` |
+| [`pattern-pack`](samples/pattern-pack) | Nine mechanics as copyable rule fragments, no game | `validate samples/pattern-pack` |
 | [`incremental-quarry`](samples/incremental-quarry) | Incremental, Presentation and Gameplay2D composed in one pack | `validate samples/incremental-quarry` |
 | [`boids-monogame`](samples/boids-monogame/README.md) | 100,000 boids on the scheduled path | `dotnet run -c Release --project samples/boids-monogame/Boids.MonoGame.csproj` |
 | [`glow-garden`](samples/glow-garden/README.md) | A playable incremental colony | `dotnet run -c Release --project samples/glow-garden` |

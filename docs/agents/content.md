@@ -146,7 +146,8 @@ ordered by entity ID unless `order` is `nearest`.
 
 Use `comparison` and `value` instead of `formula` for a simple threshold. A formula can
 read `query.count`, `query.value`, `query.nearest`, and `query.matched`, plus the normal
-expression values such as `tick` and `source.<property>`.
+expression values such as `tick`, `event.amount`, `source.<property>`, `target.<property>`,
+`source.id`, and `target.id`.
 
 The spatial filter uses the selected origin entity's bounds. An entity without bounds
 matches no range query. `limit` applies after ordering. A non-count aggregate over an
@@ -165,9 +166,44 @@ that read only `query.count` or `query.value` still run.
 - `schedule`: dispatch a fact after `delayTicks`. `DispatchDue` on the rule engine runs the facts whose tick has arrived.
 - `spawn`: create an entity from an authored template at the fact position, or where the subject stands.
 - `despawn`: mark the subject for removal, applied when the world prunes removed entities.
-- `transfer`: move up to `amount` of `property` from the subject into the fact target's `targetProperty`. A source that holds less moves what it has.
+- `transfer`: move up to `amount` of `property` from the subject into the fact target's `targetProperty`. A source that holds less moves what it has. Use `basisPoints` instead of `amount` to move a share of what the source holds, floored to whole units: `1000` is ten percent, and 2,900 basis points of 100 moves 29. This is how a grant scales with the run instead of paying a constant.
 - `action`: invoke a game action the game registered by name. Actions are domain verbs such as strike or deposit, and every rule can share one.
 
 Row subjects accept property adjustments, tags, and modifiers. Spawn, despawn, transfer, schedule, and actions address entities, because a population row has no world position, no removal lifetime, and no entity to hand an action.
 
 If a mechanic cannot be expressed, add a general primitive or a game action. Do not add a genre noun to the framework.
+
+## Copy a pattern
+
+`samples/pattern-pack` is a content-only reference for eight mechanics, each a fragment in
+`rules.json` listed in `useFragments`. A fragment carries its own rules, and also the `schedules`
+and `bundles` those rules need. Facts and entities are pack-level vocabulary: copying a fragment
+also means adding the facts and entities it names.
+
+A fragment's rules are compiled with the fragment ID as a prefix, so author the local part only:
+`produces` in fragment `pattern.producer` becomes `pattern.producer.produces`. Bundle IDs and
+schedule IDs are not prefixed, and a fragment must declare every bundle its own rules reference.
+
+| Pattern | Composition |
+| --- | --- |
+| Producer | A schedule inside the fragment emits `pattern.produce`; a rule adds to the target's balance |
+| Upgrade | A purchase fact spends currency, raises `rank` on a producer, and a modifier follows that rank |
+| Talent | A rule bundle enabled by a tag, so one tag adds behaviour and removing it stops it. Points, groups, the choice entity, and the free pick are authored in 1.11 |
+| Merge | Two distinct subjects of the same tier despawn and the next tier spawns in their place |
+| Prestige | A transfer of `basisPoints` of the run's earnings pays the meta entity, then `clearScope` removes the run entities and the unspent remainder with them |
+| Worker | Rows carry a tag and a `mined` column; a system publishes one row fact per live worker and one rule credits that row's column when `event.amount` is at least one |
+| Status | A timed `setModifier` that expires after its duration |
+| Unlock | A rule adds a tag, and other rules read that tag |
+| Offline | No fragment: the host fast-forwards over elapsed ticks and the producer rules above run unchanged |
+
+The offline case has no content because a catch-up rule would be a second economy that could
+desync from the live one. The host advances the clock; the same schedule and rules do the work.
+
+The worker fragment is the exception to copying blind: its rule addresses a population, so the
+game must define that population before the rule set binds. A pack that targets a row is a pack
+whose game owns the rows.
+
+The pack has no UI and no assets: it proves the rule vocabulary, not a game. Validate it with
+`systemic validate samples/pattern-pack`. Its tests live in `tests/Systemic.PatternPack.Tests`:
+one active and one inactive case per pattern, plus a fragment-isolation test that loads each
+fragment on its own.

@@ -254,6 +254,10 @@ public readonly record struct RuleEffect(
     /// <summary>Gets the property a rank-aware modifier reads instead of a fixed amount.</summary>
     public string? SourceProperty { get; init; }
 
+    /// <summary>Gets the share of the source's holdings a transfer moves, in basis points.</summary>
+    /// <remarks>One basis point is one hundredth of a percent, so 10,000 moves the whole holding.</remarks>
+    public int? ShareBasisPoints { get; init; }
+
     public static RuleEffect AdjustProperty(RuleSubject subject, string property, double amount) =>
         new(RuleEffectKind.AdjustProperty, subject, property, amount);
 
@@ -279,6 +283,35 @@ public readonly record struct RuleEffect(
             Destination = RuleSubject.Target,
             TargetProperty = targetProperty,
         };
+
+    /// <summary>Moves a share of the subject's holdings, rounded down to whole units.</summary>
+    /// <param name="subject">The subject the quantity leaves.</param>
+    /// <param name="property">The property the quantity leaves.</param>
+    /// <param name="targetProperty">The property the quantity arrives in, on the fact's target.</param>
+    /// <param name="basisPoints">The share to move: 1 is 0.01 percent, 10,000 is everything.</param>
+    /// <remarks>
+    /// A fixed amount only suits a value the author already knows. A share scales with whatever the
+    /// source holds, so a grant rule does not silently pay a constant. Basis points keep the share an
+    /// integer: a binary fraction such as 0.29 cannot lose a unit to rounding before the floor. The
+    /// remainder stays with the source, and the movement is floored so a quantity never takes a
+    /// fractional unit.
+    /// </remarks>
+    public static RuleEffect TransferShare(RuleSubject subject, string property,
+        string targetProperty, int basisPoints)
+    {
+        if (basisPoints is <= 0 or > 10_000)
+        {
+            throw new ArgumentOutOfRangeException(nameof(basisPoints),
+                "A transfer share must be between 1 and 10,000 basis points.");
+        }
+
+        return new RuleEffect(RuleEffectKind.Transfer, subject, property, 0)
+        {
+            Destination = RuleSubject.Target,
+            TargetProperty = targetProperty,
+            ShareBasisPoints = basisPoints,
+        };
+    }
 
     public static RuleEffect Spawn(RuleSubject subject, SpawnTemplate template)
     {

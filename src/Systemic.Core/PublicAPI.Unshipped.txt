@@ -52,6 +52,9 @@ static Systemic.Rules.RuleEffect.RemoveTag(Systemic.Rules.RuleSubject subject, s
 static Systemic.Rules.RuleEffect.Schedule(string! eventType, int delayTicks, Systemic.Rules.SimulationFactPayload? payload = null) -> Systemic.Rules.RuleEffect
 static Systemic.Rules.RuleEffect.Spawn(Systemic.Rules.RuleSubject subject, Systemic.Rules.SpawnTemplate! template) -> Systemic.Rules.RuleEffect
 static Systemic.Rules.RuleEffect.Transfer(Systemic.Rules.RuleSubject subject, string! property, string! targetProperty, double amount) -> Systemic.Rules.RuleEffect
+static Systemic.Rules.RuleEffect.TransferShare(Systemic.Rules.RuleSubject subject, string! property, string! targetProperty, int basisPoints) -> Systemic.Rules.RuleEffect
+Systemic.Rules.RuleEffect.ShareBasisPoints.get -> int?
+Systemic.Rules.RuleEffect.ShareBasisPoints.init -> void
 static Systemic.Rules.SpawnTemplate.operator !=(Systemic.Rules.SpawnTemplate? left, Systemic.Rules.SpawnTemplate? right) -> bool
 static Systemic.Rules.SpawnTemplate.operator ==(Systemic.Rules.SpawnTemplate? left, Systemic.Rules.SpawnTemplate? right) -> bool
 Systemic.Rules.CompiledRuleSet.Actions.get -> System.Collections.Immutable.ImmutableDictionary<string!, Systemic.Rules.RuleActionHandler!>!
