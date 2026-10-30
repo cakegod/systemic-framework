@@ -103,7 +103,7 @@ The analyzer project and the CLI tool publish no library contract and do not car
 dotnet format analyzers src/Systemic.Core --diagnostics RS0016
 ```
 
-That appends the exact declaration text to `PublicAPI.Unshipped.txt`. At release time a maintainer moves those lines into `PublicAPI.Shipped.txt`, which is the diff the [remediation plan](../framework-remediation-plan.md) refers to; additions made during a phase stay in `Unshipped` until then.
+That appends the exact declaration text to `PublicAPI.Unshipped.txt`. At release time a maintainer moves those lines into `PublicAPI.Shipped.txt`, which is the diff a release moves into `PublicAPI.Shipped.txt`; additions stay in `Unshipped` until then.
 
 ## Analysis boundaries
 

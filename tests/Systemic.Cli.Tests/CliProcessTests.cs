@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Text.Json;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Text;
@@ -113,6 +114,52 @@ public sealed class CliProcessTests
                 await KillProcessTreeAsync(result.ProcessId);
             }
         }
+    }
+
+    [Fact]
+    public async Task New_template_runs_and_verifies_with_json()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"systemic-cli-{Guid.NewGuid():N}");
+        try
+        {
+            var create = await RunCliAsync("new", directory, "--json");
+            Assert.Equal(0, create.ExitCode);
+            using (var document = JsonDocument.Parse(create.StandardOutput))
+            {
+                Assert.True(document.RootElement.GetProperty("ok").GetBoolean());
+            }
+
+            var run = await RunCliAsync("run", directory, "--ticks", "120", "--json");
+            Assert.Equal(0, run.ExitCode);
+            using (var document = JsonDocument.Parse(run.StandardOutput))
+            {
+                Assert.Equal(120, document.RootElement.GetProperty("tick").GetInt32());
+            }
+
+            var verify = await RunCliAsync("verify", directory, "--ticks", "120", "--json");
+            Assert.Equal(0, verify.ExitCode);
+            using (var document = JsonDocument.Parse(verify.StandardOutput))
+            {
+                Assert.True(document.RootElement.GetProperty("ok").GetBoolean());
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Json_content_error_uses_the_machine_envelope()
+    {
+        var result = await RunCliAsync("validate", SamplePath("missing-content-pack"), "--json");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("\"code\": \"content.invalid\"", result.StandardOutput, StringComparison.Ordinal);
+        Assert.Contains("\"ok\": false", result.StandardOutput, StringComparison.Ordinal);
     }
 
     [Fact]
