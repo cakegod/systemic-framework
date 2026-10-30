@@ -1,15 +1,11 @@
 using System.Diagnostics;
-using System.Net;
 using System.Text.Json;
-using System.Net.Sockets;
 using System.Text;
 
 namespace Systemic.Tests.Cli;
 
 public sealed class CliProcessTests
 {
-    private const int MaximumPreviewStartupAttempts = 3;
-
     [Fact]
     public async Task HelpListsTheSupportedCommandsAndReturnsSuccess()
     {
@@ -18,7 +14,6 @@ public sealed class CliProcessTests
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Usage:", result.StandardOutput, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("validate", result.StandardOutput, StringComparison.Ordinal);
-        Assert.Contains("preview", result.StandardOutput, StringComparison.Ordinal);
         Assert.Contains("trace", result.StandardOutput, StringComparison.Ordinal);
     }
 
@@ -26,15 +21,6 @@ public sealed class CliProcessTests
     public async Task InvalidCommandShapeKeepsTheUsageExitCode()
     {
         var result = await RunCliAsync("validate");
-
-        Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Usage:", result.StandardOutput, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task PreviewRejectsAnOutOfRangePortWithTheUsageExitCode()
-    {
-        var result = await RunCliAsync("preview", SamplePath("incremental-quarry"), "--port", "65536");
 
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("Usage:", result.StandardOutput, StringComparison.Ordinal);
@@ -159,105 +145,6 @@ public sealed class CliProcessTests
         Assert.Equal(1, result.ExitCode);
         Assert.Contains("\"code\": \"content.invalid\"", result.StandardOutput, StringComparison.Ordinal);
         Assert.Contains("\"ok\": false", result.StandardOutput, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task QuarryPreviewRetriesStartupExitAndServesTheRealLocalPreviewPage()
-    {
-        var ports = new[] { FindAvailablePort(), FindAvailablePort() };
-        var attempts = 0;
-
-        var result = await RunPreviewWithRetryAsync(ports, async port =>
-        {
-            attempts++;
-            return attempts == 1
-                ? PreviewAttempt.Failed("simulated bind race")
-                : await StartPreviewAttemptAsync(port);
-        });
-
-        Assert.Equal(2, attempts);
-        Assert.Equal(ports[1], result.Port);
-        Assert.Contains("<title>Systemic content preview</title>", result.Html, StringComparison.Ordinal);
-    }
-
-    private static async Task<PreviewRunResult> RunPreviewWithRetryAsync(
-        int[] candidatePorts,
-        Func<int, Task<PreviewAttempt>> startAttempt)
-    {
-        if (candidatePorts.Length == 0)
-        {
-            throw new ArgumentException("At least one preview port is required.", nameof(candidatePorts));
-        }
-
-        var attempts = Math.Min(candidatePorts.Length, MaximumPreviewStartupAttempts);
-        var lastDiagnostics = "";
-        for (var index = 0; index < attempts; index++)
-        {
-            var attempt = await startAttempt(candidatePorts[index]);
-            if (attempt.ExitedDuringStartup)
-            {
-                lastDiagnostics = attempt.Diagnostics;
-                continue;
-            }
-
-            return new PreviewRunResult(candidatePorts[index], index + 1, attempt.Html);
-        }
-
-        throw new InvalidOperationException(
-            $"Preview CLI exited during all {attempts} startup attempts. Last diagnostics: {lastDiagnostics}");
-    }
-
-    private static async Task<PreviewAttempt> StartPreviewAttemptAsync(int port)
-    {
-        using var process = Process.Start(CreateStartInfo("preview", SamplePath("incremental-quarry"),
-            "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture)))!;
-        var standardOutput = process.StandardOutput.ReadToEndAsync();
-        var standardError = process.StandardError.ReadToEndAsync();
-
-        try
-        {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(1) };
-            for (var attempt = 0; attempt < 50; attempt++)
-            {
-                if (process.HasExited)
-                {
-                    return PreviewAttempt.Failed(
-                        $"stdout: {await standardOutput}; stderr: {await standardError}");
-                }
-
-                try
-                {
-                    using var response = await client.GetAsync($"http://127.0.0.1:{port}/");
-                    if (response.StatusCode == HttpStatusCode.OK)
-                    {
-                        return PreviewAttempt.Success(await response.Content.ReadAsStringAsync());
-                    }
-                }
-                catch (HttpRequestException)
-                {
-                    await Task.Delay(100);
-                }
-            }
-
-            throw new TimeoutException("Preview server did not become ready within five seconds.");
-        }
-        finally
-        {
-            if (!process.HasExited)
-            {
-                try
-                {
-                    process.Kill(entireProcessTree: true);
-                }
-                catch (InvalidOperationException)
-                {
-                }
-            }
-
-            await process.WaitForExitAsync();
-            _ = await standardOutput;
-            _ = await standardError;
-        }
     }
 
     private static async Task<CliResult> RunCliAsync(params string[] arguments)
@@ -409,13 +296,6 @@ public sealed class CliProcessTests
     private static string BuildConfiguration() =>
         new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar)).Parent?.Name ?? "Release";
 
-    private static int FindAvailablePort()
-    {
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        return ((IPEndPoint)listener.LocalEndpoint).Port;
-    }
-
     private sealed record CliResult(
         int ExitCode,
         string StandardOutput,
@@ -423,13 +303,4 @@ public sealed class CliProcessTests
         bool TimedOut = false,
         bool ProcessExitedAfterTimeout = true,
         int ProcessId = 0);
-
-    private sealed record PreviewAttempt(bool ExitedDuringStartup, string Html, string Diagnostics)
-    {
-        public static PreviewAttempt Failed(string diagnostics) => new(true, "", diagnostics);
-
-        public static PreviewAttempt Success(string html) => new(false, html, "");
-    }
-
-    private sealed record PreviewRunResult(int Port, int Attempts, string Html);
 }

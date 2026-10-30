@@ -292,7 +292,7 @@ Exit gate G1b: 90 percent of the art is procedural, the contact sheet is accepte
 | `pixel-mine` | Playable mining game with upgrades, HUD, menu, particles | Hand-rolls economy, upgrades, and HUD |
 | Presentation | Declarative UI, action bindings, timelines, procedural recipes, cue stream | Preview is read-only. A real game still builds its HUD by hand |
 | Procedural art | `VisualRecipe` supports rect, ellipse, line, palette, jitter, states, parts, and imported layers | No outlines, shading, gradients, symmetry, animation frames, atlas, contact sheet, or quality checks |
-| CLI | `new`, `validate`, `trace`, `watch`, `preview` | No `run`, `simulate`, `verify`, `dump`, or replay. Errors are prose |
+| CLI | `new`, `validate`, `trace`, `watch` | No `run`, `simulate`, `verify`, `dump`, or replay. Errors are prose |
 | Scale | 1M row and 10M movement benchmarks | Real for a different genre, irrelevant here |
 
 The strongest assets are the content loader, the deterministic kernel, the Presentation UI and cues, and the two playable samples. The weakest point is the rule vocabulary: it is too small to compose a game, so every sample writes C#.
@@ -369,7 +369,7 @@ aggregate, and formula conditions. The next slice is 1.4 effects.
 | 1.11 | Port all 41 talents as tags and rules, one file per group plus default | 41/41, each at most 12 behavior lines, zero C# |
 | 1.12 | One headless test per talent, positive and negative | 41 tests green; each names the talent |
 | 1.13 | Asset DSL: primitives, outline, shading, gradient, dither, symmetry, parts, frames, atlas metadata | The target recipe compiles |
-| 1.14 | Asset commands: `sheet`, `validate`, `atlas`, `preview`; labeled manifest | Sheet and atlas from content |
+| 1.14 | Asset commands: `sheet`, `validate`, `atlas`; labeled manifest | Sheet and atlas from content |
 | 1.15 | Quality checks: palette, alpha, bounds, pivot, frames, silhouette, contrast | A bad recipe fails with a useful diagnostic |
 | 1.16 | Port the slice's art to recipes; delete hand-made atlases and the Aseprite dependency | Only the font remains imported |
 

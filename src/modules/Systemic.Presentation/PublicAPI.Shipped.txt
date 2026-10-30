@@ -99,8 +99,6 @@ static Systemic.Presentation.VisualPart.operator !=(Systemic.Presentation.Visual
 static Systemic.Presentation.VisualPart.operator ==(Systemic.Presentation.VisualPart? left, Systemic.Presentation.VisualPart? right) -> bool
 static Systemic.Presentation.VisualRecipe.operator !=(Systemic.Presentation.VisualRecipe? left, Systemic.Presentation.VisualRecipe? right) -> bool
 static Systemic.Presentation.VisualRecipe.operator ==(Systemic.Presentation.VisualRecipe? left, Systemic.Presentation.VisualRecipe? right) -> bool
-static Systemic.Preview.ContentPreviewPage.Render(Systemic.Content.ContentPack! pack) -> string!
-static Systemic.Preview.ContentPreviewServer.RunAsync(Systemic.Content.ContentPack! pack, int port, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Systemic.Presentation.CompiledUi
 Systemic.Presentation.CompiledUi.<Clone>$() -> Systemic.Presentation.CompiledUi!
 Systemic.Presentation.CompiledUi.CompiledUi(System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiLayout!> Layouts) -> void
@@ -512,8 +510,6 @@ Systemic.Presentation.VisualVariantCache.Clear() -> void
 Systemic.Presentation.VisualVariantCache.GetOrCreate(Systemic.Presentation.VisualRecipe! recipe, ulong variantSeed = 0, string? visualState = null) -> Systemic.Presentation.PixelBuffer!
 Systemic.Presentation.VisualVariantCache.MaximumBytes.get -> long
 Systemic.Presentation.VisualVariantCache.VisualVariantCache(long maximumBytes = 8388608) -> void
-Systemic.Preview.ContentPreviewPage
-Systemic.Preview.ContentPreviewServer
 ~override Systemic.Presentation.PresentationCue.Equals(object obj) -> bool
 ~override Systemic.Presentation.PresentationCue.ToString() -> string
 ~override Systemic.Presentation.PresentationCueStreamEvent.Equals(object obj) -> bool

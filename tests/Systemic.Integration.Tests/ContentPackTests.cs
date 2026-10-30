@@ -1,7 +1,6 @@
 using Systemic.Kernel;
 using Systemic.Content;
 using Systemic.Host;
-using Systemic.Preview;
 using Systemic.Rules;
 
 namespace Systemic.Tests;
@@ -801,65 +800,6 @@ public sealed class ContentPackTests
         Assert.Contains("value path", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void CompilesTheGenericSampleAndRendersOnlyReadOnlyPreviewMarkup()
-    {
-        var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
-        var compiled = SystemicTestContent.Load(samplePath);
-
-        var html = ContentPreviewPage.Render(compiled);
-
-        Assert.Equal("sample.quarry", compiled.Manifest.Id);
-        Assert.Contains("Visual recipes", html);
-        Assert.Contains("UI layouts", html);
-        Assert.Contains("quarry.ember-spark", html);
-        Assert.Contains("ui-icon", html);
-        Assert.Contains("quarry.overdrive-icon", html);
-        Assert.DoesNotContain("<script>alert", html, StringComparison.OrdinalIgnoreCase);
-        var incremental = SystemicTestContent.Incremental(compiled);
-        Assert.Single(incremental.Catalog.Resources);
-        Assert.Single(incremental.Catalog.Producers);
-        Assert.Single(incremental.Catalog.Upgrades);
-        Assert.Single(incremental.Catalog.Roles);
-        Assert.Equal(2, incremental.Choices.Groups.Length);
-        Assert.Equal(6, incremental.Choices.Choices.Length);
-    }
-
-    [Fact]
-    public void PreviewEnforcesAnAggregatePixelBudgetBeforeRasterizing()
-    {
-        var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
-        var content = SystemicTestContent.Load(samplePath);
-        var presentation = SystemicTestContent.Presentation(content);
-        var largestRecipe = presentation.Visuals.Recipes[0] with { CanvasWidth = 256, CanvasHeight = 256 };
-        var tooManyPixels = SystemicTestContent.WithPresentation(content, presentation with
-        {
-            Visuals = new CompiledVisuals([.. Enumerable.Repeat(largestRecipe, 65)])
-        });
-
-        var error = Assert.Throws<ArgumentOutOfRangeException>(() => ContentPreviewPage.Render(tooManyPixels));
-
-        Assert.Contains("generated pixels", error.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void PreviewEnforcesAnAggregateRasterWorkBudgetBeforeRendering()
-    {
-        var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
-        var content = SystemicTestContent.Load(samplePath);
-        var expensive = new VisualRecipe("visual.expensive", "prop", 1, 256, 256, ["#ffffff"],
-            [.. Enumerable.Repeat(new VisualLayer("rect", 0, 0, 0, 256, 256, 0), 250)]);
-        var tooMuchWork = SystemicTestContent.WithPresentation(content,
-            SystemicTestContent.Presentation(content) with
-            {
-                Visuals = new CompiledVisuals([expensive, expensive with { Id = "visual.expensive-copy" }])
-            });
-
-        var error = Assert.Throws<ArgumentOutOfRangeException>(() => ContentPreviewPage.Render(tooMuchWork));
-
-        Assert.Contains("raster work", error.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
     // Row-addressed rules are content like any other: the fact carries a row reference and the
     // authored rule names that row with 'factRow' in both its conditions and its effects.
     [Fact]
@@ -918,25 +858,7 @@ public sealed class ContentPackTests
         public static string[] Tags => ["burning"];
     }
 
-    [Fact]
-    public static void PreviewIncludesStatesDefinedOnlyByComposedParts()
-    {
-        var samplePath = Path.Combine(AppContext.BaseDirectory, "samples", "incremental-quarry");
-        var content = SystemicTestContent.Load(samplePath);
-        var child = new VisualRecipe("visual.child", "part", 1, 2, 2, ["#00000000", "#ffffff"],
-            [new VisualLayer("rect", 1, 0, 0, 1, 1, 0, State: "active")]);
-        var composite = new VisualRecipe("visual.composite", "actor", 2, 2, 2, ["#00000000"], [],
-            Parts: [new VisualPart(child, 0, 0, 1)]);
-        var withComposite = SystemicTestContent.WithPresentation(content,
-            SystemicTestContent.Presentation(content) with
-            {
-                Visuals = new CompiledVisuals([.. SystemicTestContent.Presentation(content).Visuals.Recipes, composite, child])
-            });
 
-        var html = ContentPreviewPage.Render(withComposite);
-
-        Assert.Contains("\"id\":\"visual.composite\",\"state\":\"active\"", html, StringComparison.Ordinal);
-    }
 }
 
 internal sealed class TestPack : IDisposable

@@ -36,7 +36,7 @@ is a TDD slice: failing test first, smallest implementation to green, then refac
 | 1.11 | Port all 41 talents as tags and rules, one file per group plus default | 41/41 talents authored as content; each at most 12 behavior lines; zero C# | 1.3, 1.4, 1.5, 1.6, 1.10 | pending |
 | 1.12 | One headless test per talent, positive and negative | 41 tests green; every test names its talent and asserts both the enabled and disabled case | 1.11 | pending |
 | 1.13 | Asset DSL: primitives, outline, shading, gradient, dither, symmetry, parts, frames, atlas metadata | The target `gnorp.slammer` recipe compiles; every new primitive has a raster test | 1.2 | pending |
-| 1.14 | Asset commands: `sheet`, `validate`, `atlas`, `preview`, labeled manifest | Sheet, atlas, manifest, and preview are produced from content; a bad recipe names its file and path | 1.13 | pending |
+| 1.14 | Asset commands: `sheet`, `validate`, `atlas`, labeled manifest | Sheet, atlas, and manifest are produced from content; a bad recipe names its file and path | 1.13 | pending |
 | 1.15 | Quality checks: palette, alpha, bounds, pivot, frames, silhouette, contrast | A bad recipe fails once for each check with a useful diagnostic; a good batch passes | 1.13, 1.14 | pending |
 | 1.16 | Port the slice's art to recipes; delete hand-made atlases and Aseprite dependency | Only the font remains imported; the contact sheet is accepted; the game loads the generated atlas | 1.13, 1.14, 1.15 | pending |
 | G1 | Phase 1 exit gate | 41/41 talents, pattern pack tests, frozen Incremental module, no genre type in the framework, asset sheet and atlas accepted | all above | pending |

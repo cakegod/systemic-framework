@@ -1,7 +1,6 @@
 using System.CommandLine;
 using System.Diagnostics;
 using System.Globalization;
-using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -12,7 +11,6 @@ using Systemic.Host;
 using Systemic.Incremental;
 using Systemic.Kernel;
 using Systemic.Presentation;
-using Systemic.Preview;
 using Systemic.Replay;
 using Systemic.Rules;
 using Systemic.Save;
@@ -66,10 +64,6 @@ catch (SystemicSaveException exception)
 {
     return Fail("save.invalid", exception.Message, 1);
 }
-catch (HttpListenerException exception)
-{
-    return Fail("preview.error", exception.Message, 1);
-}
 catch (IOException exception)
 {
     return Fail("io.error", exception.Message, 1);
@@ -94,7 +88,6 @@ static RootCommand CreateRootCommand()
     var newDirectory = new Argument<string>("directory") { Description = "Destination directory for a new project." };
     var validateDirectory = new Argument<string>("directory") { Description = "Content pack directory to validate." };
     var watchDirectory = new Argument<string>("directory") { Description = "Content pack directory to watch." };
-    var previewDirectory = new Argument<string>("directory") { Description = "Content pack directory to preview." };
     var traceDirectory = new Argument<string>("directory") { Description = "Content pack directory to trace." };
     var runDirectory = new Argument<string>("directory") { Description = "Content pack directory to run." };
     var simulateDirectory = new Argument<string>("directory") { Description = "Content pack directory to simulate." };
@@ -115,20 +108,6 @@ static RootCommand CreateRootCommand()
         Arity = ArgumentArity.ZeroOrOne,
         Description = "Optional target content ID.",
     };
-    var port = new Option<int>("--port")
-    {
-        Description = "Local preview server port (default: 8090).",
-        DefaultValueFactory = _ => 8090,
-    };
-    port.Validators.Add(result =>
-    {
-        var value = result.GetValueOrDefault<int>();
-        if (value is < 1 or > 65535)
-        {
-            result.AddError("Port must be between 1 and 65535.");
-        }
-    });
-
     var template = new Option<string>("--template")
     {
         Description = "Template name (default: systemic).",
@@ -281,11 +260,6 @@ static RootCommand CreateRootCommand()
     watch.Arguments.Add(watchDirectory);
     watch.SetAction(async parse => await WatchAsync(parse.GetValue(watchDirectory)!));
 
-    var preview = new Command("preview", "Serve a read-only local content preview.");
-    preview.Arguments.Add(previewDirectory);
-    preview.Options.Add(port);
-    preview.SetAction(async parse => await PreviewAsync(parse.GetValue(previewDirectory)!, parse.GetValue(port)));
-
     var trace = new Command("trace", "Dispatch and print an event trace.");
     trace.Arguments.Add(traceDirectory);
     trace.Arguments.Add(eventName);
@@ -315,7 +289,6 @@ static RootCommand CreateRootCommand()
     root.Subcommands.Add(replay);
     root.Subcommands.Add(assets);
     root.Subcommands.Add(watch);
-    root.Subcommands.Add(preview);
     root.Subcommands.Add(trace);
     return root;
 }
@@ -956,15 +929,6 @@ static int Trace(string directory, string eventName, string? source, string? tar
     return 0;
 }
 
-static async Task<int> PreviewAsync(string directory, int port)
-{
-    var pack = LoadPack(directory);
-    using var cancellation = CreateConsoleCancellation();
-    Console.WriteLine($"Read-only preview for {pack.Manifest.Id}: http://127.0.0.1:{port}/ (Ctrl+C to stop)");
-    await ContentPreviewServer.RunAsync(pack, port, cancellation.Token);
-    return 0;
-}
-
 static async Task<int> WatchAsync(string root)
 {
     var fullPath = Path.GetFullPath(root);
@@ -1300,7 +1264,6 @@ static int Fail(string code, string message, int exitCode, object? details = nul
             "content.gameplay2d" => "Gameplay2D content error",
             "content.reference" => "Content reference error",
             "save.invalid" => "Save error",
-            "preview.error" => "Preview server error",
             "io.error" => "File error",
             "usage.invalid" => "Argument error",
             _ => "Runtime error",
@@ -1312,7 +1275,7 @@ static int Fail(string code, string message, int exitCode, object? details = nul
 }
 
 static void PrintUsage() =>
-    Console.WriteLine("Usage: systemic <new|validate|run|simulate|dump|save|load|verify|replay|assets|watch|preview|trace> ...");
+    Console.WriteLine("Usage: systemic <new|validate|run|simulate|dump|save|load|verify|replay|assets|watch|trace> ...");
 
 static class CliJson
 {
