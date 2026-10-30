@@ -148,11 +148,11 @@ The samples are references and diagnostics. They are not the target architecture
 
 ```sh
 dotnet build Systemic.sln --configuration Release
-dotnet test Systemic.sln --configuration Release
-dotnet test tests/Systemic.Cli.Tests --configuration Release
+scripts/loop.sh --full
+scripts/loop.sh --samples
 ```
 
-The CLI tests create a template, run it, verify it, and check the JSON error envelope. The full suite also covers populations, rules, saves, replays, and the samples.
+The CLI tests create a template, run it, verify it, and check the JSON error envelope. The gate covers populations, rules, saves, and replays; the sample suites that drive the playable games run separately through `--samples`.
 
 ## Scope
 
