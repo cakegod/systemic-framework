@@ -3,15 +3,17 @@
   "$id": "https://press-the-button.dev/systemic/save.schema.json",
   "title": "Versioned engine-neutral systemic save",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["schemaVersion", "contentFingerprint", "checksum", "world", "entityIds", "extensionStates"],
+  "additionalProperties": false,  "required": ["schemaVersion", "contentFingerprint", "checksum", "world", "entityIds", "extensionStates"],
   "properties": {
     "schemaVersion": { "const": 6 },
     "contentFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "entityIds": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1 } },
+    "modules": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+    "contentModules": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
     "extensionStates": {
-      "type": "object", "required": ["systemic.clock", "systemic.rule-history"],
+      "type": "object",
+      "required": ["systemic.clock"],
       "properties": { "systemic.clock": { "$ref": "#/$defs/clock" } },
       "additionalProperties": true
     },

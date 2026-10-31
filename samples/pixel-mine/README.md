@@ -1,5 +1,9 @@
 # MonoGame pixel mine
 
+> **Legacy sample.** The mine's win rule uses the frozen JSON rule engine. New games use
+> C# systems and commands with JSON data; see
+> [ADR 0004](../../docs/adr/0004-code-first-simulation.md).
+
 A playable take on 10 Million Pixels: a mine of exactly ten million pixels, eroded by bouncing balls. Dust from mined rock pays for more balls and upgrades; prisms unlock the smash and drill balls; one golden pixel is hidden deep in the rock and ends the run.
 
 ```sh

@@ -12,7 +12,7 @@ public static class SystemicSaveMigration
     /// Verifies the original checksum, upgrades a private copy, and seals the result.
     /// The caller must validate the resulting target-version schema before using it.
     /// </summary>
-    public static string Upgrade(string json, int targetVersion, IEnumerable<ISaveMigration> migrations)
+    public static string Migrate(string json, int targetVersion, IEnumerable<ISaveMigration> migrations)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
         ArgumentNullException.ThrowIfNull(migrations);

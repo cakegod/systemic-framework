@@ -13,6 +13,11 @@ public interface ISystemicModuleContent
 public interface ISystemicContentModule
 {
     string Id { get; }
+
+    /// <summary>Gets the composition version of this content module's schema and behavior.</summary>
+    /// <remarks>Save documents record it and refuse to load when it changed. Bump it when a schema or behavior change makes old saves unsafe. Every content module declares a version.</remarks>
+    int Version { get; }
+
     ISystemicModuleContent Compile(ContentModuleContext context, JsonElement declaration);
     void Configure(SystemicGameBuilder builder, ISystemicModuleContent content);
 }

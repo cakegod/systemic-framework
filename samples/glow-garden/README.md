@@ -1,5 +1,9 @@
 # Glow Garden
 
+> **Legacy sample.** Part of this sample's behavior uses the frozen JSON rule engine.
+> New games use C# systems and commands with JSON data; see
+> [ADR 0004](../../docs/adr/0004-code-first-simulation.md).
+
 A single-screen incremental colony sample on a 1920×1280 garden. Noise-generated thickets break up the ground into organic shapes that workers must walk around, and pods grow scattered across the whole map rather than ringed around the colony. Pink Burstlings scout for ripe pods and burst them into physical Glow; blue Gatherers forage on foot, following the scent trails that bursts and pickups leave between food and home, carrying bounded loads back to the colony. Workers perceive only their local surroundings: with nothing in sight they walk their own heading, and only after a long fruitless search do they query for a distant target. The colony starts with 30 Glow; new Glow is added to the spendable balance when Gatherers return it. Yellow dots below a Gatherer show its actual carried load; shadows and leap height follow worker movement. Burst rings, Echo sparks, seed flashes and combo flashes are Presentation-module cues driven by authored fact timelines, not by renderer polling. Small green and purple dots still mark pending seeds and delayed Echo impacts.
 
 ## Run

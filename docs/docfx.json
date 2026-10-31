@@ -40,12 +40,8 @@
           "api/**/*.md",
           "api/**/*.yml",
           "api/**/*.json",
+          "design/**/*.md",
           "contributing/**/*.md"
-        ]
-      },
-      {
-        "files": [
-          "reference/**/*.yml"
         ]
       }
     ],

@@ -13,6 +13,9 @@ public sealed class Gameplay2DModule : ISystemicExtensionModule, ISystemicSystem
 
     public string Id => "systemic.gameplay2d";
 
+    /// <summary>Gets the composition version recorded in every save that composes this module.</summary>
+    public int Version => 1;
+
     public int Order => 20;
 
     /// <summary>Declares reads and deferred writes so the module can share a scheduling wave.</summary>
@@ -76,6 +79,8 @@ public sealed class Gameplay2DContentModule : Systemic.Content.ISystemicContentM
     private static readonly string s_gameplay2DSchema = ReadSchema();
 
     public string Id => ModuleId;
+
+    public int Version => 1;
 
     public Systemic.Content.ISystemicModuleContent Compile(
         Systemic.Content.ContentModuleContext context,

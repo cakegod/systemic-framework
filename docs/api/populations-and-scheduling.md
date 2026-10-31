@@ -83,11 +83,11 @@ When storing access declarations in a field, use an immutable collection. The an
 
 ## System access rules
 
-For a lower-level Kernel system, use `SystemAccess.ReadColumn<TKind, TValue>` and `WriteColumn<TKind, TValue>` with the generated column key. The scheduler can run two systems together when their declarations do not conflict. Read/read access is compatible, and so is a reader beside a buffered writer, because buffered commands land at the wave barrier after every reader; a writer conflicts with access to the same resource. `SystemAccess.WriteWorld` is exclusive. Systems using immediate World operations or rule dispatch need that declaration. Systems that only queue World changes can use `SystemAccess.DeferWorldWrites` and may share a wave with other deferred writers.
+For a lower-level Kernel system, use `SystemAccess.ReadColumn<TKind, TValue>` and `WriteColumn<TKind, TValue>` with the generated column key. The scheduler can run two systems together when their declarations do not conflict. Read/read access is compatible, and so is a reader beside a buffered writer, because buffered commands land at the wave barrier after every reader; a writer conflicts with access to the same resource. `SystemAccess.WriteWorld` is exclusive. Systems using immediate World operations need that declaration. Systems that only queue World changes can use `SystemAccess.DeferWorldWrites` and may share a wave with other deferred writers.
 
 The scheduler relies on declarations; it does not infer every memory access at runtime. Declare service state and any other shared resources too. The analyzer checks several direct generated-column and context-access patterns, with limits described in the [analyzer reference](analyzers.md#analysis-boundaries).
 
-## Row-addressed rules and crowd scans
+## Row scans in systems
 
 A population schema is an `IPopulationKind`: a stable `Id`, a `Version`, and optionally the tags and modifier properties the schema declares. Generated schemas implement it, and a hand-written schema is how the crowd tier declares its columns:
 
@@ -103,33 +103,43 @@ var prey = world.DefinePopulation<CrowdAgent>(enableHandles: true);
 var energy = prey.Column(new PopulationColumnKey<int>("crowd.prey.energy", 1, PopulationCodecs.Int32));
 ```
 
-Declared tags are one `ulong` mask column whose bit order is the schema's, so a tag test is a bit test and the mask is part of saved state. Declared modifier properties give each row inline `ModifierSlot8` slots; `SetModifier` and `EffectiveValue` address them by property name. `enableHandles` gives every row a generation-checked `PopulationRowReference`, which is what lets a fact name a row and a despawn be detected instead of retargeted.
+Declared tags are one `ulong` mask column whose bit order is the schema's, so a tag test is a bit test and the mask is part of saved state. Declared modifier properties give each row inline `ModifierSlot8` slots; `SetModifier` and `EffectiveValue` address them by property name. `enableHandles` gives every row a generation-checked `PopulationRowReference`, which lets a command or fact name a row and detect a despawn instead of retargeting a replaced row.
 
-A rule addresses the row its fact is about with the `factRow` subject in content, and one scope evaluates it against a whole population:
-
-```csharp
-var rules = new RuleEngine(content.Rules);
-rules.Bind(world);
-var result = rules.EvaluateRowEvent(world, "crowd.prey.think", CrowdAgent.Id, new PopulationRange(0, prey.Count));
-```
-
-This is the crowd path: no fact per row, one scope for the range, and only `factRow` subjects are accepted, so an entity subject or an `emitEvent` effect is rejected before the first row instead of acting once per row. The population must be defined with handles, because each row is addressed by a reference. A rule whose first condition is a tag reads a packed tag bit per row (one bit per row, not the row's eight-byte mask word) and evaluates the rest of the rule only for rows that carry it; every other condition keeps its authored order. The bitset is derived from the mask column, so a rollback or a structural change rebuilds it before the next scan. `RuleRowScanResult` reports rows evaluated, rules matched, effects applied, and whether the scan rolled back with its transaction.
-
-To turn many rows crossing a threshold into one fact, use `PopulationSink`. It counts one column against one threshold in a single pass, appends at most one row-addressed fact carrying that count, and appends nothing while the count is unchanged:
+A system scans rows in one pass. It reads the columns it needs, applies the behavior, and writes only its assigned range:
 
 ```csharp
-var sink = new PopulationSink(world, CrowdAgent.Id, "crowd.prey.energy", threshold: 1,
-    "crowd.prey.standing", prey.ReferenceOf(0));
-var facts = new List<SimulationFact>(1);
-if (sink.Collect(facts) > 0)
+public sealed class CrowdThinkSystem(Population<CrowdAgent> prey, CrowdAgent.Columns columns)
+    : ISystemicSystem
 {
-    rules.Dispatch(world, facts[0]);
+    public string Id => "crowd.think";
+
+    public IReadOnlyList<SystemAccess> Access => [
+        CrowdAgent.ReadEnergy,
+        CrowdAgent.WriteEnergy
+    ];
+
+    public void Step(SystemicSystemContext context)
+    {
+        context.ForEachPopulationRange(prey, columns,
+            static (CrowdAgent.Columns state, int _, scoped ref PopulationAccessScope<CrowdAgent> access) =>
+            {
+                var range = access.Range;
+                var energy = access.ReadCurrentRange(state.Energy);
+                var writer = state.WriteRange(ref access);
+
+                for (var offset = 0; offset < range.Length; offset++)
+                {
+                    // The behavior is ordinary C#: threshold, movement, effects, tags.
+                    writer.Write(offset, energy[offset]);
+                }
+            });
+    }
 }
 ```
 
-The anchor row receives the fact, so a rule with a `factRow` subject writes a count on that row. If the anchor despawns, the sink stops emitting rather than reporting against a replaced row. Stagger movement across ticks (the crowd tier moves an eighth of the rows per tick) so the per-tick cost stays inside the simulation budget.
+This is the crowd path: no rule dispatch and no fact per row. A system can test a row's tag, read its value, and write a result in the same deterministic range callback. Stagger movement across ticks (the crowd tier moves an eighth of the rows per tick) so the per-tick cost stays inside the simulation budget.
 
-`benchmarks/Systemic.Benchmarks -- --gate --scenario crowd` is the acceptance run for this path: one million rows, one authored rule per row per tick, every tick inside the 10 ms simulation share of a 30 Hz frame, zero allocation. See `samples/crowd-million` for the content and `RowScanTests` for the behaviours the scan pins.
+`benchmarks/Systemic.Benchmarks -- --gate --scenario crowd` is the acceptance run for this path: one million rows, one system pass per tick, every tick inside the 10 ms simulation share of a 30 Hz frame, zero allocation. See `samples/crowd-million` for the legacy data shape; its rule path is deleted with the rule engine.
 
 ## Queue population changes
 

@@ -1,0 +1,695 @@
+{
+  "schemaVersion": 2,
+  "rules": [],
+  "facts": [
+    { "id": "talent.tick" },
+    { "id": "talent.depart" },
+    { "id": "talent.build" },
+    { "id": "talent.bomb" },
+    { "id": "talent.combo" },
+    { "id": "talent.hit" },
+    { "id": "talent.grenade" },
+    { "id": "talent.inspire" },
+    { "id": "talent.balloon" },
+    { "id": "talent.throw" },
+    { "id": "talent.reset" },
+    { "id": "talent.ten-minute" },
+    { "id": "talent.rocket.strike" },
+    { "id": "talent.director.leave" },
+    { "id": "talent.king.descend" },
+    { "id": "talent.spend.zybellium" },
+    { "id": "talent.shoot" },
+    { "id": "talent.arrow.purchase" },
+    { "id": "talent.prepare" },
+    { "id": "talent.arrow.expire" },
+    { "id": "talent.drone.consume" },
+    { "id": "talent.vulnerability" },
+    { "id": "talent.timeshift" },
+    { "id": "talent.compression" },
+    { "id": "talent.rifle" },
+    { "id": "talent.drone.death" },
+    { "id": "talent.growth" },
+    { "id": "talent.select" },
+    { "id": "talent.refresh" }
+  ],
+  "fragments": [
+    {
+      "id": "talents.selection",
+      "rules": [
+        {
+          "id": "selects", "on": "talent.select", "priority": 100,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "ui.choice" },
+            { "kind": "expression", "expression": "target.selected == 0 && target.free == 0" },
+            { "kind": "propertyAtLeast", "subject": "source", "property": "talentPoints", "value": 1 },
+            { "kind": "expression", "expression": "source.talentEarned >= target.unlock" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "talentPoints", "amount": -1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "talentSpent", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "target", "property": "selected", "amount": 1 }
+          ]
+        },
+        {
+          "id": "activates-free", "on": "talent.refresh", "priority": 100,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "ui.choice" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "free", "value": 1 },
+            { "kind": "expression", "expression": "target.selected == 0" },
+            { "kind": "expression", "expression": "source.talentEarned >= target.unlock" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "target", "property": "selected", "amount": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "talents.default",
+      "rules": [
+        {
+          "id": "motivation", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.default.motivation" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.runnerProgress >= 0.5" }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "damage", "operation": "multiply", "value": 2, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "comboChance", "operation": "add", "value": 0.05, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "meditation", "operation": "set", "value": 1, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "hiking-buddy", "on": "talent.depart", "priority": 20, "cooldownTicks": 600,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.default.hiking-buddy" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "spawn", "subject": "source", "template": "actor.hiking-friend" }
+          ]
+        },
+        {
+          "id": "runner-backstop", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.default.runner-backstop" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.collectionPerMinute < source.damage * 0.5" }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "capacity", "operation": "add", "value": 20, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "extra-housing", "on": "talent.build", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.default.extra-housing" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.buildCount > 0 && source.buildCount % 7 == 0" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "housing", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "buildCount", "amount": 1 }
+          ]
+        },
+        {
+          "id": "bathe-in-fire", "on": "talent.bomb", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.default.bathe-in-fire" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.heat >= 1" }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "speed", "operation": "add", "value": 20, "durationTicks": 120 },
+            { "kind": "adjustProperty", "subject": "source", "property": "launchDistance", "amount": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-1",
+      "rules": [
+        {
+          "id": "strength-in-numbers", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g1.strength-in-numbers" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "propertyAtLeast", "subject": "source", "property": "employed", "value": 4 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "multiplier", "operation": "add", "value": 0.1, "fromProperty": "employedGroup", "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "autoHousing", "operation": "set", "value": 1, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "strength-in-numbers-gnorp", "on": "talent.ten-minute", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g1.strength-in-numbers" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "gnorps", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "employed", "amount": 1 }
+          ]
+        },
+        {
+          "id": "popcorn", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g1.popcorn" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "fireRangeMin", "operation": "set", "value": 8, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "fireRangeMax", "operation": "set", "value": 9, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "bullet-breath", "on": "talent.combo", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g1.bullet-breath" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.fireBreath >= 1 && source.comboStacks >= 7" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "bullets", "amount": 1 }
+          ]
+        },
+        {
+          "id": "superhot", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g1.superhot" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "fireDamage", "operation": "multiply", "value": 2.5, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "fireRate", "operation": "multiply", "value": 6, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "timeshift-delivery", "on": "talent.timeshift", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g1.timeshift-delivery" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.timeShiftImpact >= 1" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "timeshiftTicks", "amount": 30 }
+          ]
+        },
+        {
+          "id": "explosive-exposition", "on": "talent.grenade", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g1.explosive-exposition" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "weakspotTicks", "amount": -180 },
+            { "kind": "setModifier", "subject": "source", "property": "maxWeakspots", "operation": "set", "value": 1000, "durationTicks": 3 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-2",
+      "rules": [
+        {
+          "id": "inspiration", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g2.inspiration" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "inspiration", "operation": "set", "value": 1, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "inspiration-apply", "on": "talent.inspire", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g2.inspiration" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "inspiration", "amount": 1 }
+          ]
+        },
+        {
+          "id": "gatling-balloon", "on": "talent.balloon", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g2.gatling-balloon" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.balloonGun >= 1" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "gatlingBullets", "amount": 1 }
+          ]
+        },
+        {
+          "id": "the-flow", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g2.the-flow" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "propertyAtLeast", "subject": "source", "property": "meditation", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "damage", "operation": "add", "value": 3, "fromProperty": "comboStacks", "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "launchDistance", "operation": "add", "value": 2, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "bigger-pile", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g2.bigger-pile" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "gnorps", "operation": "add", "value": 5, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "reclamationRate", "operation": "multiply", "value": 0.8, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "pileThreshold", "operation": "multiply", "value": 2, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "the-higher-the-pile", "on": "talent.throw", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g2.the-higher-the-pile" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.pileHeight >= source.pileThreshold * 0.7" }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "throwVelocity", "operation": "multiply", "value": 2, "durationTicks": 60 }
+          ]
+        },
+        {
+          "id": "notes", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g2.notes" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "multiplier", "operation": "add", "value": 2, "stage": "foundation", "durationTicks": 3 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-3",
+      "rules": [
+        {
+          "id": "prestige-expedience", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g3.prestige-expedience" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "gnorps", "operation": "add", "value": 1, "fromProperty": "talentSpent", "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "clickPower", "operation": "multiply", "value": 2, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "future-to-the-back", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g3.future-to-the-back" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "arrowRegular", "operation": "set", "value": 1, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "arrowChoice", "operation": "set", "value": 1, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "brittleArrows", "operation": "set", "value": 1, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "project-constellation", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g3.project-constellation" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "rocketSeeking", "operation": "set", "value": 0, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "rocketRangeMin", "operation": "set", "value": 3, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "rocketRangeMax", "operation": "set", "value": 7, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "rocketTriggersWeakspots", "operation": "set", "value": 1, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "project-constellation-volley", "on": "talent.rocket.strike", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g3.project-constellation" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "rocketVolley", "amount": 1 }
+          ]
+        },
+        {
+          "id": "supershatter", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g3.supershatter" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "freezeTicks", "operation": "set", "value": 1500, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "freezeDamage", "operation": "set", "value": 1, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "iceImmune", "operation": "set", "value": 0, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "shatterDamage", "operation": "set", "value": 550, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "shatterRangeMin", "operation": "set", "value": 4, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "shatterRangeMax", "operation": "set", "value": 8, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "return-to-sender", "on": "talent.director.leave", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g3.return-to-sender" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "chance", "probability": 0.3333 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "arrows", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "stuckArrows", "amount": -1 }
+          ]
+        },
+        {
+          "id": "descent-of-the-king", "on": "talent.king.descend", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g3.descent-of-the-king" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "multiplier", "operation": "add", "value": 8, "stage": "foundation", "durationTicks": 10800 },
+            { "kind": "adjustProperty", "subject": "source", "property": "crowns", "amount": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-4",
+      "rules": [
+        {
+          "id": "zybellium-mastery", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g4.zybellium-mastery" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "zybellium", "operation": "add", "value": 1, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "zybellium-house", "on": "talent.spend.zybellium", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g4.zybellium-mastery" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "housing", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "zybellium", "amount": -1 }
+          ]
+        },
+        {
+          "id": "rocket-gatler", "on": "talent.hit", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g4.rocket-gatler" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "chance", "probability": 0.1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "rockets", "amount": 1 }
+          ]
+        },
+        {
+          "id": "frostfire", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g4.frostfire" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "statusFire", "operation": "set", "value": 1, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "statusIce", "operation": "set", "value": 1, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "directorRepel", "operation": "set", "value": 0, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "shatterRangeMin", "operation": "set", "value": 8, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "shatterRangeMax", "operation": "set", "value": 9, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "infinite-reverberation", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g4.infinite-reverberation" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "shockwaveFalloff", "operation": "set", "value": 0, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "deals", "on": "talent.shoot", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g4.deals" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "arrows", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "doubleArrows", "amount": 1 }
+          ]
+        },
+        {
+          "id": "deals-purchase", "on": "talent.arrow.purchase", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g4.deals" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "gnorps", "amount": 3 },
+            { "kind": "adjustProperty", "subject": "source", "property": "employed", "amount": 3 }
+          ]
+        },
+        {
+          "id": "reclamation-mitigation", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g4.reclamation-mitigation" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "reclamationBias", "operation": "set", "value": 1, "durationTicks": 3 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-5",
+      "rules": [
+        {
+          "id": "new-building", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g5.new-building" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "shrine", "operation": "set", "value": 1, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "combo-power", "on": "talent.prepare", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g5.combo-power" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "comboChance", "amount": 0.01 },
+            { "kind": "adjustProperty", "subject": "source", "property": "prepJumps", "amount": 1 }
+          ]
+        },
+        {
+          "id": "arrows-last-hurrah", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g5.arrows-last-hurrah" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "arrowStickDenominator", "operation": "set", "value": 20, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "arrowDeathDamage", "operation": "set", "value": 120, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "arrowDeathRangeMin", "operation": "set", "value": 7, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "arrowDeathRangeMax", "operation": "set", "value": 10, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "brittleArrows", "operation": "set", "value": 0, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "arrows-last-hurrah-expiry", "on": "talent.arrow.expire", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g5.arrows-last-hurrah" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "propertyAtLeast", "subject": "source", "property": "stuckArrows", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "arrowDeathHits", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "stuckArrows", "amount": -1 }
+          ]
+        },
+        {
+          "id": "dont-eat-that", "on": "talent.drone.consume", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g5.dont-eat-that" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "zygnorpEnergy", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "damage", "amount": 1 }
+          ]
+        },
+        {
+          "id": "drone-target", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g5.drone-target" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "droneTargetFar", "operation": "set", "value": 1, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "droneTargetClose", "operation": "set", "value": 1, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "vulnerability-empowerment", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g5.vulnerability-empowerment" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "vulnerabilityMultiplier", "operation": "set", "value": 2, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "vulnerability-refund", "on": "talent.vulnerability", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g5.vulnerability-empowerment" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "shards", "operation": "add", "value": 1, "fromProperty": "shardsTakenRecent", "durationTicks": 3 },
+            { "kind": "adjustProperty", "subject": "source", "property": "returnedShards", "amount": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "talents.group-6",
+      "rules": [
+        {
+          "id": "multiplier-growth", "on": "talent.growth", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g6.multiplier-growth" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.multiplier < 4" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "multiplier", "amount": 0.1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "multiplierGrowth", "amount": 0.1 }
+          ]
+        },
+        {
+          "id": "pocket-rocket-timeshift-retainment", "on": "talent.timeshift", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g6.pocket-rocket-timeshift-retainment" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.timeShiftImpact >= 1" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "pocketRockets", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "rockets", "amount": 1 }
+          ]
+        },
+        {
+          "id": "agitated-zybe", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g6.agitated-zybe" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "balloonSpeed", "operation": "multiply", "value": 2, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "agitated-zybe-compression", "on": "talent.compression", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g6.agitated-zybe" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.agitatorUses < 3" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "zybellium", "amount": 1 },
+            { "kind": "adjustProperty", "subject": "source", "property": "agitatorUses", "amount": 1 }
+          ]
+        },
+        {
+          "id": "gnorpcalibur-unleashed", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g6.gnorpcalibur-unleashed" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "accordConcurrent", "operation": "set", "value": 1, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "modern-warfare", "on": "talent.rifle", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g6.modern-warfare" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 },
+            { "kind": "expression", "expression": "source.grenadeLauncher >= 1" }
+          ],
+          "effects": [
+            { "kind": "adjustProperty", "subject": "source", "property": "rifleGrenades", "amount": 1 }
+          ]
+        },
+        {
+          "id": "drone-capacity", "on": "talent.tick", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g6.drone-capacity" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "setModifier", "subject": "source", "property": "droneCapacity", "operation": "multiply", "value": 2, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "droneChildren", "operation": "set", "value": 2, "durationTicks": 3 },
+            { "kind": "setModifier", "subject": "source", "property": "descentSpeed", "operation": "multiply", "value": 0.5, "durationTicks": 3 }
+          ]
+        },
+        {
+          "id": "drone-capacity-death", "on": "talent.drone.death", "priority": 20,
+          "when": [
+            { "kind": "hasTag", "subject": "target", "tag": "talent.g6.drone-capacity" },
+            { "kind": "propertyAtLeast", "subject": "target", "property": "selected", "value": 1 }
+          ],
+          "effects": [
+            { "kind": "spawn", "subject": "source", "template": "actor.baby-drone" },
+            { "kind": "spawn", "subject": "source", "template": "actor.baby-drone" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "talents.clock",
+      "schedules": [
+        { "id": "talents.tick", "event": "talent.tick", "everyTicks": 1, "sourceEntityId": "actor.runner", "targetEntityId": "actor.runner" },
+        { "id": "talents.ten-minute", "event": "talent.ten-minute", "everyTicks": 36000, "sourceEntityId": "actor.runner", "targetEntityId": "actor.runner" },
+        { "id": "talents.rocket-strike", "event": "talent.rocket.strike", "everyTicks": 1200, "sourceEntityId": "actor.runner", "targetEntityId": "actor.runner" },
+        { "id": "talents.growth", "event": "talent.growth", "everyTicks": 21600, "sourceEntityId": "actor.runner", "targetEntityId": "actor.runner" },
+        { "id": "talents.free.default", "event": "talent.refresh", "everyTicks": 60, "sourceEntityId": "actor.runner", "targetEntityId": "talent.default.motivation" },
+        { "id": "talents.free.group-1", "event": "talent.refresh", "everyTicks": 60, "sourceEntityId": "actor.runner", "targetEntityId": "talent.g1.strength-in-numbers" },
+        { "id": "talents.free.group-2", "event": "talent.refresh", "everyTicks": 60, "sourceEntityId": "actor.runner", "targetEntityId": "talent.g2.inspiration" },
+        { "id": "talents.free.group-3", "event": "talent.refresh", "everyTicks": 60, "sourceEntityId": "actor.runner", "targetEntityId": "talent.g3.prestige-expedience" },
+        { "id": "talents.free.group-4", "event": "talent.refresh", "everyTicks": 60, "sourceEntityId": "actor.runner", "targetEntityId": "talent.g4.zybellium-mastery" },
+        { "id": "talents.free.group-5", "event": "talent.refresh", "everyTicks": 60, "sourceEntityId": "actor.runner", "targetEntityId": "talent.g5.new-building" },
+        { "id": "talents.free.group-6", "event": "talent.refresh", "everyTicks": 60, "sourceEntityId": "actor.runner", "targetEntityId": "talent.g6.multiplier-growth" }
+      ],
+      "rules": []
+    }
+  ],
+  "useFragments": [
+    "talents.selection",
+    "talents.default",
+    "talents.group-1",
+    "talents.group-2",
+    "talents.group-3",
+    "talents.group-4",
+    "talents.group-5",
+    "talents.group-6",
+    "talents.clock"
+  ]
+}

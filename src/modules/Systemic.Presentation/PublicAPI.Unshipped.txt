@@ -35,6 +35,12 @@ Systemic.Presentation.UiNodeState.IsOn.get -> bool
 Systemic.Presentation.UiNodeState.IsOn.init -> void
 Systemic.Presentation.UiNodeState.ItemEntityId.get -> int?
 Systemic.Presentation.UiNodeState.ItemEntityId.init -> void
+Systemic.Presentation.PresentationModuleContent.DeclaresAction(string! actionId) -> bool
 Systemic.Presentation.UiNodeState.Tooltip.get -> string?
 Systemic.Presentation.UiNodeState.Tooltip.init -> void
 Systemic.Presentation.UiNodeState.UiNodeState(string! Type, string? Text, string? Action, string? VisualRecipeId, bool HasValue, double? NumberValue, string? TextValue, double? Progress, string? VisualState, System.Collections.Immutable.ImmutableArray<Systemic.Presentation.UiNodeState!> Children, string? Tooltip = null, int? Amount = null, bool IsOn = false, int? ItemEntityId = null) -> void
+Systemic.Presentation.PresentationContentModule.Version.get -> int
+Systemic.Presentation.UiActionResult.Reason.get -> string?
+Systemic.Presentation.UiActionResult.Reason.init -> void
+Systemic.Presentation.UiActionResult.Rejected.get -> bool
+Systemic.Presentation.UiActionResult.Rejected.init -> void

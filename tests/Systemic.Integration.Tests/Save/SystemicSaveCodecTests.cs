@@ -199,6 +199,7 @@ public sealed class SystemicSaveCodecTests
     private sealed class StatefulCounter : ISystemicExtensionModule, ISystemicStatefulExtension
     {
         public string Id => "test.counter";
+        public int Version => 1;
         public int Value { get; set; }
         public JsonElement CaptureState() => JsonSerializer.SerializeToElement(Value);
         public void RestoreState(JsonElement state) => Value = state.GetInt32();
@@ -207,6 +208,7 @@ public sealed class SystemicSaveCodecTests
     private sealed class StatefulSystemExtension : ISystemicExtensionModule, ISystemicSystem, ISystemicStatefulExtension
     {
         public string Id => "test.stateful-system";
+        public int Version => 1;
         public int Order => 10;
         public int Value { get; set; }
         public void Step(SystemicSystemContext context) => Value++;

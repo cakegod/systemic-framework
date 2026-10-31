@@ -12,6 +12,8 @@ public sealed class PresentationContentModule : ISystemicContentModule
 
     public string Id => ModuleId;
 
+    public int Version => 1;
+
     public ISystemicModuleContent Compile(ContentModuleContext context, JsonElement declaration) =>
         PresentationContentCompiler.Compile(context, declaration);
 
@@ -26,10 +28,18 @@ public sealed class PresentationContentModule : ISystemicContentModule
 }
 
 /// <summary>
-/// The outcome of invoking an authored UI action. <see cref="Handled"/> is true when at least one
-/// rule matched the published fact; <see cref="RolledBack"/> mirrors the dispatch result.
+/// The outcome of invoking an authored UI action. <see cref="Handled"/> is true when a bound typed
+/// command ran or at least one rule matched the published fact; <see cref="RolledBack"/> mirrors
+/// the fallback dispatch result.
 /// </summary>
-public sealed record UiActionResult(string LayoutId, string ActionId, bool Handled, bool RolledBack);
+public sealed record UiActionResult(string LayoutId, string ActionId, bool Handled, bool RolledBack)
+{
+    /// <summary>Gets whether the action was refused: a bound handler rejected it, or nothing consumed it.</summary>
+    public bool Rejected { get; init; }
+
+    /// <summary>Gets the handler's rejection reason, or null when the action was accepted or had no consumer.</summary>
+    public string? Reason { get; init; }
+}
 
 /// <summary>Typed presentation APIs for games that opt into the Presentation module.</summary>
 public static class PresentationGameExtensions
@@ -59,13 +69,16 @@ public static class PresentationGameExtensions
     }
 
     /// <summary>
-    /// Publishes a UI action as one fact, so a click travels the same deterministic dispatch path
-    /// as any other event. The action must be declared by the layout it is invoked on, and the
-    /// owning entity is required so a rule authored on the action id has a subject.
+    /// Resolves a declared UI action to its clicked amount, then runs its bound typed command or
+    /// publishes the legacy fact when the action is rule-backed. The action must be declared by the
+    /// layout it is invoked on, and the owning entity is required so a rule authored on the action
+    /// id has a subject.
     /// </summary>
     /// <remarks>
-    /// <see cref="UiActionResult.Handled"/> is true only when at least one rule matched, so a layout
-    /// that declares an action no rule listens for reports <c>false</c> instead of a silent success.
+    /// <see cref="UiActionResult.Handled"/> is true when a bound command handler accepted the action
+    /// or when at least one rule matched, so a layout that declares an action with no consumer reports
+    /// <c>false</c> instead of a silent success. A handler that rejects the command rolls back its
+    /// mutations and reports <see cref="UiActionResult.Rejected"/> with <see cref="UiActionResult.Reason"/>.
     /// </remarks>
     /// <param name="game">The game whose presentation content declares the layout.</param>
     /// <param name="layoutId">The layout that declares <paramref name="actionId"/>.</param>
@@ -118,6 +131,25 @@ public static class PresentationGameExtensions
         // The action id is the fact type, the owning choice entity is both source and target, and the
         // buy amount travels on the fact, so a rule can scale by the quantity the player chose. The
         // owner is required: a fact aimed at entity 0 would match no entity-addressed rule.
+        var action = new SystemicUiAction(layoutId, actionId, choiceOwnerEntityId, resolved);
+        if (game.TryExecuteUiAction(action, out var outcome))
+        {
+            return new UiActionResult(layoutId, actionId, Handled: true, RolledBack: false);
+        }
+
+        if (outcome.Handled)
+        {
+            // The bound handler rejected the action, so fall through to a rule would double-dispatch.
+            return new UiActionResult(layoutId, actionId, Handled: false, RolledBack: true)
+            {
+                Rejected = true,
+                Reason = outcome.Reason,
+            };
+        }
+
+        // WHY: a typed binding is optional, but the fact is not. On a rules-free host the engine has
+        // no rules to match, yet the fact is the notification channel presentation and telemetry
+        // observe, so publishing it is what makes a data-only button report anything at all.
         var dispatch = game.Publish(new SimulationFact(actionId, choiceOwnerEntityId, choiceOwnerEntityId,
             Amount: resolved));
         return new UiActionResult(layoutId, actionId, Handled: dispatch.RulesMatched > 0, dispatch.RolledBack);

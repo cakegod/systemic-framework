@@ -114,7 +114,16 @@ public sealed class SystemicSaveCodec
             game.EntityIds
                 .Where(pair => world.ById(pair.Value) is { ToRemove: false })
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
-            extensionStates);
+            extensionStates,
+            // WHY: an empty composition writes nothing, so a module-free pack keeps the previous save
+            // shape and only packs that actually compose behavior carry version records.
+            game.ModuleVersions.IsEmpty
+                ? null
+                : game.ModuleVersions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+            game.Content.Modules.IsDefaultOrEmpty
+                ? null
+                : game.Content.Modules.ToDictionary(module => module.Module.Id,
+                    module => module.Module.Version, StringComparer.Ordinal));
 
         var json = JsonSerializer.Serialize(document, SystemicSaveJsonContext.Default.SaveDocument);
         var sealedJson = SaveIntegrity.Seal(JsonNode.Parse(json)!.AsObject());
@@ -206,6 +215,24 @@ public sealed class SystemicSaveCodec
                 throw new SystemicSaveException("Save content fingerprint does not match the loaded content pack.");
             }
 
+            foreach (var (moduleId, savedVersion) in (document.ContentModules ?? [])
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                var loaded = content.Modules.FirstOrDefault(module =>
+                    string.Equals(module.Module.Id, moduleId, StringComparison.Ordinal));
+                if (loaded is null)
+                {
+                    throw new SystemicSaveException(
+                        $"Save requires content module '{moduleId}' version {savedVersion}, but this pack does not load it.");
+                }
+
+                if (loaded.Module.Version != savedVersion)
+                {
+                    throw new SystemicSaveException(
+                        $"Save was created with content module '{moduleId}' version {savedVersion}, but this pack loads version {loaded.Module.Version}. Bump the module version and migrate the save, or create a new save.");
+                }
+            }
+
             var clockState = document.ExtensionStates![ClockStatefulExtension.ExtensionId]
                 .Deserialize(SystemicSaveJsonContext.Default.FixedStepClockState);
             var clock = new FixedStepClock(content.Manifest.TickRateHz, content.Manifest.MaxCatchUpSteps);
@@ -281,7 +308,12 @@ public sealed class SystemicSaveCodec
                 ?? throw new SystemicSaveException("Save document requires extensionStates."))
                 .ToImmutableDictionary(
                 pair => pair.Key, pair => CloneJson(pair.Value), StringComparer.Ordinal);
-            return new MaterializedContentWorld(world, entityIds, extensionStates);
+            return new MaterializedContentWorld(world, entityIds, extensionStates)
+            {
+                ModuleVersions = document.Modules is null
+                    ? ImmutableDictionary<string, int>.Empty
+                    : document.Modules.ToImmutableDictionary(StringComparer.Ordinal),
+            };
         }
         catch (SystemicSaveException)
         {
@@ -351,7 +383,7 @@ public sealed class SystemicSaveCodec
         }
         SaveIntegrity.Validate(document.RootElement);
         return version < CurrentSchemaVersion
-            ? SystemicSaveMigration.Upgrade(json, CurrentSchemaVersion, _migrations.Values)
+            ? SystemicSaveMigration.Migrate(json, CurrentSchemaVersion, _migrations.Values)
             : json;
     }
 
@@ -562,7 +594,11 @@ internal sealed record SaveDocument(
     string Checksum,
     SavedWorld World,
     Dictionary<string, int> EntityIds,
-    Dictionary<string, JsonElement>? ExtensionStates = null);
+    Dictionary<string, JsonElement>? ExtensionStates = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    Dictionary<string, int>? Modules = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    Dictionary<string, int>? ContentModules = null);
 
 internal sealed record SavedWorld(
     int Seed,

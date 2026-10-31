@@ -29,11 +29,20 @@ public interface IReplayTarget
     void ApplyInput(ReplayInput input);
     void Step();
     ReadOnlyMemory<byte> CaptureState();
+
+    /// <summary>Gets the module versions that produced this target's state.</summary>
+    /// <remarks>The default is empty so simple targets stay valid; a host target reports every module.</remarks>
+    IReadOnlyDictionary<string, int> ModuleVersions => ImmutableDictionary<string, int>.Empty;
 }
 
 public sealed record ReplayTick(int Tick, ImmutableArray<ReplayInput> Inputs, string StateHash);
 public sealed record ReplayArtifact(int Version, int Seed, string ContentFingerprint, int InitialTick,
-    string InitialStateHash, ImmutableArray<ReplayTick> Ticks);
+    string InitialStateHash, ImmutableArray<ReplayTick> Ticks)
+{
+    /// <summary>Gets the module versions that produced this replay.</summary>
+    public ImmutableDictionary<string, int> ModuleVersions { get; init; } =
+        ImmutableDictionary<string, int>.Empty;
+}
 public sealed record ReplayMismatch(string Code, int Tick, string? Expected, string? Actual, int? InputIndex = null);
 public sealed record ReplayVerificationResult(bool Success, ReplayMismatch? Mismatch);
 
@@ -59,6 +68,7 @@ public sealed class ReplayRecorder
     private readonly int _seed, _initialTick;
     private readonly string _fingerprint, _initialHash;
     private readonly List<ReplayTick> _ticks = [];
+    private readonly ImmutableDictionary<string, int> _moduleVersions;
     private string _lastHash;
     private bool _failed;
 
@@ -73,6 +83,7 @@ public sealed class ReplayRecorder
         _seed = target.Seed;
         _fingerprint = target.ContentFingerprint;
         _initialTick = target.Tick;
+        _moduleVersions = target.ModuleVersions.ToImmutableDictionary(StringComparer.Ordinal);
         _lastHash = _initialHash = ReplayStateHash.Compute(target.CaptureState().Span);
     }
 
@@ -120,7 +131,10 @@ public sealed class ReplayRecorder
             throw new InvalidOperationException("Recording cannot finish after a failed tick or external state change.");
         }
 
-        return new ReplayArtifact(1, _seed, _fingerprint, _initialTick, _initialHash, [.. _ticks]);
+        return new ReplayArtifact(1, _seed, _fingerprint, _initialTick, _initialHash, [.. _ticks])
+        {
+            ModuleVersions = _moduleVersions,
+        };
     }
 }
 
@@ -146,6 +160,27 @@ public static class ReplayRunner
         if (artifact.InitialTick != target.Tick)
         {
             return Fail("initialTick", target.Tick, artifact.InitialTick.ToString(), target.Tick.ToString());
+        }
+
+        foreach (var (moduleId, version) in artifact.ModuleVersions.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (!target.ModuleVersions.TryGetValue(moduleId, out var actual))
+            {
+                return Fail("moduleVersion", target.Tick, $"{moduleId}:{version}", "missing");
+            }
+
+            if (actual != version)
+            {
+                return Fail("moduleVersion", target.Tick, $"{moduleId}:{version}", $"{moduleId}:{actual}");
+            }
+        }
+
+        foreach (var (moduleId, version) in target.ModuleVersions.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (!artifact.ModuleVersions.ContainsKey(moduleId))
+            {
+                return Fail("moduleVersion", target.Tick, "missing", $"{moduleId}:{version}");
+            }
         }
 
         var initial = ReplayStateHash.Compute(target.CaptureState().Span);
@@ -198,6 +233,27 @@ public static class ReplayDiff
             return new("initialTick", first.InitialTick, first.InitialTick.ToString(), second.InitialTick.ToString());
         }
 
+        foreach (var (moduleId, version) in first.ModuleVersions.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (!second.ModuleVersions.TryGetValue(moduleId, out var other))
+            {
+                return new("moduleVersion", first.InitialTick, $"{moduleId}:{version}", "missing");
+            }
+
+            if (other != version)
+            {
+                return new("moduleVersion", first.InitialTick, $"{moduleId}:{version}", $"{moduleId}:{other}");
+            }
+        }
+
+        foreach (var (moduleId, version) in second.ModuleVersions.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (!first.ModuleVersions.ContainsKey(moduleId))
+            {
+                return new("moduleVersion", first.InitialTick, "missing", $"{moduleId}:{version}");
+            }
+        }
+
         if (first.InitialStateHash != second.InitialStateHash)
         {
             return new("initialState", first.InitialTick, first.InitialStateHash, second.InitialStateHash);
@@ -236,6 +292,22 @@ public sealed class HostReplayTarget(ISystemicHostAdapter host, Action<SystemicG
     public int Tick => host.Game.World.LogicalTick;
     public void ApplyInput(ReplayInput input) => applyInput(host.Game, input);
     public void Step() => host.Step();
+    public IReadOnlyDictionary<string, int> ModuleVersions
+    {
+        get
+        {
+            var versions = host.Game.ModuleVersions.ToBuilder();
+            if (!host.Game.Content.Modules.IsDefaultOrEmpty)
+            {
+                foreach (var module in host.Game.Content.Modules)
+                {
+                    versions[module.Module.Id] = module.Module.Version;
+                }
+            }
+
+            return versions.ToImmutable();
+        }
+    }
     public ReadOnlyMemory<byte> CaptureState()
     {
         var document = JsonNode.Parse(host.Save())!.AsObject();

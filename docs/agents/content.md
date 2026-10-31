@@ -1,209 +1,227 @@
 # Author content
 
-A pack has three required files:
+> **Status (2026-10-31).** Behavior is C# systems and commands. JSON is data. The JSON rule
+> engine is legacy and is deleted after the samples migrate. See
+> [ADR 0004](../adr/0004-code-first-simulation.md).
 
-- `game.json` names the manifest and the rules and entity files.
-- `entities.json` declares entities with tags, numeric properties, and optional visual recipe IDs.
-- `rules.json` declares schedules, rules, conditions, and effects.
+A pack has two required files:
 
-Edit JSON, then validate:
+- `game.json` names the manifest, tick rate, and entity file.
+- `entities.json` declares entities with tags, numeric properties, links, and optional
+  visual recipe IDs.
+
+Optional data lives in `ui.json`, `visuals.json`, and `presentation.json`. Module-specific
+tuning documents are declared by the module that owns them.
+
+`rules.json` is a legacy reference format. Do not add one to a new pack, and do not add
+conditions, effects, schedules, expressions, or facts to an existing one. Omit the `rules`
+property from `game.json` so the loader does not read a rule file at all; a pack that
+declares no rules and no schedules builds a host without a rule engine, and its save carries
+no rule-history state.
+
+Validate after every edit:
 
 ```sh
 systemic validate my-game
 ```
 
-## Add a scheduled producer
+## Entities
 
-1. Add a target entity with a writable property.
-2. Add a schedule whose event fires every N ticks and names a source and target entity.
-3. Add a rule on that event. Guard it with a tag on the source.
-4. Apply `adjustProperty` to the target.
+An entity is a data row plus tags and properties:
 
 ```json
 {
-  "id": "demo.pulse",
-  "event": "demo.tick",
-  "everyTicks": 60,
-  "sourceEntityId": "actor.generator",
-  "targetEntityId": "resource.energy"
+  "id": "actor.generator",
+  "kind": "actor",
+  "tags": ["producer", "ui.choice"],
+  "properties": { "rate": 1, "balance": 0, "selected": 0 },
+  "visualRecipeId": "icon.generator"
 }
 ```
 
-The schedule and the rule are general primitives. A producer is a pattern, not a framework type.
+Tags are behavior gates and UI selectors. Properties are authoritative state. A game
+system reads and writes them through the World. Do not add framework genre types to describe
+what an entity is; use tags, properties, and game code.
 
-## Add a toggle
+## UI actions are commands
 
-Give an entity the `ui.choice` tag and a `selected` property. Rules can check the tag. A generic list UI binds to entities with the tag. Do not ask for a Talent type.
-
-## Invoke a UI action
-
-A button declares an `action` id, and the game publishes that id as one fact through
-`InvokeUiAction`. The id is the fact type, the owning entity is both source and target, and
-the button's `amount` travels on the fact, so a rule can scale by the quantity the player
-chose.
+A button declares an action id. The game registers a command handler for the command type
+and binds the declared action id to a command factory before the game builds. The UI does not
+publish a rule fact.
 
 ```json
-{ "type": "button", "text": "Buy x10", "action": "ui.buy", "amount": 10 }
+{ "type": "button", "text": "Buy x10", "action": "buy", "amount": 10 }
 ```
 
 ```csharp
-var result = game.InvokeUiAction("hud", "ui.buy", game.EntityId("actor.buyer"));
+builder.AddCommand<BuyCommand, BuyHandler>();
+builder.BindUiAction<BuyCommand>("buy", action =>
+    new BuyCommand(action.OwnerEntityId, action.Amount));
 ```
 
-The owning entity is required: a fact aimed at no entity matches no entity-addressed rule.
-`result.Handled` reports whether a rule actually matched, not merely that the fact was
-published, so a button no rule listens for returns `false`.
+`InvokeUiAction` resolves the clicked node's amount and runs the command. A bound action
+without a registered command handler fails at build, and so does a binding the loaded UI
+modules cannot validate. A layout action with no binding is still published as a fact, so
+presentation and telemetry observers see it; it returns `Handled = false` because no rule
+matched, not because the host dropped it.
 
-## Declare facts and payloads
+A command validates its cost and target, then mutates the World. A command that cannot
+afford or allow the purchase calls `context.Reject("insufficient.funds")` and returns; the
+host rolls the command back and reports `Rejected` with the reason instead of committing.
+The same command can be invoked by a test, a keyboard binding, or the UI once its action
+binding is registered. Every command, accepted or rejected, is appended to the host's
+command journal with its type, serialized payload, last completed tick, and sequence. The
+journal is saved and keeps the most recent 4096 records, so a save records the input that
+produced it without growing without bound.
 
-Add a `facts` array to `rules.json` when a fact should carry typed data. Each fact
-names its payload fields and their kinds: `integer`, `number`, `text`, or `boolean`.
+## Events
 
-```json
+Events are typed notifications for presentation, telemetry, and decoupling. A system queues
+one with `context.EmitEvent(...)`; the host dispatches the tick's queue after its deferred
+facts, in system registration order then queue order, inside the tick's transaction. A
+rolled-back tick discards its queue. The outer program can also emit with
+`game.Emit(...)`.
+
+Register handlers on the builder; they run in registration order inside one World
+transaction and receive a read-only World view plus registered services. Simulation
+mutations belong in commands and systems, not event handlers.
+
+```csharp
+builder.AddEvent<Harvested, HarvestPresentation>();
+context.EmitEvent(new Harvested(amount: 7));
+```
+
+## Game behavior
+
+Behavior is game-side C#. A game module registers systems and commands. Every choice in its content must pass the
+[expressive-agency test](../design/expressive-agency.md):
+
+```csharp
+public sealed class GameModule : ISystemicGameModule
 {
-  "facts": [
+    public string Id => "game";
+    public int Version => 1;
+
+    public void Compose(SystemicGameBuilder builder)
     {
-      "id": "fruit.combine",
-      "payload": [
-        { "key": "tier", "kind": "integer" },
-        { "key": "label", "kind": "text" }
-      ]
+        builder.AddSystem(new EconomySystem());
+        builder.AddSystem(new ChoiceSystem());
+        builder.AddCommand<SelectChoice, SelectChoiceHandler>();
     }
-  ]
 }
 ```
 
-A rule or schedule attaches values by key:
+A system is a stateless step function:
+
+```csharp
+public sealed class EconomySystem : ISystemicSystem
+{
+    public string Id => "game.economy";
+
+    public IReadOnlyList<SystemAccess> Access => [SystemAccess.WriteWorld];
+
+    public void Step(SystemicSystemContext context)
+    {
+        var world = context.GetWritableWorld();
+        foreach (var producer in world.EntitiesWithTag("producer"))
+        {
+            // Read authoritative properties, apply the interval, write the result.
+            // No system fields. State lives in the World.
+        }
+    }
+}
+```
+
+Keep timers, cooldowns, ranks, selection, and counters in entity properties or population
+columns. A system field is a bug unless it is a derived cache rebuilt after load.
+
+## Data versus behavior
+
+Data defines identity, cost, tags, descriptions, tuning, and visuals. Code defines what a
+selected choice does. Gnorp is one reference for the mechanical stress test, not a design
+to copy. Use it to test expression, then design choices for the game you are actually making.
 
 ```json
 {
-  "kind": "emitEvent",
-  "event": "fruit.combine",
-  "payload": [
-    { "key": "tier", "value": 3 },
-    { "key": "label", "value": "pear" }
-  ]
+  "id": "talent.default.motivation",
+  "group": "default",
+  "cost": 1,
+  "tags": ["ui.choice", "talent.default.motivation"],
+  "description": "Low progress: faster abilities, but no healing."
 }
 ```
 
-When `facts` is present, every `on` event, `emitEvent`, and schedule event must be
-declared. Payload fields are optional per emission, but a supplied key must match a
-declared field and its kind. Duplicate keys, unknown fields, and wrong value kinds
-are content errors with a path to the offending value.
-
-## Rule bundles and cooldowns
-
-A bundle is a named group of rules that runs only while a tag is present. Give the rule a
-`bundle` name and declare the bundle once. A timed tag grant turns it on and its expiry
-turns it off, so a status effect does not need a second rule to clean up after itself.
-
-```json
+```csharp
+static void Motivation(in TalentContext context)
 {
-  "bundles": [ { "id": "talent.hiking", "enabledByTag": "talent.hiking" } ],
-  "rules": [
-    { "id": "talent.hiking.boost", "on": "talent.tick", "bundle": "talent.hiking",
-      "priority": 0, "cooldownTicks": 30,
-      "effects": [ { "kind": "adjustProperty", "subject": "target", "property": "speed", "amount": 1 } ] }
-  ]
+    if (context.Runner.Progress >= 0.5)
+    {
+        return;
+    }
+
+    // A redesign target: low progress changes risk and timing, not just damage.
+    context.Runner.AddTag("cannot-heal");
+    context.Runner.AddModifier("abilityCooldown", ModifierOperation.Multiply, 0.5, ticks: 1);
 }
 ```
 
-`cooldownTicks` is the minimum number of ticks between two matches of the same rule for
-the same source and target. A cooled-down rule is skipped, so it costs no effects.
+The game owns the choice context, choice system, and behavior table. The framework does not
+know what a talent is.
 
-## Conditions
+## Designing choices
 
-- `hasTag`: subject has a tag.
-- `propertyAtLeast`: subject property meets a threshold.
-- `expression`: bounded arithmetic over properties and event aggregates.
-- `chance`: seeded probability.
-- `query`: selects entities by tag, property, radius, or nearest order, then tests an aggregate.
+A choice must express a playstyle, open a distinct future, carry a trade-off, and interact
+with at least two mechanics. A number can be part of it; a number cannot be the whole
+choice. "+20% damage" is an upgrade. "Low progress gives faster abilities but disables
+healing" is a choice.
 
-## Query entities
+Design interaction, not a menu. General rules should combine so the player can find a
+coherent strategy the design did not enumerate. Do not encode every pair of mechanics as a
+named branch; if a combination needs a special case, generalise the rule or cut the case.
+The framework can enforce this structure. It cannot make the combination interesting; that
+is confirmed by tests and playtests.
 
-A query condition selects live entities and derives a count, sum, minimum, maximum,
-average, or nearest distance. The selector is bounded and deterministic. Results are
-ordered by entity ID unless `order` is `nearest`.
+Every talent gets a design note, a competing-choice comparison, and two synergies. If the
+note cannot say what the player becomes, what becomes possible, what becomes harder, what
+new behavior appears when mechanics meet, and when another choice is better, the talent is
+not done. See [expressive agency and emergence](../design/expressive-agency.md).
 
-```json
-{
-  "kind": "query",
-  "selector": {
-    "tag": "housing",
-    "property": "built",
-    "propertyComparison": "atLeast",
-    "propertyValue": 1,
-    "origin": "source",
-    "radius": 8,
-    "order": "nearest",
-    "limit": 4
-  },
-  "aggregate": "sum",
-  "aggregateProperty": "built",
-  "formula": "query.value >= 7 && query.count > 0"
-}
-```
+## Pattern library
 
-Use `comparison` and `value` instead of `formula` for a simple threshold. A formula can
-read `query.count`, `query.value`, `query.nearest`, and `query.matched`, plus the normal
-expression values such as `tick`, `event.amount`, `source.<property>`, `target.<property>`,
-`source.id`, and `target.id`.
+Reusable patterns are game-side C# modules, not framework APIs. Keep their names neutral:
 
-The spatial filter uses the selected origin entity's bounds. An entity without bounds
-matches no range query. `limit` applies after ordering. A non-count aggregate over an
-empty selection fails the condition, so `query.matched` distinguishes zero from a
-real zero sum. An origin or a match without bounds has no distance, so a formula that
-reads `query.nearest` fails the condition instead of aborting the dispatch; formulas
-that read only `query.count` or `query.value` still run.
-
-## Effects
-
-- `adjustProperty`: change a numeric property. `quantity` picks how: `add` (default), `set`, `multiply`, `min`, or `max`.
-- `clearScope`: despawn every entity carrying the given scope tag, for example `scope.run`, and leave the other scopes intact. It addresses the whole scope, so it takes only `tag`; `subject`, `row`, and `factRow` are rejected at load rather than silently ignored.
-- `setModifier`: typed, staged, optionally timed modifier. `operation` is `add`, `multiply`, `set`, `min`, or `max`. Add `fromProperty` to make the amount follow another property at read time, which is how an upgrade rank drives its own effects.
-- `addTag`, `removeTag`: change an entity's tags.
-- `emitEvent`: dispatch another fact immediately.
-- `schedule`: dispatch a fact after `delayTicks`. `DispatchDue` on the rule engine runs the facts whose tick has arrived.
-- `spawn`: create an entity from an authored template at the fact position, or where the subject stands.
-- `despawn`: mark the subject for removal, applied when the world prunes removed entities.
-- `transfer`: move up to `amount` of `property` from the subject into the fact target's `targetProperty`. A source that holds less moves what it has. Use `basisPoints` instead of `amount` to move a share of what the source holds, floored to whole units: `1000` is ten percent, and 2,900 basis points of 100 moves 29. This is how a grant scales with the run instead of paying a constant.
-- `action`: invoke a game action the game registered by name. Actions are domain verbs such as strike or deposit, and every rule can share one.
-
-Row subjects accept property adjustments, tags, and modifiers. Spawn, despawn, transfer, schedule, and actions address entities, because a population row has no world position, no removal lifetime, and no entity to hand an action.
-
-If a mechanic cannot be expressed, add a general primitive or a game action. Do not add a genre noun to the framework.
-
-## Copy a pattern
-
-`samples/pattern-pack` is a content-only reference for eight mechanics, each a fragment in
-`rules.json` listed in `useFragments`. A fragment carries its own rules, and also the `schedules`
-and `bundles` those rules need. Facts and entities are pack-level vocabulary: copying a fragment
-also means adding the facts and entities it names.
-
-A fragment's rules are compiled with the fragment ID as a prefix, so author the local part only:
-`produces` in fragment `pattern.producer` becomes `pattern.producer.produces`. Bundle IDs and
-schedule IDs are not prefixed, and a fragment must declare every bundle its own rules reference.
-
-| Pattern | Composition |
+| Pattern | Game-side composition |
 | --- | --- |
-| Producer | A schedule inside the fragment emits `pattern.produce`; a rule adds to the target's balance |
-| Upgrade | A purchase fact spends currency, raises `rank` on a producer, and a modifier follows that rank |
-| Talent | A rule bundle enabled by a tag, so one tag adds behaviour and removing it stops it. Points, groups, the choice entity, and the free pick are authored in 1.11 |
-| Merge | Two distinct subjects of the same tier despawn and the next tier spawns in their place |
-| Prestige | A transfer of `basisPoints` of the run's earnings pays the meta entity, then `clearScope` removes the run entities and the unspent remainder with them |
-| Worker | Rows carry a tag and a `mined` column; a system publishes one row fact per live worker and one rule credits that row's column when `event.amount` is at least one |
-| Status | A timed `setModifier` that expires after its duration |
-| Unlock | A rule adds a tag, and other rules read that tag |
-| Offline | No fragment: the host fast-forwards over elapsed ticks and the producer rules above run unchanged |
+| Producer | An interval system that adds a quantity from a rate |
+| Upgrade | A costed command that increments a rank; modifiers read the rank |
+| Talent | A data record plus a behavior function gated by a selected tag |
+| Merge | A command over two same-tier entities that despawns both and spawns the next |
+| Prestige | A command that clears one scope, preserves another, and grants a currency |
+| Worker | A population with tags and columns, advanced by a system |
+| Status | A timed modifier that expires |
+| Unlock | A command or system adds a tag or property; other code checks it |
 
-The offline case has no content because a catch-up rule would be a second economy that could
-desync from the live one. The host advances the clock; the same schedule and rules do the work.
+The pattern library may be opinionated. The framework must not be.
 
-The worker fragment is the exception to copying blind: its rule addresses a population, so the
-game must define that population before the rule set binds. A pack that targets a row is a pack
-whose game owns the rows.
+## Determinism
 
-The pack has no UI and no assets: it proves the rule vocabulary, not a game. Validate it with
-`systemic validate samples/pattern-pack`. Its tests live in `tests/Systemic.PatternPack.Tests`:
-one active and one inactive case per pattern, plus a fragment-isolation test that loads each
-fragment on its own.
+- Authoritative state uses integer or fixed-point math.
+- Do not use ambient time, unseeded randomness, or unordered iteration.
+- Keep stable entity order; use the deterministic World queries.
+- Declare every column and World access a system uses.
+- Keep hot systems allocation-free.
+- Save and replay carry a game module and content module ID and version. A behavior or
+  schema change bumps the version, and an old save that no longer matches is rejected with
+  the module and both versions named.
+
+## Assets
+
+Visual recipes are data. A game references recipe IDs, not PNG paths. Validate and render:
+
+```sh
+systemic assets validate my-game
+systemic assets sheet my-game --out artifacts/assets.png --scale 8
+systemic assets atlas my-game --out content/atlas.png --manifest content/atlas.json
+```
+
+No hand-drawn PNG except the font.

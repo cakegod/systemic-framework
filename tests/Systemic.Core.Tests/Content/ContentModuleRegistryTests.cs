@@ -72,6 +72,7 @@ public sealed class ContentModuleRegistryTests
     private sealed class TestModule(string id) : ISystemicContentModule
     {
         public string Id { get; } = id;
+        public int Version => 1;
         public int CompileCount { get; private set; }
 
         public ISystemicModuleContent Compile(ContentModuleContext context, JsonElement declaration)

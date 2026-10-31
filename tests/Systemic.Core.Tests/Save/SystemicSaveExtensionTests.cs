@@ -24,12 +24,12 @@ public sealed class SystemicSaveExtensionTests
         };
         _ = new SystemicSaveCodec(migrations: migrations);
 
-        var upgraded = SystemicSaveMigration.Upgrade(original, 7, migrations);
+        var upgraded = SystemicSaveMigration.Migrate(original, 7, migrations);
 
         Assert.Equal(6, JsonNode.Parse(original)!["schemaVersion"]!.GetValue<int>());
         Assert.Equal(7, JsonNode.Parse(upgraded)!["schemaVersion"]!.GetValue<int>());
         Assert.Equal(24, JsonNode.Parse(upgraded)!["extensionStates"]!["test.future"]!.GetValue<int>());
-        Assert.Equal(upgraded, SystemicSaveMigration.Upgrade(upgraded, 7, []));
+        Assert.Equal(upgraded, SystemicSaveMigration.Migrate(upgraded, 7, []));
     }
 
     [Fact]
@@ -44,11 +44,11 @@ public sealed class SystemicSaveExtensionTests
         root["world"]!["seed"] = 44;
 
         Assert.Contains("checksum", Assert.Throws<SystemicSaveException>(() =>
-            SystemicSaveMigration.Upgrade(root.ToJsonString(), 6,
+            SystemicSaveMigration.Migrate(root.ToJsonString(), 6,
                 [new FutureMigration(5, _ => { }), new FutureMigration(6, _ => { })])).Message,
             StringComparison.OrdinalIgnoreCase);
         Assert.Contains("migration", Assert.Throws<SystemicSaveException>(() =>
-            SystemicSaveMigration.Upgrade(saved, 7, [new FutureMigration(4, _ => { })])).Message,
+            SystemicSaveMigration.Migrate(saved, 7, [new FutureMigration(4, _ => { })])).Message,
             StringComparison.OrdinalIgnoreCase);
         Assert.Throws<ArgumentException>(() => new SystemicSaveCodec(migrations: [new FutureMigration(3, _ => { })]));
     }

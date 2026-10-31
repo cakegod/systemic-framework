@@ -492,6 +492,7 @@ public sealed class RuleEngineTests
     private sealed class TestExtension : ISystemicExtensionModule
     {
         public string Id => "sample.extension";
+        public int Version => 1;
     }
 }
 

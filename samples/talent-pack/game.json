@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 3,
+  "id": "sample.talent-pack",
+  "name": "Talent pack",
+  "tickRateHz": 60,
+  "maxCatchUpSteps": 4,
+  "rules": "rules.json",
+  "entities": "entities.json"
+}

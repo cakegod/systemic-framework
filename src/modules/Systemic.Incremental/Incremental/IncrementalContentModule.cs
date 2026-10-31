@@ -16,6 +16,8 @@ public sealed class IncrementalContentModule : ISystemicContentModule
 
     public string Id => ModuleId;
 
+    public int Version => 1;
+
     public ISystemicModuleContent Compile(ContentModuleContext context, JsonElement declaration) =>
         IncrementalContentCompiler.Compile(context, declaration);
 

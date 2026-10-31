@@ -4,6 +4,14 @@ namespace Systemic.Extensions;
 public interface ISystemicExtensionModule
 {
     string Id { get; }
+
+    /// <summary>Gets the composition version of this module's behavior or content.</summary>
+    /// <remarks>
+    /// Save documents record every module version and refuse to load when one changed, so bump this
+    /// when a change makes old state unsafe to reuse. Every module declares a version; the compiler
+    /// enforces it, and the save records it.
+    /// </remarks>
+    int Version { get; }
 }
 
 /// <summary>Deterministic, explicit composition for C# behaviors outside the JSON vocabulary.</summary>

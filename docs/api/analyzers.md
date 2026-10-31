@@ -4,7 +4,7 @@
 
 ## Strict determinism
 
-The `SYSDET` rules are enabled errors. By default, they analyze implementations of `ISystemicSystem` and `IScheduledKernelSystem`. Apply `[StrictSimulation]` or set `systemic_determinism = strict` in `.editorconfig` to opt other code in. `systemic_determinism = relaxed` disables the gameplay-system default for a file, while `[CosmeticOnly]` excludes its annotated code even if `[StrictSimulation]` is also present. An explicit `[StrictSimulation]` marker still opts its code in when the file is relaxed.
+The `SYSDET` rules are enabled errors. By default, they analyze implementations of `ISystemicSystem` and `IScheduledKernelSystem`. This is the primary determinism guardrail now that game behavior lives in C# systems rather than JSON rules. Apply `[StrictSimulation]` or set `systemic_determinism = strict` in `.editorconfig` to opt other code in. `systemic_determinism = relaxed` disables the gameplay-system default for a file, while `[CosmeticOnly]` excludes its annotated code even if `[StrictSimulation]` is also present. An explicit `[StrictSimulation]` marker still opts its code in when the file is relaxed.
 
 | Rule | Detects |
 | --- | --- |

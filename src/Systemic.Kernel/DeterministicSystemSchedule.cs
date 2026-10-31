@@ -1353,6 +1353,7 @@ internal sealed class WorldCommandStorage
     private Action?[] _rollbackActions = [];
     private readonly bool _executionScoped;
     private bool _active = true;
+    private bool _expired;
     private long _generation;
     private int _count;
     private int _rollbackActionCount;
@@ -1434,6 +1435,8 @@ internal sealed class WorldCommandStorage
             _active = false;
         }
     }
+
+    internal void Expire() => _expired = true;
 
     public void SetProperty(int entityId, string property, double value)
     {
@@ -1663,6 +1666,11 @@ internal sealed class WorldCommandStorage
 
     private void EnsureActive()
     {
+        if (_expired)
+        {
+            throw new InvalidOperationException("The command buffer has expired.");
+        }
+
         if (_executionScoped && !_active)
         {
             throw new InvalidOperationException("The scheduled system is not executing.");

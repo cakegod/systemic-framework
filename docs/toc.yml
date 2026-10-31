@@ -4,6 +4,8 @@
   href: agent-first-plan.md
 - name: Guides
   items:
+    - name: Expressive agency and emergence
+      href: design/expressive-agency.md
     - name: System context
       href: api/system-context.md
     - name: Populations and scheduling
@@ -12,11 +14,7 @@
       href: api/analyzers.md
 - name: Decisions
   items:
-    - name: Populations as rule subjects
-      href: adr/0001-populations-as-rule-subjects.md
-    - name: Keep the expression language
-      href: adr/0002-keep-the-expression-language.md
-- name: API reference
-  href: reference/Systemic.Kernel.yml
+    - name: Code-first simulation, JSON data
+      href: adr/0004-code-first-simulation.md
 - name: Contributor guidance
   href: contributing/api-documentation.md

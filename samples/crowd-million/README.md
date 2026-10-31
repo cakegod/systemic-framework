@@ -1,5 +1,8 @@
 # Crowd million
 
+> **Legacy sample.** This pack uses the frozen JSON rule engine. New games use C# systems
+> and commands with JSON data; see [ADR 0004](../../docs/adr/0004-code-first-simulation.md).
+
 A content-only pack for the crowd tier: one million prey rows, one authored rule evaluated per row
 per tick, and one aggregate fact instead of a fact per row. There is no C# game here — the rules and
 the entity list are the content, and `benchmarks/Systemic.Benchmarks` drives the rows that the

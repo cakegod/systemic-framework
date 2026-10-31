@@ -153,6 +153,7 @@ public sealed class ContentReloadTests
     private sealed class TestModule : ISystemicContentModule
     {
         public string Id => "test.reload";
+        public int Version => 1;
         public int CompileCount { get; private set; }
         public ISystemicModuleContent Compile(ContentModuleContext context, JsonElement declaration)
         {

@@ -194,7 +194,6 @@ static Systemic.Rules.SimulationFactValue.FromNumber(double value) -> Systemic.R
 static Systemic.Rules.SimulationFactValue.FromText(string! value) -> Systemic.Rules.SimulationFactValue
 static Systemic.Rules.SimulationFactValue.operator !=(Systemic.Rules.SimulationFactValue left, Systemic.Rules.SimulationFactValue right) -> bool
 static Systemic.Rules.SimulationFactValue.operator ==(Systemic.Rules.SimulationFactValue left, Systemic.Rules.SimulationFactValue right) -> bool
-static Systemic.Save.SystemicSaveMigration.Upgrade(string! json, int targetVersion, System.Collections.Generic.IEnumerable<Systemic.Save.ISaveMigration!>! migrations) -> string!
 static Systemic.Ui.SystemicUiBindingContext.operator !=(Systemic.Ui.SystemicUiBindingContext? left, Systemic.Ui.SystemicUiBindingContext? right) -> bool
 static Systemic.Ui.SystemicUiBindingContext.operator ==(Systemic.Ui.SystemicUiBindingContext? left, Systemic.Ui.SystemicUiBindingContext? right) -> bool
 static Systemic.Ui.SystemicUiBindingValue.FromNumber(double value) -> Systemic.Ui.SystemicUiBindingValue
