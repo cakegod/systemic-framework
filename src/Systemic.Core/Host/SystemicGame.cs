@@ -78,7 +78,7 @@ public interface ISystemicReusableTransactionalState : ISystemicStatefulExtensio
 public sealed class SystemicSystemContext
 {
     private readonly World _world;
-    private readonly RuleEngine _contentRules;
+    private readonly RuleEngine? _contentRules;
     private readonly IReadOnlyDictionary<Type, object> _services;
     private readonly SimulationFactObserver? _observeFact;
     private readonly WorldCommandBuffer _standaloneCommands;
@@ -88,6 +88,7 @@ public sealed class SystemicSystemContext
     private bool _canWriteWorld;
     private bool _canDeferWorldWrites;
     private DeferredFactQueue? _deferredFacts;
+    private SystemicEventQueue? _events;
 
     /// <summary>Creates a single-use context for a direct system test or standalone harness.</summary>
     public SystemicSystemContext(World world, RuleEngine contentRules, int tick)
@@ -103,7 +104,7 @@ public sealed class SystemicSystemContext
 
     internal SystemicSystemContext(
         World world,
-        RuleEngine contentRules,
+        RuleEngine? contentRules,
         IReadOnlyDictionary<Type, object> services,
         SimulationFactObserver? observeFact)
     {
@@ -112,6 +113,21 @@ public sealed class SystemicSystemContext
         _services = services;
         _observeFact = observeFact;
         _standaloneCommands = default;
+    }
+
+    internal SystemicSystemContext(
+        World world,
+        RuleEngine? contentRules,
+        IReadOnlyDictionary<Type, object> services,
+        int tick)
+    {
+        _world = world ?? throw new ArgumentNullException(nameof(world));
+        _contentRules = contentRules;
+        _services = services ?? throw new ArgumentNullException(nameof(services));
+        _standaloneCommands = new WorldCommandBuffer();
+        _standaloneTick = tick;
+        _standalone = true;
+        _canWriteWorld = true;
     }
 
     /// <summary>Gets the logical tick currently executing.</summary>
@@ -174,6 +190,7 @@ public sealed class SystemicSystemContext
     /// <exception cref="InvalidOperationException">The system lacks deferred World write access.</exception>
     public void DeferFact(SimulationFact fact)
     {
+        SimulationFactValidation.Validate(fact);
         if (_kernelContext is not null)
         {
             if (!_canWriteWorld && !_canDeferWorldWrites)
@@ -189,6 +206,12 @@ public sealed class SystemicSystemContext
 
         if (_standalone)
         {
+            if (_contentRules is null)
+            {
+                _observeFact?.Invoke(fact, new SimulationFactEmitter(commitImmediately: true));
+                return;
+            }
+
             _contentRules.Dispatch(_world, fact, _observeFact);
             return;
         }
@@ -200,9 +223,39 @@ public sealed class SystemicSystemContext
     /// <exception cref="InvalidOperationException">The system did not declare immediate World write access.</exception>
     public RuleDispatchResult Publish(SimulationFact fact)
     {
+        SimulationFactValidation.Validate(fact);
+        if (_contentRules is null)
+        {
+            // WHY: a rules-free host has no writes to flush and no reactions, but observers still
+            // need the fact, so the notification path must not demand SystemAccess.WriteWorld.
+            _observeFact?.Invoke(fact, new SimulationFactEmitter(commitImmediately: true));
+            return new RuleDispatchResult(FactsProcessed: 1, RulesMatched: 0, EffectsApplied: 0, CutOff: false);
+        }
+
         EnsureImmediateWorldWriteAccess();
         FlushWorldCommands();
         return _contentRules.Dispatch(_world, fact, _observeFact);
+    }
+
+    /// <summary>Queues a typed event for dispatch after every system has run this tick.</summary>
+    /// <param name="event">The event payload.</param>
+    /// <remarks>
+    /// Events dispatch in system registration order, then queue order, after the tick's deferred
+    /// facts. A rolled-back tick discards its queue, so no handler observes a failed tick.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The system is not running under the host schedule.</exception>
+    public void EmitEvent<TEvent>(TEvent @event)
+        where TEvent : ISystemicEvent
+    {
+        ArgumentNullException.ThrowIfNull(@event);
+        if (_kernelContext is null)
+        {
+            throw new InvalidOperationException(
+                "Typed events can be emitted only while the system executes under the host schedule.");
+        }
+
+        (_events ?? throw new InvalidOperationException("The event queue is unavailable during this execution."))
+            .Events.Add(@event);
     }
 
     /// <summary>Registers recovery for external state if the enclosing scheduled tick rolls back.</summary>
@@ -438,12 +491,14 @@ public sealed class SystemicSystemContext
         ScheduledSystemContext kernelContext,
         bool canWriteWorld,
         bool canDeferWorldWrites,
-        DeferredFactQueue deferredFacts)
+        DeferredFactQueue deferredFacts,
+        SystemicEventQueue events)
     {
         _kernelContext = kernelContext;
         _canWriteWorld = canWriteWorld;
         _canDeferWorldWrites = canDeferWorldWrites;
         _deferredFacts = deferredFacts;
+        _events = events;
     }
 
     internal void Finish()
@@ -452,6 +507,8 @@ public sealed class SystemicSystemContext
         _canWriteWorld = false;
         _canDeferWorldWrites = false;
         _deferredFacts = null;
+        _events = null;
+        _standaloneCommands.Expire();
     }
 
     private void FlushWorldCommands()
@@ -524,9 +581,15 @@ public sealed class SystemicGameBuilder
     private readonly List<ISystemicUiBindingProvider> _uiBindingProviders = [];
     private readonly Dictionary<string, RuleActionHandler> _ruleActions = new(StringComparer.Ordinal);
     private readonly Dictionary<Type, object> _services = [];
+    private readonly Dictionary<Type, ICommandHandlerRegistration> _commandHandlers = [];
+    private readonly List<EventRegistration> _eventHandlers = [];
+    private readonly Dictionary<string, UiCommandBinding> _uiCommandBindings = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _moduleVersions = new(StringComparer.Ordinal);
     private readonly ExtensionModuleCatalog _extensions = new();
     private readonly ImmutableDictionary<string, JsonElement>? _extensionStates;
+    private ImmutableDictionary<string, int> _savedModuleVersions = ImmutableDictionary<string, int>.Empty;
     private bool _built;
+    private bool _failed;
     private int _scheduledWorkerCount;
 
     public SystemicGameBuilder(
@@ -553,12 +616,51 @@ public sealed class SystemicGameBuilder
     public SystemicGameBuilder(ContentPack content, MaterializedContentWorld materialized)
         : this(content, materialized.World, materialized.EntityIds, materialized.ExtensionStates)
     {
+        _savedModuleVersions = materialized.ModuleVersions;
     }
 
     public ContentPack Content { get; }
     public World World { get; }
     public ImmutableDictionary<string, int> EntityIds { get; }
     public bool IsRestoringWorld => _extensionStates is not null;
+
+    /// <summary>Registers a game module and runs its composition root.</summary>
+    /// <param name="module">The game module to compose.</param>
+    /// <remarks>A module is also an extension module, so it may own systems and saved state through the same registration path.</remarks>
+    public SystemicGameBuilder AddModule(ISystemicGameModule module)
+    {
+        EnsureNotBuilt();
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentException.ThrowIfNullOrWhiteSpace(module.Id);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(module.Version);
+        if (_moduleVersions.ContainsKey(module.Id))
+        {
+            throw new InvalidOperationException($"Game module '{module.Id}' is already registered.");
+        }
+
+        // WHY: AddExtension performs the save-version check for every module kind, so a game module
+        // cannot take a different path from an extension module.
+
+        // WHY: record the ID before composing, so a module that composes a duplicate fails before it
+        // can leave half-registered systems behind, and poison the builder if composition throws.
+        _moduleVersions.Add(module.Id, module.Version);
+        try
+        {
+            AddExtension(module);
+            module.Compose(this);
+        }
+        catch
+        {
+            _failed = true;
+            throw;
+        }
+
+        return this;
+    }
+
+    /// <summary>Registers a game module by type.</summary>
+    public SystemicGameBuilder AddModule<TModule>()
+        where TModule : ISystemicGameModule, new() => AddModule(new TModule());
 
     /// <summary>Registers a shared service for the host and every system.</summary>
     /// <remarks>A service that implements <see cref="ISystemicStatefulExtension"/> is also registered for save and rollback snapshots; that is intentional, so state carried by a service survives a rolled-back tick.</remarks>
@@ -626,6 +728,70 @@ public sealed class SystemicGameBuilder
         return this;
     }
 
+    /// <summary>Registers the handler for one typed command.</summary>
+    /// <param name="handler">The handler invoked by <see cref="SystemicGame.Execute{TCommand}(TCommand)"/>.</param>
+    /// <exception cref="InvalidOperationException">The command type already has a handler.</exception>
+    public SystemicGameBuilder AddCommand<TCommand>(ISystemicCommandHandler<TCommand> handler)
+        where TCommand : ISystemicCommand
+    {
+        EnsureNotBuilt();
+        ArgumentNullException.ThrowIfNull(handler);
+        if (!_commandHandlers.TryAdd(typeof(TCommand), new CommandHandlerRegistration<TCommand>(handler)))
+        {
+            throw new InvalidOperationException($"Command '{typeof(TCommand).FullName}' already has a handler.");
+        }
+
+        return this;
+    }
+
+    /// <summary>Registers a typed command handler by type.</summary>
+    public SystemicGameBuilder AddCommand<TCommand, THandler>()
+        where TCommand : ISystemicCommand
+        where THandler : ISystemicCommandHandler<TCommand>, new() => AddCommand(new THandler());
+
+    /// <summary>Registers a typed event handler. Handlers run in registration order.</summary>
+    public SystemicGameBuilder AddEvent<TEvent>(ISystemicEventHandler<TEvent> handler)
+        where TEvent : ISystemicEvent
+    {
+        EnsureNotBuilt();
+        ArgumentNullException.ThrowIfNull(handler);
+        var registration = _eventHandlers.Find(entry => entry.EventType == typeof(TEvent));
+        if (registration is null)
+        {
+            registration = new EventRegistration(typeof(TEvent));
+            _eventHandlers.Add(registration);
+        }
+
+        registration.Handlers.Add(new EventInvoker<TEvent>(handler));
+        return this;
+    }
+
+    /// <summary>Registers a typed event handler by type.</summary>
+    public SystemicGameBuilder AddEvent<TEvent, THandler>()
+        where TEvent : ISystemicEvent
+        where THandler : ISystemicEventHandler<TEvent>, new() => AddEvent(new THandler());
+
+    /// <summary>Binds a declared UI action to a typed command before the game builds.</summary>
+    /// <param name="actionId">The action ID declared by a UI layout.</param>
+    /// <param name="createCommand">Creates the command from the layout, owner, and clicked amount.</param>
+    /// <exception cref="InvalidOperationException">The action is already bound.</exception>
+    public SystemicGameBuilder BindUiAction<TCommand>(
+        string actionId,
+        Func<SystemicUiAction, TCommand> createCommand)
+        where TCommand : ISystemicCommand
+    {
+        EnsureNotBuilt();
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
+        ArgumentNullException.ThrowIfNull(createCommand);
+        if (!_uiCommandBindings.TryAdd(actionId,
+            new UiCommandBinding(typeof(TCommand), action => createCommand(action))))
+        {
+            throw new InvalidOperationException($"UI action '{actionId}' is already bound.");
+        }
+
+        return this;
+    }
+
     /// <summary>Registers a game action that content rules may invoke by name.</summary>
     /// <param name="name">The name a rule's action effect uses.</param>
     /// <param name="handler">The handler that runs inside the dispatch transaction.</param>
@@ -673,12 +839,31 @@ public sealed class SystemicGameBuilder
     {
         EnsureNotBuilt();
         ArgumentNullException.ThrowIfNull(module);
+        ArgumentException.ThrowIfNullOrWhiteSpace(module.Id);
         if (module is ISystemicSystem system
             && _systems.Any(existing => string.Equals(existing.Id, system.Id, StringComparison.Ordinal)))
         {
             throw new InvalidOperationException($"System '{system.Id}' is already registered.");
         }
 
+        // Both directions matter: a changed version is unsafe, and a module the save never recorded
+        // is new behavior that the saved state cannot describe.
+        if (_savedModuleVersions.Count > 0)
+        {
+            if (!_savedModuleVersions.TryGetValue(module.Id, out var savedVersion))
+            {
+                throw new InvalidOperationException(
+                    $"Save was created without module '{module.Id}'. Migrate the save or create a new one.");
+            }
+
+            if (savedVersion != module.Version)
+            {
+                throw new InvalidOperationException(
+                    $"Save was created with module '{module.Id}' version {savedVersion}, but this build composes version {module.Version}. Migrate the save or create a new one.");
+            }
+        }
+
+        _moduleVersions.TryAdd(module.Id, module.Version);
         _extensions.Add(module);
         if (module is ISystemicSystem addedSystem)
         {
@@ -700,7 +885,17 @@ public sealed class SystemicGameBuilder
     public SystemicGame Build()
     {
         EnsureNotBuilt();
-        _built = true;
+        // A restore must compose every module the save was produced with; a missing one is a
+        // composition change, not an empty extension list.
+        foreach (var (savedId, _) in _savedModuleVersions)
+        {
+            if (!_moduleVersions.ContainsKey(savedId))
+            {
+                throw new InvalidOperationException(
+                    $"Save requires module '{savedId}', but this build does not compose it. Add the module or create a new save.");
+            }
+        }
+
         var systemsToRun = new List<ISystemicSystem>(_systems);
         if (!Content.Rules.Schedules.IsDefaultOrEmpty)
         {
@@ -717,16 +912,63 @@ public sealed class SystemicGameBuilder
         }
 
         var rules = _ruleActions.Count == 0 ? Content.Rules : Content.Rules.WithActions(_ruleActions);
-        var contentRules = new RuleEngine(rules, tickRateHz: Content.Manifest.TickRateHz);
+        // WHY: a pack with no rules, schedules, or rule actions runs no legacy engine at all, so a
+        // data-only pack has a data-only runtime and the eventual engine deletion is a subtraction.
+        RuleEngine? contentRules = rules.Rules.IsEmpty && rules.Schedules.IsEmpty && _ruleActions.Count == 0
+            ? null
+            : new RuleEngine(rules, tickRateHz: Content.Manifest.TickRateHz);
+        var uiActionCatalogs = Content.Modules.IsDefaultOrEmpty
+            ? Array.Empty<ISystemicUiActionCatalog>()
+            : Content.Modules
+                .Select(module => module.Content)
+                .OfType<ISystemicUiActionCatalog>()
+                .ToArray();
+        foreach (var (actionId, binding) in _uiCommandBindings.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (!_commandHandlers.ContainsKey(binding.CommandType))
+            {
+                throw new InvalidOperationException(
+                    $"UI action '{actionId}' is bound to command '{binding.CommandType.FullName}' but no handler is registered.");
+            }
+
+            // WHY: without a catalog there is nothing to validate the action ID against, so a
+            // typo'd binding would silently produce a dead button. Fail at startup instead.
+            if (uiActionCatalogs.Length == 0)
+            {
+                throw new InvalidOperationException(
+                    $"UI action '{actionId}' is bound to command '{binding.CommandType.FullName}', but no loaded content module declares UI actions. Load the module that owns the layout, usually the Presentation module.");
+            }
+
+            if (!uiActionCatalogs.Any(catalog => catalog.DeclaresAction(actionId)))
+            {
+                throw new InvalidOperationException(
+                    $"UI action '{actionId}' is not declared by any loaded UI layout.");
+            }
+        }
+
+        // Only a build that passes validation consumes the builder, so a caller can fix the
+        // composition and retry instead of recreating the builder.
+        _built = true;
+        var commandHandlers = new Dictionary<Type, ICommandHandlerRegistration>(_commandHandlers);
+        var eventHandlers = _eventHandlers
+            .Select(entry => new EventRegistration(entry.EventType, entry.Handlers.ToArray()))
+            .ToArray();
+        var uiCommandBindings = _uiCommandBindings.ToDictionary(
+            pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var moduleVersions = _moduleVersions.ToImmutableDictionary(StringComparer.Ordinal);
         var clock = new FixedStepClock(Content.Manifest.TickRateHz, Content.Manifest.MaxCatchUpSteps);
         var hasSavedPopulationState = _extensionStates?.ContainsKey(PopulationStatefulExtension.ExtensionId) == true;
         var populationStateExtension = World.HasPopulations || hasSavedPopulationState
             ? new PopulationStatefulExtension(World)
             : null;
+        var commandJournal = new CommandJournalStatefulExtension();
         var statefulExtensions = systems.OfType<ISystemicStatefulExtension>()
             .Concat(_statefulExtensions)
             .Append(new ClockStatefulExtension(clock))
-            .Append(new RuleHistoryStatefulExtension(contentRules, () => World.LogicalTick))
+            .Concat(contentRules is null
+                ? Array.Empty<ISystemicStatefulExtension>()
+                : [new RuleHistoryStatefulExtension(contentRules, () => World.LogicalTick)])
+            .Append(commandJournal)
             .Concat(populationStateExtension is null ? [] : [populationStateExtension])
             .Distinct<ISystemicStatefulExtension>(ReferenceEqualityComparer.Instance)
             .OrderBy(extension => extension.Id, StringComparer.Ordinal)
@@ -774,7 +1016,8 @@ public sealed class SystemicGameBuilder
                 new SystemicSystemContext(World, contentRules,
                     new Dictionary<Type, object>(_services), systemObserver),
                 tickStats.Get(system.Id),
-                new DeferredFactQueue()))
+                new DeferredFactQueue(),
+                new SystemicEventQueue()))
             .ToArray();
         DeterministicSystemSchedule? schedule = null;
         if (systemBridges.Length > 0)
@@ -789,12 +1032,20 @@ public sealed class SystemicGameBuilder
         }
 
         return new SystemicGame(Content, World, schedule, contentRules,
-            EntityIds, statefulExtensions, new Dictionary<Type, object>(_services), factObservers, clock, tickStats,
-            [.. _uiBindingProviders], [.. systemBridges.Select(bridge => bridge.DeferredFacts)]);
+            EntityIds, statefulExtensions, new Dictionary<Type, object>(_services), commandHandlers,
+            eventHandlers, uiCommandBindings, moduleVersions, factObservers, clock, tickStats,
+            [.. _uiBindingProviders], [.. systemBridges.Select(bridge => bridge.DeferredFacts)],
+            [.. systemBridges.Select(bridge => bridge.Events)], commandJournal);
     }
 
     private void EnsureNotBuilt()
     {
+        if (_failed)
+        {
+            throw new InvalidOperationException(
+                "This builder is unusable because module composition failed after registering systems or services. Create a new builder.");
+        }
+
         if (_built)
         {
             throw new InvalidOperationException("A systemic game builder can only build once.");
@@ -805,8 +1056,11 @@ public sealed class SystemicGameBuilder
 public sealed class SystemicGame : IDisposable
 {
     private readonly DeterministicSystemSchedule? _schedule;
-    private readonly RuleEngine _contentRules;
+    private readonly RuleEngine? _contentRules;
     private readonly IReadOnlyDictionary<Type, object> _services;
+    private readonly IReadOnlyDictionary<Type, ICommandHandlerRegistration> _commandHandlers;
+    private readonly IReadOnlyList<EventRegistration> _eventHandlers;
+    private readonly IReadOnlyDictionary<string, UiCommandBinding> _uiCommandBindings;
     private readonly SimulationFactObserver[] _factObservers;
     private int _disposed;
 
@@ -814,15 +1068,21 @@ public sealed class SystemicGame : IDisposable
         ContentPack content,
         World world,
         DeterministicSystemSchedule? schedule,
-        RuleEngine contentRules,
+        RuleEngine? contentRules,
         ImmutableDictionary<string, int> entityIds,
         ISystemicStatefulExtension[] statefulExtensions,
         IReadOnlyDictionary<Type, object> services,
+        IReadOnlyDictionary<Type, ICommandHandlerRegistration> commandHandlers,
+        IReadOnlyList<EventRegistration> eventHandlers,
+        IReadOnlyDictionary<string, UiCommandBinding> uiCommandBindings,
+        ImmutableDictionary<string, int> moduleVersions,
         SimulationFactObserver[] factObservers,
         FixedStepClock clock,
         SystemicTickStats tickStats,
         ISystemicUiBindingProvider[] uiBindingProviders,
-        DeferredFactQueue[] deferredFactQueues)
+        DeferredFactQueue[] deferredFactQueues,
+        SystemicEventQueue[] eventQueues,
+        CommandJournalStatefulExtension commandJournal)
     {
         Content = content;
         World = world;
@@ -831,19 +1091,28 @@ public sealed class SystemicGame : IDisposable
         EntityIds = entityIds;
         StatefulExtensions = statefulExtensions;
         _services = services;
+        _commandHandlers = commandHandlers;
+        _eventHandlers = eventHandlers;
+        _uiCommandBindings = uiCommandBindings;
+        ModuleVersions = moduleVersions;
         _factObservers = factObservers;
         UiBindingProviders = uiBindingProviders;
         Clock = clock;
         TickStats = tickStats;
         _deferredFactQueues = deferredFactQueues;
+        _eventQueues = eventQueues;
+        _commandJournal = commandJournal;
     }
 
     private readonly DeferredFactQueue[] _deferredFactQueues;
+    private readonly SystemicEventQueue[] _eventQueues;
+    private readonly CommandJournalStatefulExtension _commandJournal;
     private readonly List<SimulationFact> _factBatch = new(64);
 
-    public static SystemicGameBuilder FromDirectory(string rootDirectory, int seed, double valueScale = 1)
+    public static SystemicGameBuilder FromDirectory(string rootDirectory, int seed, double valueScale = 1,
+        ContentModuleRegistry? moduleRegistry = null)
     {
-        var content = ContentPackLoader.Load(rootDirectory);
+        var content = ContentPackLoader.Load(rootDirectory, moduleRegistry);
         var materialized = content.CreateWorld(seed, valueScale);
         return new SystemicGameBuilder(content, materialized);
     }
@@ -858,6 +1127,19 @@ public sealed class SystemicGame : IDisposable
     public ImmutableDictionary<string, int> EntityIds { get; }
     public IReadOnlyList<ISystemicStatefulExtension> StatefulExtensions { get; }
     public IReadOnlyList<ISystemicUiBindingProvider> UiBindingProviders { get; }
+    public ImmutableDictionary<string, int> ModuleVersions { get; }
+
+    /// <summary>Gets whether this host composes a rule engine for legacy rule content.</summary>
+    /// <remarks>A pack with no rules, schedules, or registered rule actions reports false, and its runtime carries no rule state.</remarks>
+    public bool SupportsRules => _contentRules is not null;
+
+    /// <summary>Gets the ordered journal of accepted and rejected typed commands.</summary>
+    /// <remarks>
+    /// Each record carries the command type, its serialized payload, the last completed tick, and
+    /// whether the command committed. The journal is saved with the host and keeps the most recent
+    /// 4096 records, so a long session does not grow every later save without bound.
+    /// </remarks>
+    public IReadOnlyList<SystemicCommandRecord> CommandJournal => _commandJournal.Records;
 
     public int EntityId(string contentId) => EntityIds.TryGetValue(contentId, out var id)
         ? id
@@ -877,14 +1159,309 @@ public sealed class SystemicGame : IDisposable
     public RuleDispatchResult Publish(SimulationFact fact)
     {
         ThrowIfDisposed();
+        SimulationFactValidation.Validate(fact);
+        if (_contentRules is null)
+        {
+            // WHY: a rules-free host has no reactions, but presentation and telemetry observers
+            // still need the fact, so facts remain a notification channel without the engine.
+            CombineFactObservers(null)?.Invoke(fact, new SimulationFactEmitter(commitImmediately: true));
+            return new RuleDispatchResult(FactsProcessed: 1, RulesMatched: 0, EffectsApplied: 0, CutOff: false);
+        }
+
         return _contentRules.Dispatch(World, fact, CombineFactObservers(null));
     }
 
     public RuleDispatchTrace Trace(SimulationFact fact)
     {
         ThrowIfDisposed();
+        SimulationFactValidation.Validate(fact);
+        if (_contentRules is null)
+        {
+            // A rules-free host has nothing to trace, and tracing must not notify observers.
+            return new RuleDispatchTrace(
+                new RuleDispatchResult(FactsProcessed: 0, RulesMatched: 0, EffectsApplied: 0, CutOff: false),
+                ImmutableArray<RuleTraceFact>.Empty);
+        }
+
         return _contentRules.DispatchWithTrace(World, fact, CombineFactObservers(null));
     }
+
+    /// <summary>Runs one typed command in its own deterministic World transaction.</summary>
+    /// <typeparam name="TCommand">The registered command type.</typeparam>
+    /// <param name="command">The command payload.</param>
+    /// <exception cref="InvalidOperationException">No handler is registered for the command.</exception>
+    public SystemicCommandOutcome Execute<TCommand>(TCommand command)
+        where TCommand : ISystemicCommand
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(command);
+        return ExecuteCore(typeof(TCommand), command);
+    }
+
+    /// <summary>Runs one typed command and reports whether the handler accepted or rejected it.</summary>
+    /// <typeparam name="TCommand">The registered command type.</typeparam>
+    /// <param name="command">The command payload.</param>
+    /// <param name="outcome">The handled, accepted, and rejection details.</param>
+    /// <returns>True when a handler accepted and committed the command.</returns>
+    public bool TryExecute<TCommand>(TCommand command, out SystemicCommandOutcome outcome)
+        where TCommand : ISystemicCommand
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(command);
+        outcome = ExecuteCore(typeof(TCommand), command);
+        return outcome.Accepted;
+    }
+
+    /// <summary>Runs a typed command by its runtime type.</summary>
+    /// <param name="command">The registered command payload.</param>
+    /// <exception cref="InvalidOperationException">No handler is registered for the command.</exception>
+    public SystemicCommandOutcome Execute(ISystemicCommand command)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(command);
+        return ExecuteCore(command.GetType(), command);
+    }
+
+    /// <summary>Runs the typed command bound to a UI action, or returns false when the action is rule-backed.</summary>
+    /// <param name="action">The layout, action, owner, and clicked amount.</param>
+    /// <exception cref="ArgumentException">The action has no action ID.</exception>
+    public bool TryExecuteUiAction(SystemicUiAction action) =>
+        TryExecuteUiAction(action, out _);
+
+    /// <summary>Runs the typed command bound to a UI action and reports its outcome.</summary>
+    /// <param name="action">The layout, action, owner, and clicked amount.</param>
+    /// <param name="outcome">The handled, accepted, and rejection details.</param>
+    /// <returns>True when a bound command was accepted and committed.</returns>
+    public bool TryExecuteUiAction(SystemicUiAction action, out SystemicCommandOutcome outcome)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(action.ActionId);
+        if (!_uiCommandBindings.TryGetValue(action.ActionId, out var binding))
+        {
+            outcome = SystemicCommandOutcome.Unhandled;
+            return false;
+        }
+
+        var command = binding.CreateCommand(action)
+            ?? throw new InvalidOperationException($"UI action '{action.ActionId}' created a null command.");
+        outcome = ExecuteCore(binding.CommandType, command);
+        return outcome.Accepted;
+    }
+
+    /// <summary>Dispatches one typed event to every registered handler in registration order.</summary>
+    /// <typeparam name="TEvent">The registered event type.</typeparam>
+    /// <param name="event">The event payload.</param>
+    public void Emit<TEvent>(TEvent @event)
+        where TEvent : ISystemicEvent
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(@event);
+        if (!HasEventHandlers(@event.GetType()))
+        {
+            return;
+        }
+
+        var context = new SystemicEventContext(
+            new SystemicSystemContext(World, _contentRules, _services, World.LogicalTick));
+        try
+        {
+            using var transaction = World.BeginTransaction();
+            RegisterStatefulRollback(transaction);
+            try
+            {
+                DispatchEvent(@event, context);
+                transaction.Commit();
+            }
+            catch (Exception failure)
+            {
+                RollBackAfterFailure(transaction, failure, "The event failed and rollback also failed.");
+                throw;
+            }
+        }
+        finally
+        {
+            context.Finish();
+        }
+    }
+
+    private bool HasEventHandlers(Type eventType)
+    {
+        for (var index = 0; index < _eventHandlers.Count; index++)
+        {
+            if (_eventHandlers[index].EventType.IsAssignableFrom(eventType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void DispatchEvent(ISystemicEvent @event, SystemicEventContext context)
+    {
+        // A handler registered for a base event type or the event interface receives every
+        // assignable event; handler-type registration order decides the dispatch order.
+        var eventType = @event.GetType();
+        for (var index = 0; index < _eventHandlers.Count; index++)
+        {
+            var registration = _eventHandlers[index];
+            if (!registration.EventType.IsAssignableFrom(eventType))
+            {
+                continue;
+            }
+
+            for (var handlerIndex = 0; handlerIndex < registration.Handlers.Count; handlerIndex++)
+            {
+                registration.Handlers[handlerIndex].Invoke(@event, context);
+            }
+        }
+    }
+
+    private SystemicCommandOutcome ExecuteCore(Type commandType, ISystemicCommand command)
+    {
+        var handler = FindCommandHandler(commandType)
+            ?? throw new InvalidOperationException($"No handler is registered for command '{commandType.FullName}'.");
+
+        var context = new SystemicCommandContext(
+            new SystemicSystemContext(World, _contentRules, _services, World.LogicalTick));
+        try
+        {
+            using var transaction = World.BeginTransaction();
+            RegisterStatefulRollback(transaction);
+            try
+            {
+                handler.Invoke(command, context);
+                if (context.IsRejected)
+                {
+                    // Rejection is normal play: discard the command's mutations and report why.
+                    transaction.Rollback();
+                    RecordCommand(commandType, command, accepted: false);
+                    return SystemicCommandOutcome.Rejected(context.RejectionReason!);
+                }
+
+                context.ApplyDeferredCommands();
+                DispatchCommandEvents(context);
+                transaction.Commit();
+            }
+            catch (Exception failure)
+            {
+                RollBackAfterFailure(transaction, failure, "The command failed and rollback also failed.");
+                throw;
+            }
+
+            RecordCommand(commandType, command, accepted: true);
+            return SystemicCommandOutcome.Succeeded;
+        }
+        finally
+        {
+            context.Finish();
+        }
+    }
+
+    private ICommandHandlerRegistration? FindCommandHandler(Type commandType)
+    {
+        if (_commandHandlers.TryGetValue(commandType, out var exact))
+        {
+            return exact;
+        }
+
+        // A handler registered for a base class or interface handles derived commands, matching
+        // event dispatch. The nearest registration wins, and an ordinal name tie-break keeps the
+        // result independent of dictionary enumeration order.
+        ICommandHandlerRegistration? match = null;
+        var bestDistance = int.MaxValue;
+        var bestName = string.Empty;
+        foreach (var (registeredType, registration) in _commandHandlers)
+        {
+            if (!registeredType.IsAssignableFrom(commandType))
+            {
+                continue;
+            }
+
+            var distance = TypeDistance(commandType, registeredType);
+            var name = registeredType.FullName ?? registeredType.Name;
+            if (distance < bestDistance
+                || (distance == bestDistance && string.CompareOrdinal(name, bestName) < 0))
+            {
+                match = registration;
+                bestDistance = distance;
+                bestName = name;
+            }
+        }
+
+        return match;
+    }
+
+    private static int TypeDistance(Type commandType, Type registeredType)
+    {
+        if (registeredType.IsInterface)
+        {
+            var pending = new Queue<(Type Type, int Distance)>();
+            foreach (var implemented in commandType.GetInterfaces())
+            {
+                pending.Enqueue((implemented, 1));
+            }
+
+            var visited = new HashSet<Type>();
+            while (pending.Count > 0)
+            {
+                var (type, distance) = pending.Dequeue();
+                if (type == registeredType)
+                {
+                    return distance;
+                }
+
+                if (!visited.Add(type))
+                {
+                    continue;
+                }
+
+                foreach (var parent in type.GetInterfaces())
+                {
+                    pending.Enqueue((parent, distance + 1));
+                }
+            }
+
+            return int.MaxValue;
+        }
+
+        var depth = 1;
+        for (var type = commandType.BaseType; type is not null; type = type.BaseType, depth++)
+        {
+            if (type == registeredType)
+            {
+                return depth;
+            }
+        }
+
+        return int.MaxValue;
+    }
+
+    private void DispatchCommandEvents(SystemicCommandContext command)
+    {
+        if (command.PendingEvents.Count == 0)
+        {
+            return;
+        }
+
+        var context = new SystemicEventContext(
+            new SystemicSystemContext(World, _contentRules, _services, World.LogicalTick));
+        try
+        {
+            for (var index = 0; index < command.PendingEvents.Count; index++)
+            {
+                DispatchEvent(command.PendingEvents[index], context);
+            }
+        }
+        finally
+        {
+            context.Finish();
+        }
+    }
+
+    private void RecordCommand(Type commandType, ISystemicCommand command, bool accepted) =>
+        _commandJournal.Append(World.LogicalTick, commandType.FullName ?? commandType.Name,
+            JsonSerializer.SerializeToElement(command, commandType), accepted);
 
     public void Step()
     {
@@ -925,7 +1502,10 @@ public sealed class SystemicGame : IDisposable
         }
     }
 
-    private static void RollBackTick(WorldTransaction transaction, Exception failure)
+    private static void RollBackTick(WorldTransaction transaction, Exception failure) =>
+        RollBackAfterFailure(transaction, failure, "The tick failed and rollback also failed.");
+
+    private static void RollBackAfterFailure(WorldTransaction transaction, Exception failure, string message)
     {
         try
         {
@@ -933,7 +1513,8 @@ public sealed class SystemicGame : IDisposable
         }
         catch (Exception rollbackFailure)
         {
-            var combined = new AggregateException("The tick failed and rollback also failed.", failure, rollbackFailure);
+            // A failing rollback must not hide the failure that caused it.
+            var combined = new AggregateException(message, failure, rollbackFailure);
             CopySystemId(failure, combined);
             throw combined;
         }
@@ -949,39 +1530,17 @@ public sealed class SystemicGame : IDisposable
 
     private void StepWithinTransaction(WorldTransaction transaction)
     {
-        // A failed tick must not replay facts queued before its rollback.
+        // A failed tick must not replay facts or events queued before its rollback.
         ClearDeferredFacts();
-        for (var index = 0; index < StatefulExtensions.Count; index++)
-        {
-            var extension = StatefulExtensions[index];
-            // Kernel populations, rule history, the clock and the event engine journal their own
-            // changes, so only domain state that is not journalled needs a tick snapshot.
-            if (extension is ISaveOnlyStateExtension)
-            {
-                continue;
-            }
-
-            if (extension is ISystemicReusableTransactionalState reusable)
-            {
-                var snapshot = reusable.CaptureTransactionSnapshot();
-                transaction.OnRollback(snapshot.OnRollback);
-                transaction.OnCommit(snapshot.OnCommit);
-            }
-            else if (extension is ISystemicTransactionalState participant)
-            {
-                RegisterInMemoryRollback(transaction, participant);
-            }
-            else
-            {
-                RegisterJsonRollback(transaction, extension);
-            }
-        }
+        ClearDeferredEvents();
+        RegisterStatefulRollback(transaction);
         World.LogicalTick = checked(World.LogicalTick + 1);
         _schedule?.Execute(World, World.LogicalTick);
         DispatchDeferredFacts();
+        DispatchDeferredEvents();
         // Delayed facts belong to the tick that reached their due tick, with the same observers and
         // the same enclosing transaction as any other fact this tick dispatches.
-        if (_contentRules.HasScheduledFacts)
+        if (_contentRules is not null && _contentRules.HasScheduledFacts)
         {
             _contentRules.DispatchDue(World, CombineFactObservers(null));
         }
@@ -994,6 +1553,58 @@ public sealed class SystemicGame : IDisposable
         for (var index = 0; index < _deferredFactQueues.Length; index++)
         {
             _deferredFactQueues[index].Facts.Clear();
+        }
+    }
+
+    private void ClearDeferredEvents()
+    {
+        for (var index = 0; index < _eventQueues.Length; index++)
+        {
+            _eventQueues[index].Events.Clear();
+        }
+    }
+
+    private void DispatchDeferredEvents()
+    {
+        var pending = false;
+        for (var index = 0; index < _eventQueues.Length; index++)
+        {
+            if (_eventQueues[index].Events.Count > 0)
+            {
+                pending = true;
+                break;
+            }
+        }
+
+        if (!pending)
+        {
+            return;
+        }
+
+        var context = new SystemicEventContext(
+            new SystemicSystemContext(World, _contentRules, _services, World.LogicalTick));
+        try
+        {
+            try
+            {
+                // System order, then queue order: independent of worker count and wave layout.
+                for (var index = 0; index < _eventQueues.Length; index++)
+                {
+                    var queued = _eventQueues[index].Events;
+                    for (var eventIndex = 0; eventIndex < queued.Count; eventIndex++)
+                    {
+                        DispatchEvent(queued[eventIndex], context);
+                    }
+                }
+            }
+            finally
+            {
+                ClearDeferredEvents();
+            }
+        }
+        finally
+        {
+            context.Finish();
         }
     }
 
@@ -1025,7 +1636,17 @@ public sealed class SystemicGame : IDisposable
                 _factBatch.AddRange(_deferredFactQueues[index].Facts);
             }
 
-            _contentRules.DispatchBatch(World, CollectionsMarshal.AsSpan(_factBatch), observer);
+            if (_contentRules is null)
+            {
+                for (var index = 0; index < _factBatch.Count; index++)
+                {
+                    observer?.Invoke(_factBatch[index], new SimulationFactEmitter(commitImmediately: true));
+                }
+            }
+            else
+            {
+                _contentRules.DispatchBatch(World, CollectionsMarshal.AsSpan(_factBatch), observer);
+            }
         }
         finally
         {
@@ -1044,6 +1665,35 @@ public sealed class SystemicGame : IDisposable
             return new(false, new SystemicTickFailure(exception.Data["Systemic.SystemId"] as string,
                 attemptedTick, exception is WorldCommitCallbackException
                     && !SystemicTickCommitState.IsNestedCommit(exception), exception));
+        }
+    }
+
+    private void RegisterStatefulRollback(WorldTransaction transaction)
+    {
+        for (var index = 0; index < StatefulExtensions.Count; index++)
+        {
+            var extension = StatefulExtensions[index];
+            // Kernel populations, rule history, the clock and the event engine journal their own
+            // changes, so only domain state that is not journalled needs a snapshot.
+            if (extension is ISaveOnlyStateExtension)
+            {
+                continue;
+            }
+
+            if (extension is ISystemicReusableTransactionalState reusable)
+            {
+                var snapshot = reusable.CaptureTransactionSnapshot();
+                transaction.OnRollback(snapshot.OnRollback);
+                transaction.OnCommit(snapshot.OnCommit);
+            }
+            else if (extension is ISystemicTransactionalState participant)
+            {
+                RegisterInMemoryRollback(transaction, participant);
+            }
+            else
+            {
+                RegisterJsonRollback(transaction, extension);
+            }
         }
     }
 
@@ -1100,7 +1750,8 @@ internal sealed class SystemicSystemBridge(
     ISystemicSystem system,
     SystemicSystemContext stepContext,
     SystemicTickStats.Measurement measurement,
-    DeferredFactQueue deferredFacts) : IScheduledKernelSystem
+    DeferredFactQueue deferredFacts,
+    SystemicEventQueue events) : IScheduledKernelSystem
 {
     private readonly ISystemicSystem _system = system;
     private readonly SystemicSystemContext _stepContext = stepContext;
@@ -1110,10 +1761,11 @@ internal sealed class SystemicSystemBridge(
     public string Id => _system.Id;
     public IReadOnlyList<SystemAccess> Access => _system.Access;
     public DeferredFactQueue DeferredFacts => deferredFacts;
+    public SystemicEventQueue Events => events;
 
     public void Execute(ScheduledSystemContext context)
     {
-        _stepContext.Prepare(context, _canWriteWorld, _canDeferWorldWrites, deferredFacts);
+        _stepContext.Prepare(context, _canWriteWorld, _canDeferWorldWrites, deferredFacts, events);
         var start = Stopwatch.GetTimestamp();
         var allocated = GC.GetAllocatedBytesForCurrentThread();
         try
@@ -1139,4 +1791,48 @@ internal sealed record FactObserverRegistration(int Order, int RegistrationOrder
 internal sealed class DeferredFactQueue
 {
     public List<SimulationFact> Facts { get; } = [];
+}
+
+/// <summary>One system's typed events waiting for the end-of-tick dispatch.</summary>
+internal sealed class SystemicEventQueue
+{
+    public List<ISystemicEvent> Events { get; } = [];
+}
+
+/// <summary>Ordered command input carried by a save: type, payload, tick, and acceptance.</summary>
+/// <remarks>
+/// Commands execute only between ticks, so records stamped with the same tick belong to one
+/// inter-tick window and their sequence orders them within it. The journal keeps the most recent
+/// <see cref="Capacity"/> records so save size stays bounded.
+/// </remarks>
+internal sealed class CommandJournalStatefulExtension : ISaveOnlyStateExtension
+{
+    public const string ExtensionId = "systemic.commands";
+    internal const int Capacity = 4096;
+    private readonly List<SystemicCommandRecord> _records = [];
+    private int _nextSequence;
+
+    public string Id => ExtensionId;
+    public IReadOnlyList<SystemicCommandRecord> Records => _records;
+
+    public void Append(int tick, string commandType, JsonElement payload, bool accepted)
+    {
+        if (_records.Count == Capacity)
+        {
+            _records.RemoveAt(0);
+        }
+
+        _records.Add(new SystemicCommandRecord(tick, _nextSequence++, commandType, accepted, payload));
+    }
+
+    public JsonElement CaptureState() => JsonSerializer.SerializeToElement(
+        _records.ToArray(), SystemicSaveJsonContext.Default.SystemicCommandRecordArray);
+
+    public void RestoreState(JsonElement state)
+    {
+        _records.Clear();
+        _records.AddRange(state.Deserialize(SystemicSaveJsonContext.Default.SystemicCommandRecordArray)
+            ?? []);
+        _nextSequence = _records.Count == 0 ? 0 : _records[^1].Sequence + 1;
+    }
 }

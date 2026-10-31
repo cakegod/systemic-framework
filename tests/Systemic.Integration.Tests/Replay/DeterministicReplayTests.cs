@@ -60,6 +60,36 @@ public sealed class DeterministicReplayTests
     }
 
     [Fact]
+    public void ModuleVersionsTravelWithTheReplayAndADifferentCompositionFailsVerification()
+    {
+        var versions = new Dictionary<string, int> { ["test.game"] = 3 };
+        var recorder = new ReplayRecorder(new CounterTarget(5, Fingerprint) { ModuleVersions = versions });
+        recorder.RecordTick([]);
+        var artifact = recorder.Finish();
+
+        Assert.Equal(3, artifact.ModuleVersions["test.game"]);
+        var restored = ReplayCodec.Deserialize(ReplayCodec.Serialize(artifact));
+        Assert.Equal(3, restored.ModuleVersions["test.game"]);
+        Assert.Null(ReplayRunner.Verify(artifact,
+            new CounterTarget(5, Fingerprint) { ModuleVersions = versions }).Mismatch);
+
+        var changed = ReplayRunner.Verify(artifact, new CounterTarget(5, Fingerprint)
+        {
+            ModuleVersions = new Dictionary<string, int> { ["test.game"] = 4 },
+        });
+        Assert.False(changed.Success);
+        Assert.Equal("moduleVersion", changed.Mismatch!.Code);
+
+        // A replay recorded with modules must not verify against a host that composes none.
+        Assert.False(ReplayRunner.Verify(artifact, new CounterTarget(5, Fingerprint)).Success);
+        var other = restored with
+        {
+            ModuleVersions = ImmutableDictionary<string, int>.Empty.Add("test.game", 4),
+        };
+        Assert.Equal("moduleVersion", ReplayDiff.Compare(artifact, other)!.Code);
+    }
+
+    [Fact]
     public void RunnerReportsTheFirstDivergentTickAndNeverAppliesLaterInputs()
     {
         var recorder = new ReplayRecorder(new CounterTarget(3, Fingerprint));
@@ -224,6 +254,8 @@ public sealed class DeterministicReplayTests
         public int Value { get; set; }
         public int DriftAtTick { get; init; } = -1;
         public int InputCount { get; private set; }
+        public IReadOnlyDictionary<string, int> ModuleVersions { get; init; } =
+            ImmutableDictionary<string, int>.Empty;
         public void ApplyInput(ReplayInput input)
         {
             InputCount++;
@@ -284,5 +316,5 @@ public sealed class DeterministicReplayTests
 
 internal static class HostReplayFixture
 {
-    public const string Json = """{"version":1,"seed":41,"contentFingerprint":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","initialTick":0,"initialStateHash":"92da6c73b8418260316203abeb04ff436426d8f81253cef6290685799c596c6c","ticks":[{"tick":1,"inputs":[{"type":"add","value":2}],"stateHash":"8ee4ee1a04d4b8b24afbc691e85bea0c841022ce8f9988b4c7f81a6c0eb60682"},{"tick":2,"inputs":[],"stateHash":"6e52be43c47924ec24b712cfc438fa640ccc6c307c70e202c43a8bf3e23d4f9c"},{"tick":3,"inputs":[{"type":"add","value":1}],"stateHash":"57e41b16f9d8d86654cbe40eddae70c0c7229a1bac8b7d5c71ae6632d67d7b5b"}]}""";
+    public const string Json = """{"version":1,"seed":41,"contentFingerprint":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","initialTick":0,"initialStateHash":"ed731ccc0858712c42e829156410260aba96d11ce7c8eaaef90d54f77b2805c1","ticks":[{"tick":1,"inputs":[{"type":"add","value":2}],"stateHash":"8a1f5b6a955fdb223182dfed4c525d1f11b199481ca71810d4f1150ecc7e1d06"},{"tick":2,"inputs":[],"stateHash":"415e9ba07a023ff93c5a927b8c733e27bebac3c3aea6b269af82419d1cf020a8"},{"tick":3,"inputs":[{"type":"add","value":1}],"stateHash":"14cc5070febd7cb13a5449b621f8232a219ff50bbddb63e290b331cd4213c44b"}]}""";
 }

@@ -116,7 +116,8 @@ Optional declarative presentation lives in `ui.json`, `visuals.json`, and
 JSON path.
 
 `rules.json` is a legacy reference format. New packs do not have one. Do not add conditions,
-effects, schedules, expressions, or facts to it.
+effects, schedules, expressions, or facts to it. A pack without `rules.json` loads with an
+empty rule set and still validates its entities and tuning data.
 
 Behavior lives in a game module:
 
@@ -130,10 +131,17 @@ public sealed class GameModule : ISystemicGameModule
     {
         builder.AddSystem(new EconomySystem());
         builder.AddSystem(new ChoiceSystem());
-        builder.AddCommand<SelectChoice, SelectChoiceHandler>("select-choice");
+        builder.AddCommand<SelectChoice, SelectChoiceHandler>();
+        builder.BindUiAction<SelectChoice>("select", action =>
+            new SelectChoice(action.OwnerEntityId));
+        builder.AddEvent<ChoiceSelected, ChoicePresentation>();
     }
 }
 ```
+
+Typed commands run in their own World transaction. UI actions resolve to a bound command;
+the click does not become a rule fact. Typed events dispatch in registration order with a
+read-only World view. A UI binding whose command has no handler fails when the game builds.
 
 A talent is data plus a small function:
 
@@ -170,8 +178,9 @@ Systems are stateless; timers, cooldowns, ranks, and counters live in the World.
 determinism analyzer applies to game systems.
 
 `verify` checks that two fresh runs finish with the same hash and that a save restores to
-that hash. `replay record` and `replay verify` compare hashes on every tick. Save and replay
-include the game module version; a behavior change rejects stale state.
+that hash. `replay record` and `replay verify` compare hashes on every tick. Saves carry the
+game module and content module versions, so a behavior change rejects stale state and names
+the module and both versions.
 
 ## Samples
 
@@ -180,6 +189,7 @@ include the game module version; a behavior change rejects stale state.
 | [`systemic-sandbox`](samples/systemic-sandbox) | A legacy Core-only rule pack | `systemic validate samples/systemic-sandbox` |
 | [`pattern-pack`](samples/pattern-pack) | Legacy rule fragments; superseded by game-side patterns | `systemic validate samples/pattern-pack` |
 | [`incremental-quarry`](samples/incremental-quarry) | Incremental, Presentation and Gameplay2D composed in one pack | `systemic validate samples/incremental-quarry` |
+| [`module-pack`](samples/module-pack) | A code-first game module over a pack with no rules file | `dotnet test tests/Systemic.ModulePack.Tests` |
 | [`boids-monogame`](samples/boids-monogame/README.md) | 100,000 boids on the scheduled path | `dotnet run -c Release --project samples/boids-monogame/Boids.MonoGame.csproj` |
 | [`glow-garden`](samples/glow-garden/README.md) | A playable incremental colony | `dotnet run -c Release --project samples/glow-garden` |
 | [`pixel-mine`](samples/pixel-mine/README.md) | A playable procedural mine | `dotnet run -c Release --project samples/pixel-mine/PixelMine.csproj` |

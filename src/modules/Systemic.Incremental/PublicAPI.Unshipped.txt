@@ -1,1 +1,2 @@
 #nullable enable
+Systemic.Incremental.IncrementalContentModule.Version.get -> int

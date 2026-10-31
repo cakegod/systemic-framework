@@ -4,7 +4,7 @@
   "title": "Systemic game project",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "id", "name", "tickRateHz", "maxCatchUpSteps", "rules", "entities"],
+  "required": ["schemaVersion", "id", "name", "tickRateHz", "maxCatchUpSteps", "entities"],
   "properties": {
     "schemaVersion": { "type": "integer" },
     "id": { "$ref": "#/$defs/id" },

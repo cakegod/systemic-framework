@@ -63,17 +63,24 @@ public static partial class ContentPackLoader
             throw new ContentPackException(diagnostics);
         }
 
-        var gameRules = game.Rules.GetString()!;
+        string? gameRules;
+        using (var rawGame = JsonDocument.Parse(gameBytes))
+        {
+            gameRules = rawGame.RootElement.TryGetProperty("rules"u8, out var rulesElement)
+                ? rulesElement.GetString()
+                : null;
+        }
+
         var gameEntities = game.Entities.GetString()!;
         var gameModules = ReadModuleDeclarations(gameBytes);
 
         byte[] rulesBytes = [];
-        var rulesRead = TryCompile(root, gameRules, "$.rules", diagnostics, () =>
+        var rulesRead = gameRules is null || TryCompile(root, gameRules, "$.rules", diagnostics, () =>
         {
             rulesBytes = ReadRulesBytes(ResolveContentPath(root, gameRules), gameRules, RulesSchemaId,
                 s_rulesSchema, fingerprint);
         });
-        using var rulesDocument = rulesRead && rulesBytes.Length > 0
+        using var rulesDocument = rulesRead && gameRules is not null && rulesBytes.Length > 0
             ? Corvus.Text.Json.ParsedJsonDocument<RulesContentFile>.Parse(rulesBytes)
             : null;
         var rulesFile = rulesDocument?.RootElement;
@@ -95,8 +102,9 @@ public static partial class ContentPackLoader
                 () => tuningDocuments = moduleRegistry.CompileTunings(entitiesBytes, gameEntities, entities));
         }
         var rules = rulesFile is null
-            ? null
-            : TryCompileAt(root, gameRules, "$.rules", diagnostics, () => CompileRules(rulesFile.Value, entities));
+            ? new CompiledRuleSet(Array.Empty<CompiledRule>())
+            : TryCompileAt(root, gameRules!, "$.rules", diagnostics, () => CompileRules(rulesFile.Value, entities))
+                ?? new CompiledRuleSet(Array.Empty<CompiledRule>());
 
         if (diagnostics.Count > 0)
         {
@@ -111,12 +119,12 @@ public static partial class ContentPackLoader
             references.Add("entity", entity.Id, gameEntities);
         }
 
-        var moduleContext = new ContentModuleContext(root, manifest, entities, rules!, references,
+        var moduleContext = new ContentModuleContext(root, manifest, entities, rules, references,
             gameEntities, gameRules)
         { Fingerprint = fingerprint };
         var modules = moduleRegistry.CompileDeclared(moduleContext, gameModules);
         references.ValidateRequired();
-        return new ContentPack(root, manifest, rules!, entities, modules)
+        return new ContentPack(root, manifest, rules, entities, modules)
         {
             ContentFingerprint = fingerprint.Finish(),
             TuningDocuments = tuningDocuments,

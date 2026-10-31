@@ -21,6 +21,16 @@ public static class ReplayCodec
             writer.WriteString("contentFingerprint"u8, artifact.ContentFingerprint);
             writer.WriteNumber("initialTick"u8, artifact.InitialTick);
             writer.WriteString("initialStateHash"u8, artifact.InitialStateHash);
+            if (!artifact.ModuleVersions.IsEmpty)
+            {
+                writer.WriteStartObject("modules"u8);
+                foreach (var (moduleId, version) in artifact.ModuleVersions
+                    .OrderBy(pair => pair.Key, StringComparer.Ordinal))
+                {
+                    writer.WriteNumber(moduleId, version);
+                }
+                writer.WriteEndObject();
+            }
             writer.WriteStartArray("ticks"u8);
             foreach (var tick in artifact.Ticks)
             {
@@ -57,15 +67,30 @@ public static class ReplayCodec
         {
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
-            RequireFields(root, "version", "seed", "contentFingerprint", "initialTick", "initialStateHash", "ticks");
+            RequireFields(root, ["version", "seed", "contentFingerprint", "initialTick", "initialStateHash", "ticks"],
+                ["modules"]);
+            var modules = ImmutableDictionary.CreateBuilder<string, int>(StringComparer.Ordinal);
+            if (root.TryGetProperty("modules"u8, out var modulesElement))
+            {
+                foreach (var module in modulesElement.EnumerateObject())
+                {
+                    if (module.Value.ValueKind != JsonValueKind.Number
+                        || !module.Value.TryGetInt32(out var version) || version < 0
+                        || string.IsNullOrWhiteSpace(module.Name) || !modules.TryAdd(module.Name, version))
+                    {
+                        throw new ArgumentException("Replay module versions are invalid.");
+                    }
+                }
+            }
+
             var ticks = ImmutableArray.CreateBuilder<ReplayTick>();
             foreach (var tick in root.GetProperty("ticks"u8).EnumerateArray())
             {
-                RequireFields(tick, "tick", "inputs", "stateHash");
+                RequireFields(tick, ["tick", "inputs", "stateHash"]);
                 var inputs = ImmutableArray.CreateBuilder<ReplayInput>();
                 foreach (var input in tick.GetProperty("inputs"u8).EnumerateArray())
                 {
-                    RequireFields(input, "type", "value");
+                    RequireFields(input, ["type", "value"]);
                     inputs.Add(new ReplayInput(input.GetProperty("type"u8).GetString()!, input.GetProperty("value"u8).GetRawText()));
                 }
                 ticks.Add(new ReplayTick(tick.GetProperty("tick"u8).GetInt32(), inputs.ToImmutable(),
@@ -73,7 +98,10 @@ public static class ReplayCodec
             }
             var result = new ReplayArtifact(root.GetProperty("version"u8).GetInt32(), root.GetProperty("seed"u8).GetInt32(),
                 root.GetProperty("contentFingerprint"u8).GetString()!, root.GetProperty("initialTick"u8).GetInt32(),
-                root.GetProperty("initialStateHash"u8).GetString()!, ticks.ToImmutable());
+                root.GetProperty("initialStateHash"u8).GetString()!, ticks.ToImmutable())
+            {
+                ModuleVersions = modules.ToImmutable(),
+            };
             Validate(result);
             return result;
         }
@@ -88,7 +116,9 @@ public static class ReplayCodec
     {
         ArgumentNullException.ThrowIfNull(artifact);
         if (artifact.Version != 1 || artifact.InitialTick < 0 || !ReplayStateHash.Valid(artifact.ContentFingerprint)
-            || !ReplayStateHash.Valid(artifact.InitialStateHash) || artifact.Ticks.IsDefault || artifact.Ticks.Length > 1_000_000)
+            || !ReplayStateHash.Valid(artifact.InitialStateHash) || artifact.Ticks.IsDefault || artifact.Ticks.Length > 1_000_000
+            || artifact.ModuleVersions is null || artifact.ModuleVersions.Any(pair =>
+                string.IsNullOrWhiteSpace(pair.Key) || pair.Value < 0))
         {
             throw new ArgumentException("Replay metadata is invalid.", nameof(artifact));
         }
@@ -104,14 +134,19 @@ public static class ReplayCodec
         }
     }
 
-    private static void RequireFields(JsonElement element, params string[] fields)
+    private static void RequireFields(JsonElement element, string[] required, string[]? optional = null)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
             throw new ArgumentException("Replay field must be an object.");
         }
 
-        var allowed = new HashSet<string>(fields, StringComparer.Ordinal);
+        var allowed = new HashSet<string>(required, StringComparer.Ordinal);
+        if (optional is not null)
+        {
+            allowed.UnionWith(optional);
+        }
+
         var found = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in element.EnumerateObject())
         {
@@ -121,7 +156,7 @@ public static class ReplayCodec
             }
         }
 
-        if (found.Count != allowed.Count)
+        if (required.Any(field => !found.Contains(field)))
         {
             throw new ArgumentException("Replay object is missing a required property.");
         }

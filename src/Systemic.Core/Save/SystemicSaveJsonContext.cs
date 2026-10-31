@@ -14,6 +14,7 @@ namespace Systemic.Save;
 [JsonSerializable(typeof(PropertyGrant[]))]
 [JsonSerializable(typeof(DrawStreamSnapshot))]
 [JsonSerializable(typeof(RuleHistoryState))]
+[JsonSerializable(typeof(Systemic.Host.SystemicCommandRecord[]))]
 [JsonSerializable(typeof(PopulationWorldState))]
 [JsonSerializable(typeof(FixedStepClockState))]
 [JsonSerializable(typeof(Dictionary<string, int>))]

@@ -114,7 +114,8 @@ path. Load the pack after every content edit.
   performance hint.
 - Do not edit generated population code. Change the schema and rebuild.
 - Keep save and replay deterministic. If a change affects state or behavior, update the
-  module version and the hash comparison.
+  hash comparison and bump the module version; a save or replay with a different module
+  version is rejected.
 - Do not weaken or skip tests to make a change pass.
 
 ## File map
@@ -134,10 +135,10 @@ path. Load the pack after every content edit.
   path in the message.
 - `Unknown content entity` means a game command or system names an entity that is not in
   `entities.json`.
-- A save fingerprint mismatch means the content or game module version changed after the
-  save. Create a new save or add a migration.
-- A replay mismatch means the same seed, inputs, and module version produced different
-  state. Do not update the expected hash without finding the cause.
+- A save fingerprint mismatch means the content changed after the save (1.20 adds a game
+  module version mismatch). Create a new save or add a migration.
+- A replay mismatch means the same seed and inputs produced different state. Do not update
+  the expected hash without finding the cause.
 - `SYSACC` diagnostics mean the system's declared access does not match its actual column or
   World use.
 - `SYSDET` diagnostics mean simulation code uses a float, ambient time, or unordered

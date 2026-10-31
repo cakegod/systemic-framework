@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Systemic.Host;
-using Systemic.Kernel;
 using Xunit;
 using static Systemic.Tests.Talents.TalentTestSupport;
 

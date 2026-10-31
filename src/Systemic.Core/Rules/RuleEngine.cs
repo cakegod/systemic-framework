@@ -57,21 +57,71 @@ public readonly struct SimulationFactEmitter
 {
     private readonly RuleEngine? _engine;
     private readonly long _generation;
+    private readonly bool _commitImmediately;
 
     internal SimulationFactEmitter(RuleEngine engine, long generation)
     {
         _engine = engine;
         _generation = generation;
+        _commitImmediately = false;
     }
+
+    // WHY: a rules-free host has no dispatch transaction, so an observer's on-commit action has
+    // nothing to wait for. Run it when the host delivers the fact instead of dropping it.
+    internal SimulationFactEmitter(bool commitImmediately) : this() =>
+        _commitImmediately = commitImmediately;
 
     public bool Enqueue(SimulationFact fact) => _engine?.TryEnqueue(_generation, fact) ?? false;
 
     /// <summary>Schedules a side effect only if the enclosing fact dispatch commits.</summary>
-    public bool OnCommit(Action action) => _engine?.TryRegisterCommitCallback(_generation, action) ?? false;
+    public bool OnCommit(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (_engine is not null)
+        {
+            return _engine.TryRegisterCommitCallback(_generation, action);
+        }
+
+        if (_commitImmediately)
+        {
+            action();
+            return true;
+        }
+
+        return false;
+    }
 
 }
 
 public delegate void SimulationFactObserver(SimulationFact fact, SimulationFactEmitter emitter);
+
+/// <summary>Checks a fact before it enters any dispatch path.</summary>
+/// <remarks>
+/// WHY: the engine used to own this validation. Keeping it outside the engine means a rules-free
+/// host rejects the same malformed input, and deleting the engine in 1.26 cannot delete validation.
+/// </remarks>
+internal static class SimulationFactValidation
+{
+    public static void Validate(SimulationFact fact)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fact.Type);
+        if (fact.Depth < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fact), fact.Depth, "Fact depth must not be negative.");
+        }
+
+        if (!fact.HasValidAddress)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fact),
+                "A fact must name both a source and a target entity, or exactly one live population row.");
+        }
+
+        if (!double.IsFinite(fact.Amount))
+        {
+            throw new ArgumentOutOfRangeException(nameof(fact), fact.Amount, "Fact amount must be finite.");
+        }
+    }
+}
 
 /// <summary>Counts from one per-row rule scan.</summary>
 /// <param name="RowsEvaluated">Rows the scan visited.</param>

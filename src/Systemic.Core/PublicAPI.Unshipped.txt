@@ -132,3 +132,112 @@ Systemic.Rules.RuleConditionKind.Query = 4 -> Systemic.Rules.RuleConditionKind
 Systemic.Host.HeadlessSystemicHost.Dispose() -> void
 Systemic.Host.SystemicGameBuilder.AddRuleAction(string! name, Systemic.Rules.RuleActionHandler! handler) -> Systemic.Host.SystemicGameBuilder!
 Systemic.Rules.CompiledRuleSet.WithActions(System.Collections.Generic.IReadOnlyDictionary<string!, Systemic.Rules.RuleActionHandler!>! actions) -> Systemic.Rules.CompiledRuleSet!
+Systemic.Host.ISystemicCommand
+Systemic.Host.ISystemicCommandHandler<TCommand>
+Systemic.Host.ISystemicCommandHandler<TCommand>.Handle(TCommand command, Systemic.Host.SystemicCommandContext! context) -> void
+Systemic.Host.ISystemicGameModule
+Systemic.Host.ISystemicGameModule.Compose(Systemic.Host.SystemicGameBuilder! builder) -> void
+Systemic.Host.SystemicCommandContext
+Systemic.Host.SystemicCommandContext.Commands.get -> Systemic.Kernel.WorldCommandBuffer
+Systemic.Host.SystemicCommandContext.GetService<TService>() -> TService
+Systemic.Host.SystemicCommandContext.Tick.get -> int
+Systemic.Host.SystemicCommandContext.World.get -> Systemic.Kernel.ReadOnlyWorldView
+Systemic.Host.SystemicGame.Execute<TCommand>(TCommand command) -> Systemic.Host.SystemicCommandOutcome
+Systemic.Host.SystemicGame.ModuleVersions.get -> System.Collections.Immutable.ImmutableDictionary<string!, int>!
+Systemic.Host.SystemicGameBuilder.AddCommand<TCommand>(Systemic.Host.ISystemicCommandHandler<TCommand>! handler) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.AddCommand<TCommand, THandler>() -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.AddModule(Systemic.Host.ISystemicGameModule! module) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.AddModule<TModule>() -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.ISystemicEvent
+Systemic.Host.ISystemicEventHandler<TEvent>
+Systemic.Host.ISystemicEventHandler<TEvent>.Handle(TEvent event, Systemic.Host.SystemicEventContext! context) -> void
+Systemic.Host.SystemicEventContext
+Systemic.Host.SystemicEventContext.GetService<TService>() -> TService
+Systemic.Host.SystemicEventContext.Tick.get -> int
+Systemic.Host.SystemicEventContext.World.get -> Systemic.Kernel.ReadOnlyWorldView
+Systemic.Host.SystemicUiAction
+Systemic.Host.SystemicUiAction.ActionId.get -> string!
+Systemic.Host.SystemicUiAction.ActionId.init -> void
+Systemic.Host.SystemicUiAction.Amount.get -> int
+Systemic.Host.SystemicUiAction.Amount.init -> void
+Systemic.Host.SystemicUiAction.Deconstruct(out string! LayoutId, out string! ActionId, out int OwnerEntityId, out int Amount) -> void
+Systemic.Host.SystemicUiAction.Equals(Systemic.Host.SystemicUiAction other) -> bool
+Systemic.Host.SystemicUiAction.LayoutId.get -> string!
+Systemic.Host.SystemicUiAction.LayoutId.init -> void
+Systemic.Host.SystemicUiAction.OwnerEntityId.get -> int
+Systemic.Host.SystemicUiAction.OwnerEntityId.init -> void
+Systemic.Host.SystemicUiAction.SystemicUiAction() -> void
+Systemic.Host.SystemicUiAction.SystemicUiAction(string! LayoutId, string! ActionId, int OwnerEntityId, int Amount) -> void
+static Systemic.Host.SystemicUiAction.operator !=(Systemic.Host.SystemicUiAction left, Systemic.Host.SystemicUiAction right) -> bool
+static Systemic.Host.SystemicUiAction.operator ==(Systemic.Host.SystemicUiAction left, Systemic.Host.SystemicUiAction right) -> bool
+~override Systemic.Host.SystemicUiAction.Equals(object obj) -> bool
+override Systemic.Host.SystemicUiAction.GetHashCode() -> int
+~override Systemic.Host.SystemicUiAction.ToString() -> string
+Systemic.Host.SystemicGame.Emit<TEvent>(TEvent event) -> void
+Systemic.Host.SystemicGame.Execute(Systemic.Host.ISystemicCommand! command) -> Systemic.Host.SystemicCommandOutcome
+Systemic.Host.SystemicGame.TryExecuteUiAction(Systemic.Host.SystemicUiAction action) -> bool
+Systemic.Host.SystemicGameBuilder.AddEvent<TEvent>(Systemic.Host.ISystemicEventHandler<TEvent>! handler) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.AddEvent<TEvent, THandler>() -> Systemic.Host.SystemicGameBuilder!
+Systemic.Host.SystemicGameBuilder.BindUiAction<TCommand>(string! actionId, System.Func<Systemic.Host.SystemicUiAction, TCommand>! createCommand) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Ui.ISystemicUiActionCatalog
+*REMOVED*static Systemic.Host.SystemicGame.FromDirectory(string! rootDirectory, int seed, double valueScale = 1) -> Systemic.Host.SystemicGameBuilder!
+*REMOVED*static Systemic.Save.SystemicSaveMigration.Upgrade(string! json, int targetVersion, System.Collections.Generic.IEnumerable<Systemic.Save.ISaveMigration!>! migrations) -> string!
+static Systemic.Save.SystemicSaveMigration.Migrate(string! json, int targetVersion, System.Collections.Generic.IEnumerable<Systemic.Save.ISaveMigration!>! migrations) -> string!
+Systemic.Ui.ISystemicUiActionCatalog.DeclaresAction(string! actionId) -> bool
+~override Systemic.Host.SystemicCommandOutcome.Equals(object obj) -> bool
+override Systemic.Host.SystemicCommandOutcome.GetHashCode() -> int
+~override Systemic.Host.SystemicCommandOutcome.ToString() -> string
+override Systemic.Host.SystemicCommandRecord.Equals(object? obj) -> bool
+override Systemic.Host.SystemicCommandRecord.GetHashCode() -> int
+override Systemic.Host.SystemicCommandRecord.ToString() -> string!
+static Systemic.Host.SystemicCommandOutcome.operator !=(Systemic.Host.SystemicCommandOutcome left, Systemic.Host.SystemicCommandOutcome right) -> bool
+static Systemic.Host.SystemicCommandOutcome.operator ==(Systemic.Host.SystemicCommandOutcome left, Systemic.Host.SystemicCommandOutcome right) -> bool
+static Systemic.Host.SystemicCommandOutcome.Rejected(string! reason) -> Systemic.Host.SystemicCommandOutcome
+static Systemic.Host.SystemicCommandOutcome.Succeeded.get -> Systemic.Host.SystemicCommandOutcome
+static Systemic.Host.SystemicCommandOutcome.Unhandled.get -> Systemic.Host.SystemicCommandOutcome
+static Systemic.Host.SystemicCommandRecord.operator !=(Systemic.Host.SystemicCommandRecord? left, Systemic.Host.SystemicCommandRecord? right) -> bool
+static Systemic.Host.SystemicCommandRecord.operator ==(Systemic.Host.SystemicCommandRecord? left, Systemic.Host.SystemicCommandRecord? right) -> bool
+static Systemic.Host.SystemicGame.FromDirectory(string! rootDirectory, int seed, double valueScale = 1, Systemic.Content.ContentModuleRegistry? moduleRegistry = null) -> Systemic.Host.SystemicGameBuilder!
+Systemic.Content.ISystemicContentModule.Version.get -> int
+Systemic.Content.MaterializedContentWorld.ModuleVersions.get -> System.Collections.Immutable.ImmutableDictionary<string!, int>!
+Systemic.Content.MaterializedContentWorld.ModuleVersions.init -> void
+Systemic.Extensions.ISystemicExtensionModule.Version.get -> int
+Systemic.Host.SystemicCommandContext.IsRejected.get -> bool
+Systemic.Host.SystemicCommandContext.RejectionReason.get -> string?
+Systemic.Host.SystemicCommandContext.Reject(string! reason) -> void
+Systemic.Host.SystemicCommandOutcome
+Systemic.Host.SystemicCommandOutcome.Accepted.get -> bool
+Systemic.Host.SystemicCommandOutcome.Accepted.init -> void
+Systemic.Host.SystemicCommandOutcome.Deconstruct(out bool Handled, out bool Accepted, out string? Reason) -> void
+Systemic.Host.SystemicCommandOutcome.Equals(Systemic.Host.SystemicCommandOutcome other) -> bool
+Systemic.Host.SystemicCommandOutcome.Handled.get -> bool
+Systemic.Host.SystemicCommandOutcome.Handled.init -> void
+Systemic.Host.SystemicCommandOutcome.Reason.get -> string?
+Systemic.Host.SystemicCommandOutcome.Reason.init -> void
+Systemic.Host.SystemicCommandOutcome.SystemicCommandOutcome(bool Handled, bool Accepted, string? Reason) -> void
+Systemic.Host.SystemicCommandOutcome.SystemicCommandOutcome() -> void
+Systemic.Host.SystemicCommandRecord
+Systemic.Host.SystemicCommandRecord.Accepted.get -> bool
+Systemic.Host.SystemicCommandRecord.Accepted.init -> void
+Systemic.Host.SystemicCommandRecord.<Clone>$() -> Systemic.Host.SystemicCommandRecord!
+Systemic.Host.SystemicCommandRecord.CommandType.get -> string!
+Systemic.Host.SystemicCommandRecord.CommandType.init -> void
+Systemic.Host.SystemicCommandRecord.Deconstruct(out int Tick, out int Sequence, out string! CommandType, out bool Accepted, out System.Text.Json.JsonElement Payload) -> void
+Systemic.Host.SystemicCommandRecord.Payload.get -> System.Text.Json.JsonElement
+Systemic.Host.SystemicCommandRecord.Payload.init -> void
+Systemic.Host.SystemicCommandRecord.Equals(Systemic.Host.SystemicCommandRecord? other) -> bool
+Systemic.Host.SystemicCommandRecord.Sequence.get -> int
+Systemic.Host.SystemicCommandRecord.Sequence.init -> void
+Systemic.Host.SystemicCommandRecord.SystemicCommandRecord(int Tick, int Sequence, string! CommandType, bool Accepted, System.Text.Json.JsonElement Payload) -> void
+Systemic.Replay.HostReplayTarget.ModuleVersions.get -> System.Collections.Generic.IReadOnlyDictionary<string!, int>!
+Systemic.Replay.IReplayTarget.ModuleVersions.get -> System.Collections.Generic.IReadOnlyDictionary<string!, int>!
+Systemic.Host.SystemicCommandContext.EmitEvent<TEvent>(TEvent event) -> void
+Systemic.Replay.ReplayArtifact.ModuleVersions.get -> System.Collections.Immutable.ImmutableDictionary<string!, int>!
+Systemic.Replay.ReplayArtifact.ModuleVersions.init -> void
+Systemic.Host.SystemicCommandRecord.Tick.get -> int
+Systemic.Host.SystemicCommandRecord.Tick.init -> void
+Systemic.Host.SystemicGame.CommandJournal.get -> System.Collections.Generic.IReadOnlyList<Systemic.Host.SystemicCommandRecord!>!
+Systemic.Host.SystemicGame.SupportsRules.get -> bool
+Systemic.Host.SystemicGame.TryExecute<TCommand>(TCommand command, out Systemic.Host.SystemicCommandOutcome outcome) -> bool
+Systemic.Host.SystemicGame.TryExecuteUiAction(Systemic.Host.SystemicUiAction action, out Systemic.Host.SystemicCommandOutcome outcome) -> bool
+Systemic.Host.SystemicSystemContext.EmitEvent<TEvent>(TEvent event) -> void

@@ -225,7 +225,9 @@ save/replay and performance gates, the design is wrong before the 41-talent port
   clone.
 - No talent has its own class, and the framework has no genre type.
 - The second game changes game code and data only, not framework source.
-- Save and replay include the module version and reject stale behavior.
+- Save and replay include the module version and reject stale behavior. Landed in 1.20:
+  saves record every module version in both directions, and replay artifacts carry the
+  composition versions they were recorded against.
 - The rule engine, expression language, rule schema, and rule tests are deleted.
 - 10,000 actors and 50,000 particles hold 60 Hz within the performance contract.
 - A new mechanic is a system or command plus data, not a new JSON primitive.

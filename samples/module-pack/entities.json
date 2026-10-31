@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 2,
+  "entities": [
+    { "id": "forge", "kind": "prop", "properties": { "heat": 0 } }
+  ]
+}

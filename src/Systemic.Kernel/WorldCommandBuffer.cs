@@ -9,6 +9,8 @@ public readonly struct WorldCommandBuffer
     {
     }
 
+    internal void Expire() => _storage?.Expire();
+
     internal WorldCommandBuffer(WorldCommandStorage storage, long generation)
     {
         _storage = storage;

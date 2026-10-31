@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Systemic.Content;
+using Systemic.Ui;
 
 namespace Systemic.Presentation;
 
@@ -50,4 +51,34 @@ public sealed record PresentationModuleContent(
     CompiledVisuals Visuals,
     CompiledUi Ui,
     PresentationCatalog Catalog,
-    ImmutableDictionary<string, string> ChoiceVisualRecipes) : ISystemicModuleContent;
+    ImmutableDictionary<string, string> ChoiceVisualRecipes) : ISystemicModuleContent, ISystemicUiActionCatalog
+{
+    /// <summary>Checks whether any compiled layout declares the action.</summary>
+    /// <param name="actionId">The action ID a game bound to a command.</param>
+    public bool DeclaresAction(string actionId) =>
+        !Ui.Layouts.IsDefaultOrEmpty
+        && Ui.Layouts.Any(layout => DeclaresAction(layout.Root, actionId));
+
+    private static bool DeclaresAction(UiNode node, string actionId)
+    {
+        if (string.Equals(node.Action, actionId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (node.Children.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        foreach (var child in node.Children)
+        {
+            if (DeclaresAction(child, actionId))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

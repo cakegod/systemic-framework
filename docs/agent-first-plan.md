@@ -449,7 +449,8 @@ JSON is data.
 derived cache rebuilt on load.
 
 **D15. Save and replay carry a composition version.** A behavior change invalidates an old
-save or replay unless it migrates.
+save or replay unless it migrates. Targeted in 1.20; until then only the content fingerprint
+is checked.
 
 **D16. Delete the rule engine after migration.** The JSON rule path is legacy. Do not extend
 it, and do not build a typed version of it.

@@ -1,1 +1,3 @@
 #nullable enable
+Systemic.Gameplay2D.Gameplay2DContentModule.Version.get -> int
+Systemic.Gameplay2D.Gameplay2DModule.Version.get -> int

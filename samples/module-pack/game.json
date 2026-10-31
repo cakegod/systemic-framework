@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 3,
+  "id": "sample.module-pack",
+  "name": "Module pack",
+  "tickRateHz": 60,
+  "maxCatchUpSteps": 4,
+  "entities": "entities.json"
+}

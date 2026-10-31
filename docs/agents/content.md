@@ -14,7 +14,10 @@ Optional data lives in `ui.json`, `visuals.json`, and `presentation.json`. Modul
 tuning documents are declared by the module that owns them.
 
 `rules.json` is a legacy reference format. Do not add one to a new pack, and do not add
-conditions, effects, schedules, expressions, or facts to an existing one.
+conditions, effects, schedules, expressions, or facts to an existing one. Omit the `rules`
+property from `game.json` so the loader does not read a rule file at all; a pack that
+declares no rules and no schedules builds a host without a rule engine, and its save carries
+no rule-history state.
 
 Validate after every edit:
 
@@ -42,19 +45,51 @@ what an entity is; use tags, properties, and game code.
 
 ## UI actions are commands
 
-A button declares an action id. The game registers a command handler for that id. The UI
-does not publish a rule fact.
+A button declares an action id. The game registers a command handler for the command type
+and binds the declared action id to a command factory before the game builds. The UI does not
+publish a rule fact.
 
 ```json
 { "type": "button", "text": "Buy x10", "action": "buy", "amount": 10 }
 ```
 
 ```csharp
-builder.AddCommand<BuyCommand, BuyHandler>("buy");
+builder.AddCommand<BuyCommand, BuyHandler>();
+builder.BindUiAction<BuyCommand>("buy", action =>
+    new BuyCommand(action.OwnerEntityId, action.Amount));
 ```
 
-A missing handler is a startup error. A command validates its cost and target, then mutates
-the World. The same command can be invoked by a test, a keyboard binding, or the UI.
+`InvokeUiAction` resolves the clicked node's amount and runs the command. A bound action
+without a registered command handler fails at build, and so does a binding the loaded UI
+modules cannot validate. A layout action with no binding is still published as a fact, so
+presentation and telemetry observers see it; it returns `Handled = false` because no rule
+matched, not because the host dropped it.
+
+A command validates its cost and target, then mutates the World. A command that cannot
+afford or allow the purchase calls `context.Reject("insufficient.funds")` and returns; the
+host rolls the command back and reports `Rejected` with the reason instead of committing.
+The same command can be invoked by a test, a keyboard binding, or the UI once its action
+binding is registered. Every command, accepted or rejected, is appended to the host's
+command journal with its type, serialized payload, last completed tick, and sequence. The
+journal is saved and keeps the most recent 4096 records, so a save records the input that
+produced it without growing without bound.
+
+## Events
+
+Events are typed notifications for presentation, telemetry, and decoupling. A system queues
+one with `context.EmitEvent(...)`; the host dispatches the tick's queue after its deferred
+facts, in system registration order then queue order, inside the tick's transaction. A
+rolled-back tick discards its queue. The outer program can also emit with
+`game.Emit(...)`.
+
+Register handlers on the builder; they run in registration order inside one World
+transaction and receive a read-only World view plus registered services. Simulation
+mutations belong in commands and systems, not event handlers.
+
+```csharp
+builder.AddEvent<Harvested, HarvestPresentation>();
+context.EmitEvent(new Harvested(amount: 7));
+```
 
 ## Game behavior
 
@@ -71,7 +106,7 @@ public sealed class GameModule : ISystemicGameModule
     {
         builder.AddSystem(new EconomySystem());
         builder.AddSystem(new ChoiceSystem());
-        builder.AddCommand<SelectChoice, SelectChoiceHandler>("select-choice");
+        builder.AddCommand<SelectChoice, SelectChoiceHandler>();
     }
 }
 ```
@@ -175,7 +210,9 @@ The pattern library may be opinionated. The framework must not be.
 - Keep stable entity order; use the deterministic World queries.
 - Declare every column and World access a system uses.
 - Keep hot systems allocation-free.
-- Save and replay carry a game module ID and version. A behavior change bumps the version.
+- Save and replay carry a game module and content module ID and version. A behavior or
+  schema change bumps the version, and an old save that no longer matches is rejected with
+  the module and both versions named.
 
 ## Assets
 

@@ -28,7 +28,12 @@ public sealed record CompiledEntities(ImmutableArray<EntityDefinition> Definitio
 public sealed record MaterializedContentWorld(
     World World,
     ImmutableDictionary<string, int> EntityIds,
-    ImmutableDictionary<string, JsonElement>? ExtensionStates = null);
+    ImmutableDictionary<string, JsonElement>? ExtensionStates = null)
+{
+    /// <summary>Game module versions recorded by the save this world was restored from, if any.</summary>
+    public ImmutableDictionary<string, int> ModuleVersions { get; init; } =
+        ImmutableDictionary<string, int>.Empty;
+}
 
 /// <summary>Compiled core content plus opaque content produced by registered optional modules.</summary>
 public sealed record ContentPack(

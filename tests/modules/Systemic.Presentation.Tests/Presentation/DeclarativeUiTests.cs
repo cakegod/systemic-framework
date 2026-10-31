@@ -11,6 +11,18 @@ namespace Systemic.Tests.Presentation;
 public sealed class DeclarativeUiTests
 {
     [Fact]
+    public void AContentRecordWithDefaultLayoutsDeclaresNoActions()
+    {
+        var content = new PresentationModuleContent(
+            new CompiledVisuals(default),
+            new CompiledUi(default),
+            new PresentationCatalog(default, default),
+            ImmutableDictionary<string, string>.Empty);
+
+        Assert.False(content.DeclaresAction("ui.buy"));
+    }
+
+    [Fact]
     public void EvaluatesWorldSelectionAndEventBindingsIntoHostNeutralNodeState()
     {
         var world = new World(seed: 1, valueScale: 1);

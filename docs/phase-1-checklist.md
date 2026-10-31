@@ -13,8 +13,9 @@ genre type, save and replay carry the module version, and the asset sheet and at
 accepted. The legacy JSON rule engine, expression language, and rule schema are deleted.
 
 Status: the old rule-engine work (1.1-1.12) is frozen and scheduled for deletion. The asset
-work (1.13-1.16) remains. Code-first migration starts at 1.17. Every unchecked item is a TDD
-slice: failing test first, smallest implementation to green, then refactor.
+work (1.13-1.16) remains. Code-first migration starts at 1.17; 1.17 through 1.20 are
+complete, and 1.21 is next. Every unchecked item is a TDD slice: failing test first,
+smallest implementation to green, then refactor.
 
 The architecture decision is in
 [ADR 0004](adr/0004-code-first-simulation.md). Behavior is C# systems and commands. JSON is
@@ -62,10 +63,10 @@ replace it.
 
 | ID | Work | Acceptance evidence | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| 1.17 | Game module API: `ISystemicGameModule`, `AddModule`, typed commands, and module version tracking | A template game composes systems and commands; duplicate module IDs fail | 1.6, 1.7 | pending |
-| 1.18 | Typed commands and events: record handlers, deterministic dispatch, UI action binding | A UI button invokes a typed command; a missing handler is a startup error | 1.17 | pending |
-| 1.19 | Data-only content path: `rules.json` optional, no rule compilation for new packs, data validation for entities and tuning | A pack without `rules.json` loads and validates | 1.17 | pending |
-| 1.20 | Save and replay composition version: module ID, version, content fingerprint, mismatch diagnostics | A changed module version rejects an old save with a clear message; replay hashes still match | 1.17, 1.19 | pending |
+| 1.17 | Game module API: `ISystemicGameModule`, `AddModule`, typed commands, and module version tracking | A game module composes systems and commands; duplicate module IDs fail; a failed compose poisons the builder | 1.6, 1.7 | done (`SystemicGameModuleTests`, `samples/module-pack` with `Systemic.ModulePack.Tests`) |
+| 1.18 | Typed commands and events: record handlers, deterministic dispatch, UI action binding | A UI button invokes a typed command; a missing handler or an unvalidatable binding is a startup error; a system emits a typed event that dispatches after the tick and is discarded on rollback | 1.17 | done (`SystemicTypedEventTests`, `UiCommandActionTests`, `SystemicGameModuleTests`) |
+| 1.19 | Data-only content path: `rules.json` optional, no rule compilation or rule engine for new packs, data validation for entities and tuning | A pack with no `rules.json` on disk loads, builds, and steps without a rule engine or rule-history state | 1.17 | done (`ContentPackTests.AContentPackWithNoRulesFileRunsADataOnlyHost`, `SystemicGameModuleTests.APackWithNoRulesRunsWithoutARuleEngine`) |
+| 1.20 | Save and replay composition version: module ID, version, content fingerprint, mismatch diagnostics | A changed game or content module version rejects an old save with a clear message; replay hashes still match | 1.17, 1.19 | done (`SystemicGameModuleTests.AChangedModuleVersionRejectsAnOldSave`, `DeterministicReplayTests.ModuleVersionsTravelWithTheReplayAndADifferentCompositionFailsVerification`, `Systemic.ModulePack.Tests`) |
 | 1.21 | Five-talent host spike: Motivation, Strength In Numbers, Project Constellation, Hiking Buddy, Deals, plus one pattern | Host scenarios with real systems, positive and negative cases, save/load, replay, and p95 measurement | 1.18, 1.19, 1.20 | pending |
 | 1.22 | Port and design-audit the 41-reference corpus as data plus behavior functions | 41/41 host scenarios and expressive-agency notes; each has a competing-choice comparison, two named synergies, and one non-obvious interaction exercised through general rules; numeric-only or clone-only talents redesigned or replaced; no per-talent class; no flag without a consumer; no test-only property | 1.21 | pending |
 | 1.23 | Neutral pattern library: interval emitter, costed mutation, tier combiner, scope reset, tag gate, row worker | Game A and Game B reuse the same patterns without framework changes | 1.21 | pending |

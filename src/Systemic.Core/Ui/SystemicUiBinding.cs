@@ -17,6 +17,14 @@ public readonly record struct SystemicUiBindingValue(bool HasValue, double? Numb
     public static SystemicUiBindingValue FromText(string value) => new(true, null, value);
 }
 
+/// <summary>Reports the actions declared by a loaded UI module so bindings can be validated at build.</summary>
+public interface ISystemicUiActionCatalog
+{
+    /// <summary>Checks whether any layout in this module declares the action.</summary>
+    /// <param name="actionId">The action ID a game bound to a command.</param>
+    bool DeclaresAction(string actionId);
+}
+
 /// <summary>Provides values for module-owned declarative UI bindings without a module reference in Core.</summary>
 public interface ISystemicUiBindingProvider
 {

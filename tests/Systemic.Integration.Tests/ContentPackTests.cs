@@ -65,6 +65,40 @@ public sealed class ContentPackTests
     }
 
     [Fact]
+    public void AContentPackWithoutRulesLoadsAsAnEmptyRuleSet()
+    {
+        using var pack = TestPack.Create();
+        TestPack.RemoveRulesReference(pack.Root);
+        File.WriteAllText(Path.Combine(pack.Root, "rules.json"), "{ this file is intentionally invalid");
+
+        var content = SystemicTestContent.Load(pack.Root);
+
+        Assert.Empty(content.Rules.Rules);
+        Assert.Empty(content.Rules.Schedules);
+    }
+
+    [Fact]
+    public void AContentPackWithNoRulesFileRunsADataOnlyHost()
+    {
+        using var pack = TestPack.CreateWithoutRules();
+
+        var content = SystemicTestContent.Load(pack.Root);
+        using var game = new Systemic.Host.SystemicGameBuilder(content,
+                content.CreateWorld(seed: 3, valueScale: 1))
+            .Build();
+
+        Assert.False(File.Exists(Path.Combine(pack.Root, "rules.json")));
+        Assert.Empty(content.Rules.Rules);
+        Assert.False(game.SupportsRules);
+        Assert.DoesNotContain(game.StatefulExtensions,
+            extension => extension.Id == "systemic.rule-history");
+
+        game.Step();
+
+        Assert.Equal(1, game.World.LogicalTick);
+    }
+
+    [Fact]
     public void RejectsVersionOneContentWithAVersionUpgradeDiagnostic()
     {
         using var pack = TestPack.Create(schemaVersion: 1);
@@ -932,6 +966,37 @@ internal sealed class TestPack : IDisposable
             """);
 
         return new TestPack(root);
+    }
+
+    public static TestPack CreateWithoutRules()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"systemic-pack-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "game.json"), """
+            {
+              "schemaVersion": 3,
+              "id": "sample.dataless",
+              "name": "Dataless",
+              "tickRateHz": 60,
+              "maxCatchUpSteps": 4,
+              "entities": "entities.json"
+            }
+            """);
+        File.WriteAllText(Path.Combine(root, "entities.json"), """
+            { "schemaVersion": 2, "entities": [
+              { "id": "actor", "kind": "actor", "properties": { "heat": 2 } }
+            ] }
+            """);
+        return new TestPack(root);
+    }
+
+    public static void RemoveRulesReference(string root)
+    {
+        var gamePath = Path.Combine(root, "game.json");
+        var json = File.ReadAllText(gamePath);
+        var withoutRules = json.Replace("\"rules\": \"rules.json\",", string.Empty, StringComparison.Ordinal);
+        Assert.NotEqual(json, withoutRules);
+        File.WriteAllText(gamePath, withoutRules);
     }
 
     public static void SetTimelineVisual(TestPack pack, string recipeId) =>
